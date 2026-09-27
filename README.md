@@ -80,6 +80,33 @@ after a reboot.
    endpoint filters by the user's *current* role, so a promoted admin
    never shows up as a manageable owner or contractor.)
 
+## Demo data
+
+`backend/scripts/seed_kuwait_demo.py` populates a running instance with a
+realistic Kuwait-flavored dataset — owners, contractors, and projects
+across every lifecycle state (draft, open, sealed, under evaluation,
+awarded with a review, no-award) plus the admin-moderation states
+(a pending owner, a pending contractor, a suspended contractor, an
+admin-suspended project, and an admin-suspended offer) — everything
+needed to click through the app right after a deploy. It drives the real
+API (not direct DB writes), so it needs an admin account to already
+exist:
+
+```
+cd backend
+pip install requests   # if not already installed
+python scripts/seed_kuwait_demo.py --api-url http://localhost:8000 \
+    --admin-email you@example.com --admin-password 'yourpassword'
+```
+
+Point `--api-url` at wherever the backend is actually reachable (e.g. the
+port `deploy-native.sh` picked on a live server). Safe to run more than
+once for the accounts themselves — an email that already exists just gets
+logged into instead of re-registered — but not for projects/offers, which
+have no natural key to dedupe against and would be created a second time;
+run it once against a database that doesn't already have this demo data.
+Everyone it creates shares the password printed at the end of the run.
+
 ## Running tests
 
 The backend has a real pytest suite under `backend/tests/` — one module per
