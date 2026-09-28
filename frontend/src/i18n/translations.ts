@@ -432,6 +432,7 @@ export interface Dictionary {
       submitted: string;
       revised: string;
       suspendedBadge: string;
+      viewProject: string;
     };
     projects: {
       eyebrow: string;
@@ -975,6 +976,7 @@ export const en: Dictionary = {
       submitted: "Submitted",
       revised: "revised",
       suspendedBadge: "Offer suspended",
+      viewProject: "View full project",
     },
     projects: {
       eyebrow: "Admin · Projects",
@@ -1520,6 +1522,7 @@ export const ar: Dictionary = {
       submitted: "تاريخ التقديم",
       revised: "مُعدَّل",
       suspendedBadge: "العرض موقوف",
+      viewProject: "عرض المشروع كاملاً",
     },
     projects: {
       eyebrow: "المسؤول · المشاريع",

@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/api/client";
@@ -12,8 +13,35 @@ const STATUS_BADGE: Record<string, string> = {
   withdrawn: "bg-border text-steel-light",
 };
 
+interface ProjectGroup {
+  project_id: string;
+  project_title: string;
+  tender_type: string;
+  latest_offer_at: string;
+  offers: AdminOffer[];
+}
+
+// The API returns offers newest-first, not grouped by project (a bid on an
+// older project can be more recent than one on a newer project) -- grouped
+// client-side here rather than asking the backend to change its shape,
+// since nothing else consuming /admin/offers wants it pre-grouped.
+function groupByProject(offers: AdminOffer[]): ProjectGroup[] {
+  const groups = new Map<string, ProjectGroup>();
+  for (const o of offers) {
+    let group = groups.get(o.project_id);
+    if (!group) {
+      group = { project_id: o.project_id, project_title: o.project_title, tender_type: o.tender_type, latest_offer_at: o.created_at, offers: [] };
+      groups.set(o.project_id, group);
+    }
+    group.offers.push(o);
+    if (o.created_at > group.latest_offer_at) group.latest_offer_at = o.created_at;
+  }
+  return Array.from(groups.values()).sort((a, b) => (a.latest_offer_at < b.latest_offer_at ? 1 : -1));
+}
+
 export function AdminOffersPage() {
   const { t } = useI18n();
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const {
     data: offers,
     isError,
@@ -22,6 +50,16 @@ export function AdminOffersPage() {
     queryKey: ["admin-offers"],
     queryFn: () => apiFetch<AdminOffer[]>("/admin/offers"),
   });
+
+  const groups = useMemo(() => (offers ? groupByProject(offers) : []), [offers]);
+
+  const toggle = (projectId: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
 
   return (
     <main className="max-w-5xl mx-auto px-5 py-8">
@@ -36,47 +74,83 @@ export function AdminOffersPage() {
       ) : !offers?.length ? (
         <div className="border border-dashed border-border rounded p-10 text-center text-sm text-steel">{t("admin.offers.empty")}</div>
       ) : (
-        <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr>
-              <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("admin.offers.project")}</th>
-              <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("admin.offers.contractor")}</th>
-              <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("admin.offers.amount")}</th>
-              <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("admin.offers.status")}</th>
-              <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("admin.offers.tenderType")}</th>
-              <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("admin.offers.submitted")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {offers.map((o) => (
-              <tr key={o.id} className="border-b border-border">
-                <td className="py-3 px-2.5">
-                  <Link to={`/admin/projects/${o.project_id}`} className="font-display font-semibold text-[13.5px] text-navy hover:underline">
-                    {o.project_title}
-                  </Link>
-                  {o.revision > 1 && <span className="text-[11px] text-steel-light"> · {t("admin.offers.revised")} x{o.revision - 1}</span>}
-                  {o.is_suspended && (
-                    <span className="ms-1.5 font-mono text-[10px] uppercase px-2 py-0.5 rounded-full bg-red-tint text-red">
-                      {t("admin.offers.suspendedBadge")}
-                    </span>
-                  )}
-                </td>
-                <td className="py-3 px-2.5 text-[13px]">{o.contractor_company_name ?? "—"}</td>
-                <td className="py-3 px-2.5 font-mono font-semibold text-navy text-sm">
-                  {o.amount !== null ? `$${Number(o.amount).toLocaleString()}` : "—"}
-                </td>
-                <td className="py-3 px-2.5">
-                  <span className={`font-mono text-[10px] uppercase px-2 py-0.5 rounded-full ${STATUS_BADGE[o.status] ?? "bg-blue-tint text-steel"}`}>
-                    {o.status}
-                  </span>
-                </td>
-                <td className="py-3 px-2.5 font-mono text-[11px] text-steel-light">{o.tender_type.replace(/_/g, " ")}</td>
-                <td className="py-3 px-2.5 font-mono text-[11px] text-steel-light">{new Date(o.created_at).toLocaleDateString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="grid gap-2.5">
+          {groups.map((g) => {
+            const isOpen = expanded.has(g.project_id);
+            const anySuspended = g.offers.some((o) => o.is_suspended);
+            return (
+              <div key={g.project_id} className="border border-border rounded bg-white overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => toggle(g.project_id)}
+                  aria-expanded={isOpen}
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-blue-tint/20"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`shrink-0 font-mono text-[11px] text-steel transition-transform ${isOpen ? "rotate-90" : ""}`}>▶</span>
+                    <span className="font-display font-semibold text-[14px] text-navy truncate">{g.project_title}</span>
+                    {anySuspended && (
+                      <span className="shrink-0 font-mono text-[10px] uppercase px-2 py-0.5 rounded-full bg-red-tint text-red">
+                        {t("admin.offers.suspendedBadge")}
+                      </span>
+                    )}
+                  </div>
+                  <div className="shrink-0 flex items-center gap-3 font-mono text-[11px] text-steel-light">
+                    <span>{g.tender_type.replace(/_/g, " ")}</span>
+                    <span>{g.offers.length} {t("admin.offers.total")}</span>
+                  </div>
+                </button>
+
+                {isOpen && (
+                  <div className="border-t border-border">
+                    <div className="px-4 pt-2.5">
+                      <Link to={`/admin/projects/${g.project_id}`} className="text-[11.5px] text-navy hover:underline">
+                        {t("admin.offers.viewProject")} →
+                      </Link>
+                    </div>
+                    <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr>
+                          <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left py-2 px-4">{t("admin.offers.contractor")}</th>
+                          <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left py-2 px-2.5">{t("admin.offers.amount")}</th>
+                          <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left py-2 px-2.5">{t("admin.offers.status")}</th>
+                          <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left py-2 px-2.5">{t("admin.offers.submitted")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {g.offers.map((o) => (
+                          <tr key={o.id} className="border-t border-border">
+                            <td className="py-2.5 px-4 text-[13px]">
+                              {o.contractor_company_name ?? "—"}
+                              {o.revision > 1 && <span className="text-[11px] text-steel-light"> · {t("admin.offers.revised")} x{o.revision - 1}</span>}
+                            </td>
+                            <td className="py-2.5 px-2.5 font-mono font-semibold text-navy text-sm">
+                              {o.amount !== null ? `$${Number(o.amount).toLocaleString()}` : "—"}
+                            </td>
+                            <td className="py-2.5 px-2.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`font-mono text-[10px] uppercase px-2 py-0.5 rounded-full ${STATUS_BADGE[o.status] ?? "bg-blue-tint text-steel"}`}>
+                                  {o.status}
+                                </span>
+                                {o.is_suspended && (
+                                  <span className="font-mono text-[10px] uppercase px-2 py-0.5 rounded-full bg-red-tint text-red">
+                                    {t("admin.offers.suspendedBadge")}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-2.5 font-mono text-[11px] text-steel-light">{new Date(o.created_at).toLocaleDateString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </main>

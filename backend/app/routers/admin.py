@@ -942,6 +942,8 @@ def list_all_offers(db: Session = Depends(get_db)):
             "timeline_estimate": o.timeline_estimate,
             "status": o.status,
             "revision": o.revision,
+            "is_suspended": o.is_suspended,
+            "message": o.message,
             "created_at": o.created_at,
             "updated_at": o.updated_at,
         }
