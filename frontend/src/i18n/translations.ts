@@ -974,7 +974,7 @@ export const en: Dictionary = {
       tenderType: "Tender type",
       submitted: "Submitted",
       revised: "revised",
-      suspendedBadge: "Suspended",
+      suspendedBadge: "Offer suspended",
     },
     projects: {
       eyebrow: "Admin · Projects",
@@ -1034,7 +1034,7 @@ export const en: Dictionary = {
       deleteOfferError: "Could not delete this offer.",
       deleteOfferConfirm: "Permanently delete this offer? This can't be undone.",
       deleteOfferBlocked: "This offer was awarded — suspend it instead of deleting it.",
-      offerSuspendedBadge: "Suspended",
+      offerSuspendedBadge: "Offer suspended",
     },
     requirements: {
       eyebrow: "Admin · Document requirements",
@@ -1519,7 +1519,7 @@ export const ar: Dictionary = {
       tenderType: "نوع العطاء",
       submitted: "تاريخ التقديم",
       revised: "مُعدَّل",
-      suspendedBadge: "موقوف",
+      suspendedBadge: "العرض موقوف",
     },
     projects: {
       eyebrow: "المسؤول · المشاريع",
@@ -1579,7 +1579,7 @@ export const ar: Dictionary = {
       deleteOfferError: "تعذر حذف هذا العرض.",
       deleteOfferConfirm: "هل تريد حذف هذا العرض نهائيًا؟ لا يمكن التراجع عن هذا.",
       deleteOfferBlocked: "تمت ترسية هذا العرض — أوقفه بدلاً من حذفه.",
-      offerSuspendedBadge: "موقوف",
+      offerSuspendedBadge: "العرض موقوف",
     },
     requirements: {
       eyebrow: "المسؤول · متطلبات المستندات",
