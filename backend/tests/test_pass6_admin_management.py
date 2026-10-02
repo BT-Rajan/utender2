@@ -47,7 +47,13 @@ def test_pass6_admin_management():
     r = admin_client.post("/admin/requirements", json={"name": "Insurance certificate", "description": "Proof of liability coverage.", "is_required": False})
     check("requirement created (optional)", r.status_code == 201)
     requirement_id = r.json()["id"]
-    original_effective_from = r.json()["effective_from"]
+    # Back-date the original so the bump below is distinguishable on MySQL,
+    # whose DATETIME has whole-second resolution (SQLite keeps microseconds):
+    # created and flipped inside one second, the two values could be identical.
+    backdated = (datetime.utcnow() - timedelta(days=1)).replace(microsecond=0)
+    db.get(DocumentRequirement, requirement_id).effective_from = backdated
+    db.commit()
+    original_effective_from = backdated.isoformat()
 
     # contractor now has a not_submitted row for it (ensure_document_rows ran at signup for pre-existing reqs only —
     # this one was created after signup, so it won't auto-exist; call the endpoint that lists active requirements to confirm it's visible)

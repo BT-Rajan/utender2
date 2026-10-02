@@ -16,13 +16,34 @@ safe test defaults here, before anything under `app` is imported, so
 production default for `database_url` — not that it matters, since
 every test replaces the engine directly regardless of what
 `DATABASE_URL` resolved to at import time.
+
+Two database targets
+--------------------
+* Default (no env var): per-test in-memory SQLite, schema from
+  `Base.metadata.create_all` — fast, needs nothing running.
+* `TEST_DATABASE_URL=mysql+pymysql://...`: a real MySQL server. At session
+  start every table in that database is dropped and the schema is rebuilt by
+  running `alembic upgrade head` (so the migrations themselves are what the
+  tests run against, not the ORM's idea of the schema); between tests every
+  table is truncated, which gives each test the same empty starting state
+  SQLite's `create_all` gives. The target database's name must contain
+  "test" — the session reset is destructive and refuses to run otherwise.
 """
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 
-os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL") or None
+USE_MYSQL = TEST_DATABASE_URL is not None
+if USE_MYSQL:
+    if not TEST_DATABASE_URL.startswith("mysql"):
+        raise RuntimeError("TEST_DATABASE_URL must be a mysql+pymysql:// URL (leave it unset to use SQLite).")
+    # app.db builds its engine from this at import time.
+    os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+else:
+    os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("JWT_SECRET", "test-secret")
 os.environ.setdefault("STORAGE_SIGNING_SECRET", "test-signing-secret")
 os.environ.setdefault("STORAGE_ROOT", tempfile.mkdtemp(prefix="utender-test-storage-"))
@@ -33,8 +54,9 @@ os.environ.setdefault("S3_REGION", "us-east-1")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
+from sqlalchemy.orm import close_all_sessions, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import app.db as db_module
@@ -45,16 +67,84 @@ from fastapi.testclient import TestClient
 from app.main import app as fastapi_app  # imported once for the whole session
 
 
-@pytest.fixture(autouse=True)
-def isolated_backend(tmp_path):
-    """Runs before/after every test: fresh DB, fresh storage root."""
-    engine = create_engine(
-        "sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool
+BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _mysql_table_names(conn) -> list[str]:
+    return list(conn.execute(text("SHOW TABLES")).scalars().all())
+
+
+@pytest.fixture(scope="session")
+def mysql_engine():
+    """Session-wide engine for the MySQL target (None under SQLite).
+
+    Drops everything in the test database, then rebuilds it with the real
+    Alembic migration chain so every run exercises 0001 -> head on a
+    pristine server."""
+    if not USE_MYSQL:
+        yield None
+        return
+
+    db_name = make_url(TEST_DATABASE_URL).database or ""
+    if "test" not in db_name.lower():
+        pytest.exit(
+            f"Refusing to wipe database {db_name!r}: TEST_DATABASE_URL must point at a database whose "
+            "name contains 'test' (the MySQL test session drops every table in it).",
+            returncode=2,
+        )
+
+    # READ COMMITTED, not MySQL's default REPEATABLE READ: many tests keep one
+    # long-lived `db` session and re-read through it after API calls commit on
+    # other connections. SQLite's single shared connection always showed those
+    # commits; under REPEATABLE READ the session's first read pins a snapshot
+    # and later reads return stale rows (false failures in pass5/6/13/21).
+    # Application request sessions are short-lived, so this only changes what
+    # the tests' own sessions can see; no test assertion depends on it.
+    engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True, isolation_level="READ COMMITTED")
+    with engine.begin() as conn:
+        conn.execute(text("SET FOREIGN_KEY_CHECKS=0"))
+        for name in _mysql_table_names(conn):
+            conn.execute(text(f"DROP TABLE IF EXISTS `{name}`"))
+        conn.execute(text("SET FOREIGN_KEY_CHECKS=1"))
+
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=BACKEND_DIR,
+        env={**os.environ, "DATABASE_URL": TEST_DATABASE_URL},
+        check=True,
     )
+
+    yield engine
+    engine.dispose()
+
+
+def _truncate_all_mysql_tables(engine) -> None:
+    """Back to the empty state SQLite's create_all starts every test in. This
+    also clears rows the migrations seed (e.g. default document
+    requirements), which the SQLite path never has."""
+    with engine.begin() as conn:
+        conn.execute(text("SET FOREIGN_KEY_CHECKS=0"))
+        for name in _mysql_table_names(conn):
+            if name != "alembic_version":
+                conn.execute(text(f"TRUNCATE TABLE `{name}`"))
+        conn.execute(text("SET FOREIGN_KEY_CHECKS=1"))
+
+
+@pytest.fixture(autouse=True)
+def isolated_backend(tmp_path, mysql_engine):
+    """Runs before/after every test: fresh DB, fresh storage root."""
+    if USE_MYSQL:
+        engine = mysql_engine
+        _truncate_all_mysql_tables(engine)
+    else:
+        engine = create_engine(
+            "sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool
+        )
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     db_module.engine = engine
     db_module.SessionLocal = SessionLocal
-    db_module.Base.metadata.create_all(bind=engine)
+    if not USE_MYSQL:
+        db_module.Base.metadata.create_all(bind=engine)
 
     storage_root = tmp_path / "storage"
     storage_root.mkdir()
@@ -64,7 +154,14 @@ def isolated_backend(tmp_path):
 
     yield
 
-    engine.dispose()
+    if USE_MYSQL:
+        # Many tests open `db_module.SessionLocal()` directly and never close
+        # it. SQLite's single shared connection hides that; on MySQL the
+        # leaked session's open transaction holds a metadata lock that blocks
+        # the next test's TRUNCATE forever. Release them all here.
+        close_all_sessions()
+    else:
+        engine.dispose()
 
 
 @pytest.fixture

@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 from starlette.responses import StreamingResponse
@@ -50,6 +52,24 @@ def _can_view_project(user: User, project: Project, db: Session) -> bool:
     return bool(profile and profile.is_verified_active)
 
 
+def _parse_bid_deadline(raw: str) -> datetime:
+    """Parses an ISO 8601 deadline into the naive-UTC datetime this app stores
+    everywhere (see `datetime.utcnow()` throughout). A value carrying an
+    explicit offset ("...Z", "...+03:00") is converted to UTC; a value with no
+    offset is taken as UTC already, exactly as before. Anything unparseable is
+    a client error, not a server error."""
+    try:
+        parsed = datetime.fromisoformat(raw.strip())
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    except (ValueError, OverflowError):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid bid deadline. Use an ISO 8601 date and time, e.g. 2030-01-31T17:00:00Z.",
+        )
+    return parsed
+
+
 @router.post("", response_model=ProjectDetailOut, status_code=201)
 async def create_project(
     title: str = Form(...),
@@ -63,8 +83,6 @@ async def create_project(
     user: User = Depends(require_verified_owner),
     db: Session = Depends(get_db),
 ):
-    from datetime import datetime
-
     try:
         tender_type_value = TenderType(tender_type)
     except ValueError:
@@ -76,7 +94,7 @@ async def create_project(
         raise HTTPException(status_code=400, detail="A new project must start as draft or open.")
     status_value = ProjectStatus(status)
 
-    deadline = datetime.fromisoformat(bid_deadline)
+    deadline = _parse_bid_deadline(bid_deadline)
     if status_value == ProjectStatus.open and deadline <= datetime.utcnow():
         raise HTTPException(status_code=400, detail="Bid deadline must be in the future.")
 

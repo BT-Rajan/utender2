@@ -55,7 +55,7 @@ def create_billing_portal_session(user: User = Depends(require_approved_contract
     if not cp.stripe_customer_id:
         raise HTTPException(status_code=400, detail="No billing account yet — subscribe first.")
 
-    session = stripe.billingPortal.Session.create(
+    session = stripe.billing_portal.Session.create(
         customer=cp.stripe_customer_id, return_url=f"{settings.app_url}/contractor/subscribe"
     )
     return {"url": session.url}
