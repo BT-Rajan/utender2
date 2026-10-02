@@ -109,6 +109,7 @@ else
     cp "$env_example" "$env_file"
 
     sed -i \
+        -e "s|^ENVIRONMENT=.*|ENVIRONMENT=production|" \
         -e "s|^JWT_SECRET=.*|JWT_SECRET=$(new_secret)|" \
         -e "s|^STORAGE_SIGNING_SECRET=.*|STORAGE_SIGNING_SECRET=$(new_secret)|" \
         -e "s|^CRON_SECRET=.*|CRON_SECRET=$(new_secret)|" \

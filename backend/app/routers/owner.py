@@ -244,6 +244,15 @@ def close_project(project_id: str, user: User = Depends(require_owner), db: Sess
     project = _get_owned_project(project_id, user, db)
     if project.status != ProjectStatus.open:
         raise HTTPException(status_code=400, detail="Only an open project can be closed.")
+    # Closing lifts the seal (is_sealed_and_open turns false), so an owner who
+    # could close early could read every sealed bid before the deadline.
+    # Sealed tenders open only when their deadline passes.
+    if is_sealed_and_open(project) and project.bid_deadline > datetime.utcnow():
+        raise HTTPException(
+            status_code=400,
+            detail="A sealed tender can't be closed early \u2014 its bids stay sealed until the deadline. "
+            "Cancel the tender instead if you no longer want bids.",
+        )
     project.status = ProjectStatus.closed
     db.commit()
     db.refresh(project)

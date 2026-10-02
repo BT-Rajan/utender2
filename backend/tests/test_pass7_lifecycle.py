@@ -110,8 +110,19 @@ def test_pass7_lifecycle():
     r = owner_client.post(f"/owner/projects/{project_id}/offers/{offer_id}/approve")
     check("awarding while still open is rejected", r.status_code == 400)
 
+    # This tender is sealed and has a bid: closing it early would unseal that bid, so it is refused
+    # (audit remediation R1). It closes when its deadline passes instead. Early close of an
+    # owner-visible tender is still exercised below (project2) and in the R1 regression tests.
     r = owner_client.post(f"/owner/projects/{project_id}/close")
-    check("owner closes bidding early", r.status_code == 200 and r.json()["status"] == "closed")
+    check("owner cannot close a sealed tender early", r.status_code == 400)
+
+    from app.models.project import Project as _Project
+
+    db.get(_Project, project_id).bid_deadline = datetime.utcnow() - timedelta(minutes=1)
+    db.commit()
+    owner_client.get("/owner/projects")  # lazy deadline sync, exactly as production does on any read
+    r = owner_client.get(f"/projects/{project_id}")
+    check("sealed tender closes when its deadline passes", r.json()["status"] == "closed")
 
     r = owner_client.post(f"/owner/projects/{project_id}/close")
     check("closing an already-closed project rejected", r.status_code == 400)

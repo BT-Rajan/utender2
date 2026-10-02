@@ -133,8 +133,13 @@ def test_pass11_bidding_engine():
     r = c1.get(f"/projects/{sealed_project_id}/offers/mine")
     check("contractor sees their own amount even on a sealed tender", float(r.json()["amount"]) == 5000.00)
 
-    # once the owner closes bidding, the seal lifts
-    owner_client.post(f"/owner/projects/{sealed_project_id}/close")
+    # once bidding closes, the seal lifts. A sealed tender closes only when its deadline
+    # passes -- the owner can no longer close it early (audit remediation R1) -- so expire it.
+    from app.models.project import Project as _Project
+
+    db.get(_Project, sealed_project_id).bid_deadline = datetime.utcnow() - timedelta(minutes=1)
+    db.commit()
+    owner_client.get("/owner/projects")  # lazy deadline sync, exactly as production does on any read
     r = owner_client.get(f"/owner/projects/{sealed_project_id}/offers")
     check("after close, amounts are revealed", all(o["amount"] is not None for o in r.json()))
     check("after close, contractor identities are revealed", all(o["contractor_id"] is not None for o in r.json()))

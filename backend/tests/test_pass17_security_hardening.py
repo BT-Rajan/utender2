@@ -125,8 +125,13 @@ def test_pass17_security_hardening():
     check("owner's answer succeeds", r.status_code == 200)
     check("the answer response itself does not reveal contractor identity while sealed", r.json()["contractor_id"] is None)
 
-    # once bidding closes, the seal lifts and identity is visible again
-    owner1.post(f"/owner/projects/{sealed_id}/close")
+    # once bidding closes, the seal lifts and identity is visible again. A sealed tender closes
+    # only when its deadline passes (an owner can't close it early -- audit remediation R1).
+    from app.models.project import Project as _Project
+
+    db.get(_Project, sealed_id).bid_deadline = datetime.utcnow() - timedelta(minutes=1)
+    db.commit()
+    owner1.get("/owner/projects")  # lazy deadline sync, exactly as production does on any read
     r = owner1.get(f"/projects/{sealed_id}/clarifications")
     check("after closing, owner now sees contractor identity on the same question", r.json()[0]["contractor_id"] == c1_id)
 

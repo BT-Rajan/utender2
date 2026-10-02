@@ -133,6 +133,9 @@ def _truncate_all_mysql_tables(engine) -> None:
 @pytest.fixture(autouse=True)
 def isolated_backend(tmp_path, mysql_engine):
     """Runs before/after every test: fresh DB, fresh storage root."""
+    from app.services.login_throttle import login_throttle
+
+    login_throttle.reset()  # process-global; every TestClient shares one "client ip"
     if USE_MYSQL:
         engine = mysql_engine
         _truncate_all_mysql_tables(engine)

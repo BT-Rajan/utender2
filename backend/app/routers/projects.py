@@ -10,6 +10,7 @@ from app.models.award_record import AwardRecord
 from app.models.contractor import ContractorProfile
 from app.models.enums import NotificationType, OfferStatus, ProjectStatus, TenderType, UserRole
 from app.models.offer import Offer
+from app.models.owner import OwnerProfile
 from app.models.project import Project, ProjectDrawing
 from app.models.project_amendment import ProjectAmendment
 from app.models.user import User
@@ -17,6 +18,7 @@ from app.schemas.amendment import ProjectAmendmentOut, ProjectAmendmentRequest
 from app.schemas.award import AwardRecordOut
 from app.schemas.project import DrawingOut, ProjectCreate, ProjectDetailOut
 from app.services.drawings import upload_drawings_for_project
+from app.services.file_security import safe_relative_name
 from app.services.email import notify_contractor_tender_amended
 from app.services.notify import notify
 from app.services.storage import drawing_url_expiry_seconds, get_storage
@@ -133,6 +135,16 @@ def get_project(project_id: str, user: User = Depends(get_current_user), db: Ses
 # permanent numbered record, never a silent edit. changed_fields only
 # lists what actually differs from before, so a no-op PATCH (same values
 # resubmitted) creates no amendment row and bumps nothing.
+def _require_active_owner(user: User, db: Session) -> None:
+    """A suspended (or unapproved) owner can still see their tender but can't
+    change it. Same rule and same "not_approved" code as
+    deps.require_verified_owner, applied *after* the ownership lookup so
+    everyone else keeps getting the 404 they always did."""
+    profile = db.get(OwnerProfile, user.id)
+    if not profile or not profile.is_verified_active:
+        raise HTTPException(status_code=403, detail="not_approved")
+
+
 @router.patch("/{project_id}", response_model=ProjectDetailOut)
 def amend_project(
     project_id: str, payload: ProjectAmendmentRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)
@@ -141,6 +153,7 @@ def amend_project(
     project = db.get(Project, project_id)
     if not project or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Project not found.")
+    _require_active_owner(user, db)
     if project.status not in (ProjectStatus.draft, ProjectStatus.open, ProjectStatus.closed, ProjectStatus.under_evaluation):
         raise HTTPException(status_code=400, detail="This project can no longer be amended.")
 
@@ -267,6 +280,7 @@ async def add_drawings(
     project = db.get(Project, project_id)
     if not project or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Project not found.")
+    _require_active_owner(user, db)
 
     real_files = [f for f in drawings if f.filename]
     await upload_drawings_for_project(db, get_storage(), project_id, real_files)
@@ -302,7 +316,9 @@ def download_drawings_zip(project_id: str, user: User = Depends(get_current_user
             content = storage.download("project-drawings", d.file_path)
             if content is None:
                 continue
-            zf.writestr(d.file_name, content)
+            # Normalised here too: rows stored before names were sanitised on
+            # upload may still hold a hostile path.
+            zf.writestr(safe_relative_name(d.file_name), content)
             included += 1
 
     if included == 0:

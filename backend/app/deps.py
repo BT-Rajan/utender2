@@ -1,7 +1,7 @@
 from fastapi import Cookie, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.auth.security import decode_token
+from app.auth.security import decode_token_payload, token_matches_password
 from app.db import get_db
 from app.models.contractor import ContractorProfile
 from app.models.enums import UserRole
@@ -20,8 +20,8 @@ def get_current_user(
     if not access_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
-    user_id = decode_token(access_token, expected_type="access")
-    if not user_id:
+    token = decode_token_payload(access_token, expected_type="access")
+    if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     # Access tokens aren't checked against the revocation table here — only
     # the long-lived refresh token is (see /auth/refresh, /auth/logout).
@@ -29,8 +29,9 @@ def get_current_user(
     # by design specifically so this per-request check can skip a DB hit;
     # logout closes the loop within one access-token lifetime at most.
 
-    user = db.get(User, user_id)
-    if not user:
+    user = db.get(User, token.user_id)
+    # A token issued before the user's last password change/reset is dead.
+    if not user or not token_matches_password(token, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
     return user

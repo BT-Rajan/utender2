@@ -4,7 +4,12 @@ from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.models.project import ProjectDrawing
-from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
+from app.services.file_security import (
+    ALLOWED_DRAWING_EXTENSIONS,
+    assert_allowed_extension,
+    safe_relative_name,
+    sanitize_path_segment,
+)
 from app.services.storage import Storage
 from app.services.zip_utils import ZipSecurityError, extract_zip, is_zip_filename
 
@@ -70,13 +75,22 @@ async def upload_drawings_for_project(
                 continue
 
             for entry in entries:
-                path = f"{project_id}/{int(time.time() * 1000)}-{sanitize_path_segment(entry.name)}"
+                name = safe_relative_name(entry.name)
+                # The outer file passed the extension check, but its contents
+                # didn't: skip anything that isn't a drawing type (and nested
+                # archives), counted as failed like any other bad entry.
+                try:
+                    assert_allowed_extension(name, ALLOWED_DRAWING_EXTENSIONS - {"zip"})
+                except HTTPException:
+                    failed += 1
+                    continue
+                path = f"{project_id}/{int(time.time() * 1000)}-{sanitize_path_segment(name)}"
                 try:
                     storage.save("project-drawings", path, entry.content, entry.content_type)
                 except Exception:
                     failed += 1
                     continue
-                _record_drawing(db, project_id, path, entry.name)
+                _record_drawing(db, project_id, path, name)
                 uploaded += 1
             continue
 
@@ -86,7 +100,7 @@ async def upload_drawings_for_project(
         except Exception:
             failed += 1
             continue
-        _record_drawing(db, project_id, path, file.filename)
+        _record_drawing(db, project_id, path, safe_relative_name(file.filename))
         uploaded += 1
 
     db.commit()

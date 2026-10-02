@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -7,6 +7,7 @@ from app.auth.security import (
     create_refresh_token,
     decode_token_payload,
     hash_password,
+    token_matches_password,
     verify_password,
 )
 from app.config import get_settings
@@ -30,6 +31,7 @@ from app.schemas.user import UserOut
 from app.services.auth_tokens import consume_token, issue_token
 from app.services.documents import ensure_document_rows, ensure_owner_document_rows
 from app.services.email import notify_password_reset, notify_verify_email
+from app.services.login_throttle import login_throttle
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
@@ -38,15 +40,20 @@ ACCESS_TTL_SECONDS = settings.jwt_access_ttl_minutes * 60
 REFRESH_TTL_SECONDS = settings.jwt_refresh_ttl_days * 24 * 60 * 60
 
 
-def _set_auth_cookies(response: Response, user_id: str) -> None:
-    access_token = create_access_token(user_id)
-    refresh_token = create_refresh_token(user_id)
+def _set_auth_cookies(response: Response, user: User) -> None:
+    access_token = create_access_token(user.id, user.password_hash)
+    refresh_token = create_refresh_token(user.id, user.password_hash)
     # httpOnly so a browser-side XSS can't read the token; SameSite=lax is
     # enough since frontend and backend are same-site in production
     # deployments (reverse-proxied together) — see README for the local-dev
     # cross-origin case, which needs SameSite=None + secure over https.
-    response.set_cookie("access_token", access_token, httponly=True, samesite="lax", max_age=ACCESS_TTL_SECONDS)
-    response.set_cookie("refresh_token", refresh_token, httponly=True, samesite="lax", max_age=REFRESH_TTL_SECONDS)
+    secure = settings.cookies_secure
+    response.set_cookie(
+        "access_token", access_token, httponly=True, samesite="lax", secure=secure, max_age=ACCESS_TTL_SECONDS
+    )
+    response.set_cookie(
+        "refresh_token", refresh_token, httponly=True, samesite="lax", secure=secure, max_age=REFRESH_TTL_SECONDS
+    )
 
 
 def _revoke_refresh_token(db: Session, refresh_token: str | None) -> None:
@@ -113,18 +120,30 @@ def signup(payload: SignupRequest, response: Response, db: Session = Depends(get
     token = issue_token(db, user.id, AuthTokenType.email_verify)
     notify_verify_email(user.email, token)
 
-    _set_auth_cookies(response, user.id)
+    _set_auth_cookies(response, user)
     return user
 
 
 @router.post("/login", response_model=UserOut)
-def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)):
+def login(payload: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     email = payload.email.strip().lower()
+    client_ip = request.client.host if request.client else "unknown"
+
+    wait = login_throttle.retry_after(client_ip, email)
+    if wait:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed login attempts. Please try again later.",
+            headers={"Retry-After": str(wait)},
+        )
+
     user = db.query(User).filter(User.email == email).first()
     if not user or not verify_password(payload.password, user.password_hash):
+        login_throttle.record_failure(client_ip, email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
 
-    _set_auth_cookies(response, user.id)
+    login_throttle.record_success(client_ip, email)
+    _set_auth_cookies(response, user)
     return user
 
 
@@ -134,7 +153,8 @@ def refresh(response: Response, refresh_token: str | None = Cookie(default=None)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
     payload = decode_token_payload(refresh_token, expected_type="refresh")
-    if not payload or not db.get(User, payload.user_id):
+    user = db.get(User, payload.user_id) if payload else None
+    if not payload or not user or not token_matches_password(payload, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
     if db.get(RevokedToken, payload.jti):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
@@ -145,7 +165,7 @@ def refresh(response: Response, refresh_token: str | None = Cookie(default=None)
     db.add(RevokedToken(jti=payload.jti, expires_at=payload.expires_at.replace(tzinfo=None)))
     db.commit()
 
-    _set_auth_cookies(response, payload.user_id)
+    _set_auth_cookies(response, user)
     return {"ok": True}
 
 
@@ -212,12 +232,18 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
 
 @router.post("/change-password")
 def change_password(
-    payload: ChangePasswordRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    payload: ChangePasswordRequest,
+    response: Response,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     if not verify_password(payload.current_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Current password is incorrect.")
     user.password_hash = hash_password(payload.new_password)
     db.commit()
+    # The new hash ends every other session; re-issue this one so the person
+    # who just changed their password isn't logged out of the tab they used.
+    _set_auth_cookies(response, user)
     return {"ok": True}
 
 

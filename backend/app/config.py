@@ -1,9 +1,14 @@
 from functools import lru_cache
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    # "production" turns on the startup check below that refuses placeholder
+    # secrets. Anything else (the default) keeps local development frictionless.
+    environment: str = "development"
 
     database_url: str = "mysql+pymysql://utender:utender@localhost:3306/utender"
 
@@ -46,9 +51,39 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:5173"
 
+    # Secure flag on the auth cookies. Unset follows app_url's scheme (https
+    # -> Secure); set explicitly when TLS terminates somewhere app_url
+    # doesn't reflect. Browsers drop Secure cookies on plain http, so this
+    # must stay off for an http-only deployment.
+    cookie_secure: bool | None = None
+
     # Matches the original app's raised Server Action body limit (25MB ->
     # 50MB) to accommodate zipped folders of drawings.
     max_upload_mb: int = 50
+
+    @property
+    def cookies_secure(self) -> bool:
+        if self.cookie_secure is not None:
+            return self.cookie_secure
+        return self.app_url.lower().startswith("https://")
+
+    @model_validator(mode="after")
+    def _refuse_placeholder_secrets_in_production(self):
+        if self.environment.strip().lower() != "production":
+            return self
+        # Covers both the code defaults ("change-me-in-production") and the
+        # .env.example placeholders ("change-me-to-a-...").
+        weak = [
+            name
+            for name in ("jwt_secret", "storage_signing_secret")
+            if not getattr(self, name) or getattr(self, name).startswith("change-me")
+        ]
+        if weak:
+            raise ValueError(
+                f"ENVIRONMENT=production but {', '.join(w.upper() for w in weak)} is unset or still a placeholder. "
+                "Generate a long random value (e.g. `openssl rand -hex 32`)."
+            )
+        return self
 
 
 @lru_cache

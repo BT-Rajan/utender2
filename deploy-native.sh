@@ -125,6 +125,7 @@ else
 
     sed -i \
         -e "s|^DATABASE_URL=.*|DATABASE_URL=mysql+pymysql://utender:${db_password}@127.0.0.1:3306/utender|" \
+        -e "s|^ENVIRONMENT=.*|ENVIRONMENT=production|" \
         -e "s|^JWT_SECRET=.*|JWT_SECRET=$(new_secret)|" \
         -e "s|^STORAGE_SIGNING_SECRET=.*|STORAGE_SIGNING_SECRET=$(new_secret)|" \
         -e "s|^CRON_SECRET=.*|CRON_SECRET=$(new_secret)|" \

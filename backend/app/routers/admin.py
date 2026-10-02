@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from decimal import Decimal
 
@@ -13,7 +14,7 @@ from app.models.award_record import AwardRecord
 from app.models.cms_content import CmsContent
 from app.models.contractor import ContractorProfile
 from app.models.document import ContractorDocument, DocumentRequirement, OwnerDocument
-from app.models.enums import DocumentStatus, Language, NotificationType, UserRole, VerificationStatus
+from app.models.enums import DocumentStatus, Language, NotificationType, ProjectStatus, UserRole, VerificationStatus
 from app.models.offer import Offer, OfferRevision
 from app.models.owner import OwnerProfile
 from app.models.payment_override import PaymentOverride
@@ -35,6 +36,7 @@ from app.schemas.owner import OwnerProfileOut
 from app.services.audit import log_action
 from app.services.notify import notify
 from app.services.storage import get_storage
+from app.services.tender_lifecycle import is_sealed_and_open
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
@@ -1140,7 +1142,7 @@ def suspend_project(
 # to them, not just this owner. Suspend instead, same reasoning as
 # delete_owner/delete_contractor above.
 @router.delete("/projects/{project_id}", status_code=204)
-def delete_project(project_id: str, db: Session = Depends(get_db)):
+def delete_project(project_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     project = db.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found.")
@@ -1160,8 +1162,19 @@ def delete_project(project_id: str, db: Session = Depends(get_db)):
     if drawing_paths:
         get_storage().delete("project-drawings", drawing_paths)
 
+    snapshot = json.dumps(
+        {"title": project.title, "owner_id": project.owner_id, "status": project.status.value}, default=str
+    )
     db.delete(project)  # cascades to project_drawings/project_amendments; offers already guarded to zero above
-    db.commit()
+    # log_action commits, so the delete and its audit row land in one transaction.
+    log_action(
+        db,
+        actor_id=admin.id,
+        action="project.admin_delete",
+        target_type="project",
+        target_id=project_id,
+        previous_value=snapshot,
+    )
     return None
 
 
@@ -1196,6 +1209,19 @@ def admin_edit_offer(
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found.")
 
+    # Bid integrity: a bid on a sealed tender is untouchable until the tender
+    # opens, and once a tender is decided its bids are the permanent record
+    # (AwardRecord.amount must keep matching the awarded offer).
+    project = db.get(Project, offer.project_id)
+    if project and is_sealed_and_open(project):
+        raise HTTPException(status_code=400, detail="Bids on a sealed tender can't be edited until it has opened.")
+    decided = project is not None and project.status in (ProjectStatus.awarded, ProjectStatus.no_award)
+    if decided or db.query(AwardRecord).filter(AwardRecord.offer_id == offer_id).first():
+        raise HTTPException(
+            status_code=400,
+            detail="This tender has been decided, so its bids are part of the permanent record and can't be edited.",
+        )
+
     changed: list[str] = []
     if payload.amount is not None and payload.amount != offer.amount:
         if payload.amount <= 0:
@@ -1209,6 +1235,7 @@ def admin_edit_offer(
     if not changed:
         raise HTTPException(status_code=400, detail="No changes were provided.")
 
+    previous_values = {field: getattr(offer, field) for field in changed}
     _snapshot_offer_revision(db, offer)
     if payload.amount is not None:
         offer.amount = payload.amount
@@ -1226,9 +1253,9 @@ def admin_edit_offer(
         action="offer.admin_edit",
         target_type="offer",
         target_id=offer_id,
-        new_value=", ".join(changed),
+        previous_value=json.dumps({k: (None if v is None else str(v)) for k, v in previous_values.items()}),
+        new_value=json.dumps({field: (lambda v: None if v is None else str(v))(getattr(offer, field)) for field in changed}),
     )
-    project = db.get(Project, offer.project_id)
     cp = db.get(ContractorProfile, offer.contractor_id)
     return _offer_admin_fields(offer, project, cp)
 
@@ -1276,7 +1303,7 @@ def suspend_offer(
 # hard delete would violate that foreign key anyway; suspend instead to
 # keep the award's history intact.
 @router.delete("/offers/{offer_id}", status_code=204)
-def delete_offer(offer_id: str, db: Session = Depends(get_db)):
+def delete_offer(offer_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     offer = db.get(Offer, offer_id)
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found.")
@@ -1288,8 +1315,24 @@ def delete_offer(offer_id: str, db: Session = Depends(get_db)):
             detail="This offer was awarded and has a permanent award record on file. Suspend it instead of deleting it.",
         )
 
+    snapshot = json.dumps(
+        {
+            "project_id": offer.project_id,
+            "contractor_id": offer.contractor_id,
+            "amount": str(offer.amount),
+            "status": offer.status.value,
+        },
+        default=str,
+    )
     db.delete(offer)  # cascades to offer_revisions
-    db.commit()
+    log_action(
+        db,
+        actor_id=admin.id,
+        action="offer.admin_delete",
+        target_type="offer",
+        target_id=offer_id,
+        previous_value=snapshot,
+    )
     return None
 
 
