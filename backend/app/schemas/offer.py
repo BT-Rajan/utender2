@@ -1,15 +1,18 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import OfferStatus
 
 
 class OfferCreate(BaseModel):
     amount: Decimal
-    timeline_estimate: str | None = None
-    message: str | None = None
+    # Bounds mirror the columns (String(255) / TEXT): longer input would be a
+    # database error (a 500 under MySQL strict mode), so it is refused as
+    # invalid input instead.
+    timeline_estimate: str | None = Field(default=None, max_length=255)
+    message: str | None = Field(default=None, max_length=10_000)
 
 
 class OfferOut(BaseModel):

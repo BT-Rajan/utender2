@@ -24,13 +24,17 @@ from app.services.email import notify_contractor_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify
 from app.services.storage import get_storage
-from app.services.tender_lifecycle import is_sealed_and_open, sync_expired_projects
+from app.services.tender_lifecycle import is_sealed_and_open, lock_project, sync_expired_projects
 
 router = APIRouter(prefix="/owner", tags=["owner"])
 
 
-def _get_owned_project(project_id: str, user: User, db: Session) -> Project:
-    project = db.get(Project, project_id)
+def _get_owned_project(project_id: str, user: User, db: Session, *, lock: bool = False) -> Project:
+    # lock=True for anything that CHANGES the tender's state: take the tender
+    # row lock first and judge the state under it (see lock_project), so two
+    # transitions at once -- close vs cancel, award vs award, award vs a bid
+    # -- are serialized instead of both passing a stale check.
+    project = lock_project(db, project_id) if lock else db.get(Project, project_id)
     if not project or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Project not found.")
     return project
@@ -135,7 +139,7 @@ def offer_history(project_id: str, offer_id: str, user: User = Depends(require_o
 @router.post("/projects/{project_id}/offers/{offer_id}/approve", response_model=ProjectOut)
 def approve_offer(project_id: str, offer_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     sync_expired_projects(db)
-    project = _get_owned_project(project_id, user, db)
+    project = _get_owned_project(project_id, user, db, lock=True)
     # Awarding is only meaningful once bidding has actually stopped — the
     # full lifecycle (spec §2.12) makes "open" and "draft" ineligible, not
     # just "already awarded". A deadline that just passed is caught by the
@@ -188,8 +192,8 @@ def approve_offer(project_id: str, offer_id: str, user: User = Depends(require_o
             awarded_by=user.id,
         )
     )
-    db.commit()
-
+    # log_action commits: the award, the status changes and the audit row land
+    # in ONE transaction, so there is no committed award without its audit entry.
     log_action(
         db,
         actor_id=user.id,
@@ -226,7 +230,7 @@ def _project_response(project: Project, db: Session) -> ProjectOut:
 
 @router.post("/projects/{project_id}/publish", response_model=ProjectOut)
 def publish_project(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
-    project = _get_owned_project(project_id, user, db)
+    project = _get_owned_project(project_id, user, db, lock=True)
     if project.status != ProjectStatus.draft:
         raise HTTPException(status_code=400, detail="Only a draft project can be published.")
     if project.bid_deadline <= datetime.utcnow():
@@ -241,7 +245,7 @@ def publish_project(project_id: str, user: User = Depends(require_owner), db: Se
 def close_project(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     """Manually stop accepting bids before the deadline — e.g. the owner is
     satisfied with what's in hand and wants to move straight to evaluation."""
-    project = _get_owned_project(project_id, user, db)
+    project = _get_owned_project(project_id, user, db, lock=True)
     if project.status != ProjectStatus.open:
         raise HTTPException(status_code=400, detail="Only an open project can be closed.")
     # Closing lifts the seal (is_sealed_and_open turns false), so an owner who
@@ -262,7 +266,7 @@ def close_project(project_id: str, user: User = Depends(require_owner), db: Sess
 @router.post("/projects/{project_id}/start-evaluation", response_model=ProjectOut)
 def start_evaluation(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     sync_expired_projects(db)
-    project = _get_owned_project(project_id, user, db)
+    project = _get_owned_project(project_id, user, db, lock=True)
     if project.status != ProjectStatus.closed:
         raise HTTPException(status_code=400, detail="Only a closed project can enter evaluation.")
     project.status = ProjectStatus.under_evaluation
@@ -287,12 +291,11 @@ def _notify_bidders(db: Session, project: Project, notification_type: Notificati
 @router.post("/projects/{project_id}/no-award", response_model=ProjectOut)
 def mark_no_award(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     sync_expired_projects(db)
-    project = _get_owned_project(project_id, user, db)
+    project = _get_owned_project(project_id, user, db, lock=True)
     if project.status not in (ProjectStatus.closed, ProjectStatus.under_evaluation):
         raise HTTPException(status_code=400, detail="Only a closed or under-evaluation project can be marked no-award.")
     previous = project.status.value
     project.status = ProjectStatus.no_award
-    db.commit()
     log_action(db, actor_id=user.id, action="project.no_award", target_type="project", target_id=project_id, previous_value=previous, new_value="no_award")
     _notify_bidders(db, project, NotificationType.tender_no_award)
     db.refresh(project)
@@ -302,12 +305,11 @@ def mark_no_award(project_id: str, user: User = Depends(require_owner), db: Sess
 @router.post("/projects/{project_id}/cancel", response_model=ProjectOut)
 def cancel_project(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     sync_expired_projects(db)
-    project = _get_owned_project(project_id, user, db)
+    project = _get_owned_project(project_id, user, db, lock=True)
     if project.status not in (ProjectStatus.draft, ProjectStatus.open, ProjectStatus.closed, ProjectStatus.under_evaluation):
         raise HTTPException(status_code=400, detail="This project can no longer be canceled.")
     previous = project.status.value
     project.status = ProjectStatus.canceled
-    db.commit()
     log_action(db, actor_id=user.id, action="project.cancel", target_type="project", target_id=project_id, previous_value=previous, new_value="canceled")
     _notify_bidders(db, project, NotificationType.tender_cancelled)
     db.refresh(project)

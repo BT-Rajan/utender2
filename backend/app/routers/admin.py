@@ -36,7 +36,7 @@ from app.schemas.owner import OwnerProfileOut
 from app.services.audit import log_action
 from app.services.notify import notify
 from app.services.storage import get_storage
-from app.services.tender_lifecycle import is_sealed_and_open
+from app.services.tender_lifecycle import is_sealed_and_open, lock_project
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
@@ -1212,7 +1212,9 @@ def admin_edit_offer(
     # Bid integrity: a bid on a sealed tender is untouchable until the tender
     # opens, and once a tender is decided its bids are the permanent record
     # (AwardRecord.amount must keep matching the awarded offer).
-    project = db.get(Project, offer.project_id)
+    # Locked so the guards below hold for the write that follows -- an award
+    # can't land between the check and the edit.
+    project = lock_project(db, offer.project_id)
     if project and is_sealed_and_open(project):
         raise HTTPException(status_code=400, detail="Bids on a sealed tender can't be edited until it has opened.")
     decided = project is not None and project.status in (ProjectStatus.awarded, ProjectStatus.no_award)

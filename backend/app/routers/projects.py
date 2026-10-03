@@ -22,7 +22,7 @@ from app.services.file_security import safe_relative_name
 from app.services.email import notify_contractor_tender_amended
 from app.services.notify import notify
 from app.services.storage import drawing_url_expiry_seconds, get_storage
-from app.services.tender_lifecycle import sync_expired_projects
+from app.services.tender_lifecycle import lock_project, sync_expired_projects
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -150,7 +150,9 @@ def amend_project(
     project_id: str, payload: ProjectAmendmentRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     sync_expired_projects(db)
-    project = db.get(Project, project_id)
+    # Locked: "can't move the deadline earlier once bids exist" reads
+    # tender_type_locked, which the first bid sets under this same lock.
+    project = lock_project(db, project_id)
     if not project or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)

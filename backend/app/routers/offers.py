@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -12,8 +13,13 @@ from app.models.user import User
 from app.schemas.offer import OfferCreate, OfferOut, OfferRevisionOut
 from app.services.email import notify_owner_new_offer
 from app.services.notify import notify
+from app.services.tender_lifecycle import bidding_is_open, lock_project
 
 router = APIRouter(prefix="/projects/{project_id}/offers", tags=["offers"])
+
+# offers.amount is NUMERIC(12,2). The DB rounds to 2 places, so anything at or
+# above 9999999999.995 would round past the column's range and fail the insert.
+_AMOUNT_LIMIT = Decimal("9999999999.995")
 
 
 @router.get("/mine", response_model=OfferOut | None)
@@ -62,28 +68,27 @@ def submit_offer(
 ):
     profile = get_contractor_profile(user, db)
 
-    project = db.get(Project, project_id)
-    if not project or project.status != ProjectStatus.open or project.bid_deadline < datetime.utcnow():
+    # Lock the tender row, THEN check it. Checking an unlocked copy let a bid
+    # slip in after the owner's close had committed, and two near-simultaneous
+    # first bids from one contractor (double-click, retry) both inserted and
+    # deadlocked. Under the lock every bid, withdrawal and lifecycle change on
+    # this tender is serialized, so the state read below is the state the bid
+    # is written against.
+    project = lock_project(db, project_id)
+    if not project or not bidding_is_open(project):
         raise HTTPException(status_code=400, detail="Bidding on this project is closed.")
     if project.is_suspended:
         raise HTTPException(status_code=400, detail="This project has been suspended and is not accepting offers.")
 
-    if payload.amount <= 0:
+    if payload.amount <= 0 or payload.amount >= _AMOUNT_LIMIT:
         raise HTTPException(status_code=400, detail="Enter a valid bid amount.")
 
-    # SELECT ... FOR UPDATE: two near-simultaneous edits from the same
-    # contractor (double-click, retried request) would otherwise both read
-    # the same pre-edit revision number and race to write it, corrupting
-    # the sequence in offer_revisions. Locking the row for the duration of
-    # this transaction serializes them. (SQLite, used in this app's tests,
-    # has no row-level locking and silently ignores this — the guarantee
-    # is real only against MySQL, this app's actual database.)
-    offer = (
-        db.query(Offer)
-        .filter(Offer.project_id == project_id, Offer.contractor_id == user.id)
-        .with_for_update()
-        .first()
-    )
+    # The tender lock above already serializes every writer of this
+    # contractor's offer (a plain read is enough). Deliberately NOT
+    # SELECT ... FOR UPDATE on the offer: when no row exists yet that takes a
+    # next-key/gap lock, and two such locks held at once deadlock on the
+    # inserts that follow.
+    offer = db.query(Offer).filter(Offer.project_id == project_id, Offer.contractor_id == user.id).first()
     if offer:
         # upsert on the (project_id, contractor_id) unique constraint — a
         # contractor revising their bid before the deadline updates the
@@ -132,16 +137,21 @@ def submit_offer(
 
 @router.post("/withdraw", response_model=OfferOut)
 def withdraw_offer(project_id: str, user: User = Depends(require_approved_contractor), db: Session = Depends(get_db)):
-    offer = (
-        db.query(Offer)
-        .filter(Offer.project_id == project_id, Offer.contractor_id == user.id)
-        .with_for_update()
-        .first()
-    )
-    if not offer:
+    # Same lock-then-check as submit_offer. Withdrawal is a change to a bid, and
+    # bids can't change once bidding has stopped (an awarded bid flipped to
+    # "withdrawn" would contradict the permanent AwardRecord; a bid pulled
+    # after the deadline would let a bidder walk away from a price the owner is
+    # already evaluating).
+    project = lock_project(db, project_id)
+    offer = db.query(Offer).filter(Offer.project_id == project_id, Offer.contractor_id == user.id).first()
+    if not project or not offer:
         raise HTTPException(status_code=404, detail="No offer to withdraw.")
     if offer.status == OfferStatus.withdrawn:
         raise HTTPException(status_code=400, detail="This offer has already been withdrawn.")
+    if not bidding_is_open(project):
+        raise HTTPException(
+            status_code=400, detail="Bidding on this project has closed, so this offer can no longer be withdrawn."
+        )
     _snapshot_revision(db, offer)
     offer.status = OfferStatus.withdrawn
     offer.updated_at = datetime.utcnow()
