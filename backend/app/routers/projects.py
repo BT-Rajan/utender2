@@ -178,15 +178,24 @@ def amend_project(
         project.trade = payload.trade or None
 
     deadline_extended = False
-    if payload.bid_deadline is not None and payload.bid_deadline != project.bid_deadline:
+    new_deadline = payload.bid_deadline
+    if new_deadline is not None and new_deadline.tzinfo is not None:
+        # Deadlines are stored as naive UTC (compared with utcnow() everywhere);
+        # an explicit offset ("...Z", "...+03:00") is converted, not compared
+        # raw (naive vs aware raised TypeError -> 500).
+        try:
+            new_deadline = new_deadline.astimezone(timezone.utc).replace(tzinfo=None)
+        except OverflowError:
+            raise HTTPException(status_code=400, detail="Invalid bid deadline.")
+    if new_deadline is not None and new_deadline != project.bid_deadline:
         # A bid already locks the tender type (spec D-001) for the same
         # reason a deadline can't then be pulled earlier out from under
         # bidders who priced against the original window.
-        if payload.bid_deadline < project.bid_deadline and project.tender_type_locked:
+        if new_deadline < project.bid_deadline and project.tender_type_locked:
             raise HTTPException(status_code=400, detail="Cannot move the deadline earlier once bids have been submitted.")
-        deadline_extended = payload.bid_deadline > project.bid_deadline
+        deadline_extended = new_deadline > project.bid_deadline
         changed.append("bid_deadline")
-        project.bid_deadline = payload.bid_deadline
+        project.bid_deadline = new_deadline
 
     if not changed:
         raise HTTPException(status_code=400, detail="No changes were provided.")

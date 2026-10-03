@@ -648,3 +648,31 @@ def test_a_suspended_owner_cannot_drive_the_tender_lifecycle_or_award(db):
     db.commit()
     assert owner.post(f"/owner/projects/{pid}/close").status_code == 200
     assert owner.post(f"/owner/projects/{pid}/offers/{oid}/approve").status_code == 200
+
+
+# --------------------------------------------------------------------------
+# Deadline amendments: offsets and garbage are handled, not a server error
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "submitted, stored",
+    [("2031-06-01T10:00:00Z", "2031-06-01T10:00:00"), ("2031-06-01T10:00:00+03:00", "2031-06-01T07:00:00")],
+)
+def test_amending_the_deadline_with_a_timezone_offset_is_stored_as_utc(db, submitted, stored):
+    owner, _ = _owner(db)
+    pid = _project(owner, deadline="2030-01-01T00:00:00")
+
+    r = owner.patch(f"/projects/{pid}", json={"bid_deadline": submitted})
+
+    assert r.status_code == 200, r.text
+    assert r.json()["bid_deadline"] == stored
+
+
+def test_amending_the_deadline_with_garbage_is_a_client_error(db):
+    owner, _ = _owner(db)
+    pid = _project(owner)
+
+    for bad in ("not-a-date", "2031-13-45T00:00:00", 12345678901234567890):
+        r = owner.patch(f"/projects/{pid}", json={"bid_deadline": bad})
+        assert r.status_code in (400, 422), (bad, r.status_code)
