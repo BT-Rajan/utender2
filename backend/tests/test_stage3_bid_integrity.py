@@ -619,3 +619,32 @@ def test_a_bid_racing_a_close_is_never_accepted_after_the_close_commits(db):
 
     assert response.status_code == 400, response.text
     assert _offers(db, pid) == []
+
+
+# --------------------------------------------------------------------------
+# Privileged operations: a suspended owner can look, but not act
+# --------------------------------------------------------------------------
+
+
+def test_a_suspended_owner_cannot_drive_the_tender_lifecycle_or_award(db):
+    owner, uid = _owner(db)
+    c1, _ = _contractor(db)
+    pid = _project(owner)
+    oid = _bid(c1, pid).json()["id"]
+    db.get(OwnerProfile, uid).is_suspended = True
+    db.commit()
+
+    for action in ("publish", "close", "start-evaluation", "no-award", "cancel"):
+        assert owner.post(f"/owner/projects/{pid}/{action}").status_code == 403, action
+    assert owner.post(f"/owner/projects/{pid}/offers/{oid}/approve").status_code == 403
+    assert owner.get(f"/owner/projects/{pid}/offers").status_code == 200  # read access is unchanged
+
+    db.expire_all()
+    assert db.get(Project, pid).status.value == "open"
+    assert db.get(Offer, oid).status == OfferStatus.submitted
+    assert db.query(AwardRecord).count() == 0
+
+    db.get(OwnerProfile, uid).is_suspended = False  # reinstated: the same calls work again
+    db.commit()
+    assert owner.post(f"/owner/projects/{pid}/close").status_code == 200
+    assert owner.post(f"/owner/projects/{pid}/offers/{oid}/approve").status_code == 200

@@ -37,6 +37,14 @@ def _get_owned_project(project_id: str, user: User, db: Session, *, lock: bool =
     project = lock_project(db, project_id) if lock else db.get(Project, project_id)
     if not project or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Project not found.")
+    if lock:
+        # A suspended (or unapproved) owner keeps read access to their tender
+        # but can't change its state or award it -- the same rule and code as
+        # require_verified_owner, checked after ownership so everyone else
+        # still gets the 404 they always did.
+        profile = db.get(OwnerProfile, user.id)
+        if not profile or not profile.is_verified_active:
+            raise HTTPException(status_code=403, detail="not_approved")
     return project
 
 
