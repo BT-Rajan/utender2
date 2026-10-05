@@ -25,6 +25,19 @@ jobs:
   backend-mysql:
     name: Backend tests + Alembic (MySQL 8.4)
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: utender_test
+          MYSQL_USER: utender
+          MYSQL_PASSWORD: utender
+        ports:
+          - "3307:3306"
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"
+          --health-interval=3s --health-timeout=3s --health-retries=40
     env:
       DATABASE_URL: mysql+pymysql://utender:utender@127.0.0.1:3307/utender_test
       TEST_DATABASE_URL: mysql+pymysql://utender:utender@127.0.0.1:3307/utender_test
@@ -33,9 +46,6 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
-      - name: Start MySQL 8.4
-        working-directory: .
-        run: docker compose -f docker-compose.test.yml up -d --wait
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -50,10 +60,6 @@ jobs:
       # so the suite always runs against a freshly migrated schema.
       - name: Backend tests against MySQL
         run: pytest -q
-      - name: MySQL logs (on failure)
-        if: failure()
-        working-directory: .
-        run: docker compose -f docker-compose.test.yml logs mysql-test
 
   frontend:
     name: Frontend typecheck + build
