@@ -21,26 +21,6 @@ frontend/   React 18 + Vite + TypeScript + React Router + TanStack Query
 
 ## Setup
 
-**Windows, one click:** install [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-if you haven't already, make sure it's running, then double-click
-`install.bat` in the repo root. It creates `backend/.env` for you (with
-random secrets already filled in) and starts everything. Safe to run
-again any time — it won't overwrite an existing `.env`, and it's how you
-start the app back up after a reboot too.
-
-**With Docker (any OS):**
-
-```
-cp backend/.env.example backend/.env
-# fill in JWT_SECRET, STORAGE_SIGNING_SECRET, CRON_SECRET at minimum —
-# see backend/.env.example for what each variable does
-docker compose up --build
-```
-
-This starts MySQL, runs the Alembic migration automatically on backend
-startup, and serves the API on `http://localhost:8000` and the frontend on
-`http://localhost:5173`.
-
 **Deploying to a real server:** the server needs a MySQL/MariaDB database
 and a user for it already set up (e.g. created in CloudPanel). SSH in,
 clone this repo, and from the repo root run as root:
@@ -57,11 +37,7 @@ on the first run; set `APP_PORT`/`API_PORT` to choose them. After a
 `git pull`, just run `./deploy.sh` again -- everything is remembered in
 `backend/.env`. The script header lists the other options.
 
-`docker-compose.prod.yml` remains for running the production build with
-Docker yourself:
-`docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d`.
-
-**Without Docker:**
+**Local development:**
 
 1. **Database** — run a local MySQL 8.x instance and create a database/user
    matching `backend/.env`'s `DATABASE_URL` (defaults to
@@ -126,7 +102,7 @@ hardening, and the file-repository storage backends (local + S3, the
 latter via `moto`), plus a couple of full multi-actor end-to-end business
 scenarios. Each test gets its own fresh in-memory SQLite database and
 local-storage root (see `backend/tests/conftest.py`), so nothing needs a
-running MySQL instance or Docker to run:
+running MySQL instance to run:
 
 ```
 cd backend
@@ -147,7 +123,7 @@ STORAGE_BACKEND=local   # or "s3"
 ```
 
 - **`local`** (default): files are written under `STORAGE_ROOT` on the
-  backend's own disk (a bind-mounted Docker volume in `docker-compose.yml`).
+  backend's own disk (`backend/storage` by default).
   "Signed" download URLs are HMAC-signed and verified by the backend's own
   `/files` route, so they expire the same way a real signed URL does.
 - **`s3`**: set `S3_BUCKET_DRAWINGS`, `S3_BUCKET_DOCUMENTS`,
