@@ -22,6 +22,15 @@ fail() { echo; echo -e "\033[31mERROR: $*\033[0m"; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || fail "Run as root (or with sudo) -- this installs systemd services."
 
+# Settings are also accepted as arguments: ./deploy.sh DB_USER=x DB_PASSWORD=y
+for arg in "$@"; do
+    case "$arg" in
+        DB_USER=*|DB_PASSWORD=*|DB_NAME=*|DB_HOST=*|DB_PORT=*|APP_PORT=*|API_PORT=*|PUBLIC_HOST=*)
+            export "${arg?}" ;;
+        *) fail "Unknown argument: $arg" ;;
+    esac
+done
+
 # Reads KEY from backend/.env (empty if missing).
 get_env() { [ -f "$env_file" ] && grep -m1 "^$1=" "$env_file" | cut -d= -f2- || true; }
 # Sets KEY=VALUE in backend/.env, replacing an existing line or appending.
@@ -54,6 +63,13 @@ ok "Python, Node and serve are ready."
 
 step "Configuring backend/.env"
 if [ ! -f "$env_file" ]; then
+    # First run: ask for the database login if it wasn't passed in.
+    if [ -z "${DB_USER:-}" ] && [ -t 0 ]; then
+        read -r -p "    MySQL user: " DB_USER
+        read -r -s -p "    MySQL password: " DB_PASSWORD; echo
+        read -r -p "    Database name [utender]: " DB_NAME
+        DB_NAME="${DB_NAME:-utender}"
+    fi
     [ -n "${DB_USER:-}" ] && [ -n "${DB_PASSWORD:-}" ] \
         || fail "First run needs the database login: DB_USER='app_user' DB_PASSWORD='secret' DB_NAME='utender' ./deploy.sh"
     cp "$repo_root/backend/.env.example" "$env_file"
