@@ -95,22 +95,41 @@ ok "App will be on port $http_port, API on port $api_port"
 env_file="$repo_root/backend/.env"
 
 step "Setting up the database"
+db_host="${DB_HOST:-127.0.0.1}"
+db_port="${DB_PORT:-3306}"
+db_name="${DB_NAME:-utender}"
 if [ -f "$env_file" ] && grep -q '^DATABASE_URL=' "$env_file" 2>/dev/null; then
     ok "backend/.env already has a DATABASE_URL -- leaving the database alone."
+elif [ -n "${DB_USER:-}" ]; then
+    # An existing MySQL user (e.g. one created in CloudPanel) -- use it as
+    # the app's own credentials instead of creating a new one.
+    : "${DB_PASSWORD:?Set DB_PASSWORD together with DB_USER}"
+    db_user="$DB_USER"
+    db_password="$DB_PASSWORD"
+    export MYSQL_PWD="$db_password"  # keeps the password off the process list
+    mysql -h"$db_host" -P"$db_port" -u"$db_user" \
+        -e "CREATE DATABASE IF NOT EXISTS \`${db_name}\` CHARACTER SET utf8mb4;" 2>/dev/null || true
+    mysql -h"$db_host" -P"$db_port" -u"$db_user" -e "USE \`${db_name}\`;" \
+        || fail "MySQL user '${db_user}' can't log in or can't use database '${db_name}'. Check DB_USER/DB_PASSWORD, or set DB_NAME to a database that user has access to."
+    unset MYSQL_PWD
+    ok "Using existing MySQL user '${db_user}' on database '${db_name}'."
 else
     # A stray apostrophe in this message (e.g. "the server's password")
     # would break bash's own parsing of ${VAR:?message} -- it needs its
     # quotes balanced even though the whole thing sits inside double
     # quotes -- so this stays contraction-free on purpose.
-    : "${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD to the MySQL root or admin password for this server first, example: MYSQL_ROOT_PASSWORD=xxx ./deploy-native.sh -- get it with: clpctl db:show:master-credentials}"
+    : "${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD to the MySQL root or admin password for this server first, example: MYSQL_ROOT_PASSWORD=xxx ./deploy-native.sh -- get it with: clpctl db:show:master-credentials. Or reuse an existing MySQL user: DB_USER=xxx DB_PASSWORD=xxx DB_NAME=xxx ./deploy-native.sh}"
+    db_user="utender"
     db_password="$(openssl rand -hex 16)"
-    mysql -h127.0.0.1 -P3306 -uroot -p"$MYSQL_ROOT_PASSWORD" -e "
-        CREATE DATABASE IF NOT EXISTS utender CHARACTER SET utf8mb4;
-        CREATE USER IF NOT EXISTS 'utender'@'127.0.0.1' IDENTIFIED BY '${db_password}';
-        GRANT ALL PRIVILEGES ON utender.* TO 'utender'@'127.0.0.1';
+    export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
+    mysql -h"$db_host" -P"$db_port" -u"${MYSQL_ROOT_USER:-root}" -e "
+        CREATE DATABASE IF NOT EXISTS \`${db_name}\` CHARACTER SET utf8mb4;
+        CREATE USER IF NOT EXISTS '${db_user}'@'${db_host}' IDENTIFIED BY '${db_password}';
+        GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'${db_host}';
         FLUSH PRIVILEGES;
     "
-    ok "Created database 'utender' and a scoped user for it (the master password above was only used for this one step)."
+    unset MYSQL_PWD
+    ok "Created database '${db_name}' and a scoped user for it (the master password above was only used for this one step)."
 fi
 
 step "Setting up backend/.env"
@@ -123,8 +142,14 @@ else
     [ -f "$env_example" ] || fail "Can't find backend/.env.example -- make sure deploy-native.sh is sitting in the repo root."
     cp "$env_example" "$env_file"
 
+    # Credentials go into a URL, so characters like # @ : / % & | must be
+    # percent-encoded (this also keeps them from breaking the sed below).
+    urlenc() { python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"; }
+    db_user_enc="$(urlenc "$db_user")"
+    db_password_enc="$(urlenc "$db_password")"
+
     sed -i \
-        -e "s|^DATABASE_URL=.*|DATABASE_URL=mysql+pymysql://utender:${db_password}@127.0.0.1:3306/utender|" \
+        -e "s|^DATABASE_URL=.*|DATABASE_URL=mysql+pymysql://${db_user_enc}:${db_password_enc}@${db_host}:${db_port}/${db_name}|" \
         -e "s|^ENVIRONMENT=.*|ENVIRONMENT=production|" \
         -e "s|^JWT_SECRET=.*|JWT_SECRET=$(new_secret)|" \
         -e "s|^STORAGE_SIGNING_SECRET=.*|STORAGE_SIGNING_SECRET=$(new_secret)|" \
