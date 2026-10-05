@@ -13,9 +13,8 @@
 #     instead of the dev defaults (5173/8000) -- a server already hosting
 #     other sites usually has something else bound to the obvious ports
 #     (80/443 for a control panel's own nginx, sometimes 8000 too), so
-#     deploy.sh picks free ones and passes them in here rather than this
-#     file assuming any particular port is actually available. Running
-#     this file directly without deploy.sh falls back to 80/8000.
+#     set PUBLIC_HTTP_PORT/PUBLIC_API_PORT to free ones; unset, this
+#     falls back to 80/8000.
 #   - VITE_API_URL is supplied as a build arg (PUBLIC_API_URL from the
 #     shell environment) since Vite bakes it into the built JS at build
 #     time; see frontend/Dockerfile.prod for why that's a build arg and

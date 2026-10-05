@@ -1,171 +1,163 @@
 #!/usr/bin/env bash
-# One-shot production deploy for U-Tender on a Linux server.
+# Deploy U-Tender on a Linux server (no Docker), using a MySQL/MariaDB
+# database that already exists. Run as root from the repo root:
 #
-# What this does:
-#   1. Installs Docker if it isn't already present (via the official
-#      get.docker.com script, which supports basically every mainstream
-#      distro on its own).
-#   2. Detects the server's public IP address.
-#   3. Picks two free host ports -- one for the app, one for the API --
-#      instead of assuming 80/8000 are free. Most servers hosting other
-#      sites already have something bound to 80/443 (a control panel's
-#      own nginx, e.g. CloudPanel/Plesk) and sometimes 8000 too, so
-#      grabbing those blindly could either fail outright or, worse,
-#      collide with another site already running there.
-#   4. Creates backend/.env from backend/.env.example the first time this
-#      runs, with random secrets generated and APP_URL/API_URL/
-#      CORS_ORIGINS pointed at the real public IP and chosen ports
-#      instead of localhost.
-#   5. Builds and starts the app with docker-compose.prod.yml layered on
-#      top of the base compose file -- a real nginx-served frontend build,
-#      and MySQL not published to the internet at all.
+#   First time:
+#     DB_USER='app_user' DB_PASSWORD='secret' DB_NAME='utender' ./deploy.sh
 #
-# Safe to run again later: it won't touch an existing backend/.env, and
-# docker compose will just rebuild/restart whatever changed. Ports chosen
-# on a previous run aren't remembered between runs -- they're only used to
-# generate backend/.env the first time; after that, backend/.env itself is
-# the source of truth for the ports docker compose publishes.
+#   After a git pull (credentials and ports are remembered in backend/.env):
+#     ./deploy.sh
+#
+# Optional: DB_HOST (127.0.0.1), DB_PORT (3306), APP_PORT (8080),
+# API_PORT (8081), PUBLIC_HOST (auto-detected public IP, or a domain).
+# Passing DB_* or *_PORT again later updates backend/.env with the new values.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$repo_root"
+env_file="$repo_root/backend/.env"
 
 step() { echo; echo -e "\033[36m==> $*\033[0m"; }
 ok()   { echo -e "    \033[32m$*\033[0m"; }
-warn() { echo -e "    \033[33m$*\033[0m"; }
 fail() { echo; echo -e "\033[31mERROR: $*\033[0m"; exit 1; }
 
-step "Checking Docker"
-if ! command -v docker >/dev/null 2>&1; then
-    warn "Docker isn't installed -- installing it now via get.docker.com."
-    curl -fsSL https://get.docker.com | sh
-fi
-if ! docker version >/dev/null 2>&1; then
-    fail "Docker is installed but the daemon isn't running (or this user can't reach it). Try: sudo systemctl start docker -- and if you're not root, either re-run this script with sudo or add your user to the docker group (sudo usermod -aG docker \$USER) and log back in."
-fi
-if ! docker compose version >/dev/null 2>&1; then
-    fail "'docker compose' isn't available even though Docker is. This usually means a very old Docker install -- re-run the install: curl -fsSL https://get.docker.com | sh"
-fi
-ok "Docker is available."
+[ "$(id -u)" -eq 0 ] || fail "Run as root (or with sudo) -- this installs systemd services."
 
-step "Detecting this server's public IP"
-public_ip="$(curl -fsS --max-time 5 https://api.ipify.org || true)"
-if [ -z "$public_ip" ]; then
-    fail "Couldn't auto-detect the public IP. Re-run as: PUBLIC_IP=your.server.ip ./deploy.sh"
-fi
-if [ -n "${PUBLIC_IP:-}" ]; then
-    public_ip="$PUBLIC_IP"
-fi
-ok "Using $public_ip"
-
-step "Picking free ports"
-# Walks up from a starting port until it finds one nothing is already
-# listening on (IPv4 or IPv6, TCP). Works whether "ss" or only "netstat"
-# is available -- one or the other ships on basically every distro.
-port_in_use() {
-    local port="$1"
-    if command -v ss >/dev/null 2>&1; then
-        ss -tln 2>/dev/null | awk '{print $4}' | grep -qE "[.:]${port}\$"
-    else
-        netstat -tln 2>/dev/null | awk '{print $4}' | grep -qE "[.:]${port}\$"
-    fi
-}
-find_free_port() {
-    local port="$1"
-    while port_in_use "$port"; do
-        port=$((port + 1))
-    done
-    echo "$port"
-}
-
-if [ -n "${PUBLIC_HTTP_PORT:-}" ]; then
-    http_port="$PUBLIC_HTTP_PORT"
-else
-    http_port="$(find_free_port 8080)"
-fi
-if [ -n "${PUBLIC_API_PORT:-}" ]; then
-    api_port="$PUBLIC_API_PORT"
-else
-    # Starts searching past http_port so the two can never land on the
-    # same port even if both had to skip forward from their defaults.
-    api_port="$(find_free_port $((http_port + 1)))"
-fi
-ok "App will be on port $http_port, API on port $api_port"
-
-if [ "$http_port" != "8080" ] || [ "$api_port" != "8081" ]; then
-    warn "8080 and/or 8081 were already taken by something else on this server, so different ports were picked automatically."
-fi
-
-step "Setting up backend/.env"
-env_example="$repo_root/backend/.env.example"
-env_file="$repo_root/backend/.env"
-
-new_secret() { openssl rand -hex 32; }
-
-if [ -f "$env_file" ]; then
-    ok "backend/.env already exists -- leaving it as-is (including whatever ports it already has)."
-else
-    [ -f "$env_example" ] || fail "Can't find backend/.env.example -- make sure deploy.sh is sitting in the repo root."
-    cp "$env_example" "$env_file"
-
-    sed -i \
-        -e "s|^ENVIRONMENT=.*|ENVIRONMENT=production|" \
-        -e "s|^JWT_SECRET=.*|JWT_SECRET=$(new_secret)|" \
-        -e "s|^STORAGE_SIGNING_SECRET=.*|STORAGE_SIGNING_SECRET=$(new_secret)|" \
-        -e "s|^CRON_SECRET=.*|CRON_SECRET=$(new_secret)|" \
-        -e "s|^APP_URL=.*|APP_URL=http://$public_ip:$http_port|" \
-        -e "s|^API_URL=.*|API_URL=http://$public_ip:$api_port|" \
-        -e "s|^CORS_ORIGINS=.*|CORS_ORIGINS=http://$public_ip:$http_port|" \
-        "$env_file"
-
-    {
-        echo ""
-        echo "# --- Ports this deploy is published on (set by deploy.sh) ---"
-        echo "PUBLIC_HTTP_PORT=$http_port"
-        echo "PUBLIC_API_PORT=$api_port"
-    } >> "$env_file"
-
-    ok "Created backend/.env with generated secrets, pointed at http://$public_ip:$http_port."
-    warn "Stripe and email are left blank -- the app runs fine without them (billing checkout and emails just no-op). Fill them in later in backend/.env if you need them."
-fi
-
-# On a re-run, the ports actually in effect are whatever backend/.env
-# says (from the first run), not whatever was just freshly detected above.
-http_port="$(grep -m1 '^PUBLIC_HTTP_PORT=' "$env_file" | cut -d= -f2)"
-api_port="$(grep -m1 '^PUBLIC_API_PORT=' "$env_file" | cut -d= -f2)"
-
-step "Building and starting the app (the first run can take a few minutes)"
-PUBLIC_API_URL="http://$public_ip:$api_port" \
-PUBLIC_HTTP_PORT="$http_port" \
-PUBLIC_API_PORT="$api_port" \
-    docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
-ok "Containers are up."
-
-step "Waiting for the backend to come up"
-ready=false
-for _ in $(seq 1 30); do
-    if curl -fsS --max-time 2 "http://localhost:$api_port/docs" >/dev/null 2>&1; then
-        ready=true
+# Reads KEY from backend/.env (empty if missing).
+get_env() { [ -f "$env_file" ] && grep -m1 "^$1=" "$env_file" | cut -d= -f2- || true; }
+# Sets KEY=VALUE in backend/.env, replacing an existing line or appending.
+set_env() {
+    python3 - "$env_file" "$1" "$2" <<'PY'
+import sys, re
+path, key, value = sys.argv[1:]
+lines = open(path).read().splitlines()
+for i, line in enumerate(lines):
+    if line.startswith(key + "="):
+        lines[i] = f"{key}={value}"
         break
-    fi
-    sleep 2
+else:
+    lines.append(f"{key}={value}")
+open(path, "w").write("\n".join(lines) + "\n")
+PY
+}
+urlenc() { python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"; }
+secret() { openssl rand -hex 32; }
+
+step "Installing prerequisites"
+apt-get update -qq
+apt-get install -y -qq python3-venv python3-pip curl openssl >/dev/null
+if ! command -v node >/dev/null 2>&1; then
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null
+    apt-get install -y -qq nodejs >/dev/null
+fi
+command -v serve >/dev/null 2>&1 || npm install -g --silent serve
+ok "Python, Node and serve are ready."
+
+step "Configuring backend/.env"
+if [ ! -f "$env_file" ]; then
+    [ -n "${DB_USER:-}" ] && [ -n "${DB_PASSWORD:-}" ] \
+        || fail "First run needs the database login: DB_USER='app_user' DB_PASSWORD='secret' DB_NAME='utender' ./deploy.sh"
+    cp "$repo_root/backend/.env.example" "$env_file"
+    chmod 600 "$env_file"
+    set_env ENVIRONMENT production
+    set_env JWT_SECRET "$(secret)"
+    set_env STORAGE_SIGNING_SECRET "$(secret)"
+    set_env CRON_SECRET "$(secret)"
+    set_env STORAGE_ROOT "$repo_root/backend/storage"
+    ok "Created backend/.env with fresh secrets."
+fi
+
+if [ -n "${DB_USER:-}" ]; then
+    [ -n "${DB_PASSWORD:-}" ] || fail "DB_PASSWORD is required together with DB_USER."
+    set_env DATABASE_URL "mysql+pymysql://$(urlenc "$DB_USER"):$(urlenc "$DB_PASSWORD")@${DB_HOST:-127.0.0.1}:${DB_PORT:-3306}/${DB_NAME:-utender}"
+    ok "Database: ${DB_USER}@${DB_HOST:-127.0.0.1}:${DB_PORT:-3306}/${DB_NAME:-utender}"
+fi
+
+# Ports: explicit APP_PORT/API_PORT, else what backend/.env remembers, else
+# the first free port from 8080 up (only on the first run).
+port_busy() { ss -tln 2>/dev/null | awk '{print $4}' | grep -qE "[.:]$1\$"; }
+free_port() { local p="$1"; while port_busy "$p"; do p=$((p + 1)); done; echo "$p"; }
+app_port="${APP_PORT:-$(get_env PUBLIC_HTTP_PORT)}"; app_port="${app_port:-$(free_port 8080)}"
+api_port="${API_PORT:-$(get_env PUBLIC_API_PORT)}";  api_port="${api_port:-$(free_port $((app_port + 1)))}"
+public_host="${PUBLIC_HOST:-$(curl -fsS --max-time 5 https://api.ipify.org || hostname -I | awk '{print $1}')}"
+[ -n "$public_host" ] || fail "Couldn't detect the server address. Re-run with PUBLIC_HOST=your.server.ip"
+
+set_env PUBLIC_HTTP_PORT "$app_port"
+set_env PUBLIC_API_PORT "$api_port"
+set_env APP_URL "http://${public_host}:${app_port}"
+set_env API_URL "http://${public_host}:${api_port}"
+set_env CORS_ORIGINS "http://${public_host}:${app_port}"
+ok "App http://${public_host}:${app_port}, API http://${public_host}:${api_port}"
+
+step "Backend: dependencies and migrations"
+cd "$repo_root/backend"
+[ -d .venv ] || python3 -m venv .venv
+.venv/bin/pip install -q --upgrade pip
+.venv/bin/pip install -q -r requirements.txt
+mkdir -p storage
+.venv/bin/alembic upgrade head
+ok "Database schema is up to date."
+
+step "Frontend: build"
+cd "$repo_root/frontend"
+npm ci --silent
+VITE_API_URL="http://${public_host}:${api_port}" npm run build --silent
+ok "Built frontend/dist."
+
+step "Starting services"
+cat > /etc/systemd/system/utender-backend.service <<EOF
+[Unit]
+Description=U-Tender backend
+After=network.target mariadb.service mysql.service
+
+[Service]
+WorkingDirectory=$repo_root/backend
+ExecStart=$repo_root/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port $api_port
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat > /etc/systemd/system/utender-frontend.service <<EOF
+[Unit]
+Description=U-Tender frontend
+After=network.target
+
+[Service]
+WorkingDirectory=$repo_root/frontend
+ExecStart=$(command -v serve) -s dist -l $app_port
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --quiet utender-backend utender-frontend
+systemctl restart utender-backend utender-frontend
+
+if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
+    ufw allow "${app_port}/tcp" >/dev/null
+    ufw allow "${api_port}/tcp" >/dev/null
+fi
+
+for _ in $(seq 1 20); do
+    curl -fsS --max-time 2 "http://127.0.0.1:${api_port}/health" >/dev/null 2>&1 && break
+    sleep 1
 done
-if [ "$ready" = true ]; then
-    ok "Backend is up."
+if curl -fsS --max-time 2 "http://127.0.0.1:${api_port}/health" >/dev/null 2>&1; then
+    ok "Backend is healthy."
 else
-    warn "Backend didn't respond yet. Check what's happening with: docker compose logs backend"
+    echo "    Backend isn't responding yet -- check: journalctl -u utender-backend -n 50 --no-pager"
 fi
 
 echo
 echo -e "\033[36mU-Tender is running:\033[0m"
-echo "  App:  http://$public_ip:$http_port"
-echo "  API:  http://$public_ip:$api_port"
+echo "  App:  http://${public_host}:${app_port}"
+echo "  API:  http://${public_host}:${api_port}"
 echo
-echo -e "\033[36mFirst time here? Sign up through the app (as an owner or contractor),\033[0m"
-echo "then make that account an admin:"
-echo "  docker compose exec mysql mysql -uutender -putender utender -e \"UPDATE users SET role='admin' WHERE email='YOUR-EMAIL-HERE';\""
-echo
-echo "Useful commands:"
-echo "  docker compose logs -f                        (watch the logs)"
-echo "  docker compose down                            (stop everything)"
-echo "  ./deploy.sh                                     (start it again later)"
+echo "Logs:     journalctl -u utender-backend -f"
+echo "Restart:  systemctl restart utender-backend utender-frontend"
+echo "Update:   git pull && ./deploy.sh"

@@ -41,15 +41,25 @@ This starts MySQL, runs the Alembic migration automatically on backend
 startup, and serves the API on `http://localhost:8000` and the frontend on
 `http://localhost:5173`.
 
-**Deploying to a real server:** SSH in (e.g. with PuTTY on Windows), clone
-this repo, and run `./deploy.sh` from the repo root. It installs Docker if
-needed, detects the server's public IP, creates `backend/.env` with that
-IP filled in and random secrets generated, then builds and starts a
-production setup: the frontend as a real nginx-served build (not the dev
-server `docker-compose.yml` uses) on port 80, and MySQL is not published
-to the internet at all — see `docker-compose.prod.yml` for exactly what
-changes. Safe to run again later; it's also how you start the app back up
-after a reboot.
+**Deploying to a real server:** the server needs a MySQL/MariaDB database
+and a user for it already set up (e.g. created in CloudPanel). SSH in,
+clone this repo, and from the repo root run as root:
+
+```
+DB_USER='app_user' DB_PASSWORD='secret' DB_NAME='utender' ./deploy.sh
+```
+
+It installs Python/Node if needed, writes `backend/.env` (fresh secrets,
+your database login, the server's public address), runs the migrations,
+builds the frontend and starts both as systemd services
+(`utender-backend`, `utender-frontend`). It picks free ports from 8080 up
+on the first run; set `APP_PORT`/`API_PORT` to choose them. After a
+`git pull`, just run `./deploy.sh` again -- everything is remembered in
+`backend/.env`. The script header lists the other options.
+
+`docker-compose.prod.yml` remains for running the production build with
+Docker yourself:
+`docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d`.
 
 **Without Docker:**
 
@@ -100,7 +110,7 @@ python scripts/seed_kuwait_demo.py --api-url http://localhost:8000 \
 ```
 
 Point `--api-url` at wherever the backend is actually reachable (e.g. the
-port `deploy-native.sh` picked on a live server). Safe to run more than
+API port `deploy.sh` printed on a live server). Safe to run more than
 once for the accounts themselves — an email that already exists just gets
 logged into instead of re-registered — but not for projects/offers, which
 have no natural key to dedupe against and would be created a second time;
