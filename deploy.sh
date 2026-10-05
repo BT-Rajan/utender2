@@ -62,31 +62,38 @@ command -v serve >/dev/null 2>&1 || npm install -g --silent serve
 ok "Python, Node and serve are ready."
 
 step "Configuring backend/.env"
-if [ ! -f "$env_file" ]; then
-    # First run: ask for the database login if it wasn't passed in.
-    if [ -z "${DB_USER:-}" ] && [ -t 0 ]; then
+# backend/.env is (re)built from whatever it already holds: anything missing,
+# blank or still a placeholder is filled in; real values are kept.
+[ -s "$env_file" ] || cp "$repo_root/backend/.env.example" "$env_file"
+chmod 600 "$env_file"
+
+db_url="$(get_env DATABASE_URL)"
+if [ -z "${DB_USER:-}" ] && { [ -z "$db_url" ] || [[ "$db_url" == *"utender:utender@localhost"* ]]; }; then
+    # No real database login yet: ask for it if we can.
+    if [ -t 0 ]; then
         read -r -p "    MySQL user: " DB_USER
         read -r -s -p "    MySQL password: " DB_PASSWORD; echo
         read -r -p "    Database name [utender]: " DB_NAME
         DB_NAME="${DB_NAME:-utender}"
     fi
-    [ -n "${DB_USER:-}" ] && [ -n "${DB_PASSWORD:-}" ] \
-        || fail "First run needs the database login: DB_USER='app_user' DB_PASSWORD='secret' DB_NAME='utender' ./deploy.sh"
-    cp "$repo_root/backend/.env.example" "$env_file"
-    chmod 600 "$env_file"
-    set_env ENVIRONMENT production
-    set_env JWT_SECRET "$(secret)"
-    set_env STORAGE_SIGNING_SECRET "$(secret)"
-    set_env CRON_SECRET "$(secret)"
-    set_env STORAGE_ROOT "$repo_root/backend/storage"
-    ok "Created backend/.env with fresh secrets."
+    [ -n "${DB_USER:-}" ] \
+        || fail "Needs the database login: ./deploy.sh DB_USER='app_user' DB_PASSWORD='secret' DB_NAME='utender'"
 fi
-
 if [ -n "${DB_USER:-}" ]; then
     [ -n "${DB_PASSWORD:-}" ] || fail "DB_PASSWORD is required together with DB_USER."
     set_env DATABASE_URL "mysql+pymysql://$(urlenc "$DB_USER"):$(urlenc "$DB_PASSWORD")@${DB_HOST:-127.0.0.1}:${DB_PORT:-3306}/${DB_NAME:-utender}"
     ok "Database: ${DB_USER}@${DB_HOST:-127.0.0.1}:${DB_PORT:-3306}/${DB_NAME:-utender}"
 fi
+
+for key in JWT_SECRET STORAGE_SIGNING_SECRET CRON_SECRET; do
+    value="$(get_env "$key")"
+    if [ -z "$value" ] || [[ "$value" == change-me* ]]; then
+        set_env "$key" "$(secret)"
+        ok "Generated $key."
+    fi
+done
+set_env ENVIRONMENT production
+set_env STORAGE_ROOT "$repo_root/backend/storage"
 
 # Ports: explicit APP_PORT/API_PORT, else what backend/.env remembers, else
 # the first free port from 8080 up (only on the first run).
