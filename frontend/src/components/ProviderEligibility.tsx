@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
-import type { EligibilityQualification, ProjectDetail, ProviderEligibility } from "@/api/types";
+import { Link } from "react-router-dom";
+import type { EligibilityQualification, EligibilityReason, ProjectDetail, ProviderEligibility } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
 
@@ -13,7 +14,12 @@ export function ProviderEligibilityEditor({ project }: { project: ProjectDetail 
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const rules = project.provider_eligibility;
-  const initial = () => ({ provider_type: rules.provider_type, qualifications: rules.qualifications.map((q) => q.id) });
+  const initial = () => ({
+    provider_type: rules.provider_type,
+    qualifications: rules.qualifications.map((q) => q.id),
+    match_category: rules.match_category,
+    match_governorate: rules.match_governorate,
+  });
   const [values, setValues] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -67,6 +73,36 @@ export function ProviderEligibilityEditor({ project }: { project: ProjectDetail 
         </fieldset>
 
         <fieldset className="border-t border-border pt-4">
+          <legend className="font-display text-sm font-semibold text-navy pt-4">{t("eligibility.matchingHeading")}</legend>
+          <label className="flex items-start gap-2 text-sm text-navy">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={values.match_category}
+              disabled={!project.category_id && !values.match_category}
+              onChange={(e) => set({ match_category: e.target.checked })}
+            />
+            <span>
+              {t("eligibility.matchCategory").replace("{category}", project.trade ?? "—")}
+              {!project.category_id && <span className="block text-xs text-steel-light">{t("eligibility.matchCategoryUnavailable")}</span>}
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm text-navy mt-1.5">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={values.match_governorate}
+              disabled={!project.governorate && !values.match_governorate}
+              onChange={(e) => set({ match_governorate: e.target.checked })}
+            />
+            <span>
+              {t("eligibility.matchGovernorate").replace("{governorate}", project.governorate ? t(`location.${project.governorate}`) : "—")}
+              {!project.governorate && <span className="block text-xs text-steel-light">{t("eligibility.matchGovernorateUnavailable")}</span>}
+            </span>
+          </label>
+        </fieldset>
+
+        <fieldset className="border-t border-border pt-4">
           <legend className="font-display text-sm font-semibold text-navy pt-4">{t("eligibility.qualificationsHeading")}</legend>
           <p className="text-xs text-steel-light mb-2">{t("eligibility.qualificationsHint")}</p>
           {options.length === 0 ? (
@@ -113,21 +149,48 @@ export function ProviderEligibilityEditor({ project }: { project: ProjectDetail 
 export function eligibilitySummary(t: (key: string) => string, rules: ProviderEligibility): string {
   const parts = [
     ...(rules.provider_type === "organization" ? [t("eligibility.organizationOnly")] : []),
+    ...(rules.match_category && rules.category ? [rules.category] : []),
+    ...(rules.match_governorate && rules.governorate ? [t(`location.${rules.governorate}`)] : []),
     ...rules.qualifications.map((q) => q.name),
   ];
   return parts.length ? parts.join(" · ") : t("eligibility.openToAll");
 }
 
-export function IneligibleNotice({ reasons }: { reasons: string[] }) {
+export function reasonText(t: (key: string) => string, reason: EligibilityReason): string {
+  return t(`eligibility.reason_${reason.code}`)
+    .replace("{name}", reason.name ?? "")
+    .replace("{date}", reason.date ? new Date(`${reason.date}T00:00:00`).toLocaleDateString() : "")
+    .replace("{governorate}", reason.governorate ? t(`location.${reason.governorate}`) : "");
+}
+
+// Each reason in the viewer's language, with a way to act on it where the
+// provider can (their declared services, or adding a qualification).
+export function IneligibleNotice({ reasons }: { reasons: EligibilityReason[] }) {
   const { t } = useI18n();
+  const fixServices = reasons.some((r) => r.code === "category_not_offered" || r.code === "governorate_not_served");
+  const addQualification = reasons.some((r) => r.code === "qualification_missing" || r.code === "qualification_expired");
   return (
     <div className="border border-amber-dark/40 bg-amber/10 rounded px-4 py-3 text-sm text-navy">
       <strong className="font-display block mb-1">{t("eligibility.notEligible")}</strong>
       <ul className="list-disc ps-5 text-[13px] text-steel">
         {reasons.map((r) => (
-          <li key={r}>{r}</li>
+          <li key={r.code + (r.name ?? "") + (r.governorate ?? "")}>{reasonText(t, r)}</li>
         ))}
       </ul>
+      {(fixServices || addQualification) && (
+        <div className="flex gap-3 mt-1.5 text-xs">
+          {fixServices && (
+            <Link to="/service-provider/dashboard#services" className="text-blue underline">
+              {t("eligibility.fixServices")}
+            </Link>
+          )}
+          {addQualification && (
+            <Link to="/service-provider/verify" className="text-blue underline">
+              {t("eligibility.addQualification")}
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   );
 }

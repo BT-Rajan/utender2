@@ -15,12 +15,15 @@ from app.models.user import User
 from app.schemas.service_provider import ServiceProviderProfileOut, MyBidOut, SubmitForReview
 from app.schemas.document import ServiceProviderDocumentOut, DocumentRequirementOut
 from app.schemas.project import ProjectOut
+from app.schemas.category import ProviderServices
+from app.services.categories import clean_services
 from app.services.eligibility import ineligibility_reasons
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.locations import clean_governorate
 from app.services.stakeholder import require_established
 from app.services.verification import (
     applicable_requirements,
+    assert_can_upload,
     assert_editable,
     assert_ready_to_submit,
     checklist,
@@ -99,6 +102,7 @@ def feed(
                 area=p.area,
                 description=None,
                 trade=p.trade,
+                category_id=p.category_id,
                 bid_deadline=p.bid_deadline,
                 expected_start_date=p.expected_start_date,
                 expected_completion_date=p.expected_completion_date,
@@ -168,6 +172,18 @@ def profile(user: User = Depends(require_service_provider), db: Session = Depend
     return ServiceProviderProfileOut(**_profile_fields(cp), email=user.email)
 
 
+@router.put("/services", response_model=ServiceProviderProfileOut)
+def set_services(payload: ProviderServices, user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
+    """Stage 3.9: what this provider offers and where, in the platform's
+    structured terms. A declaration, editable at any time -- not part of
+    verification. Requirements that match on category or governorate use it."""
+    cp = get_service_provider_profile(user, db)
+    cp.service_categories, cp.service_governorates = clean_services(db, payload.categories, payload.governorates)
+    db.commit()
+    db.refresh(cp)
+    return ServiceProviderProfileOut(**_profile_fields(cp), email=user.email)
+
+
 @router.get("/documents", response_model=list[ServiceProviderDocumentOut])
 def list_documents(user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
     """This account's checklist: one row per applicable requirement."""
@@ -184,10 +200,14 @@ async def upload_document(
     db: Session = Depends(get_db),
 ):
     cp = get_service_provider_profile(user, db)
-    assert_editable(cp)
-    doc = next((d for r, d in checklist(db, cp) if r.id == requirement_id), None)
-    if not doc:
+    entry = next(((r, d) for r, d in checklist(db, cp) if r.id == requirement_id), None)
+    if not entry:
+        assert_editable(cp)
         raise HTTPException(status_code=404, detail="Document requirement not found for this service provider.")
+    requirement, doc = entry
+    # Stage 3.9: a verified provider can add an optional qualification at any
+    # time; everything else only while verification is being completed.
+    assert_can_upload(cp, requirement)
 
     assert_allowed_extension(file.filename, ALLOWED_DOCUMENT_EXTENSIONS)
     content = await file.read()
@@ -229,6 +249,8 @@ def _profile_fields(cp: ServiceProviderProfile) -> dict:
         license_number=cp.license_number,
         primary_trade=cp.primary_trade,
         service_area=cp.service_area,
+        service_categories=cp.service_categories or [],
+        service_governorates=cp.service_governorates or [],
         verification_status=cp.verification_status,
         is_suspended=cp.is_suspended,
         avg_rating=cp.avg_rating,

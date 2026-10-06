@@ -65,7 +65,8 @@ class ProjectOut(BaseModel):
     # Stage 3.9, service provider feed only: whether this provider may respond,
     # and if not, why.
     eligible: bool | None = None
-    ineligible_reasons: list[str] = Field(default_factory=list)
+    ineligible_reasons: list["EligibilityReason"] = Field(default_factory=list)
+    category_id: str | None = None
 
 
 class ProjectItemIn(BaseModel):
@@ -120,6 +121,10 @@ class ProviderEligibilityIn(BaseModel):
 
     provider_type: Literal["any", "organization"] = "any"
     qualifications: list[str] = Field(default_factory=list, max_length=5)
+    # Only providers who list this requirement's service category / serve
+    # its governorate (as declared on their profile).
+    match_category: bool = False
+    match_governorate: bool = False
 
     @field_validator("qualifications")
     @classmethod
@@ -136,6 +141,23 @@ class EligibilityQualification(BaseModel):
 class ProviderEligibilityOut(BaseModel):
     provider_type: Literal["any", "organization"] = "any"
     qualifications: list[EligibilityQualification] = Field(default_factory=list)
+    match_category: bool = False
+    match_governorate: bool = False
+    category: str | None = None  # the requirement's category name, when matched on
+    governorate: str | None = None  # the requirement's governorate key, when matched on
+
+
+class EligibilityReason(BaseModel):
+    """One reason, as a code the interface translates (organization_only,
+    qualification_missing, qualification_expired, category_not_offered,
+    governorate_not_served) plus its details, and the English sentence used
+    in API errors."""
+
+    code: str
+    name: str | None = None  # qualification or category name
+    date: str | None = None  # expiry date (ISO)
+    governorate: str | None = None
+    message: str
 
 
 class EligibilityCheckOut(BaseModel):
@@ -143,7 +165,7 @@ class EligibilityCheckOut(BaseModel):
     when they can't respond -- never an unexplained refusal."""
 
     eligible: bool
-    reasons: list[str] = Field(default_factory=list)
+    reasons: list[EligibilityReason] = Field(default_factory=list)
     rules: ProviderEligibilityOut
 
 
@@ -156,6 +178,9 @@ class ProjectItemOut(BaseModel):
     quantity: Decimal | None
     unit: str | None
     specification: str | None
+
+
+ProjectOut.model_rebuild()
 
 
 class ProjectDetailOut(ProjectOut):

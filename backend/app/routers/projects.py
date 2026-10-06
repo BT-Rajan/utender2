@@ -28,7 +28,8 @@ from app.schemas.project import (
     ProviderEligibilityIn,
     ResponseRequirements,
 )
-from app.services.eligibility import ineligibility_reasons, rules_out, validate_rules
+from app.services.categories import resolve_trade
+from app.services.eligibility import ineligibility_reasons, rules_for, rules_out, validate_rules
 from app.services.drawings import DOCUMENT_CATEGORIES, upload_drawings_for_project
 from app.services.locations import clean_area, clean_governorate
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name
@@ -134,6 +135,7 @@ async def create_project(
     area: str | None = Form(None),
     description: str | None = Form(None),
     trade: str | None = Form(None),
+    category_id: str | None = Form(None),
     bid_deadline: str = Form(...),
     expected_start_date: date | None = Form(None),
     expected_completion_date: date | None = Form(None),
@@ -158,6 +160,7 @@ async def create_project(
     status_value = ProjectStatus(status)
 
     _check_scope_length(description)
+    category_value, trade = resolve_trade(db, category_id, trade)
     governorate_value, area_value = clean_governorate(governorate), clean_area(area)
     deadline = _parse_bid_deadline(bid_deadline)
     if status_value == ProjectStatus.open and deadline <= datetime.utcnow():
@@ -176,7 +179,8 @@ async def create_project(
         governorate=governorate_value,
         area=area_value,
         description=description or None,
-        trade=trade or None,
+        trade=trade,
+        category_id=category_value,
         bid_deadline=deadline,
         expected_start_date=expected_start_date,
         expected_completion_date=expected_completion_date,
@@ -274,9 +278,16 @@ def amend_project(
             changed.append("address")
             project.address = address
 
+    # Stage 3.9: once published, providers were told who may respond on the
+    # basis of the category and governorate; a rule that depends on one fixes it.
+    rules = rules_for(project)
+    published = project.status != ProjectStatus.draft
+
     if "governorate" in payload.model_fields_set:
         governorate = clean_governorate(payload.governorate)
         if governorate != project.governorate:
+            if published and rules.match_governorate:
+                raise HTTPException(status_code=409, detail="Who can respond depends on the governorate, so it can't be changed after publishing.")
             changed.append("governorate")
             project.governorate = governorate
 
@@ -291,9 +302,13 @@ def amend_project(
         changed.append("description")
         project.description = payload.description or None
 
-    if payload.trade is not None and payload.trade != project.trade:
-        changed.append("trade")
-        project.trade = payload.trade or None
+    if "category_id" in payload.model_fields_set or payload.trade is not None:
+        category_value, trade = resolve_trade(db, payload.category_id, payload.trade)
+        if (category_value, trade) != (project.category_id, project.trade):
+            if published and rules.match_category and category_value != project.category_id:
+                raise HTTPException(status_code=409, detail="Who can respond depends on the type of work, so it can't be changed after publishing.")
+            changed.append("trade")
+            project.category_id, project.trade = category_value, trade
 
     deadline_extended = False
     new_deadline = payload.bid_deadline
@@ -446,7 +461,7 @@ def set_provider_eligibility(
     _require_active_owner(user, db)
     if project.status != ProjectStatus.draft:
         raise HTTPException(status_code=409, detail="Eligibility can only be changed while the requirement is a draft.")
-    project.provider_eligibility = validate_rules(db, payload)
+    project.provider_eligibility = validate_rules(db, payload, project)
     db.commit()
     db.refresh(project)
     return _serialize_detail(project, db)
@@ -694,6 +709,7 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
         area=project.area,
         description=project.description,
         trade=project.trade,
+        category_id=project.category_id,
         bid_deadline=project.bid_deadline,
         expected_start_date=project.expected_start_date,
         expected_completion_date=project.expected_completion_date,

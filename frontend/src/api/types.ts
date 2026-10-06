@@ -39,7 +39,8 @@ export interface Project {
   my_offer_status: OfferStatus | null;
   // Stage 3.9, provider feed only.
   eligible?: boolean | null;
-  ineligible_reasons?: string[];
+  ineligible_reasons?: EligibilityReason[];
+  category_id?: string | null;
 }
 
 export interface Drawing {
@@ -74,12 +75,31 @@ export interface EligibilityQualification {
 export interface ProviderEligibility {
   provider_type: "any" | "organization";
   qualifications: EligibilityQualification[];
+  match_category: boolean;
+  match_governorate: boolean;
+  category: string | null;
+  governorate: string | null;
+}
+
+// A reason code the interface translates, with the details to fill in.
+export interface EligibilityReason {
+  code: "organization_only" | "qualification_missing" | "qualification_expired" | "category_not_offered" | "governorate_not_served";
+  name: string | null;
+  date: string | null;
+  governorate: string | null;
+  message: string;
 }
 
 export interface EligibilityCheck {
   eligible: boolean;
-  reasons: string[];
+  reasons: EligibilityReason[];
   rules: ProviderEligibility;
+}
+
+export interface ServiceCategory {
+  id: string;
+  name: string;
+  is_active: boolean;
 }
 
 export interface ResponseRequirements {
@@ -144,6 +164,8 @@ export interface ServiceProviderProfile {
   license_number: string | null;
   primary_trade: string | null;
   service_area: string | null;
+  service_categories: string[];
+  service_governorates: string[];
   verification_status: VerificationStatus;
   is_suspended: boolean;
   avg_rating: string;
@@ -247,6 +269,7 @@ export interface AdminOffer {
   service_provider_id: string | null;
   service_provider_company_name: string | null;
   amount: string | null;
+  item_prices?: OfferItemPrice[] | null;
   timeline_estimate: string | null;
   message?: string | null;
   status: OfferStatus;
@@ -277,6 +300,8 @@ export interface AdminProject {
 export interface AdminProjectDetail {
   project: AdminProject;
   offers: AdminOffer[];
+  pricing_basis?: PricingBasis;
+  items?: { id: string; position: number; description: string; quantity: string | null; unit: string | null }[];
 }
 
 export interface Clarification {

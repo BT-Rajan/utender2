@@ -5,6 +5,7 @@ import type { ProjectDetail, TenderType } from "@/api/types";
 import { useI18n } from "@/i18n/I18nContext";
 import { localInputToUtcIso } from "@/lib/dates";
 import { KUWAIT_GOVERNORATES } from "@/lib/location";
+import { CategoryField } from "@/components/CategoryField";
 
 export function OwnerProjectNewPage() {
   const { t } = useI18n();
@@ -120,7 +121,7 @@ export function OwnerProjectNewPage() {
           </div>
           <div>
             <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("owner.projectNew.trade")}</label>
-            <input name="trade" placeholder={t("owner.projectNew.tradePlaceholder")} className="w-full border border-border rounded px-3 py-2.5 text-sm" />
+            <CategoryField name="trade" placeholder={t("owner.projectNew.tradePlaceholder")} className="w-full border border-border rounded px-3 py-2.5 text-sm" />
           </div>
           <div>
             <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("owner.projectNew.scope")}</label>

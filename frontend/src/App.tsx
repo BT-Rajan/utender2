@@ -23,6 +23,7 @@ import { ServiceProviderOfferPage } from "@/pages/service-provider/Offer";
 import { ServiceProviderSubscribePage } from "@/pages/service-provider/Subscribe";
 import { AdminLayout } from "@/pages/admin/AdminLayout";
 import { AdminRequirementsPage } from "@/pages/admin/Requirements";
+import { AdminCategoriesPage } from "@/pages/admin/Categories";
 import { AdminReviewPage } from "@/pages/admin/Review";
 import { AdminServiceProvidersPage } from "@/pages/admin/ServiceProviders";
 import { AdminServiceProviderDetailPage } from "@/pages/admin/ServiceProviderDetail";
@@ -137,6 +138,7 @@ export function App() {
           }
         >
           <Route path="requirements" element={<AdminRequirementsPage />} />
+          <Route path="categories" element={<AdminCategoriesPage />} />
           <Route path="review" element={<AdminReviewPage />} />
           <Route path="service-providers" element={<AdminServiceProvidersPage />} />
           <Route path="service-providers/:id" element={<AdminServiceProviderDetailPage />} />

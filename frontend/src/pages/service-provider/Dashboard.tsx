@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { ProviderServicesPanel } from "@/components/ProviderServices";
 import { apiFetch } from "@/api/client";
 import type { ServiceProviderProfile, OfferStatus, ProjectStatus } from "@/api/types";
 import { PageLoading } from "@/components/PageLoading";
@@ -131,6 +132,8 @@ export function ServiceProviderDashboardPage() {
           )}
         </div>
       )}
+
+      <ProviderServicesPanel profile={profile} />
 
       {isActive && (
         <>

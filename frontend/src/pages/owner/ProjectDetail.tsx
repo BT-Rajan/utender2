@@ -15,6 +15,7 @@ import { formatWorkTiming } from "@/lib/dates";
 import { DraftDates } from "@/components/DraftDates";
 import { OfferResponseDetails, ResponseRequirementsEditor } from "@/components/ResponseRequirements";
 import { ProviderEligibilityEditor } from "@/components/ProviderEligibility";
+import { CategoryField } from "@/components/CategoryField";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
 import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
 
@@ -168,7 +169,7 @@ function DraftDetailsForm({ project }: { project: ProjectDetail }) {
         </div>
         <div>
           <label htmlFor="draft-trade" className={label}>{t("draftDetails.category")}</label>
-          <input id="draft-trade" value={trade} onChange={(e) => setTrade(e.target.value)} maxLength={100} className={field} />
+          <CategoryField id="draft-trade" value={trade} onChange={setTrade} className={field} />
           <p className={hint}>{t("draftDetails.categoryHint")}</p>
         </div>
         <div>

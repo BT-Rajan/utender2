@@ -74,7 +74,8 @@ def test_owner_sets_eligibility_on_the_draft_and_it_persists(db):
     assert [o["name"] for o in options] == ["Electrical works licence"]  # provider documents only
 
     pid = owner.post("/projects", data={"title": "Fit-out", "address": "Salwa", "bid_deadline": DEADLINE}).json()["id"]
-    assert owner.get(f"/projects/{pid}").json()["provider_eligibility"] == {"provider_type": "any", "qualifications": []}
+    rules = owner.get(f"/projects/{pid}").json()["provider_eligibility"]
+    assert (rules["provider_type"], rules["qualifications"], rules["match_category"], rules["match_governorate"]) == ("any", [], False, False)
     assert owner.put(f"/projects/{pid}/eligibility", json={"qualifications": ["not-a-real-id"]}).status_code == 400
     r = owner.put(f"/projects/{pid}/eligibility", json={"provider_type": "organization", "qualifications": [licence.id]})
     assert r.status_code == 200
@@ -108,8 +109,11 @@ def test_eligible_provider_responds_and_ineligible_one_cannot_bypass_the_api(db)
     # 2. The listing stays visible with the reasons; everything past it is refused server-side.
     card = next(p for p in individual.get("/service-provider/feed").json() if p["id"] == pid)
     assert card["eligible"] is False and card["address"] is None
-    assert any("organization" in r for r in card["ineligible_reasons"])
-    assert any("Electrical works licence" in r for r in card["ineligible_reasons"])
+    # Codes the interface translates (EN/AR), with the details to fill in.
+    assert [(r["code"], r["name"]) for r in card["ineligible_reasons"]] == [
+        ("organization_only", None),
+        ("qualification_missing", "Electrical works licence"),
+    ]
     assert individual.get(f"/projects/{pid}/eligibility").json()["eligible"] is False
     assert individual.get(f"/projects/{pid}").status_code == 404  # no address, scope or drawings
     assert individual.get(f"/projects/{pid}/drawings-zip").status_code == 404
@@ -120,7 +124,7 @@ def test_eligible_provider_responds_and_ineligible_one_cannot_bypass_the_api(db)
     r = expired.post(f"/projects/{pid}/offers", json={"amount": "2000"})
     assert r.status_code == 403 and "expired on" in r.json()["detail"]
     reasons = expired.get(f"/projects/{pid}/eligibility").json()["reasons"]
-    assert len(reasons) == 1 and "expired" in reasons[0]  # organization part is satisfied
+    assert [(r["code"], r["date"]) for r in reasons] == [("qualification_expired", (date.today() - timedelta(days=1)).isoformat())]
 
     # The owner only ever receives offers from eligible providers.
     assert [o["service_provider_company_name"] for o in owner.get(f"/owner/projects/{pid}/offers").json()] == ["noor"]

@@ -7,6 +7,7 @@ class ProjectAmendmentRequest(BaseModel):
     title: str | None = None
     description: str | None = None
     trade: str | None = None
+    category_id: str | None = None  # one of the platform's service categories (sets trade)
     address: str | None = None
     governorate: str | None = None
     area: str | None = None

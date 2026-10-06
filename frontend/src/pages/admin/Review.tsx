@@ -216,6 +216,15 @@ export function AdminReviewPage() {
                 ))}
               </div>
 
+              {selected.service_provider.verification_status === "approved" ? (
+                // Stage 3.9: an already-verified provider who added an optional
+                // qualification. Decide the document above; the account stays verified.
+                <p className="py-4 border-t border-border mt-1 text-[12.5px] text-steel">
+                  Already verified — this is an added qualification. Approve it or request a correction above; their verification and
+                  marketplace access are unaffected.
+                </p>
+              ) : (
+              <>
               <div className="py-4.5 border-t border-border mt-1">
                 <ApplicationDecisionControls
                   canApprove={readyToApprove}
@@ -229,6 +238,8 @@ export function AdminReviewPage() {
                 <p className="text-[11px] text-steel-light -mt-2 pb-4">
                   All required documents must be approved before this service provider can be approved.
                 </p>
+              )}
+              </>
               )}
             </div>
           )}

@@ -13,6 +13,21 @@ export interface Dictionary {
     optional: string;
     noDocuments: string;
   };
+  services: {
+    heading: string;
+    hint: string;
+    categories: string;
+    governorates: string;
+    allKuwait: string;
+    noCategories: string;
+    save: string;
+    saved: string;
+    saveError: string;
+  };
+  categoryPicker: {
+    choose: string;
+    none: string;
+  };
   eligibility: {
     heading: string;
     hint: string;
@@ -30,6 +45,18 @@ export interface Dictionary {
     notEligibleIntro: string;
     backToFeed: string;
     rulesLine: string;
+    reason_organization_only: string;
+    reason_qualification_missing: string;
+    reason_qualification_expired: string;
+    reason_category_not_offered: string;
+    reason_governorate_not_served: string;
+    matchCategory: string;
+    matchCategoryUnavailable: string;
+    matchGovernorate: string;
+    matchGovernorateUnavailable: string;
+    matchingHeading: string;
+    fixServices: string;
+    addQualification: string;
   };
   response: {
     heading: string;
@@ -190,6 +217,7 @@ export interface Dictionary {
     locked: string;
     replace: string;
     noRequirements: string;
+    addLaterHint: string;
   };
   stakeholder: {
     heading: string;
@@ -764,6 +792,21 @@ export const en: Dictionary = {
     optional: "optional",
     noDocuments: "No documents are currently required.",
   },
+  services: {
+    heading: "Your services",
+    hint: "Tell owners what you do and where. Some requirements are open only to providers who offer that type of work or serve that governorate. You can change this at any time.",
+    categories: "Types of work you offer",
+    governorates: "Governorates you serve",
+    allKuwait: "Leave all unticked if you serve all of Kuwait.",
+    noCategories: "The platform has no service categories yet.",
+    save: "Save services",
+    saved: "Saved",
+    saveError: "Could not save your services.",
+  },
+  categoryPicker: {
+    choose: "Choose a type of work",
+    none: "Not specified",
+  },
   eligibility: {
     heading: "Who can respond",
     hint: "Every provider must already be verified by U-Tender. Narrow it further only if the work genuinely needs it — each restriction reduces the offers you receive.",
@@ -781,6 +824,18 @@ export const en: Dictionary = {
     notEligibleIntro: "You can't respond to this requirement:",
     backToFeed: "Back to available projects",
     rulesLine: "Who can respond",
+    reason_organization_only: "This requirement is open to registered organizations only; your account is registered as an individual.",
+    reason_qualification_missing: "This requirement needs a U-Tender-approved \"{name}\". You can add it from your verification page.",
+    reason_qualification_expired: "This requirement needs a valid \"{name}\"; yours expired on {date}.",
+    reason_category_not_offered: "This requirement is for \"{name}\", which isn't among the services on your profile.",
+    reason_governorate_not_served: "This requirement is in {governorate}, which isn't among the governorates your profile says you serve.",
+    matchCategory: "Only providers who offer this type of work ({category})",
+    matchCategoryUnavailable: "Choose the type of work from the platform's list to use this.",
+    matchGovernorate: "Only providers who serve {governorate}",
+    matchGovernorateUnavailable: "Set the governorate to use this.",
+    matchingHeading: "Type of work and location",
+    fixServices: "Update your services",
+    addQualification: "Add a qualification",
   },
   response: {
     heading: "What providers must submit",
@@ -941,6 +996,7 @@ export const en: Dictionary = {
     locked: "Documents can't be changed while your verification is under review or after a decision.",
     replace: "Replace",
     noRequirements: "No documents are currently required for this account.",
+    addLaterHint: "You're verified. You can add optional qualifications at any time — each is reviewed on its own and your access continues meanwhile.",
   },
   stakeholder: {
     heading: "Who does this account represent?",
@@ -1540,6 +1596,21 @@ export const ar: Dictionary = {
     optional: "اختياري",
     noDocuments: "لا توجد مستندات مطلوبة حاليًا.",
   },
+  services: {
+    heading: "خدماتك",
+    hint: "أخبر الملاك بما تقدمه وأين. بعض الطلبات متاحة فقط لمن يقدم نوع العمل المطلوب أو يخدم المحافظة المعنية. يمكنك التعديل في أي وقت.",
+    categories: "أنواع الأعمال التي تقدمها",
+    governorates: "المحافظات التي تخدمها",
+    allKuwait: "اترك الكل دون تحديد إذا كنت تخدم كل الكويت.",
+    noCategories: "لا توجد فئات خدمات على المنصة حتى الآن.",
+    save: "حفظ الخدمات",
+    saved: "تم الحفظ",
+    saveError: "تعذر حفظ خدماتك.",
+  },
+  categoryPicker: {
+    choose: "اختر نوع العمل",
+    none: "غير محدد",
+  },
   eligibility: {
     heading: "من يمكنه تقديم عرض",
     hint: "يجب أن يكون كل مقدم خدمة موثقًا مسبقًا لدى U-Tender. لا تضيّق النطاق إلا إذا تطلّب العمل ذلك فعلًا — فكل قيد يقلل عدد العروض التي تصلك.",
@@ -1557,6 +1628,18 @@ export const ar: Dictionary = {
     notEligibleIntro: "لا يمكنك تقديم عرض لهذا الطلب:",
     backToFeed: "العودة إلى المشاريع المتاحة",
     rulesLine: "من يمكنه تقديم عرض",
+    reason_organization_only: "هذا الطلب متاح للجهات المسجلة فقط؛ حسابك مسجل كفرد.",
+    reason_qualification_missing: "يتطلب هذا الطلب \"{name}\" معتمدًا من U-Tender. يمكنك إضافته من صفحة التوثيق.",
+    reason_qualification_expired: "يتطلب هذا الطلب \"{name}\" ساري المفعول؛ انتهت صلاحية مستندك في {date}.",
+    reason_category_not_offered: "هذا الطلب لأعمال \"{name}\"، وهي ليست ضمن الخدمات المدرجة في ملفك.",
+    reason_governorate_not_served: "هذا الطلب في محافظة {governorate}، وهي ليست ضمن المحافظات التي يذكر ملفك أنك تخدمها.",
+    matchCategory: "فقط مقدمو الخدمة الذين يقدمون هذا النوع من الأعمال ({category})",
+    matchCategoryUnavailable: "اختر نوع العمل من قائمة المنصة لاستخدام هذا الخيار.",
+    matchGovernorate: "فقط مقدمو الخدمة الذين يخدمون محافظة {governorate}",
+    matchGovernorateUnavailable: "حدد المحافظة لاستخدام هذا الخيار.",
+    matchingHeading: "نوع العمل والموقع",
+    fixServices: "تحديث خدماتك",
+    addQualification: "إضافة مؤهل",
   },
   response: {
     heading: "ما يجب على مقدمي الخدمة تقديمه",
@@ -1717,6 +1800,7 @@ export const ar: Dictionary = {
     locked: "لا يمكن تغيير المستندات أثناء مراجعة طلب التحقق أو بعد اتخاذ قرار بشأنه.",
     replace: "استبدال",
     noRequirements: "لا توجد مستندات مطلوبة حاليًا لهذا الحساب.",
+    addLaterHint: "حسابك موثق. يمكنك إضافة مؤهلات اختيارية في أي وقت — تُراجع كل منها على حدة ويستمر وصولك أثناء ذلك.",
   },
   stakeholder: {
     heading: "من يمثّل هذا الحساب؟",
