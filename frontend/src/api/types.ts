@@ -57,6 +57,29 @@ export interface ProjectDetail extends Project {
   pricing_basis: PricingBasis;
   items: RequirementItem[];
   drawings: Drawing[];
+  currency: string;
+  response_requirements: ResponseRequirements;
+}
+
+export interface ResponseRequirements {
+  completion_period: "required" | "optional";
+  approach: "required" | "optional";
+  documents: { name: string; required: boolean }[];
+  declarations: string[];
+}
+
+export interface OfferItemPrice {
+  item_id: string;
+  rate: string;
+  line_total: string;
+}
+
+export interface OfferDocument {
+  id: string;
+  label: string;
+  file_name: string;
+  uploaded_at: string;
+  url: string;
 }
 
 export interface Offer {
@@ -75,6 +98,10 @@ export interface Offer {
   service_provider_avg_rating?: string | null;
   service_provider_review_count?: number | null;
   sealed: boolean;
+  item_prices: OfferItemPrice[] | null;
+  assumptions: string | null;
+  declarations_accepted: string[] | null;
+  documents: OfferDocument[];
 }
 
 export interface OfferRevision {
@@ -84,6 +111,8 @@ export interface OfferRevision {
   amount: string;
   timeline_estimate: string | null;
   message: string | null;
+  item_prices: OfferItemPrice[] | null;
+  assumptions: string | null;
   status: OfferStatus;
   recorded_at: string;
 }

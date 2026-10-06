@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import JSON, Boolean, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -20,9 +20,17 @@ class Offer(Base):
     service_provider_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("service_provider_profiles.user_id", ondelete="CASCADE"), nullable=False, index=True
     )
-    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(15, 3), nullable=False)  # KWD: 3 decimals (fils)
     timeline_estimate: Mapped[str | None] = mapped_column(String(255), nullable=True)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Stage 3.8 response content. item_prices: [{"item_id", "rate", "line_total"}]
+    # when the requirement is priced per item (amount is then their sum);
+    # assumptions: the provider's clarifications/assumptions/exclusions;
+    # declarations_accepted: the requirement's declarations as worded when
+    # the provider accepted them.
+    item_prices: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    assumptions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    declarations_accepted: Mapped[list | None] = mapped_column(JSON, nullable=True)
     status: Mapped[OfferStatus] = mapped_column(
         Enum(OfferStatus, native_enum=True), nullable=False, default=OfferStatus.submitted
     )
@@ -52,8 +60,34 @@ class OfferRevision(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
     offer_id: Mapped[str] = mapped_column(String(36), ForeignKey("offers.id", ondelete="CASCADE"), nullable=False, index=True)
     revision_number: Mapped[int] = mapped_column(Integer, nullable=False)
-    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(15, 3), nullable=False)  # KWD: 3 decimals (fils)
     timeline_estimate: Mapped[str | None] = mapped_column(String(255), nullable=True)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    item_prices: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    assumptions: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[OfferStatus] = mapped_column(Enum(OfferStatus, native_enum=True), nullable=False)
     recorded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+# Stage 3.8: a file a provider submits with their response (method statement,
+# programme, data sheets...), against one of the documents the requirement
+# asks for (label). Keyed like the offer itself -- one requirement, one
+# provider -- so it can be attached before the offer is first submitted.
+# Re-uploading the same label replaces it until bidding closes.
+class OfferDocument(Base):
+    __tablename__ = "offer_documents"
+    __table_args__ = (
+        UniqueConstraint("project_id", "service_provider_id", "label", name="uq_offer_document_label"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    service_provider_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("service_provider_profiles.user_id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    file_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())

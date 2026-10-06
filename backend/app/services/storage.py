@@ -121,6 +121,9 @@ class S3Storage(Storage):
             "project-drawings": settings.s3_bucket_drawings,
             "service-provider-documents": settings.s3_bucket_documents,
             "owner-documents": settings.s3_bucket_owner_documents,
+            # Stage 3.8 response attachments share the documents bucket; their
+            # keys are namespaced by project and provider.
+            "offer-documents": settings.s3_bucket_documents,
         }.get(bucket, bucket)
 
     def _resolve_key(self, key: str) -> str:

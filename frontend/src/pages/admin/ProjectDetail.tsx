@@ -6,6 +6,7 @@ import type { AdminOffer, AdminProjectDetail } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
+import { money } from "@/lib/money";
 
 // datetime-local inputs want "YYYY-MM-DDTHH:mm" with no timezone suffix.
 function toLocalInputValue(iso: string): string {
@@ -118,7 +119,7 @@ function OfferRow({ offer, projectId, t }: { offer: AdminOffer; projectId: strin
           </span>
         )}
       </td>
-      <td className="py-3 px-2.5 font-mono font-semibold text-navy text-sm">{offer.amount !== null ? `$${Number(offer.amount).toLocaleString()}` : "—"}</td>
+      <td className="py-3 px-2.5 font-mono font-semibold text-navy text-sm">{money(offer.amount)}</td>
       <td className="py-3 px-2.5 text-[12.5px] text-steel">{offer.timeline_estimate || "—"}</td>
       <td className="py-3 px-2.5">
         <span className={`font-mono text-[10px] uppercase px-2 py-0.5 rounded-full ${OFFER_STATUS_BADGE[offer.status] ?? "bg-blue-tint text-steel"}`}>

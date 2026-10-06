@@ -6,7 +6,7 @@ from app.models.cms_content import CmsContent
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import ServiceProviderDocument, DocumentRequirement, OwnerDocument
 from app.models.notification import Notification
-from app.models.offer import Offer, OfferRevision
+from app.models.offer import Offer, OfferDocument, OfferRevision
 from app.models.organization import Organization, OrganizationMembership
 from app.models.owner import OwnerProfile
 from app.models.payment_override import PaymentOverride
@@ -33,6 +33,7 @@ __all__ = [
     "Clarification",
     "Offer",
     "OfferRevision",
+    "OfferDocument",
     "AwardRecord",
     "Review",
     "RevokedToken",

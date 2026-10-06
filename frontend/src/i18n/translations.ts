@@ -13,6 +13,45 @@ export interface Dictionary {
     optional: string;
     noDocuments: string;
   };
+  response: {
+    heading: string;
+    hint: string;
+    completionPeriod: string;
+    approach: string;
+    required: string;
+    optional: string;
+    documentsHeading: string;
+    documentsHint: string;
+    documentName: string;
+    addDocument: string;
+    remove: string;
+    declarationsHeading: string;
+    declarationsHint: string;
+    declarationText: string;
+    addDeclaration: string;
+    save: string;
+    saved: string;
+    saveError: string;
+    whatToSubmit: string;
+    priceTotal: string;
+    pricePerItem: string;
+    rateCol: string;
+    lineTotalCol: string;
+    total: string;
+    amount: string;
+    assumptions: string;
+    assumptionsPlaceholder: string;
+    attachments: string;
+    upload: string;
+    replace: string;
+    uploadError: string;
+    declarations: string;
+    requiredMark: string;
+    noDocuments: string;
+    itemBreakdown: string;
+    declarationsConfirmed: string;
+    details: string;
+  };
   dates: {
     heading: string;
     responseHeading: string;
@@ -707,6 +746,45 @@ export const en: Dictionary = {
     optional: "optional",
     noDocuments: "No documents are currently required.",
   },
+  response: {
+    heading: "What providers must submit",
+    hint: "Every offer includes a price in {currency}. Choose what else a complete offer must contain. Offers missing a required part are refused.",
+    completionPeriod: "Completion period",
+    approach: "Technical approach / method",
+    required: "Required",
+    optional: "Optional",
+    documentsHeading: "Documents to attach",
+    documentsHint: "e.g. Method statement, Programme, Trade licence copy.",
+    documentName: "Document name",
+    addDocument: "Add document",
+    remove: "Remove",
+    declarationsHeading: "Declarations providers must confirm",
+    declarationsHint: "Short statements each provider must tick, e.g. \"I have visited the site.\"",
+    declarationText: "Declaration",
+    addDeclaration: "Add declaration",
+    save: "Save response requirements",
+    saved: "Saved",
+    saveError: "Could not save the response requirements.",
+    whatToSubmit: "What your offer must include",
+    priceTotal: "Total price in {currency}",
+    pricePerItem: "A rate in {currency} for every item listed",
+    rateCol: "Rate ({currency})",
+    lineTotalCol: "Line total",
+    total: "Total",
+    amount: "Your total price ({currency})",
+    assumptions: "Assumptions, exclusions & clarifications",
+    assumptionsPlaceholder: "e.g. Excludes dewatering; client provides water and power on site.",
+    attachments: "Supporting documents",
+    upload: "Upload",
+    replace: "Replace",
+    uploadError: "Could not upload the document.",
+    declarations: "Declarations",
+    requiredMark: "required",
+    noDocuments: "No documents attached.",
+    itemBreakdown: "Price breakdown",
+    declarationsConfirmed: "All declarations confirmed",
+    details: "Response details",
+  },
   dates: {
     heading: "Dates",
     responseHeading: "Offer deadline",
@@ -1085,7 +1163,7 @@ export const en: Dictionary = {
       awardedTo: "Awarded to",
       anotherServiceProvider: "another service provider",
       noAwardNotice: "The owner decided not to award this project.",
-      bidAmount: "Your bid amount (USD)",
+      bidAmount: "Your bid amount",
       timeline: "Estimated timeline",
       timelinePlaceholder: "e.g. 3 weeks from start",
       messageToOwner: "Message to owner",
@@ -1425,6 +1503,45 @@ export const ar: Dictionary = {
     costLabel: "التكلفة",
     optional: "اختياري",
     noDocuments: "لا توجد مستندات مطلوبة حاليًا.",
+  },
+  response: {
+    heading: "ما يجب على مقدمي الخدمة تقديمه",
+    hint: "يتضمن كل عرض سعرًا بعملة {currency}. اختر ما يجب أن يحتويه العرض الكامل أيضًا. تُرفض العروض التي ينقصها جزء مطلوب.",
+    completionPeriod: "مدة الإنجاز",
+    approach: "المنهجية / طريقة التنفيذ",
+    required: "مطلوب",
+    optional: "اختياري",
+    documentsHeading: "المستندات المطلوب إرفاقها",
+    documentsHint: "مثل: بيان طريقة التنفيذ، الجدول الزمني، نسخة الرخصة التجارية.",
+    documentName: "اسم المستند",
+    addDocument: "إضافة مستند",
+    remove: "إزالة",
+    declarationsHeading: "إقرارات يجب على مقدمي الخدمة تأكيدها",
+    declarationsHint: "عبارات قصيرة يؤكدها كل مقدم خدمة، مثل: \"قمت بزيارة الموقع.\"",
+    declarationText: "الإقرار",
+    addDeclaration: "إضافة إقرار",
+    save: "حفظ متطلبات العرض",
+    saved: "تم الحفظ",
+    saveError: "تعذر حفظ متطلبات العرض.",
+    whatToSubmit: "ما يجب أن يتضمنه عرضك",
+    priceTotal: "السعر الإجمالي بعملة {currency}",
+    pricePerItem: "سعر وحدة بعملة {currency} لكل بند مدرج",
+    rateCol: "سعر الوحدة ({currency})",
+    lineTotalCol: "إجمالي البند",
+    total: "الإجمالي",
+    amount: "السعر الإجمالي ({currency})",
+    assumptions: "الافتراضات والاستثناءات والتوضيحات",
+    assumptionsPlaceholder: "مثال: لا يشمل نزح المياه الجوفية؛ يوفر المالك الماء والكهرباء في الموقع.",
+    attachments: "المستندات الداعمة",
+    upload: "رفع",
+    replace: "استبدال",
+    uploadError: "تعذر رفع المستند.",
+    declarations: "الإقرارات",
+    requiredMark: "مطلوب",
+    noDocuments: "لا توجد مستندات مرفقة.",
+    itemBreakdown: "تفصيل السعر",
+    declarationsConfirmed: "تم تأكيد جميع الإقرارات",
+    details: "تفاصيل العرض",
   },
   dates: {
     heading: "التواريخ",
@@ -1804,7 +1921,7 @@ export const ar: Dictionary = {
       awardedTo: "تم الترسية على",
       anotherServiceProvider: "مزوّد خدمة آخر",
       noAwardNotice: "قرر المالك عدم ترسية هذا المشروع.",
-      bidAmount: "قيمة عرضك (دولار أمريكي)",
+      bidAmount: "قيمة عرضك",
       timeline: "الجدول الزمني المتوقع",
       timelinePlaceholder: "مثال: 3 أسابيع من بدء العمل",
       messageToOwner: "رسالة إلى المالك",

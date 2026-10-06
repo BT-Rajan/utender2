@@ -17,7 +17,8 @@ from app.models.project_amendment import ProjectAmendment
 from app.models.user import User
 from app.schemas.amendment import ProjectAmendmentOut, ProjectAmendmentRequest
 from app.schemas.award import AwardRecordOut
-from app.schemas.project import DrawingOut, ProjectCreate, ProjectDetailOut, ProjectItemOut, ProjectItemsUpdate
+from app.config import get_settings
+from app.schemas.project import DrawingOut, ProjectCreate, ProjectDetailOut, ProjectItemOut, ProjectItemsUpdate, ResponseRequirements
 from app.services.drawings import DOCUMENT_CATEGORIES, upload_drawings_for_project
 from app.services.locations import clean_area, clean_governorate
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name
@@ -398,6 +399,24 @@ def set_project_items(
     return _serialize_detail(project, db)
 
 
+@router.put("/{project_id}/response-requirements", response_model=ProjectDetailOut)
+def set_response_requirements(
+    project_id: str, payload: ResponseRequirements, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Stage 3.8: what providers must submit with their price. Owner only,
+    while a draft -- once published, providers rely on these terms."""
+    project = db.get(Project, project_id)
+    if not project or project.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    _require_active_owner(user, db)
+    if project.status != ProjectStatus.draft:
+        raise HTTPException(status_code=409, detail="Response requirements can only be changed while the requirement is a draft.")
+    project.response_requirements = payload.model_dump()
+    db.commit()
+    db.refresh(project)
+    return _serialize_detail(project, db)
+
+
 @router.get("/{project_id}/amendments", response_model=list[ProjectAmendmentOut])
 def list_amendments(project_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     project = db.get(Project, project_id)
@@ -641,4 +660,6 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
         drawings=drawings,
         pricing_basis=project.pricing_basis,
         items=[ProjectItemOut.model_validate(i) for i in project.items],
+        response_requirements=ResponseRequirements(**(project.response_requirements or {})),
+        currency=get_settings().marketplace_currency,
     )

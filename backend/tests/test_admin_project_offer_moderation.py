@@ -102,7 +102,7 @@ def test_admin_project_detail_shows_offers_unredacted_even_when_sealed():
     assert body["project"]["title"] == "Sealed job"
     assert len(body["offers"]) == 1
     assert body["offers"][0]["service_provider_id"] == c1_id
-    assert body["offers"][0]["amount"] == "5000.00"
+    assert body["offers"][0]["amount"] == "5000.000"
     assert body["offers"][0]["service_provider_company_name"] == "Acme"
 
 
@@ -206,14 +206,14 @@ def test_admin_edit_offer_snapshots_revision():
 
     r = admin_client.patch(f"/admin/offers/{offer_id}", json={"amount": "4500.00", "message": "corrected typo"})
     assert r.status_code == 200
-    assert r.json()["amount"] == "4500.00"
+    assert r.json()["amount"] == "4500.000"
     assert r.json()["message"] == "corrected typo"
     assert r.json()["revision"] == 2
 
     r = c1.get(f"/projects/{project_id}/offers/mine/history")
     assert r.status_code == 200
     assert len(r.json()) == 1
-    assert r.json()[0]["amount"] == "5000.00"
+    assert r.json()[0]["amount"] == "5000.000"
     assert r.json()[0]["message"] == "original"
 
     r = admin_client.patch(f"/admin/offers/{offer_id}", json={"amount": "0"})

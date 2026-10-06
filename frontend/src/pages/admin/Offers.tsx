@@ -5,6 +5,7 @@ import { apiFetch } from "@/api/client";
 import type { AdminOffer } from "@/api/types";
 import { QueryError } from "@/components/QueryError";
 import { useI18n } from "@/i18n/I18nContext";
+import { money } from "@/lib/money";
 
 const STATUS_BADGE: Record<string, string> = {
   submitted: "bg-blue-tint text-blue",
@@ -126,7 +127,7 @@ export function AdminOffersPage() {
                               {o.revision > 1 && <span className="text-[11px] text-steel-light"> · {t("admin.offers.revised")} x{o.revision - 1}</span>}
                             </td>
                             <td className="py-2.5 px-2.5 font-mono font-semibold text-navy text-sm">
-                              {o.amount !== null ? `$${Number(o.amount).toLocaleString()}` : "—"}
+                              {money(o.amount)}
                             </td>
                             <td className="py-2.5 px-2.5">
                               <div className="flex items-center gap-1.5">

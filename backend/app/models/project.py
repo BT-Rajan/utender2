@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -50,6 +50,10 @@ class Project(Base):
     pricing_basis: Mapped[PricingBasis] = mapped_column(
         Enum(PricingBasis, native_enum=True), nullable=False, default=PricingBasis.lump_sum
     )
+    # Stage 3.8: what a provider must submit beyond the price (see
+    # schemas.project.ResponseRequirements). NULL = the defaults: price only,
+    # everything else optional.
+    response_requirements: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     # Admin moderation flag — independent of the owner-driven lifecycle
     # `status` above. Hides the project from the service provider feed and blocks
     # new bids while set, but leaves `status` untouched so un-suspending

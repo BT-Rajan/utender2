@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError, API_URL } from "@/api/client";
-import type { Offer, ProjectDetail } from "@/api/types";
+import type { Offer, OfferDocument, ProjectDetail } from "@/api/types";
 import { formatDeadline, timeRemaining } from "@/lib/format";
 import { PageLoading } from "@/components/PageLoading";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { RequirementItemsView } from "@/components/RequirementItems";
 import { ClarificationsPanel } from "@/components/ClarificationsPanel";
+import { ResponseRequirementsSummary } from "@/components/ResponseRequirements";
 import { useI18n } from "@/i18n/I18nContext";
+import { money } from "@/lib/money";
 import { formatWorkTiming } from "@/lib/dates";
 import { sortDocuments } from "@/lib/documents";
 import { formatArea } from "@/lib/location";
@@ -30,8 +32,8 @@ function AwardOutcome({ projectId }: { projectId: string }) {
 
   return (
     <p className="mt-3 font-mono text-xs text-navy">
-      {t("service_provider.offer.awardedTo")} {award.service_provider_company_name ?? t("service_provider.offer.anotherServiceProvider")} at $
-      {Number(award.amount).toLocaleString()}
+      {t("service_provider.offer.awardedTo")} {award.service_provider_company_name ?? t("service_provider.offer.anotherServiceProvider")} at{" "}
+      {money(award.amount)}
     </p>
   );
 }
@@ -45,6 +47,9 @@ export function ServiceProviderOfferPage() {
   const [amount, setAmount] = useState("");
   const [timeline, setTimeline] = useState("");
   const [message, setMessage] = useState("");
+  const [assumptions, setAssumptions] = useState("");
+  const [rates, setRates] = useState<Record<string, string>>({});
+  const [accepted, setAccepted] = useState<string[]>([]);
 
   const {
     data: project,
@@ -77,17 +82,62 @@ export function ServiceProviderOfferPage() {
 
   useEffect(() => {
     if (existingOffer) {
-      setAmount(String(existingOffer.amount));
+      setAmount(existingOffer.amount === null ? "" : String(Number(existingOffer.amount)));
       setTimeline(existingOffer.timeline_estimate ?? "");
       setMessage(existingOffer.message ?? "");
+      setAssumptions(existingOffer.assumptions ?? "");
+      setRates(Object.fromEntries((existingOffer.item_prices ?? []).map((l) => [l.item_id, String(Number(l.rate))])));
+      setAccepted(existingOffer.declarations_accepted ?? []);
     }
   }, [existingOffer]);
+
+  // Stage 3.8: attachments the requirement asks for, one per requested label.
+  const { data: myDocuments = [] } = useQuery({
+    queryKey: ["my-offer-documents", id],
+    queryFn: () => apiFetch<OfferDocument[]>(`/projects/${id}/offers/documents`),
+    enabled: !!id,
+  });
+  const uploadMutation = useMutation({
+    mutationFn: ({ label, file }: { label: string; file: File }) => {
+      const formData = new FormData();
+      formData.append("label", label);
+      formData.append("file", file);
+      return apiFetch<OfferDocument[]>(`/projects/${id}/offers/documents`, { method: "POST", formData });
+    },
+    onSuccess: (docs) => {
+      setError(null);
+      queryClient.setQueryData(["my-offer-documents", id], docs);
+    },
+    onError: (err) => setError(err instanceof ApiError ? err.detail : t("response.uploadError")),
+  });
+  const removeDocument = useMutation({
+    mutationFn: (documentId: string) => apiFetch(`/projects/${id}/offers/documents/${documentId}`, { method: "DELETE" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["my-offer-documents", id] }),
+    onError: (err) => setError(err instanceof ApiError ? err.detail : t("response.uploadError")),
+  });
+
+  const perItem = project?.pricing_basis === "per_item";
+  const clean = (v: string) => v.replace(/[^0-9.]/g, "");
+  // Shown as a guide only; the server computes the authoritative total.
+  const lineTotal = (rate: string, quantity: string | null) => {
+    if (!clean(rate)) return null;
+    const value = Number(clean(rate)) * (quantity === null ? 1 : Number(quantity));
+    return Math.round(value * 1000) / 1000;
+  };
+  const itemTotal = project?.items.reduce((sum, item) => sum + (lineTotal(rates[item.id] ?? "", item.quantity) ?? 0), 0) ?? 0;
 
   const submitMutation = useMutation({
     mutationFn: () =>
       apiFetch(`/projects/${id}/offers`, {
         method: "POST",
-        body: { amount: Number(amount.replace(/[^0-9.]/g, "")), timeline_estimate: timeline || null, message: message || null },
+        body: {
+          amount: perItem ? null : clean(amount),
+          item_prices: perItem ? project!.items.map((item) => ({ item_id: item.id, rate: clean(rates[item.id] ?? "") })) : null,
+          timeline_estimate: timeline || null,
+          message: message || null,
+          assumptions: assumptions || null,
+          accepted_declarations: accepted,
+        },
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-offer", id] });
@@ -117,6 +167,9 @@ export function ServiceProviderOfferPage() {
   if (!project) return <PageLoading />;
 
   const biddingClosed = project.status !== "open" || new Date(project.bid_deadline) < new Date();
+  const rules = project.response_requirements;
+  const rateLabel = t("response.rateCol").replace("{currency}", project.currency);
+  const requiredMark = <span className="text-amber-dark"> *</span>;
 
   return (
     <main className="max-w-4xl mx-auto px-5 py-8">
@@ -176,6 +229,8 @@ export function ServiceProviderOfferPage() {
         )}
       </div>
 
+      {!biddingClosed && <ResponseRequirementsSummary project={project} />}
+
       <div className="mb-6">
         <ClarificationsPanel projectId={project.id} role="service_provider" canAsk={project.status === "open"} />
       </div>
@@ -187,7 +242,7 @@ export function ServiceProviderOfferPage() {
           {t("service_provider.offer.biddingClosedNotice")}
           {existingOffer && (
             <div className="mt-3 font-mono text-xs text-navy">
-              {t("service_provider.offer.yourFinalOffer")} ${Number(existingOffer.amount).toLocaleString()} — status: {existingOffer.status}
+              {t("service_provider.offer.yourFinalOffer")} {money(existingOffer.amount, project.currency)} — status: {existingOffer.status}
             </div>
           )}
           {project.status === "awarded" && <AwardOutcome projectId={project.id} />}
@@ -198,35 +253,164 @@ export function ServiceProviderOfferPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6 items-start">
           <form onSubmit={handleSubmit} className="grid gap-[18px]">
+            {perItem ? (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="font-mono text-[10px] uppercase text-steel">
+                      <th className="border-b-2 border-navy py-2 pe-2 text-start">{t("requirementItems.item")}</th>
+                      <th className="border-b-2 border-navy py-2 pe-2 text-end">{t("requirementItems.quantity")}</th>
+                      <th className="border-b-2 border-navy py-2 pe-2 text-start">{rateLabel}</th>
+                      <th className="border-b-2 border-navy py-2 text-end">{t("response.lineTotalCol")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {project.items.map((item) => (
+                      <tr key={item.id} className="border-b border-border">
+                        <td className="py-2 pe-2 text-navy">
+                          {item.position}. {item.description}
+                        </td>
+                        <td className="py-2 pe-2 font-mono text-end whitespace-nowrap">
+                          {item.quantity === null ? "—" : `${Number(item.quantity)} ${item.unit ?? ""}`}
+                        </td>
+                        <td className="py-2 pe-2">
+                          <input
+                            aria-label={`${rateLabel} ${item.position}`}
+                            value={rates[item.id] ?? ""}
+                            onChange={(e) => setRates((r) => ({ ...r, [item.id]: e.target.value }))}
+                            required
+                            inputMode="decimal"
+                            className="w-28 border border-border rounded px-2 py-1.5 text-sm font-mono"
+                          />
+                        </td>
+                        <td className="py-2 font-mono text-end whitespace-nowrap">{money(lineTotal(rates[item.id] ?? "", item.quantity), project.currency)}</td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td colSpan={3} className="py-2 pe-2 font-mono text-[11px] uppercase text-navy text-end">{t("response.total")}</td>
+                      <td className="py-2 font-mono font-semibold text-navy text-end whitespace-nowrap">{money(itemTotal, project.currency)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div>
+                <label htmlFor="offer-amount" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">
+                  {t("response.amount").replace("{currency}", project.currency)}
+                </label>
+                <input
+                  id="offer-amount"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  required
+                  inputMode="decimal"
+                  placeholder="8,400.000"
+                  className="w-full border border-border rounded px-3 py-2.5 text-sm font-mono"
+                />
+              </div>
+            )}
             <div>
-              <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("service_provider.offer.bidAmount")}</label>
+              <label htmlFor="offer-timeline" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">
+                {t("response.completionPeriod")}
+                {rules.completion_period === "required" && requiredMark}
+              </label>
               <input
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                required
-                placeholder="8,400"
-                className="w-full border border-border rounded px-3 py-2.5 text-sm font-mono"
-              />
-            </div>
-            <div>
-              <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("service_provider.offer.timeline")}</label>
-              <input
+                id="offer-timeline"
                 value={timeline}
                 onChange={(e) => setTimeline(e.target.value)}
+                required={rules.completion_period === "required"}
                 placeholder={t("service_provider.offer.timelinePlaceholder")}
                 className="w-full border border-border rounded px-3 py-2.5 text-sm"
               />
             </div>
             <div>
-              <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("service_provider.offer.messageToOwner")}</label>
+              <label htmlFor="offer-message" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">
+                {t("response.approach")}
+                {rules.approach === "required" && requiredMark}
+              </label>
               <textarea
+                id="offer-message"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
+                required={rules.approach === "required"}
                 rows={4}
                 placeholder={t("service_provider.offer.messagePlaceholder")}
                 className="w-full border border-border rounded px-3 py-2.5 text-sm resize-y"
               />
             </div>
+            <div>
+              <label htmlFor="offer-assumptions" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("response.assumptions")}</label>
+              <textarea
+                id="offer-assumptions"
+                value={assumptions}
+                onChange={(e) => setAssumptions(e.target.value)}
+                rows={3}
+                maxLength={10000}
+                placeholder={t("response.assumptionsPlaceholder")}
+                className="w-full border border-border rounded px-3 py-2.5 text-sm resize-y"
+              />
+            </div>
+            {rules.documents.length > 0 && (
+              <fieldset>
+                <legend className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("response.attachments")}</legend>
+                <ul className="grid gap-2">
+                  {rules.documents.map((doc) => {
+                    const attached = myDocuments.find((d) => d.label === doc.name);
+                    return (
+                      <li key={doc.name} className="flex flex-wrap items-center gap-2 text-sm">
+                        <span className="text-navy min-w-[10rem]">
+                          {doc.name}
+                          {doc.required && requiredMark}
+                        </span>
+                        {attached && (
+                          <>
+                            <a href={attached.url} target="_blank" rel="noreferrer" className="font-mono text-xs text-blue underline">
+                              {attached.file_name}
+                            </a>
+                            <button type="button" onClick={() => removeDocument.mutate(attached.id)} className="text-xs text-red underline">
+                              {t("response.remove")}
+                            </button>
+                          </>
+                        )}
+                        <label className="text-xs text-blue underline cursor-pointer">
+                          {attached ? t("response.replace") : t("response.upload")}
+                          <input
+                            type="file"
+                            aria-label={`${t("response.upload")} ${doc.name}`}
+                            className="sr-only"
+                            disabled={uploadMutation.isPending}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) uploadMutation.mutate({ label: doc.name, file });
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </fieldset>
+            )}
+            {rules.declarations.length > 0 && (
+              <fieldset>
+                <legend className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("response.declarations")}</legend>
+                <div className="grid gap-1.5">
+                  {rules.declarations.map((text) => (
+                    <label key={text} className="flex items-start gap-2 text-sm text-navy">
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        required
+                        checked={accepted.includes(text)}
+                        onChange={(e) => setAccepted((a) => (e.target.checked ? [...a, text] : a.filter((x) => x !== text)))}
+                      />
+                      {text}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            )}
             <div className="flex items-center gap-3">
               <button
                 type="submit"

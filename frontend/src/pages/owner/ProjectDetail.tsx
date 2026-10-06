@@ -10,8 +10,10 @@ import { RequirementItemsEditor, RequirementItemsView } from "@/components/Requi
 import { PageLoading } from "@/components/PageLoading";
 import { ClarificationsPanel } from "@/components/ClarificationsPanel";
 import { useI18n } from "@/i18n/I18nContext";
+import { money } from "@/lib/money";
 import { formatWorkTiming } from "@/lib/dates";
 import { DraftDates } from "@/components/DraftDates";
+import { OfferResponseDetails, ResponseRequirementsEditor } from "@/components/ResponseRequirements";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
 import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
 
@@ -39,17 +41,17 @@ function EvaluationSummary({ offers, t }: { offers: Offer[]; t: (key: string) =>
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-4">
       <div className="border border-border bg-white rounded px-3 py-2.5">
-        <div className="font-display text-lg font-semibold text-green leading-none">${low.toLocaleString()}</div>
+        <div className="font-display text-lg font-semibold text-green leading-none">{money(low)}</div>
         <div className="font-mono text-[9.5px] uppercase tracking-wide text-steel mt-1">{t("owner.projectDetail.lowestBid")}</div>
       </div>
       <div className="border border-border bg-white rounded px-3 py-2.5">
         <div className="font-display text-lg font-semibold text-navy leading-none">
-          ${Math.round(avg).toLocaleString()}
+          {money(avg)}
         </div>
         <div className="font-mono text-[9.5px] uppercase tracking-wide text-steel mt-1">{t("owner.projectDetail.averageBid")}</div>
       </div>
       <div className="border border-border bg-white rounded px-3 py-2.5">
-        <div className="font-display text-lg font-semibold text-steel leading-none">${high.toLocaleString()}</div>
+        <div className="font-display text-lg font-semibold text-steel leading-none">{money(high)}</div>
         <div className="font-mono text-[9.5px] uppercase tracking-wide text-steel mt-1">{t("owner.projectDetail.highestBid")}</div>
       </div>
     </div>
@@ -358,6 +360,7 @@ export function OwnerProjectDetailPage() {
       {project.status === "draft" && <DraftDetailsForm project={project} />}
       {project.status === "draft" && <DraftDates project={project} />}
       {project.status === "draft" && <RequirementItemsEditor project={project} />}
+      {project.status === "draft" && <ResponseRequirementsEditor project={project} />}
 
       {(project.status === "draft" ||
         project.status === "open" ||
@@ -587,13 +590,14 @@ export function OwnerProjectDetailPage() {
                         )}
                       </div>
                       {o.message && <div className="text-xs text-steel-light mt-0.5 max-w-xs">{o.message}</div>}
+                      <OfferResponseDetails offer={o} project={project} />
                     </td>
                     <td className="py-3 px-2.5">
                       <span className="text-amber text-[11px] tracking-tight">{stars(Number(o.service_provider_avg_rating ?? 0))}</span>{" "}
                       <span className="font-mono text-[11px] text-steel">({o.service_provider_review_count ?? 0})</span>
                     </td>
                     <td className="py-3 px-2.5 font-mono font-semibold text-navy text-sm">
-                      {o.amount !== null ? `$${Number(o.amount).toLocaleString()}` : "—"}
+                      {money(o.amount, project.currency)}
                     </td>
                     <td className="py-3 px-2.5 font-mono text-xs">{o.timeline_estimate || "—"}</td>
                     <td className="py-3 px-2.5">
