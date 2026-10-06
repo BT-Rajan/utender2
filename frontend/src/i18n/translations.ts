@@ -1,7 +1,36 @@
 export interface Dictionary {
   common: { loading: string; save: string; cancel: string; back: string };
   brand: { tagline: string };
-  home: { login: string; signup: string };
+  home: {
+    login: string;
+    signup: string;
+    statOpen: string;
+    statVerified: string;
+    statAwarded: string;
+    rolesHeading: string;
+    rolesIntro: string;
+    ownerTitle: string;
+    ownerWho: string;
+    ownerStep1: string;
+    ownerStep2: string;
+    ownerStep3: string;
+    ownerStep4: string;
+    ownerAfter: string;
+    ownerCost: string;
+    ownerCta: string;
+    providerTitle: string;
+    providerWho: string;
+    providerStep1: string;
+    providerStep2: string;
+    providerStep3: string;
+    providerStep4: string;
+    providerAfter: string;
+    providerCost: string;
+    providerCta: string;
+    stepsLabel: string;
+    afterLabel: string;
+    costLabel: string;
+  };
   header: { logOut: string; account: string };
   language: { label: string; en: string; ar: string };
   auth: {
@@ -21,6 +50,9 @@ export interface Dictionary {
       iAmA: string;
       propertyOwner: string;
       contractor: string;
+      ownerHint: string;
+      contractorHint: string;
+      chooseRole: string;
       companyName: string;
       companyNameHint: string;
       fullName: string;
@@ -528,6 +560,38 @@ export const en: Dictionary = {
   home: {
     login: "Log in",
     signup: "Sign up",
+    statOpen: "Open tenders",
+    statVerified: "Verified contractors",
+    statAwarded: "Projects awarded",
+    rolesHeading: "Which side are you on?",
+    rolesIntro:
+      "U-Tender is a tender marketplace with two sides. Owners publish a requirement with drawings and a deadline; verified contractors compete by submitting offers. Each account is one or the other — pick the one that describes you.",
+    ownerTitle: "Owner",
+    ownerWho:
+      "You are a landowner, project owner, buyer or organization with work that needs doing, and you want contractors to send you offers.",
+    ownerStep1: "Create a requirement (drawings, scope, deadline)",
+    ownerStep2: "Receive offers from verified contractors",
+    ownerStep3: "Evaluate and compare the offers",
+    ownerStep4: "Select the contractor you want",
+    ownerAfter:
+      "Upload your verification documents (currently a Civil ID and proof of ownership of the property). Our team reviews them; once approved you can publish requirements.",
+    ownerCost: "Free for owners — no subscription.",
+    ownerCta: "Sign up as an Owner",
+    providerTitle: "Contractor / Service provider",
+    providerWho:
+      "You are a contractor, company or service provider looking for projects to price and win.",
+    providerStep1: "Discover open requirements",
+    providerStep2: "Review the drawings and scope",
+    providerStep3: "Submit your offer before the deadline",
+    providerStep4: "Win the project",
+    providerAfter:
+      "Upload your company verification documents (for example, your commercial license). Once our team approves them you can browse open requirements.",
+    providerCost:
+      "Signing up and verification are free, but a paid subscription is required to open full drawings and submit offers: $79/month, or $804/year billed annually. No commission on awarded work.",
+    providerCta: "Sign up as a Contractor",
+    stepsLabel: "What you'll do",
+    afterLabel: "After you sign up",
+    costLabel: "Cost",
   },
   header: {
     logOut: "Log out",
@@ -553,8 +617,12 @@ export const en: Dictionary = {
     signup: {
       heading: "Create an account",
       iAmA: "I am a...",
-      propertyOwner: "Property owner",
+      propertyOwner: "Owner",
       contractor: "Contractor",
+      ownerHint: "You have a requirement and want to receive offers. Free — you'll verify your identity and property ownership next.",
+      contractorHint:
+        "You want to find requirements and submit offers. You'll verify your company next; submitting offers needs a paid subscription ($79/month or $804/year).",
+      chooseRole: "Choose Owner or Contractor to continue.",
       companyName: "Company name",
       companyNameHint: "You'll submit verification documents after signing up.",
       fullName: "Full name",
@@ -1074,6 +1142,37 @@ export const ar: Dictionary = {
   home: {
     login: "تسجيل الدخول",
     signup: "إنشاء حساب",
+    statOpen: "مناقصات مفتوحة",
+    statVerified: "مقاولون موثقون",
+    statAwarded: "مشاريع تمت ترسيتها",
+    rolesHeading: "إلى أي جانب تنتمي؟",
+    rolesIntro:
+      "U-Tender سوق مناقصات له جانبان. ينشر الملاك متطلبًا مع المخططات وموعد نهائي، ويتنافس المقاولون الموثقون بتقديم عروضهم. كل حساب إما مالك أو مقاول — اختر ما يصفك.",
+    ownerTitle: "مالك",
+    ownerWho:
+      "أنت مالك أرض أو صاحب مشروع أو مشترٍ أو جهة لديها عمل تريد تنفيذه، وتريد أن يرسل لك المقاولون عروضهم.",
+    ownerStep1: "أنشئ متطلبًا (المخططات، نطاق العمل، الموعد النهائي)",
+    ownerStep2: "استلم العروض من مقاولين موثقين",
+    ownerStep3: "قيّم العروض وقارن بينها",
+    ownerStep4: "اختر المقاول الذي تريده",
+    ownerAfter:
+      "ارفع مستندات التحقق (حاليًا البطاقة المدنية وإثبات ملكية العقار). يراجعها فريقنا، وبعد الموافقة يمكنك نشر المتطلبات.",
+    ownerCost: "مجاني للملاك — بدون اشتراك.",
+    ownerCta: "سجّل كمالك",
+    providerTitle: "مقاول / مزوّد خدمة",
+    providerWho: "أنت مقاول أو شركة أو مزوّد خدمة تبحث عن مشاريع لتسعيرها والفوز بها.",
+    providerStep1: "اكتشف المتطلبات المفتوحة",
+    providerStep2: "راجع المخططات ونطاق العمل",
+    providerStep3: "قدّم عرضك قبل الموعد النهائي",
+    providerStep4: "افز بالمشروع",
+    providerAfter:
+      "ارفع مستندات التحقق الخاصة بشركتك (مثل الرخصة التجارية). بعد موافقة فريقنا يمكنك تصفح المتطلبات المفتوحة.",
+    providerCost:
+      "التسجيل والتحقق مجانيان، لكن يلزم اشتراك مدفوع لفتح المخططات الكاملة وتقديم العروض: 79 دولارًا شهريًا، أو 804 دولارات سنويًا. بلا عمولة على المشاريع المرساة.",
+    providerCta: "سجّل كمقاول",
+    stepsLabel: "ما الذي ستفعله",
+    afterLabel: "بعد التسجيل",
+    costLabel: "التكلفة",
   },
   header: {
     logOut: "تسجيل الخروج",
@@ -1099,8 +1198,12 @@ export const ar: Dictionary = {
     signup: {
       heading: "إنشاء حساب",
       iAmA: "أنا...",
-      propertyOwner: "مالك عقار",
+      propertyOwner: "مالك",
       contractor: "مقاول",
+      ownerHint: "لديك متطلب وتريد استلام العروض. مجاني — ستتحقق من هويتك وملكية العقار في الخطوة التالية.",
+      contractorHint:
+        "تريد إيجاد المتطلبات وتقديم العروض. ستتحقق من شركتك في الخطوة التالية؛ تقديم العروض يتطلب اشتراكًا مدفوعًا (79 دولارًا شهريًا أو 804 دولارات سنويًا).",
+      chooseRole: "اختر مالك أو مقاول للمتابعة.",
       companyName: "اسم الشركة",
       companyNameHint: "ستقوم بتقديم مستندات التحقق بعد إنشاء الحساب.",
       fullName: "الاسم الكامل",

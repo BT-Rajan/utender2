@@ -1,17 +1,17 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ApiError } from "@/api/client";
 
-function RoleFields({
-  role,
-  setRole,
-}: {
-  role: "owner" | "contractor";
-  setRole: (r: "owner" | "contractor") => void;
-}) {
+type SignupRole = "owner" | "contractor";
+
+function parseRole(value: string | null): SignupRole | null {
+  return value === "owner" || value === "contractor" ? value : null;
+}
+
+function RoleFields({ role, setRole }: { role: SignupRole | null; setRole: (r: SignupRole) => void }) {
   const { t } = useI18n();
   return (
     <>
@@ -35,6 +35,13 @@ function RoleFields({
             {t("auth.signup.contractor")}
           </button>
         </div>
+        <p className={`text-xs mt-1.5 ${role ? "text-steel" : "text-amber-dark"}`}>
+          {role === "owner"
+            ? t("auth.signup.ownerHint")
+            : role === "contractor"
+              ? t("auth.signup.contractorHint")
+              : t("auth.signup.chooseRole")}
+        </p>
       </div>
 
       {role === "contractor" && (
@@ -54,12 +61,21 @@ export function SignupPage() {
   const { signup } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [role, setRole] = useState<"owner" | "contractor">("owner");
+  const [searchParams, setSearchParams] = useSearchParams();
+  // The role chosen on the landing page arrives as ?role=owner|contractor.
+  // With no (or an unknown) role, nothing is preselected so the visitor
+  // must pick deliberately instead of silently signing up as an owner.
+  const role = parseRole(searchParams.get("role"));
+  const setRole = (r: SignupRole) => setSearchParams({ role: r }, { replace: true });
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!role) {
+      setError(t("auth.signup.chooseRole"));
+      return;
+    }
     setError(null);
     setPending(true);
     const form = new FormData(e.currentTarget);
@@ -71,7 +87,7 @@ export function SignupPage() {
         role,
         company_name: (form.get("company_name") as string) || undefined,
       });
-      navigate(role === "owner" ? "/owner/dashboard" : "/contractor/verify");
+      navigate(role === "owner" ? "/owner/verify" : "/contractor/verify");
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : t("auth.signup.genericError"));
     } finally {
@@ -128,7 +144,7 @@ export function SignupPage() {
 
         <button
           type="submit"
-          disabled={pending}
+          disabled={pending || !role}
           className="bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 mt-2"
         >
           {pending ? t("auth.signup.submitting") : t("auth.signup.submit")}
