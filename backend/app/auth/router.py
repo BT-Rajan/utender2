@@ -78,7 +78,7 @@ def _revoke_refresh_token(db: Session, refresh_token: str | None) -> None:
 @router.post("/signup", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 def signup(payload: SignupRequest, response: Response, db: Session = Depends(get_db)):
     if payload.role not in (UserRole.owner, UserRole.contractor):
-        raise HTTPException(status_code=400, detail="Only owner or contractor accounts can self-register.")
+        raise HTTPException(status_code=400, detail="Only owner or service provider accounts can self-register.")
 
     email = payload.email.strip().lower()
 

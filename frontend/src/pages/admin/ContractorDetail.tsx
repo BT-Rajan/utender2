@@ -229,7 +229,7 @@ export function AdminContractorDetailPage() {
 
   return (
     <main className="max-w-3xl mx-auto px-5 py-8">
-      <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">Admin · Contractors</span>
+      <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">Admin · Service providers</span>
       <div className="flex items-start justify-between flex-wrap gap-3 mb-6">
         <div>
           <h1 className="font-display text-2xl font-semibold text-navy mb-1">{contractor.company_name}</h1>
@@ -308,8 +308,8 @@ export function AdminContractorDetailPage() {
             </button>
             <p className="text-[11px] text-steel-light mt-2">
               {contractor.is_suspended
-                ? "This contractor can't view projects, drawings, or submit offers until reactivated."
-                : "Immediately blocks the contractor from the feed and offers, without deleting anything."}
+                ? "This service provider can't view projects, drawings, or submit offers until reactivated."
+                : "Immediately blocks the service provider from the feed and offers, without deleting anything."}
             </p>
           </div>
 

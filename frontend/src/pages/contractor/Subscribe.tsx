@@ -5,53 +5,72 @@ import type { ContractorProfile } from "@/api/types";
 import { PageLoading } from "@/components/PageLoading";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
+import { formatMoney, usePricing, type PlanPrice } from "@/lib/publicInfo";
 
 function PlanToggle({
+  plans,
   plan,
   setPlan,
   onSubscribe,
   pending,
-  t,
 }: {
+  plans: PlanPrice[];
   plan: "monthly" | "annual";
   setPlan: (p: "monthly" | "annual") => void;
   onSubscribe: () => void;
   pending: boolean;
-  t: (key: string) => string;
 }) {
+  const { t, language } = useI18n();
   const features = [
     t("contractor.subscribe.feature1"),
     t("contractor.subscribe.feature2"),
     t("contractor.subscribe.feature3"),
     t("contractor.subscribe.feature4"),
   ];
+  // Prices are the live Stripe prices checkout will charge (/public/pricing).
+  const monthly = plans.find((p) => p.plan === "monthly");
+  const annual = plans.find((p) => p.plan === "annual");
+  const selected = plans.find((p) => p.plan === plan) ?? plans[0];
+  const savingPercent =
+    monthly && annual && monthly.currency === annual.currency
+      ? Math.round((1 - Number(annual.amount) / (Number(monthly.amount) * 12)) * 100)
+      : 0;
+  const perMonth = selected && selected.interval === "year" ? Number(selected.amount) / 12 : Number(selected?.amount);
+
   return (
     <div>
-      <div className="inline-flex border border-navy rounded-full overflow-hidden mb-6">
-        <button
-          type="button"
-          onClick={() => setPlan("monthly")}
-          className={`font-mono text-xs px-4.5 py-2 uppercase tracking-wide ${plan === "monthly" ? "bg-navy text-white" : "bg-white text-navy"}`}
-        >
-          {t("contractor.subscribe.monthly")}
-        </button>
-        <button
-          type="button"
-          onClick={() => setPlan("annual")}
-          className={`font-mono text-xs px-4.5 py-2 uppercase tracking-wide border-l border-navy ${plan === "annual" ? "bg-navy text-white" : "bg-white text-navy"}`}
-        >
-          {t("contractor.subscribe.annual")}
-        </button>
-      </div>
+      {plans.length > 1 && (
+        <div className="inline-flex border border-navy rounded-full overflow-hidden mb-6">
+          {plans.map((p, i) => (
+            <button
+              key={p.plan}
+              type="button"
+              onClick={() => setPlan(p.plan)}
+              className={`font-mono text-xs px-4.5 py-2 uppercase tracking-wide ${i > 0 ? "border-s border-navy" : ""} ${selected?.plan === p.plan ? "bg-navy text-white" : "bg-white text-navy"}`}
+            >
+              {t(`pricing.${p.plan}`)}
+              {p.plan === "annual" && savingPercent > 0 && ` — ${t("contractor.subscribe.save").replace("{percent}", String(savingPercent))}`}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="bg-white border border-border border-t-4 border-t-amber rounded px-7 py-7 max-w-md">
-        <div className="font-display text-[42px] font-bold text-navy leading-none">
-          ${plan === "monthly" ? "79" : "67"}
-          <span className="font-mono text-sm font-normal text-steel">/month</span>
-        </div>
-        <p className="text-xs text-steel mt-2 mb-5">
-          {plan === "monthly" ? t("contractor.subscribe.priceMonthlyNote") : t("contractor.subscribe.priceAnnualNote")}
-        </p>
+        {selected ? (
+          <>
+            <div className="font-display text-[42px] font-bold text-navy leading-none">
+              {formatMoney(Number.isInteger(perMonth) ? perMonth : perMonth.toFixed(2), selected.currency, language)}
+              <span className="font-mono text-sm font-normal text-steel"> {t("pricing.perMonth")}</span>
+            </div>
+            <p className="text-xs text-steel mt-2 mb-5">
+              {selected.interval === "year"
+                ? t("contractor.subscribe.priceAnnualNote").replace("{amount}", formatMoney(selected.amount, selected.currency, language))
+                : t("contractor.subscribe.priceMonthlyNote")}
+            </p>
+          </>
+        ) : (
+          <p className="text-sm text-steel mb-5">{t("pricing.unavailable")}</p>
+        )}
         <ul className="mb-6">
           {features.map((f) => (
             <li key={f} className="flex items-center gap-2 text-[13.5px] py-2 border-t border-border">
@@ -62,7 +81,7 @@ function PlanToggle({
         <button
           type="button"
           onClick={onSubscribe}
-          disabled={pending}
+          disabled={pending || !selected}
           className="bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 w-full"
         >
           {t("contractor.subscribe.start")}
@@ -82,8 +101,12 @@ export function ContractorSubscribePage() {
     queryFn: () => apiFetch<ContractorProfile>("/contractor/profile"),
   });
 
+  const { data: plans, isLoading: plansLoading } = usePricing();
+  // If only one plan is configured, checkout must use that one.
+  const checkoutPlan = plans?.some((p) => p.plan === plan) ? plan : (plans?.[0]?.plan ?? plan);
+
   const checkoutMutation = useMutation({
-    mutationFn: () => apiFetch<{ url: string }>(`/billing/checkout-session?plan=${plan}`, { method: "POST" }),
+    mutationFn: () => apiFetch<{ url: string }>(`/billing/checkout-session?plan=${checkoutPlan}`, { method: "POST" }),
     onSuccess: (data) => {
       window.location.href = data.url;
     },
@@ -98,7 +121,7 @@ export function ContractorSubscribePage() {
     onError: (err) => setError(err instanceof ApiError ? err.detail : t("contractor.subscribe.portalError")),
   });
 
-  if (!profile) return <PageLoading />;
+  if (!profile || plansLoading) return <PageLoading />;
 
   const hasRealSubscription = profile.subscription_status === "active" || profile.subscription_status === "trialing";
   // marketplace_status already folds in an admin payment override, so a
@@ -143,7 +166,13 @@ export function ContractorSubscribePage() {
         </div>
       ) : (
         <>
-          <PlanToggle plan={plan} setPlan={setPlan} onSubscribe={() => checkoutMutation.mutate()} pending={checkoutMutation.isPending} t={t} />
+          <PlanToggle
+            plans={plans ?? []}
+            plan={checkoutPlan}
+            setPlan={setPlan}
+            onSubscribe={() => checkoutMutation.mutate()}
+            pending={checkoutMutation.isPending}
+          />
           <p className="text-xs text-steel-light mt-6 max-w-md">{t("contractor.subscribe.checkoutNote")}</p>
         </>
       )}

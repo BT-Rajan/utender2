@@ -83,7 +83,7 @@ export function AdminReviewPage() {
   const approveMutation = useMutation({
     mutationFn: (contractorId: string) => apiFetch(`/admin/review/contractors/${contractorId}/approve`, { method: "POST" }),
     onSuccess: invalidate,
-    onError: (err) => onMutationError(err, "Could not approve this contractor."),
+    onError: (err) => onMutationError(err, "Could not approve this service provider."),
   });
 
   const rejectMutation = useMutation({
@@ -103,7 +103,7 @@ export function AdminReviewPage() {
     <main className="max-w-5xl mx-auto px-5 py-8">
       <div className="mb-6">
         <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">Admin · Applications</span>
-        <h1 className="font-display text-2xl font-semibold text-navy mb-1">Contractor applications</h1>
+        <h1 className="font-display text-2xl font-semibold text-navy mb-1">Service provider applications</h1>
         <p className="text-[13.5px] text-steel">{queue?.length ?? 0} pending review{queue?.length === 1 ? "" : "s"}.</p>
       </div>
 
@@ -235,7 +235,7 @@ export function AdminReviewPage() {
               </div>
               {!readyToApprove && (
                 <p className="text-[11px] text-steel-light -mt-2 pb-4">
-                  All required documents must be approved before this contractor can be approved.
+                  All required documents must be approved before this service provider can be approved.
                 </p>
               )}
             </div>

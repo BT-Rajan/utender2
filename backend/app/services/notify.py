@@ -25,8 +25,8 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.ar: ("تحديث بخصوص {project_title}", "اختار مالك {project_title} عرضًا آخر."),
     },
     NotificationType.clarification_asked: {
-        Language.en: ("New question on {project_title}", "A contractor asked a question about {project_title}."),
-        Language.ar: ("سؤال جديد على {project_title}", "طرح أحد المقاولين سؤالاً حول {project_title}."),
+        Language.en: ("New question on {project_title}", "A service provider asked a question about {project_title}."),
+        Language.ar: ("سؤال جديد على {project_title}", "طرح أحد مزوّدي الخدمات سؤالاً حول {project_title}."),
     },
     NotificationType.clarification_answered: {
         Language.en: ("Your question was answered", "The owner of {project_title} answered your question."),
@@ -45,8 +45,8 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.ar: ("المستند يحتاج إلى مراجعة", "تم رفض مستند {requirement_name} الخاص بك — يرجى إعادة الرفع."),
     },
     NotificationType.verification_activated: {
-        Language.en: ("You're verified", "Your contractor account has been approved."),
-        Language.ar: ("تم التحقق من حسابك", "تمت الموافقة على حساب المقاول الخاص بك."),
+        Language.en: ("You're verified", "Your service provider account has been approved."),
+        Language.ar: ("تم التحقق من حسابك", "تمت الموافقة على حساب مزوّد الخدمة الخاص بك."),
     },
     NotificationType.payment_override_granted: {
         Language.en: ("Marketplace access activated", "An administrator activated full marketplace access on your account."),
@@ -97,8 +97,8 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.ar: ("تم إعادة تفعيل الحساب", "تمت إعادة تفعيل حسابك."),
     },
     NotificationType.project_suspended: {
-        Language.en: ("{project_title} was suspended", "A site admin suspended this project — it's hidden from contractors until reactivated."),
-        Language.ar: ("تم تعليق {project_title}", "قام مسؤول الموقع بتعليق هذا المشروع — أصبح مخفيًا عن المقاولين حتى تتم إعادة تفعيله."),
+        Language.en: ("{project_title} was suspended", "A site admin suspended this project — it's hidden from service providers until reactivated."),
+        Language.ar: ("تم تعليق {project_title}", "قام مسؤول الموقع بتعليق هذا المشروع — أصبح مخفيًا عن مزوّدي الخدمات حتى تتم إعادة تفعيله."),
     },
     NotificationType.project_reactivated: {
         Language.en: ("{project_title} was reactivated", "A site admin reactivated this project."),

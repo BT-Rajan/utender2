@@ -7,30 +7,13 @@ export interface Dictionary {
     statOpen: string;
     statVerified: string;
     statAwarded: string;
-    rolesHeading: string;
-    rolesIntro: string;
-    ownerTitle: string;
-    ownerWho: string;
-    ownerStep1: string;
-    ownerStep2: string;
-    ownerStep3: string;
-    ownerStep4: string;
-    ownerAfter: string;
-    ownerCost: string;
-    ownerCta: string;
-    providerTitle: string;
-    providerWho: string;
-    providerStep1: string;
-    providerStep2: string;
-    providerStep3: string;
-    providerStep4: string;
-    providerAfter: string;
-    providerCost: string;
-    providerCta: string;
     stepsLabel: string;
     afterLabel: string;
     costLabel: string;
+    optional: string;
+    noDocuments: string;
   };
+  pricing: { monthly: string; annual: string; perMonth: string; perYear: string; unavailable: string };
   header: { logOut: string; account: string };
   language: { label: string; en: string; ar: string };
   auth: {
@@ -50,8 +33,6 @@ export interface Dictionary {
       iAmA: string;
       propertyOwner: string;
       contractor: string;
-      ownerHint: string;
-      contractorHint: string;
       chooseRole: string;
       companyName: string;
       companyNameHint: string;
@@ -205,8 +186,7 @@ export interface Dictionary {
       feature2: string;
       feature3: string;
       feature4: string;
-      monthly: string;
-      annual: string;
+      save: string;
       priceMonthlyNote: string;
       priceAnnualNote: string;
       start: string;
@@ -540,6 +520,7 @@ export interface Dictionary {
       descriptionPlaceholder: string;
       addForOwners: string;
       addForContractors: string;
+      edit: string;
       addError: string;
       updateError: string;
       removeError: string;
@@ -561,37 +542,20 @@ export const en: Dictionary = {
     login: "Log in",
     signup: "Sign up",
     statOpen: "Open tenders",
-    statVerified: "Verified contractors",
+    statVerified: "Verified service providers",
     statAwarded: "Projects awarded",
-    rolesHeading: "Which side are you on?",
-    rolesIntro:
-      "U-Tender is a tender marketplace with two sides. Owners publish a requirement with drawings and a deadline; verified contractors compete by submitting offers. Each account is one or the other — pick the one that describes you.",
-    ownerTitle: "Owner",
-    ownerWho:
-      "You are a landowner, project owner, buyer or organization with work that needs doing, and you want contractors to send you offers.",
-    ownerStep1: "Create a requirement (drawings, scope, deadline)",
-    ownerStep2: "Receive offers from verified contractors",
-    ownerStep3: "Evaluate and compare the offers",
-    ownerStep4: "Select the contractor you want",
-    ownerAfter:
-      "Upload your verification documents (currently a Civil ID and proof of ownership of the property). Our team reviews them; once approved you can publish requirements.",
-    ownerCost: "Free for owners — no subscription.",
-    ownerCta: "Sign up as an Owner",
-    providerTitle: "Contractor / Service provider",
-    providerWho:
-      "You are a contractor, company or service provider looking for projects to price and win.",
-    providerStep1: "Discover open requirements",
-    providerStep2: "Review the drawings and scope",
-    providerStep3: "Submit your offer before the deadline",
-    providerStep4: "Win the project",
-    providerAfter:
-      "Upload your company verification documents (for example, your commercial license). Once our team approves them you can browse open requirements.",
-    providerCost:
-      "Signing up and verification are free, but a paid subscription is required to open full drawings and submit offers: $79/month, or $804/year billed annually. No commission on awarded work.",
-    providerCta: "Sign up as a Contractor",
     stepsLabel: "What you'll do",
     afterLabel: "After you sign up",
     costLabel: "Cost",
+    optional: "optional",
+    noDocuments: "No documents are currently required.",
+  },
+  pricing: {
+    monthly: "Monthly",
+    annual: "Annual",
+    perMonth: "/ month",
+    perYear: "/ year",
+    unavailable: "Subscription prices are shown on the subscription page before you pay.",
   },
   header: {
     logOut: "Log out",
@@ -618,11 +582,8 @@ export const en: Dictionary = {
       heading: "Create an account",
       iAmA: "I am a...",
       propertyOwner: "Owner",
-      contractor: "Contractor",
-      ownerHint: "You have a requirement and want to receive offers. Free — you'll verify your identity and property ownership next.",
-      contractorHint:
-        "You want to find requirements and submit offers. You'll verify your company next; submitting offers needs a paid subscription ($79/month or $804/year).",
-      chooseRole: "Choose Owner or Contractor to continue.",
+      contractor: "Service provider",
+      chooseRole: "Choose Owner or Service provider to continue.",
       companyName: "Company name",
       companyNameHint: "You'll submit verification documents after signing up.",
       fullName: "Full name",
@@ -690,7 +651,7 @@ export const en: Dictionary = {
     answerError: "Could not submit your answer.",
   },
   contractor: {
-    roleLabel: "Contractor",
+    roleLabel: "Service provider",
     dashboard: {
       kpiActiveBids: "Active bids",
       kpiProjectsWon: "Projects won",
@@ -719,7 +680,7 @@ export const en: Dictionary = {
       },
     },
     feed: {
-      eyebrow: "Contractor · Open projects",
+      eyebrow: "Service provider · Open projects",
       heading: "Projects open for bidding",
       sortedNewest: "Sorted by most recently posted.",
       sortedClosest: "Sorted by closing soonest.",
@@ -744,7 +705,7 @@ export const en: Dictionary = {
         "Your account has been suspended by a site admin. You can't view new projects or submit offers while suspended. Contact support if you believe this is a mistake.",
       approvedTitle: "You're approved",
       approvedBody: "Head to your dashboard to browse open projects.",
-      eyebrow: "Contractor · Account verification",
+      eyebrow: "Service provider · Account verification",
       heading: "Application status",
       changesRequestedTitle: "Changes requested — one or more documents need to be re-uploaded",
       underReviewTitle: "Application under review",
@@ -762,7 +723,7 @@ export const en: Dictionary = {
         "You'll be notified as soon as your account is fully approved. Full access to drawings and offers stays locked until then.",
     },
     verify: {
-      eyebrow: "Contractor · Account verification",
+      eyebrow: "Service provider · Account verification",
       heading: "Verify your company",
       description: "Submit the documents below so a site admin can activate your account.",
       companyName: "Company name",
@@ -781,12 +742,11 @@ export const en: Dictionary = {
       feature2: "Full drawings and scope details on every listing",
       feature3: "Unlimited offers and revisions before deadline",
       feature4: "Public rating and review profile",
-      monthly: "Monthly",
-      annual: "Annual — save 15%",
+      save: "save {percent}%",
       priceMonthlyNote: "Billed monthly. No lead fees, no commission on top.",
-      priceAnnualNote: "Billed annually at $804. No lead fees, no commission on top.",
+      priceAnnualNote: "Billed annually at {amount}. No lead fees, no commission on top.",
       start: "Start subscription",
-      eyebrow: "Contractor access",
+      eyebrow: "Service provider access",
       headingActive: "Your subscription",
       headingInactive: "Subscribe to bid on projects",
       subheadingActive: "Manage your plan and billing details.",
@@ -809,7 +769,7 @@ export const en: Dictionary = {
       biddingClosedNotice: "Bidding on this project has closed.",
       yourFinalOffer: "Your final offer:",
       awardedTo: "Awarded to",
-      anotherContractor: "another contractor",
+      anotherContractor: "another service provider",
       noAwardNotice: "The owner decided not to award this project.",
       bidAmount: "Your bid amount (USD)",
       timeline: "Estimated timeline",
@@ -867,7 +827,7 @@ export const en: Dictionary = {
     projectNew: {
       eyebrow: "New project",
       heading: "Post a project",
-      description: "Add your drawings and set a deadline — contractors can only bid before it closes.",
+      description: "Add your drawings and set a deadline — service providers can only bid before it closes.",
       tenderType: "Tender type",
       ownerVisibleToggle: "Owner-visible",
       sealedToggle: "Sealed",
@@ -880,10 +840,10 @@ export const en: Dictionary = {
       trade: "Trade",
       tradePlaceholder: "e.g. Roofing, Framing, Fencing",
       scope: "Scope of work",
-      scopePlaceholder: "Describe the work you need done. Contractors will use this alongside your drawings to price their offer.",
+      scopePlaceholder: "Describe the work you need done. Service providers will use this alongside your drawings to price their offer.",
       drawings: "Drawings",
       drawingsHint: "PDF, DWG, JPG, PNG, or a .zip folder of drawings — up to 50MB total",
-      drawingsAccessNote: "Only approved, subscribed contractors can view these files.",
+      drawingsAccessNote: "Only approved, subscribed service providers can view these files.",
       deadline: "Bid deadline",
       deadlineNote: "No offers are accepted after this time.",
       postProject: "Post project",
@@ -892,7 +852,7 @@ export const en: Dictionary = {
       draftNote: "A draft is only visible to you. Publish it later from the project page when you're ready for bids.",
       sidebarHeading: "Before you post",
       tip1: "Clear drawings get more accurate offers — include dimensions where you can.",
-      tip2: "Give contractors at least 5–7 days to price the job properly.",
+      tip2: "Give service providers at least 5–7 days to price the job properly.",
       tip3: "You won't be charged. Posting and reviewing offers is free for property owners.",
       validationError: "Title, address, and deadline are required.",
       submitError: "Could not create project.",
@@ -922,8 +882,8 @@ export const en: Dictionary = {
       sealedBidsReceived: "sealed bid(s) received",
       sealedExplanation:
         "This is a sealed tender — bidder identities and amounts stay hidden from you until bidding closes. Close bidding to reveal and evaluate them.",
-      noOffersYet: "No offers yet. Contractors can bid until the deadline above.",
-      contractorCol: "Contractor",
+      noOffersYet: "No offers yet. Service providers can bid until the deadline above.",
+      contractorCol: "Service provider",
       ratingCol: "Rating",
       bidCol: "Bid",
       timelineCol: "Timeline",
@@ -931,7 +891,7 @@ export const en: Dictionary = {
       approve: "Approve",
       closeToAwardHint: "Close bidding to award",
       rateContractor: "Rate",
-      theContractor: "the contractor",
+      theContractor: "the service provider",
       submittedOn: "Submitted",
       ratingPlaceholder: "How did the work go? Optional, but helps other owners.",
       submitReview: "Submit review",
@@ -981,7 +941,7 @@ export const en: Dictionary = {
     nav: {
       requirements: "Document requirements",
       review: "Review applications",
-      contractors: "All contractors",
+      contractors: "All service providers",
       owners: "All owners",
       offers: "All offers",
       projects: "All projects",
@@ -1020,7 +980,7 @@ export const en: Dictionary = {
       suspendNote: "Immediately blocks the owner from posting or managing projects, without deleting anything.",
       dangerZone: "Danger zone",
       deleteBlockedNote:
-        "This owner has posted projects. Suspend the account instead of deleting it, to keep that project and offer history intact for the contractors involved.",
+        "This owner has posted projects. Suspend the account instead of deleting it, to keep that project and offer history intact for the service providers involved.",
       deleteNote: "This owner has no projects yet, so deleting removes the account entirely. This can't be undone.",
       deleteConfirm: "Permanently delete this owner's account? This can't be undone.",
       deleteAccount: "Delete account",
@@ -1037,7 +997,7 @@ export const en: Dictionary = {
       total: "total",
       empty: "No offers have been submitted yet.",
       project: "Project",
-      contractor: "Contractor",
+      contractor: "Service provider",
       amount: "Amount",
       status: "Status",
       tenderType: "Tender type",
@@ -1072,19 +1032,19 @@ export const en: Dictionary = {
       accessHeading: "Marketplace visibility",
       reactivate: "Reactivate project",
       suspend: "Suspend project",
-      suspendedNote: "This project is hidden from the contractor feed and can't receive new offers until reactivated.",
-      suspendNote: "Immediately hides this project from the contractor feed and blocks new offers, without deleting anything.",
+      suspendedNote: "This project is hidden from the service provider feed and can't receive new offers until reactivated.",
+      suspendNote: "Immediately hides this project from the service provider feed and blocks new offers, without deleting anything.",
       suspendError: "Could not update project visibility.",
       dangerZone: "Danger zone",
       deleteBlockedNote:
-        "This project has offers on it. Suspend it instead of deleting it, to keep that bid history intact for the contractors involved.",
+        "This project has offers on it. Suspend it instead of deleting it, to keep that bid history intact for the service providers involved.",
       deleteNote: "This project has no offers yet, so deleting removes it entirely. This can't be undone.",
       deleteConfirm: "Permanently delete this project? This can't be undone.",
       deleteProject: "Delete project",
       deleteError: "Could not delete this project.",
       offersHeading: "Offers on this project",
       noOffers: "No offers have been submitted on this project.",
-      contractorCol: "Contractor",
+      contractorCol: "Service provider",
       amountCol: "Amount",
       timelineCol: "Timeline",
       statusCol: "Status",
@@ -1111,7 +1071,7 @@ export const en: Dictionary = {
       heading: "Required documents",
       description:
         "Turn requirements on or off, or remove one entirely. Changes apply to new submissions right away — accounts already approved aren't affected.",
-      forContractors: "For contractors",
+      forContractors: "For service providers",
       forOwners: "For owners",
       emptyForScope: "No requirements set up for this group yet.",
       toggleRequiredFor: "Toggle required for",
@@ -1121,7 +1081,8 @@ export const en: Dictionary = {
       namePlaceholder: "Document name, e.g. Civil ID",
       descriptionPlaceholder: "Short description shown to the applicant",
       addForOwners: "+ Add owner requirement",
-      addForContractors: "+ Add contractor requirement",
+      addForContractors: "+ Add service provider requirement",
+      edit: "Edit",
       addError: "Could not add requirement.",
       updateError: "Could not update requirement.",
       removeError: "Could not remove requirement.",
@@ -1143,36 +1104,20 @@ export const ar: Dictionary = {
     login: "تسجيل الدخول",
     signup: "إنشاء حساب",
     statOpen: "مناقصات مفتوحة",
-    statVerified: "مقاولون موثقون",
+    statVerified: "مزوّدو خدمات موثقون",
     statAwarded: "مشاريع تمت ترسيتها",
-    rolesHeading: "إلى أي جانب تنتمي؟",
-    rolesIntro:
-      "U-Tender سوق مناقصات له جانبان. ينشر الملاك متطلبًا مع المخططات وموعد نهائي، ويتنافس المقاولون الموثقون بتقديم عروضهم. كل حساب إما مالك أو مقاول — اختر ما يصفك.",
-    ownerTitle: "مالك",
-    ownerWho:
-      "أنت مالك أرض أو صاحب مشروع أو مشترٍ أو جهة لديها عمل تريد تنفيذه، وتريد أن يرسل لك المقاولون عروضهم.",
-    ownerStep1: "أنشئ متطلبًا (المخططات، نطاق العمل، الموعد النهائي)",
-    ownerStep2: "استلم العروض من مقاولين موثقين",
-    ownerStep3: "قيّم العروض وقارن بينها",
-    ownerStep4: "اختر المقاول الذي تريده",
-    ownerAfter:
-      "ارفع مستندات التحقق (حاليًا البطاقة المدنية وإثبات ملكية العقار). يراجعها فريقنا، وبعد الموافقة يمكنك نشر المتطلبات.",
-    ownerCost: "مجاني للملاك — بدون اشتراك.",
-    ownerCta: "سجّل كمالك",
-    providerTitle: "مقاول / مزوّد خدمة",
-    providerWho: "أنت مقاول أو شركة أو مزوّد خدمة تبحث عن مشاريع لتسعيرها والفوز بها.",
-    providerStep1: "اكتشف المتطلبات المفتوحة",
-    providerStep2: "راجع المخططات ونطاق العمل",
-    providerStep3: "قدّم عرضك قبل الموعد النهائي",
-    providerStep4: "افز بالمشروع",
-    providerAfter:
-      "ارفع مستندات التحقق الخاصة بشركتك (مثل الرخصة التجارية). بعد موافقة فريقنا يمكنك تصفح المتطلبات المفتوحة.",
-    providerCost:
-      "التسجيل والتحقق مجانيان، لكن يلزم اشتراك مدفوع لفتح المخططات الكاملة وتقديم العروض: 79 دولارًا شهريًا، أو 804 دولارات سنويًا. بلا عمولة على المشاريع المرساة.",
-    providerCta: "سجّل كمقاول",
     stepsLabel: "ما الذي ستفعله",
     afterLabel: "بعد التسجيل",
     costLabel: "التكلفة",
+    optional: "اختياري",
+    noDocuments: "لا توجد مستندات مطلوبة حاليًا.",
+  },
+  pricing: {
+    monthly: "شهري",
+    annual: "سنوي",
+    perMonth: "/ شهر",
+    perYear: "/ سنة",
+    unavailable: "تُعرض أسعار الاشتراك في صفحة الاشتراك قبل الدفع.",
   },
   header: {
     logOut: "تسجيل الخروج",
@@ -1199,11 +1144,8 @@ export const ar: Dictionary = {
       heading: "إنشاء حساب",
       iAmA: "أنا...",
       propertyOwner: "مالك",
-      contractor: "مقاول",
-      ownerHint: "لديك متطلب وتريد استلام العروض. مجاني — ستتحقق من هويتك وملكية العقار في الخطوة التالية.",
-      contractorHint:
-        "تريد إيجاد المتطلبات وتقديم العروض. ستتحقق من شركتك في الخطوة التالية؛ تقديم العروض يتطلب اشتراكًا مدفوعًا (79 دولارًا شهريًا أو 804 دولارات سنويًا).",
-      chooseRole: "اختر مالك أو مقاول للمتابعة.",
+      contractor: "مزوّد خدمة",
+      chooseRole: "اختر مالك أو مزوّد خدمة للمتابعة.",
       companyName: "اسم الشركة",
       companyNameHint: "ستقوم بتقديم مستندات التحقق بعد إنشاء الحساب.",
       fullName: "الاسم الكامل",
@@ -1259,19 +1201,19 @@ export const ar: Dictionary = {
   clarifications: {
     heading: "الأسئلة والأجوبة",
     noQuestions: "لا توجد أسئلة بعد.",
-    sealedBidder: "مقاول مغفل الهوية",
+    sealedBidder: "مزوّد خدمة مغفل الهوية",
     privateTag: "خاص",
     writeAnswerPlaceholder: "اكتب إجابة…",
     answerButton: "إجابة",
     awaitingAnswer: "بانتظار إجابة من المالك.",
-    shareCheckboxLabel: "مشاركة هذا السؤال والجواب مع المقاولين الآخرين بعد الإجابة عليه",
+    shareCheckboxLabel: "مشاركة هذا السؤال والجواب مع مزوّدي الخدمات الآخرين بعد الإجابة عليه",
     askPlaceholder: "اطرح سؤالاً على المالك حول هذا المشروع…",
     askButton: "إرسال السؤال",
     askError: "تعذر إرسال سؤالك.",
     answerError: "تعذر إرسال إجابتك.",
   },
   contractor: {
-    roleLabel: "مقاول",
+    roleLabel: "مزوّد خدمة",
     dashboard: {
       kpiActiveBids: "العروض النشطة",
       kpiProjectsWon: "المشاريع الفائزة",
@@ -1300,7 +1242,7 @@ export const ar: Dictionary = {
       },
     },
     feed: {
-      eyebrow: "مقاول · المشاريع المفتوحة",
+      eyebrow: "مزوّد خدمة · المشاريع المفتوحة",
       heading: "مشاريع مفتوحة لتقديم العروض",
       sortedNewest: "مرتبة حسب الأحدث نشرًا.",
       sortedClosest: "مرتبة حسب الأقرب إغلاقًا.",
@@ -1325,7 +1267,7 @@ export const ar: Dictionary = {
         "تم إيقاف حسابك من قبل مسؤول الموقع. لا يمكنك عرض مشاريع جديدة أو تقديم عروض أثناء الإيقاف. تواصل مع الدعم إذا كنت تعتقد أن هذا خطأ.",
       approvedTitle: "تمت الموافقة عليك",
       approvedBody: "توجه إلى لوحة التحكم لتصفح المشاريع المفتوحة.",
-      eyebrow: "مقاول · التحقق من الحساب",
+      eyebrow: "مزوّد خدمة · التحقق من الحساب",
       heading: "حالة الطلب",
       changesRequestedTitle: "تم طلب تعديلات — يجب إعادة رفع مستند واحد أو أكثر",
       underReviewTitle: "الطلب قيد المراجعة",
@@ -1343,7 +1285,7 @@ export const ar: Dictionary = {
         "سيتم إعلامك بمجرد الموافقة الكاملة على حسابك. يبقى الوصول الكامل إلى المخططات والعروض مقفلاً حتى ذلك الحين.",
     },
     verify: {
-      eyebrow: "مقاول · التحقق من الحساب",
+      eyebrow: "مزوّد خدمة · التحقق من الحساب",
       heading: "تحقق من شركتك",
       description: "قدّم المستندات أدناه ليتمكن مسؤول الموقع من تفعيل حسابك.",
       companyName: "اسم الشركة",
@@ -1362,12 +1304,11 @@ export const ar: Dictionary = {
       feature2: "مخططات كاملة وتفاصيل نطاق العمل لكل إعلان",
       feature3: "عروض ومراجعات غير محدودة قبل الموعد النهائي",
       feature4: "ملف تقييمات ومراجعات عام",
-      monthly: "شهري",
-      annual: "سنوي — وفّر 15٪",
+      save: "وفّر {percent}٪",
       priceMonthlyNote: "تُفوتَر شهريًا. بلا رسوم عمولات إضافية.",
-      priceAnnualNote: "تُفوتَر سنويًا بمبلغ 804 دولارات. بلا رسوم عمولات إضافية.",
+      priceAnnualNote: "تُفوتَر سنويًا بمبلغ {amount}. بلا رسوم عمولات إضافية.",
       start: "بدء الاشتراك",
-      eyebrow: "وصول المقاول",
+      eyebrow: "وصول مزوّد الخدمة",
       headingActive: "اشتراكك",
       headingInactive: "اشترك لتقديم العروض على المشاريع",
       subheadingActive: "أدر باقتك وتفاصيل الفوترة.",
@@ -1390,7 +1331,7 @@ export const ar: Dictionary = {
       biddingClosedNotice: "أُغلق تقديم العروض على هذا المشروع.",
       yourFinalOffer: "عرضك النهائي:",
       awardedTo: "تم الترسية على",
-      anotherContractor: "مقاول آخر",
+      anotherContractor: "مزوّد خدمة آخر",
       noAwardNotice: "قرر المالك عدم ترسية هذا المشروع.",
       bidAmount: "قيمة عرضك (دولار أمريكي)",
       timeline: "الجدول الزمني المتوقع",
@@ -1448,7 +1389,7 @@ export const ar: Dictionary = {
     projectNew: {
       eyebrow: "مشروع جديد",
       heading: "انشر مشروعًا",
-      description: "أضف مخططاتك وحدّد موعدًا نهائيًا — لا يمكن للمقاولين تقديم عروض إلا قبل إغلاقه.",
+      description: "أضف مخططاتك وحدّد موعدًا نهائيًا — لا يمكن لمزوّدي الخدمات تقديم عروض إلا قبل إغلاقه.",
       tenderType: "نوع العطاء",
       ownerVisibleToggle: "مرئي للمالك",
       sealedToggle: "مغلق (سري)",
@@ -1461,10 +1402,10 @@ export const ar: Dictionary = {
       trade: "التخصص",
       tradePlaceholder: "مثال: أسقف، هياكل، أسوار",
       scope: "نطاق العمل",
-      scopePlaceholder: "صف العمل المطلوب. سيستخدم المقاولون هذا الوصف مع مخططاتك لتسعير عروضهم.",
+      scopePlaceholder: "صف العمل المطلوب. سيستخدم مزوّدو الخدمات هذا الوصف مع مخططاتك لتسعير عروضهم.",
       drawings: "المخططات",
       drawingsHint: "PDF أو DWG أو JPG أو PNG أو ملف .zip للمخططات — حتى 50 ميغابايت إجمالاً",
-      drawingsAccessNote: "فقط المقاولون المعتمدون والمشتركون يمكنهم عرض هذه الملفات.",
+      drawingsAccessNote: "فقط مزوّدو الخدمات المعتمدون والمشتركون يمكنهم عرض هذه الملفات.",
       deadline: "الموعد النهائي لتقديم العروض",
       deadlineNote: "لا تُقبل العروض بعد هذا الوقت.",
       postProject: "نشر المشروع",
@@ -1473,7 +1414,7 @@ export const ar: Dictionary = {
       draftNote: "المسودة مرئية لك فقط. يمكنك نشرها لاحقًا من صفحة المشروع عندما تكون جاهزًا لاستقبال العروض.",
       sidebarHeading: "قبل أن تنشر",
       tip1: "المخططات الواضحة تُنتج عروضًا أدق — أضف الأبعاد قدر الإمكان.",
-      tip2: "امنح المقاولين 5 إلى 7 أيام على الأقل لتسعير العمل بشكل صحيح.",
+      tip2: "امنح مزوّدي الخدمات 5 إلى 7 أيام على الأقل لتسعير العمل بشكل صحيح.",
       tip3: "لن يتم تحصيل أي رسوم منك. نشر المشاريع ومراجعة العروض مجاني لملاك العقارات.",
       validationError: "العنوان والموقع والموعد النهائي حقول مطلوبة.",
       submitError: "تعذر إنشاء المشروع.",
@@ -1502,9 +1443,9 @@ export const ar: Dictionary = {
       highestBid: "أعلى عرض",
       sealedBidsReceived: "عرض/عروض سرية مستلمة",
       sealedExplanation:
-        "هذا عطاء مغلق (سري) — تبقى هويات المقاولين وقيم عروضهم مخفية عنك حتى يُغلق تقديم العروض. أغلق تقديم العروض لكشفها وتقييمها.",
-      noOffersYet: "لا توجد عروض بعد. يمكن للمقاولين تقديم عروض حتى الموعد النهائي أعلاه.",
-      contractorCol: "المقاول",
+        "هذا عطاء مغلق (سري) — تبقى هويات مزوّدي الخدمات وقيم عروضهم مخفية عنك حتى يُغلق تقديم العروض. أغلق تقديم العروض لكشفها وتقييمها.",
+      noOffersYet: "لا توجد عروض بعد. يمكن لمزوّدي الخدمات تقديم عروض حتى الموعد النهائي أعلاه.",
+      contractorCol: "مزوّد الخدمة",
       ratingCol: "التقييم",
       bidCol: "العرض",
       timelineCol: "الجدول الزمني",
@@ -1512,7 +1453,7 @@ export const ar: Dictionary = {
       approve: "قبول",
       closeToAwardHint: "أغلق تقديم العروض للترسية",
       rateContractor: "قيّم",
-      theContractor: "المقاول",
+      theContractor: "مزوّد الخدمة",
       submittedOn: "تاريخ التقديم",
       ratingPlaceholder: "كيف سار العمل؟ اختياري، لكنه يساعد الملاك الآخرين.",
       submitReview: "إرسال التقييم",
@@ -1562,7 +1503,7 @@ export const ar: Dictionary = {
     nav: {
       requirements: "متطلبات المستندات",
       review: "مراجعة الطلبات",
-      contractors: "جميع المقاولين",
+      contractors: "جميع مزوّدي الخدمات",
       owners: "جميع الملاك",
       offers: "جميع العروض",
       projects: "جميع المشاريع",
@@ -1601,7 +1542,7 @@ export const ar: Dictionary = {
       suspendNote: "يمنع المالك فورًا من نشر أو إدارة المشاريع، دون حذف أي شيء.",
       dangerZone: "منطقة الخطر",
       deleteBlockedNote:
-        "قام هذا المالك بنشر مشاريع. أوقف الحساب بدلاً من حذفه، للحفاظ على سجل المشاريع والعروض سليماً للمقاولين المعنيين.",
+        "قام هذا المالك بنشر مشاريع. أوقف الحساب بدلاً من حذفه، للحفاظ على سجل المشاريع والعروض سليماً لمزوّدي الخدمات المعنيين.",
       deleteNote: "لا يملك هذا المالك أي مشاريع بعد، لذا فإن الحذف يزيل الحساب بالكامل. لا يمكن التراجع عن هذا.",
       deleteConfirm: "هل تريد حذف حساب هذا المالك نهائيًا؟ لا يمكن التراجع عن هذا.",
       deleteAccount: "حذف الحساب",
@@ -1618,7 +1559,7 @@ export const ar: Dictionary = {
       total: "الإجمالي",
       empty: "لم يتم تقديم أي عروض بعد.",
       project: "المشروع",
-      contractor: "المقاول",
+      contractor: "مزوّد الخدمة",
       amount: "القيمة",
       status: "الحالة",
       tenderType: "نوع العطاء",
@@ -1653,19 +1594,19 @@ export const ar: Dictionary = {
       accessHeading: "الظهور في السوق",
       reactivate: "إعادة تفعيل المشروع",
       suspend: "إيقاف المشروع",
-      suspendedNote: "هذا المشروع مخفي عن قائمة المقاولين ولا يمكنه استقبال عروض جديدة حتى تتم إعادة التفعيل.",
-      suspendNote: "يخفي هذا المشروع فورًا عن قائمة المقاولين ويمنع العروض الجديدة، دون حذف أي شيء.",
+      suspendedNote: "هذا المشروع مخفي عن قائمة مزوّدي الخدمات ولا يمكنه استقبال عروض جديدة حتى تتم إعادة التفعيل.",
+      suspendNote: "يخفي هذا المشروع فورًا عن قائمة مزوّدي الخدمات ويمنع العروض الجديدة، دون حذف أي شيء.",
       suspendError: "تعذر تحديث ظهور المشروع.",
       dangerZone: "منطقة الخطر",
       deleteBlockedNote:
-        "يحتوي هذا المشروع على عروض. أوقفه بدلاً من حذفه، للحفاظ على سجل العروض سليماً للمقاولين المعنيين.",
+        "يحتوي هذا المشروع على عروض. أوقفه بدلاً من حذفه، للحفاظ على سجل العروض سليماً لمزوّدي الخدمات المعنيين.",
       deleteNote: "لا يحتوي هذا المشروع على أي عروض بعد، لذا فإن الحذف يزيله بالكامل. لا يمكن التراجع عن هذا.",
       deleteConfirm: "هل تريد حذف هذا المشروع نهائيًا؟ لا يمكن التراجع عن هذا.",
       deleteProject: "حذف المشروع",
       deleteError: "تعذر حذف هذا المشروع.",
       offersHeading: "العروض على هذا المشروع",
       noOffers: "لم يتم تقديم أي عروض على هذا المشروع.",
-      contractorCol: "المقاول",
+      contractorCol: "مزوّد الخدمة",
       amountCol: "القيمة",
       timelineCol: "الجدول الزمني",
       statusCol: "الحالة",
@@ -1692,7 +1633,7 @@ export const ar: Dictionary = {
       heading: "المستندات المطلوبة",
       description:
         "فعّل أو عطّل المتطلبات، أو أزل أحدها نهائيًا. تُطبَّق التغييرات على الطلبات الجديدة فورًا — الحسابات التي تمت الموافقة عليها سابقًا لا تتأثر.",
-      forContractors: "للمقاولين",
+      forContractors: "لمزوّدي الخدمات",
       forOwners: "للملاك",
       emptyForScope: "لا توجد متطلبات مُعدة لهذه المجموعة بعد.",
       toggleRequiredFor: "تبديل حالة الإلزام لـ",
@@ -1702,7 +1643,8 @@ export const ar: Dictionary = {
       namePlaceholder: "اسم المستند، مثال: الهوية المدنية",
       descriptionPlaceholder: "وصف مختصر يظهر لمقدم الطلب",
       addForOwners: "+ إضافة متطلب للملاك",
-      addForContractors: "+ إضافة متطلب للمقاولين",
+      addForContractors: "+ إضافة متطلب لمزوّدي الخدمات",
+      edit: "تعديل",
       addError: "تعذر إضافة المتطلب.",
       updateError: "تعذر تحديث المتطلب.",
       removeError: "تعذر إزالة المتطلب.",

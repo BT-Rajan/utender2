@@ -79,7 +79,7 @@ def ask_clarification(
     project_id: str, payload: ClarificationCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     if user.role != UserRole.contractor:
-        raise HTTPException(status_code=403, detail="Only contractors can ask clarification questions.")
+        raise HTTPException(status_code=403, detail="Only service providers can ask clarification questions.")
 
     project = db.get(Project, project_id)
     if not project or not _can_view_project(user, project, db):

@@ -79,7 +79,7 @@ def notify_owner_new_clarification(owner_email: str, project_title: str, project
     _send(
         owner_email,
         f"New question on {project_title}",
-        f"<p>A contractor asked a question about <strong>{project_title}</strong>.</p>"
+        f"<p>A service provider asked a question about <strong>{project_title}</strong>.</p>"
         f'<p><a href="{settings.app_url}/owner/projects/{project_id}">Answer it</a></p>',
     )
 

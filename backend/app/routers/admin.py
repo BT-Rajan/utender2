@@ -66,6 +66,8 @@ def add_requirement(payload: DocumentRequirementCreate, admin: User = Depends(re
 
 
 class RequirementPatch(BaseModel):
+    name: str | None = None
+    description: str | None = None
     is_required: bool | None = None
     is_active: bool | None = None
 
@@ -94,6 +96,23 @@ def patch_requirement(
             previous_value="False",
             new_value="True",
         )
+    if payload.name is not None:
+        name = payload.name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Document name is required.")
+        if name != req.name:
+            log_action(
+                db,
+                actor_id=admin.id,
+                action="requirement.renamed",
+                target_type="document_requirement",
+                target_id=requirement_id,
+                previous_value=req.name,
+                new_value=name,
+            )
+            req.name = name
+    if payload.description is not None:
+        req.description = payload.description.strip() or None
     if payload.is_required is not None:
         req.is_required = payload.is_required
     if payload.is_active is not None:
@@ -239,11 +258,11 @@ def approve_contractor(contractor_id: str, admin: User = Depends(require_admin),
     # under-verified contractor.
     missing_approval = any(r.is_required and d.status != DocumentStatus.approved for d, r in docs)
     if missing_approval:
-        raise HTTPException(status_code=400, detail="All required documents must be approved before approving this contractor.")
+        raise HTTPException(status_code=400, detail="All required documents must be approved before approving this service provider.")
 
     cp = db.get(ContractorProfile, contractor_id)
     if not cp:
-        raise HTTPException(status_code=404, detail="Contractor not found.")
+        raise HTTPException(status_code=404, detail="Service provider not found.")
     previous = cp.verification_status.value
     cp.verification_status = VerificationStatus.approved
     db.commit()
@@ -267,7 +286,7 @@ def approve_contractor(contractor_id: str, admin: User = Depends(require_admin),
 def reject_application(contractor_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     cp = db.get(ContractorProfile, contractor_id)
     if not cp:
-        raise HTTPException(status_code=404, detail="Contractor not found.")
+        raise HTTPException(status_code=404, detail="Service provider not found.")
     previous = cp.verification_status.value
     cp.verification_status = VerificationStatus.changes_requested
     db.commit()
@@ -297,7 +316,7 @@ def _get_active_contractor_profile(db: Session, contractor_id: str) -> Contracto
     cp = db.get(ContractorProfile, contractor_id)
     user = db.get(User, contractor_id)
     if not cp or not user or user.role != UserRole.contractor:
-        raise HTTPException(status_code=404, detail="Contractor not found.")
+        raise HTTPException(status_code=404, detail="Service provider not found.")
     return cp
 
 
@@ -575,7 +594,10 @@ def list_cms(db: Session = Depends(get_db)):
             return overrides[(key, lang)]
         return DEFAULT_CMS.get(key, {}).get(lang.value, "")
 
-    return [CmsEntry(key=k, en=resolve(k, Language.en), ar=resolve(k, Language.ar)) for k in sorted(keys)]
+    # Built-in keys first, in the order they appear on the site; any extra
+    # keys an admin stored outside the defaults follow alphabetically.
+    ordered = list(DEFAULT_CMS.keys()) + sorted(keys - DEFAULT_CMS.keys())
+    return [CmsEntry(key=k, en=resolve(k, Language.en), ar=resolve(k, Language.ar)) for k in ordered]
 
 
 @router.put("/cms/{key}/{language}", response_model=CmsContentOut)
@@ -639,7 +661,7 @@ def delete_contractor(contractor_id: str, db: Session = Depends(get_db)):
     if review_count > 0:
         raise HTTPException(
             status_code=400,
-            detail="This contractor has completed projects with reviews on record. Suspend the account instead of deleting it, to keep that history intact.",
+            detail="This service provider has completed projects with reviews on record. Suspend the account instead of deleting it, to keep that history intact.",
         )
 
     docs_with_files = (
@@ -653,7 +675,7 @@ def delete_contractor(contractor_id: str, db: Session = Depends(get_db)):
 
     user = db.get(User, contractor_id)
     if not user:
-        raise HTTPException(status_code=404, detail="Contractor not found.")
+        raise HTTPException(status_code=404, detail="Service provider not found.")
     db.delete(user)  # cascades to contractor_profiles -> contractor_documents/offers
     db.commit()
     return None
@@ -895,7 +917,7 @@ def delete_owner(owner_id: str, db: Session = Depends(get_db)):
     if project_count > 0:
         raise HTTPException(
             status_code=400,
-            detail="This owner has posted projects. Suspend the account instead of deleting it, to keep that project and offer history intact for the contractors involved.",
+            detail="This owner has posted projects. Suspend the account instead of deleting it, to keep that project and offer history intact for the service providers involved.",
         )
 
     docs_with_files = (
@@ -1151,7 +1173,7 @@ def delete_project(project_id: str, admin: User = Depends(require_admin), db: Se
     if offer_count > 0:
         raise HTTPException(
             status_code=400,
-            detail="This project has offers on it. Suspend it instead of deleting it, to keep that bid history intact for the contractors involved.",
+            detail="This project has offers on it. Suspend it instead of deleting it, to keep that bid history intact for the service providers involved.",
         )
 
     drawing_paths = [

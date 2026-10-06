@@ -129,7 +129,7 @@ def submit_offer(
             NotificationType.bid_submitted,
             link=f"/owner/projects/{project_id}",
             project_title=project.title,
-            contractor_name="A contractor" if sealed else profile.company_name,
+            contractor_name="A service provider" if sealed else profile.company_name,
         )
 
     return offer

@@ -91,7 +91,7 @@ def require_marketplace_active_contractor(user: User = Depends(require_contracto
 def get_contractor_profile(user: User, db: Session) -> ContractorProfile:
     profile = db.get(ContractorProfile, user.id)
     if not profile:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contractor profile not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service provider profile not found")
     return profile
 
 

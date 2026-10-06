@@ -1,9 +1,19 @@
+import type { ReactNode } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { apiFetch } from "@/api/client";
+import {
+  formatPlanPrice,
+  usePricing,
+  usePublicCms,
+  usePublicRequirements,
+  type PlanPrice,
+  type PublicRequirement,
+  type SignupRole,
+} from "@/lib/publicInfo";
 
 interface PublicStats {
   open_tenders: number;
@@ -12,38 +22,81 @@ interface PublicStats {
   total_awarded_value: string;
 }
 
-type SignupRole = "owner" | "contractor";
+function Label({ children }: { children: ReactNode }) {
+  return <div className="font-mono text-[10px] uppercase tracking-wide text-steel mb-1">{children}</div>;
+}
 
-function RoleCard({ role, t }: { role: SignupRole; t: (key: string) => string }) {
-  const k = role === "owner" ? "owner" : "provider";
-  const steps = [1, 2, 3, 4].map((n) => t(`home.${k}Step${n}`));
+// Copy comes from the admin-editable CMS (home_owner_* / home_provider_*);
+// the document checklist and the prices underneath it are live data, so
+// they stay correct whatever an admin writes in the copy.
+function RoleCard({
+  role,
+  cms,
+  documents,
+  plans,
+}: {
+  role: SignupRole;
+  cms: Record<string, string>;
+  documents: PublicRequirement[] | undefined;
+  plans: PlanPrice[] | undefined;
+}) {
+  const { t, language } = useI18n();
+  const k = role === "owner" ? "home_owner" : "home_provider";
+  const steps = [1, 2, 3, 4].map((n) => cms[`${k}_step_${n}`]).filter(Boolean);
   return (
     <div className="bg-white border border-border border-t-4 border-t-navy rounded px-6 py-6 flex flex-col">
-      <h3 className="font-display text-xl font-semibold text-navy mb-2">{t(`home.${k}Title`)}</h3>
-      <p className="text-[14px] text-steel mb-5">{t(`home.${k}Who`)}</p>
+      <h3 className="font-display text-xl font-semibold text-navy mb-2">{cms[`${k}_title`]}</h3>
+      <p className="text-[14px] text-steel mb-5">{cms[`${k}_who`]}</p>
 
-      <div className="font-mono text-[10px] uppercase tracking-wide text-steel mb-2">{t("home.stepsLabel")}</div>
-      <ol className="mb-5">
-        {steps.map((step, i) => (
-          <li key={step} className="flex gap-2.5 text-[13.5px] py-1.5 border-t border-border">
-            <span className="font-mono font-bold text-amber-dark">{i + 1}</span> {step}
-          </li>
-        ))}
-      </ol>
+      {steps.length > 0 && (
+        <>
+          <Label>{t("home.stepsLabel")}</Label>
+          <ol className="mb-5">
+            {steps.map((step, i) => (
+              <li key={i} className="flex gap-2.5 text-[13.5px] py-1.5 border-t border-border">
+                <span className="font-mono font-bold text-amber-dark">{i + 1}</span> {step}
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
 
-      <div className="font-mono text-[10px] uppercase tracking-wide text-steel mb-1">{t("home.afterLabel")}</div>
-      <p className="text-[13.5px] text-steel mb-4">{t(`home.${k}After`)}</p>
+      <Label>{t("home.afterLabel")}</Label>
+      <p className="text-[13.5px] text-steel mb-2">{cms[`${k}_after`]}</p>
+      {documents && documents.length > 0 && (
+        <ul className="mb-4 text-[13px] text-navy list-disc ps-5">
+          {documents.map((d) => (
+            <li key={d.name}>
+              {d.name}
+              {!d.is_required && <span className="text-steel-light"> ({t("home.optional")})</span>}
+              {d.description && <span className="block text-[12px] text-steel">{d.description}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {documents && documents.length === 0 && <p className="text-[13px] text-steel mb-4">{t("home.noDocuments")}</p>}
 
-      <div className="font-mono text-[10px] uppercase tracking-wide text-steel mb-1">{t("home.costLabel")}</div>
-      <p className={`text-[13.5px] mb-6 ${role === "contractor" ? "text-navy font-semibold" : "text-steel"}`}>
-        {t(`home.${k}Cost`)}
-      </p>
+      <Label>{t("home.costLabel")}</Label>
+      <p className={`text-[13.5px] mb-2 ${role === "contractor" ? "text-navy font-semibold" : "text-steel"}`}>{cms[`${k}_cost`]}</p>
+      {role === "contractor" && plans && (
+        <ul className="mb-4 text-[13.5px] text-navy font-semibold">
+          {plans.length > 0 ? (
+            plans.map((p) => (
+              <li key={p.plan}>
+                {t(`pricing.${p.plan}`)}: {formatPlanPrice(p, language, t)}
+              </li>
+            ))
+          ) : (
+            <li className="font-normal text-steel">{t("pricing.unavailable")}</li>
+          )}
+        </ul>
+      )}
 
       <Link
         to={`/signup?role=${role}`}
         className="mt-auto bg-amber hover:bg-amber-dark text-white text-sm font-semibold rounded px-5 py-2.5 text-center"
       >
-        {t(`home.${k}Cta`)}
+        {cms[`${k}_cta`]}
       </Link>
     </div>
   );
@@ -62,11 +115,10 @@ export function HomePage() {
   const { user, loading } = useAuth();
   const { t, language } = useI18n();
 
-  const { data: cms } = useQuery({
-    queryKey: ["public-cms", language],
-    queryFn: () => apiFetch<Record<string, string>>(`/public/cms?language=${language}`),
-    enabled: !user,
-  });
+  const { data: cms } = usePublicCms(language, !user);
+  const { data: ownerDocs } = usePublicRequirements("owner", !user);
+  const { data: providerDocs } = usePublicRequirements("contractor", !user);
+  const { data: plans } = usePricing(!user);
   const { data: stats } = useQuery({
     queryKey: ["public-stats"],
     queryFn: () => apiFetch<PublicStats>("/public/stats"),
@@ -131,12 +183,26 @@ export function HomePage() {
       )}
 
       <section id="roles" className="mb-14 scroll-mt-6">
-        <h2 className="font-display text-2xl font-semibold text-navy mb-2 text-center">{t("home.rolesHeading")}</h2>
-        <p className="text-[14px] text-steel mb-7 text-center max-w-2xl mx-auto">{t("home.rolesIntro")}</p>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <RoleCard role="owner" t={t} />
-          <RoleCard role="contractor" t={t} />
-        </div>
+        {cms ? (
+          <>
+            <h2 className="font-display text-2xl font-semibold text-navy mb-2 text-center">{cms.home_roles_heading}</h2>
+            <p className="text-[14px] text-steel mb-7 text-center max-w-2xl mx-auto">{cms.home_roles_intro}</p>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <RoleCard role="owner" cms={cms} documents={ownerDocs} plans={plans} />
+              <RoleCard role="contractor" cms={cms} documents={providerDocs} plans={plans} />
+            </div>
+          </>
+        ) : (
+          // Content couldn't load (API down) — still give both signup paths.
+          <div className="flex items-center justify-center gap-3">
+            <Link to="/signup?role=owner" className="border border-navy text-navy rounded px-5 py-2.5 text-sm font-semibold">
+              {t("auth.signup.propertyOwner")}
+            </Link>
+            <Link to="/signup?role=contractor" className="border border-navy text-navy rounded px-5 py-2.5 text-sm font-semibold">
+              {t("auth.signup.contractor")}
+            </Link>
+          </div>
+        )}
       </section>
 
       {(cms?.how_it_works_title || cms?.how_it_works_body) && (

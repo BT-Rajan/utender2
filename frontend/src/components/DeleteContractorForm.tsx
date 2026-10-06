@@ -18,13 +18,13 @@ export function DeleteContractorForm({
   const deleteMutation = useMutation({
     mutationFn: () => apiFetch(`/admin/contractors/${contractorId}`, { method: "DELETE" }),
     onSuccess: onDeleted,
-    onError: (err) => setError(err instanceof ApiError ? err.detail : "Could not delete this contractor."),
+    onError: (err) => setError(err instanceof ApiError ? err.detail : "Could not delete this service provider."),
   });
 
   if (!confirming) {
     return (
       <button type="button" onClick={() => setConfirming(true)} className="text-xs text-red underline">
-        Delete contractor permanently
+        Delete service provider permanently
       </button>
     );
   }

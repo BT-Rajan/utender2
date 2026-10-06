@@ -4,11 +4,25 @@ import { useAuth } from "@/auth/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ApiError } from "@/api/client";
-
-type SignupRole = "owner" | "contractor";
+import { formatPlanPrice, usePricing, usePublicCms, type SignupRole } from "@/lib/publicInfo";
 
 function parseRole(value: string | null): SignupRole | null {
   return value === "owner" || value === "contractor" ? value : null;
+}
+
+function RoleHint({ role }: { role: SignupRole | null }) {
+  const { t, language } = useI18n();
+  const { data: cms } = usePublicCms(language);
+  const { data: plans } = usePricing(role === "contractor");
+  if (!role) return <p className="text-xs mt-1.5 text-amber-dark">{t("auth.signup.chooseRole")}</p>;
+  const hint = cms?.[role === "owner" ? "signup_owner_hint" : "signup_provider_hint"];
+  const prices = role === "contractor" && plans && plans.length > 0 ? plans.map((p) => formatPlanPrice(p, language, t)).join(" · ") : null;
+  return (
+    <p className="text-xs mt-1.5 text-steel">
+      {hint}
+      {prices && <span className="block text-navy font-semibold mt-0.5">{prices}</span>}
+    </p>
+  );
 }
 
 function RoleFields({ role, setRole }: { role: SignupRole | null; setRole: (r: SignupRole) => void }) {
@@ -35,13 +49,7 @@ function RoleFields({ role, setRole }: { role: SignupRole | null; setRole: (r: S
             {t("auth.signup.contractor")}
           </button>
         </div>
-        <p className={`text-xs mt-1.5 ${role ? "text-steel" : "text-amber-dark"}`}>
-          {role === "owner"
-            ? t("auth.signup.ownerHint")
-            : role === "contractor"
-              ? t("auth.signup.contractorHint")
-              : t("auth.signup.chooseRole")}
-        </p>
+        <RoleHint role={role} />
       </div>
 
       {role === "contractor" && (

@@ -14,6 +14,7 @@ export function AdminRequirementsPage() {
   const [isRequired, setIsRequired] = useState(true);
   const [scopeFilter, setScopeFilter] = useState<"contractor" | "owner">("contractor");
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ id: string; name: string; description: string } | null>(null);
 
   const {
     data: requirements,
@@ -50,6 +51,16 @@ export function AdminRequirementsPage() {
     mutationFn: ({ id, value }: { id: string; value: boolean }) =>
       apiFetch(`/admin/requirements/${id}`, { method: "PATCH", body: { is_required: value } }),
     onSuccess: invalidate,
+    onError: (err) => onMutationError(err, t("admin.requirements.updateError")),
+  });
+
+  const editMutation = useMutation({
+    mutationFn: (edit: { id: string; name: string; description: string }) =>
+      apiFetch(`/admin/requirements/${edit.id}`, { method: "PATCH", body: { name: edit.name, description: edit.description } }),
+    onSuccess: () => {
+      setEditing(null);
+      invalidate();
+    },
     onError: (err) => onMutationError(err, t("admin.requirements.updateError")),
   });
 
@@ -104,14 +115,56 @@ export function AdminRequirementsPage() {
               <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${req.is_required ? "left-4" : "left-0.5"}`} />
             </button>
 
-            <div className="flex-1">
-              <div className="font-display font-semibold text-sm">{req.name}</div>
-              <div className="text-xs text-steel-light">{req.description}</div>
-            </div>
+            {editing?.id === req.id ? (
+              <form
+                className="flex-1 grid gap-1.5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  editMutation.mutate(editing);
+                }}
+              >
+                <input
+                  value={editing.name}
+                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                  required
+                  aria-label={t("admin.requirements.namePlaceholder")}
+                  className="border border-border rounded px-2.5 py-1.5 text-sm"
+                />
+                <input
+                  value={editing.description}
+                  onChange={(e) => setEditing({ ...editing, description: e.target.value })}
+                  placeholder={t("admin.requirements.descriptionPlaceholder")}
+                  className="border border-border rounded px-2.5 py-1.5 text-xs"
+                />
+                <div className="flex gap-2">
+                  <button type="submit" disabled={editMutation.isPending} className="bg-navy text-white text-xs font-semibold rounded px-3 py-1">
+                    {t("common.save")}
+                  </button>
+                  <button type="button" onClick={() => setEditing(null)} className="text-xs text-steel underline">
+                    {t("common.cancel")}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex-1">
+                <div className="font-display font-semibold text-sm">{req.name}</div>
+                <div className="text-xs text-steel-light">{req.description}</div>
+              </div>
+            )}
 
             <span className="font-mono text-[9.5px] uppercase text-steel-light">
               {req.is_required ? t("admin.requirements.required") : t("admin.requirements.optional")}
             </span>
+
+            {editing?.id !== req.id && (
+              <button
+                type="button"
+                onClick={() => setEditing({ id: req.id, name: req.name, description: req.description ?? "" })}
+                className="text-xs text-navy underline"
+              >
+                {t("admin.requirements.edit")}
+              </button>
+            )}
 
             <button
               type="button"
