@@ -14,18 +14,18 @@ import { OwnerProjectNewPage } from "@/pages/owner/ProjectNew";
 import { OwnerProjectDetailPage } from "@/pages/owner/ProjectDetail";
 import { OwnerVerifyPage } from "@/pages/owner/Verify";
 import { OwnerStatusPage } from "@/pages/owner/Status";
-import { ContractorLayout } from "@/pages/contractor/ContractorLayout";
-import { ContractorDashboardPage } from "@/pages/contractor/Dashboard";
-import { ContractorFeedPage } from "@/pages/contractor/Feed";
-import { ContractorVerifyPage } from "@/pages/contractor/Verify";
-import { ContractorStatusPage } from "@/pages/contractor/Status";
-import { ContractorOfferPage } from "@/pages/contractor/Offer";
-import { ContractorSubscribePage } from "@/pages/contractor/Subscribe";
+import { ServiceProviderLayout } from "@/pages/service-provider/ServiceProviderLayout";
+import { ServiceProviderDashboardPage } from "@/pages/service-provider/Dashboard";
+import { ServiceProviderFeedPage } from "@/pages/service-provider/Feed";
+import { ServiceProviderVerifyPage } from "@/pages/service-provider/Verify";
+import { ServiceProviderStatusPage } from "@/pages/service-provider/Status";
+import { ServiceProviderOfferPage } from "@/pages/service-provider/Offer";
+import { ServiceProviderSubscribePage } from "@/pages/service-provider/Subscribe";
 import { AdminLayout } from "@/pages/admin/AdminLayout";
 import { AdminRequirementsPage } from "@/pages/admin/Requirements";
 import { AdminReviewPage } from "@/pages/admin/Review";
-import { AdminContractorsPage } from "@/pages/admin/Contractors";
-import { AdminContractorDetailPage } from "@/pages/admin/ContractorDetail";
+import { AdminServiceProvidersPage } from "@/pages/admin/ServiceProviders";
+import { AdminServiceProviderDetailPage } from "@/pages/admin/ServiceProviderDetail";
 import { AdminOwnersPage } from "@/pages/admin/Owners";
 import { AdminOwnerDetailPage } from "@/pages/admin/OwnerDetail";
 import { AdminOffersPage } from "@/pages/admin/Offers";
@@ -86,46 +86,46 @@ export function App() {
         </Route>
 
         <Route
-          path="/contractor/dashboard"
+          path="/service-provider/dashboard"
           element={
-            <ProtectedRoute role="contractor">
-              <ContractorLayout />
+            <ProtectedRoute role="service_provider">
+              <ServiceProviderLayout />
             </ProtectedRoute>
           }
         >
-          <Route index element={<ContractorDashboardPage />} />
+          <Route index element={<ServiceProviderDashboardPage />} />
         </Route>
         <Route
-          path="/contractor/verify"
+          path="/service-provider/verify"
           element={
-            <ProtectedRoute role="contractor">
-              <ContractorLayout />
+            <ProtectedRoute role="service_provider">
+              <ServiceProviderLayout />
             </ProtectedRoute>
           }
         >
-          <Route index element={<ContractorVerifyPage />} />
+          <Route index element={<ServiceProviderVerifyPage />} />
         </Route>
         <Route
-          path="/contractor/status"
+          path="/service-provider/status"
           element={
-            <ProtectedRoute role="contractor">
-              <ContractorLayout />
+            <ProtectedRoute role="service_provider">
+              <ServiceProviderLayout />
             </ProtectedRoute>
           }
         >
-          <Route index element={<ContractorStatusPage />} />
+          <Route index element={<ServiceProviderStatusPage />} />
         </Route>
         <Route
-          path="/contractor"
+          path="/service-provider"
           element={
-            <ProtectedRoute role="contractor" gate>
-              <ContractorLayout />
+            <ProtectedRoute role="service_provider" gate>
+              <ServiceProviderLayout />
             </ProtectedRoute>
           }
         >
-          <Route path="feed" element={<ContractorFeedPage />} />
-          <Route path="subscribe" element={<ContractorSubscribePage />} />
-          <Route path="projects/:id/offer" element={<ContractorOfferPage />} />
+          <Route path="feed" element={<ServiceProviderFeedPage />} />
+          <Route path="subscribe" element={<ServiceProviderSubscribePage />} />
+          <Route path="projects/:id/offer" element={<ServiceProviderOfferPage />} />
         </Route>
 
         <Route
@@ -138,8 +138,8 @@ export function App() {
         >
           <Route path="requirements" element={<AdminRequirementsPage />} />
           <Route path="review" element={<AdminReviewPage />} />
-          <Route path="contractors" element={<AdminContractorsPage />} />
-          <Route path="contractors/:id" element={<AdminContractorDetailPage />} />
+          <Route path="service-providers" element={<AdminServiceProvidersPage />} />
+          <Route path="service-providers/:id" element={<AdminServiceProviderDetailPage />} />
           <Route path="owners" element={<AdminOwnersPage />} />
           <Route path="owners/:id" element={<AdminOwnerDetailPage />} />
           <Route path="offers" element={<AdminOffersPage />} />

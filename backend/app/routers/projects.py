@@ -7,7 +7,7 @@ from starlette.responses import StreamingResponse
 from app.db import get_db
 from app.deps import get_current_user, require_verified_owner
 from app.models.award_record import AwardRecord
-from app.models.contractor import ContractorProfile
+from app.models.service_provider import ServiceProviderProfile
 from app.models.enums import NotificationType, OfferStatus, ProjectStatus, TenderType, UserRole
 from app.models.offer import Offer
 from app.models.owner import OwnerProfile
@@ -19,7 +19,7 @@ from app.schemas.award import AwardRecordOut
 from app.schemas.project import DrawingOut, ProjectCreate, ProjectDetailOut
 from app.services.drawings import upload_drawings_for_project
 from app.services.file_security import safe_relative_name
-from app.services.email import notify_contractor_tender_amended
+from app.services.email import notify_service_provider_tender_amended
 from app.services.notify import notify
 from app.services.storage import drawing_url_expiry_seconds, get_storage
 from app.services.tender_lifecycle import lock_project, sync_expired_projects
@@ -29,28 +29,28 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 
 # Full project detail includes signed drawing URLs — the P0 payment gate
 # (spec checklist "docs approved but payment absent") applies here, not
-# just verification. A verification-approved-but-unpaid contractor sees a
+# just verification. A verification-approved-but-unpaid service provider sees a
 # 404 on this endpoint exactly like a project they're not eligible for at
 # all — the response never distinguishes "doesn't exist" from "you don't
 # have access yet", so it can't be used to enumerate projects. The
-# lightweight /contractor/feed listing (title, deadline, offer count — no
+# lightweight /service-provider/feed listing (title, deadline, offer count — no
 # drawings) stays available on verification alone; that split is what lets
-# an unpaid contractor browse before paying instead of a hard app lockout.
+# an unpaid service provider browse before paying instead of a hard app lockout.
 def _can_view_project(user: User, project: Project, db: Session) -> bool:
     if user.role == UserRole.admin or project.owner_id == user.id:
         return True
-    if user.role != UserRole.contractor:
+    if user.role != UserRole.service_provider:
         return False
-    # Draft is the only status a contractor never sees — every other state,
+    # Draft is the only status a service provider never sees — every other state,
     # including the newer under_evaluation/no_award/canceled/expired, stays
-    # visible so a contractor who bid can still see what happened to their
+    # visible so a service provider who bid can still see what happened to their
     # bid after bidding itself has ended. An admin-suspended project is
-    # blocked the same way, even for a contractor who already bid on it —
+    # blocked the same way, even for a service provider who already bid on it —
     # suspension is a moderation action meant to pull the whole project out
     # of sight until an admin reactivates it.
     if project.status == ProjectStatus.draft or project.is_suspended:
         return False
-    profile = db.get(ContractorProfile, user.id)
+    profile = db.get(ServiceProviderProfile, user.id)
     return bool(profile and profile.is_verified_active)
 
 
@@ -219,23 +219,23 @@ def amend_project(
     db.commit()
     db.refresh(project)
 
-    # Best-effort — every contractor with a live (non-withdrawn) bid gets
+    # Best-effort — every service provider with a live (non-withdrawn) bid gets
     # notified; a failed send never rolls back the amendment itself.
     bidder_ids = (
-        db.query(Offer.contractor_id)
+        db.query(Offer.service_provider_id)
         .filter(Offer.project_id == project_id, Offer.status != OfferStatus.withdrawn)
         .distinct()
         .all()
     )
-    for (contractor_id,) in bidder_ids:
-        contractor_user = db.get(User, contractor_id)
-        if contractor_user:
-            notify_contractor_tender_amended(contractor_user.email, project.title, project_id, summary)
+    for (service_provider_id,) in bidder_ids:
+        service_provider_user = db.get(User, service_provider_id)
+        if service_provider_user:
+            notify_service_provider_tender_amended(service_provider_user.email, project.title, project_id, summary)
             notify(
                 db,
-                contractor_user,
+                service_provider_user,
                 NotificationType.tender_amendment,
-                link=f"/contractor/projects/{project_id}/offer",
+                link=f"/service-provider/projects/{project_id}/offer",
                 project_title=project.title,
                 summary=summary,
             )
@@ -266,18 +266,18 @@ def get_award(project_id: str, user: User = Depends(get_current_user), db: Sessi
     if not record:
         raise HTTPException(status_code=404, detail="This project has not been awarded.")
 
-    cp = db.get(ContractorProfile, record.contractor_id)
+    cp = db.get(ServiceProviderProfile, record.service_provider_id)
     return AwardRecordOut(
         id=record.id,
         project_id=record.project_id,
         offer_id=record.offer_id,
-        contractor_id=record.contractor_id,
+        service_provider_id=record.service_provider_id,
         amount=record.amount,
         project_revision=record.project_revision,
         offer_revision=record.offer_revision,
         awarded_by=record.awarded_by,
         created_at=record.created_at,
-        contractor_company_name=cp.company_name if cp else None,
+        service_provider_company_name=cp.company_name if cp else None,
     )
 
 

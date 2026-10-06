@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/api/client";
-import type { ContractorProfile, OfferStatus, ProjectStatus } from "@/api/types";
+import type { ServiceProviderProfile, OfferStatus, ProjectStatus } from "@/api/types";
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
 
@@ -21,37 +21,37 @@ interface MyBid {
 function statusBanner(
   t: (key: string) => string,
 ): Record<string, { tone: "green" | "blue" | "amber" | "red"; title: string; body: string; cta?: { label: string; href: string } }> {
-  const b = "contractor.dashboard.banner";
+  const b = "service_provider.dashboard.banner";
   return {
     documents_incomplete: {
       tone: "amber",
       title: t(`${b}.documentsIncompleteTitle`),
       body: t(`${b}.documentsIncompleteBody`),
-      cta: { label: t(`${b}.documentsIncompleteCta`), href: "/contractor/verify" },
+      cta: { label: t(`${b}.documentsIncompleteCta`), href: "/service-provider/verify" },
     },
     submitted_for_review: {
       tone: "blue",
       title: t(`${b}.submittedTitle`),
       body: t(`${b}.submittedBody`),
-      cta: { label: t(`${b}.submittedCta`), href: "/contractor/status" },
+      cta: { label: t(`${b}.submittedCta`), href: "/service-provider/status" },
     },
     changes_requested: {
       tone: "red",
       title: t(`${b}.changesRequestedTitle`),
       body: t(`${b}.changesRequestedBody`),
-      cta: { label: t(`${b}.changesRequestedCta`), href: "/contractor/status" },
+      cta: { label: t(`${b}.changesRequestedCta`), href: "/service-provider/status" },
     },
     payment_required: {
       tone: "amber",
       title: t(`${b}.paymentRequiredTitle`),
       body: t(`${b}.paymentRequiredBody`),
-      cta: { label: t(`${b}.paymentRequiredCta`), href: "/contractor/subscribe" },
+      cta: { label: t(`${b}.paymentRequiredCta`), href: "/service-provider/subscribe" },
     },
     payment_restricted: {
       tone: "red",
       title: t(`${b}.paymentRestrictedTitle`),
       body: t(`${b}.paymentRestrictedBody`),
-      cta: { label: t(`${b}.paymentRestrictedCta`), href: "/contractor/subscribe" },
+      cta: { label: t(`${b}.paymentRestrictedCta`), href: "/service-provider/subscribe" },
     },
     suspended: {
       tone: "red",
@@ -87,15 +87,15 @@ function offerStatusBadge(status: OfferStatus) {
   }
 }
 
-export function ContractorDashboardPage() {
+export function ServiceProviderDashboardPage() {
   const { t } = useI18n();
   const { data: profile } = useQuery({
-    queryKey: ["contractor-profile"],
-    queryFn: () => apiFetch<ContractorProfile>("/contractor/profile"),
+    queryKey: ["service-provider-profile"],
+    queryFn: () => apiFetch<ServiceProviderProfile>("/service-provider/profile"),
   });
   const { data: bids } = useQuery({
-    queryKey: ["contractor-my-bids"],
-    queryFn: () => apiFetch<MyBid[]>("/contractor/my-bids"),
+    queryKey: ["service-provider-my-bids"],
+    queryFn: () => apiFetch<MyBid[]>("/service-provider/my-bids"),
     enabled: !!profile,
   });
 
@@ -110,7 +110,7 @@ export function ContractorDashboardPage() {
   return (
     <main className="max-w-5xl mx-auto px-5 py-8">
       <div className="mb-6">
-        <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">{t("contractor.roleLabel")}</span>
+        <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">{t("service_provider.roleLabel")}</span>
         <h1 className="font-display text-2xl font-semibold text-navy mb-1">{profile.company_name}</h1>
       </div>
 
@@ -136,37 +136,37 @@ export function ContractorDashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
             <div className="border border-border bg-white rounded px-4 py-3">
               <div className="font-display text-2xl font-semibold text-navy leading-none">{activeBids}</div>
-              <div className="font-mono text-[10px] uppercase tracking-wide text-steel mt-1">{t("contractor.dashboard.kpiActiveBids")}</div>
+              <div className="font-mono text-[10px] uppercase tracking-wide text-steel mt-1">{t("service_provider.dashboard.kpiActiveBids")}</div>
             </div>
             <div className="border border-border bg-white rounded px-4 py-3">
               <div className="font-display text-2xl font-semibold text-green leading-none">{won}</div>
-              <div className="font-mono text-[10px] uppercase tracking-wide text-steel mt-1">{t("contractor.dashboard.kpiProjectsWon")}</div>
+              <div className="font-mono text-[10px] uppercase tracking-wide text-steel mt-1">{t("service_provider.dashboard.kpiProjectsWon")}</div>
             </div>
             <div className="border border-border bg-white rounded px-4 py-3">
               <div className="font-display text-2xl font-semibold text-navy leading-none">{totalBids}</div>
-              <div className="font-mono text-[10px] uppercase tracking-wide text-steel mt-1">{t("contractor.dashboard.kpiTotalBids")}</div>
+              <div className="font-mono text-[10px] uppercase tracking-wide text-steel mt-1">{t("service_provider.dashboard.kpiTotalBids")}</div>
             </div>
           </div>
 
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-mono text-[11px] uppercase tracking-wide text-navy">{t("contractor.dashboard.myBids")}</h2>
-            <Link to="/contractor/feed" className="text-xs text-navy underline">
-              {t("contractor.dashboard.browseOpenProjects")}
+            <h2 className="font-mono text-[11px] uppercase tracking-wide text-navy">{t("service_provider.dashboard.myBids")}</h2>
+            <Link to="/service-provider/feed" className="text-xs text-navy underline">
+              {t("service_provider.dashboard.browseOpenProjects")}
             </Link>
           </div>
 
           {!bids?.length ? (
             <div className="border border-dashed border-border rounded p-10 text-center text-sm text-steel">
-              {t("contractor.dashboard.noBidsYetPrefix")}{" "}
-              <Link to="/contractor/feed" className="text-navy underline">
-                {t("contractor.dashboard.browseOpenProjects")}
+              {t("service_provider.dashboard.noBidsYetPrefix")}{" "}
+              <Link to="/service-provider/feed" className="text-navy underline">
+                {t("service_provider.dashboard.browseOpenProjects")}
               </Link>
               .
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {bids.map((b) => (
-                <Link key={b.offer_id} to={`/contractor/projects/${b.project_id}/offer`} className="tblock rounded px-5 pt-4">
+                <Link key={b.offer_id} to={`/service-provider/projects/${b.project_id}/offer`} className="tblock rounded px-5 pt-4">
                   <div className="flex justify-between items-start gap-2">
                     <div>
                       <h3 className="font-display font-semibold text-[15px] mb-0.5">{b.project_title}</h3>

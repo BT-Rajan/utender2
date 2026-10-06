@@ -62,7 +62,7 @@ def test_pass18_files_route_e2e():
     r = owner_client.get(f"/files/project-drawings/some/key.pdf?exp={expired_exp}&sig={expired_sig}")
     check("an expired (but correctly signed) link is rejected", r.status_code == 403)
 
-    # A contractor with no access to this project cannot even discover the URL
+    # A service provider with no access to this project cannot even discover the URL
     # (separate from the signed-URL mechanism) — the project detail endpoint
     # itself gates it, verified elsewhere; here we only confirm the /files
     # route's OWN defenses (signature + expiry) hold regardless of who calls it,

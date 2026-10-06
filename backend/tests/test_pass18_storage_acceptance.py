@@ -62,8 +62,8 @@ def run_acceptance_suite(storage, label, results, check, prefix_check_url=None):
         check(f"[{label}] delete() of a nonexistent key does not raise", False)
         print("   ->", exc)
 
-    # A separate bucket namespace (contractor-documents) is independent of project-drawings.
-    doc_bucket = "contractor-documents"
+    # A separate bucket namespace (service-provider-documents) is independent of project-drawings.
+    doc_bucket = "service-provider-documents"
     doc_key = f"acceptance/{label}/license.pdf"
     storage.save(doc_bucket, doc_key, b"license content", "application/pdf")
     check(f"[{label}] a different bucket has its own independent keyspace", storage.download(doc_bucket, doc_key) == b"license content")
@@ -116,7 +116,7 @@ def test_pass18_storage_acceptance():
 
         client = boto3.client("s3", region_name="us-east-1")
         client.create_bucket(Bucket="project-drawings")
-        client.create_bucket(Bucket="contractor-documents")
+        client.create_bucket(Bucket="service-provider-documents")
 
         from app.services.storage import S3Storage
 

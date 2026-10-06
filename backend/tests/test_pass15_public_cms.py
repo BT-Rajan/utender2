@@ -14,7 +14,7 @@ def test_pass15_public_cms():
 
 
     from app.auth.security import hash_password
-    from app.models.document import ContractorDocument
+    from app.models.document import ServiceProviderDocument
     from app.models.enums import DocumentStatus, UserRole
     from app.models.user import User
 
@@ -37,18 +37,18 @@ def test_pass15_public_cms():
     _owner_approve_db.commit()
 
 
-    def make_active_contractor(email, company):
+    def make_active_service_provider(email, company):
         client = TestClient(app)
         r = client.post(
             "/auth/signup",
-            json={"email": email, "password": "password123", "full_name": "C", "role": "contractor", "company_name": company},
+            json={"email": email, "password": "password123", "full_name": "C", "role": "service_provider", "company_name": company},
         )
         cid = r.json()["id"]
-        for doc in db.query(ContractorDocument).filter_by(contractor_id=cid).all():
+        for doc in db.query(ServiceProviderDocument).filter_by(service_provider_id=cid).all():
             doc.status = DocumentStatus.approved
         db.commit()
-        admin_client.post(f"/admin/review/contractors/{cid}/approve")
-        admin_client.post(f"/admin/contractors/{cid}/payment-override", json={"reason": "test activation"})
+        admin_client.post(f"/admin/review/service-providers/{cid}/approve")
+        admin_client.post(f"/admin/service-providers/{cid}/payment-override", json={"reason": "test activation"})
         return client, cid
 
 
@@ -63,7 +63,7 @@ def test_pass15_public_cms():
     # ---------- public stats: real numbers, starts at zero ----------
     r = anon.get("/public/stats")
     check("public stats accessible anonymously", r.status_code == 200)
-    check("stats start at zero with no data", r.json()["open_tenders"] == 0 and r.json()["verified_contractors"] == 0 and r.json()["awarded_projects"] == 0)
+    check("stats start at zero with no data", r.json()["open_tenders"] == 0 and r.json()["verified_service_providers"] == 0 and r.json()["awarded_projects"] == 0)
 
     # non-admin cannot edit CMS
     r = owner_client.put("/admin/cms/hero_heading/en", json={"value": "Hacked heading"})
@@ -104,7 +104,7 @@ def test_pass15_public_cms():
 
 
     # ---------- public stats reflect real activity ----------
-    c1, c1_id = make_active_contractor("c1@example.com", "Acme")
+    c1, c1_id = make_active_service_provider("c1@example.com", "Acme")
     future = (datetime.utcnow() + timedelta(days=7)).isoformat()
 
     r = owner_client.post("/projects", data={"title": "Roof job", "address": "1 Main St", "bid_deadline": future, "status": "open"})
@@ -112,7 +112,7 @@ def test_pass15_public_cms():
 
     r = anon.get("/public/stats")
     check("open_tenders reflects the newly posted project", r.json()["open_tenders"] == 1)
-    check("verified_contractors reflects the activated contractor", r.json()["verified_contractors"] == 1)
+    check("verified_service_providers reflects the activated service_provider", r.json()["verified_service_providers"] == 1)
 
     r = c1.post(f"/projects/{project_id}/offers", json={"amount": "4200.00"})
     offer_id = r.json()["id"]
@@ -124,11 +124,11 @@ def test_pass15_public_cms():
     check("awarded_projects reflects the real award", r.json()["awarded_projects"] == 1)
     check("total_awarded_value reflects the actual winning bid amount", float(r.json()["total_awarded_value"]) == 4200.00)
 
-    # suspending the only verified contractor drops the count for real
-    cp_row = db.query(__import__("app.models.contractor", fromlist=["ContractorProfile"]).ContractorProfile).filter_by(user_id=c1_id).first()
-    admin_client.post(f"/admin/contractors/{c1_id}/suspend", json={"suspended": True})
+    # suspending the only verified service provider drops the count for real
+    cp_row = db.query(__import__("app.models.service_provider", fromlist=["ServiceProviderProfile"]).ServiceProviderProfile).filter_by(user_id=c1_id).first()
+    admin_client.post(f"/admin/service-providers/{c1_id}/suspend", json={"suspended": True})
     r = anon.get("/public/stats")
-    check("verified_contractors drops to 0 once suspended (never fabricated)", r.json()["verified_contractors"] == 0)
+    check("verified_service_providers drops to 0 once suspended (never fabricated)", r.json()["verified_service_providers"] == 0)
 
 
     failed = [n for n, ok in results if not ok]

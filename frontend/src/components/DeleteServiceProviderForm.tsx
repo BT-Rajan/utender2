@@ -2,12 +2,12 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 
-export function DeleteContractorForm({
-  contractorId,
+export function DeleteServiceProviderForm({
+  serviceProviderId,
   companyName,
   onDeleted,
 }: {
-  contractorId: string;
+  serviceProviderId: string;
   companyName: string;
   onDeleted: () => void;
 }) {
@@ -16,15 +16,15 @@ export function DeleteContractorForm({
   const [error, setError] = useState<string | null>(null);
 
   const deleteMutation = useMutation({
-    mutationFn: () => apiFetch(`/admin/contractors/${contractorId}`, { method: "DELETE" }),
+    mutationFn: () => apiFetch(`/admin/service-providers/${serviceProviderId}`, { method: "DELETE" }),
     onSuccess: onDeleted,
-    onError: (err) => setError(err instanceof ApiError ? err.detail : "Could not delete this contractor."),
+    onError: (err) => setError(err instanceof ApiError ? err.detail : "Could not delete this service provider."),
   });
 
   if (!confirming) {
     return (
       <button type="button" onClick={() => setConfirming(true)} className="text-xs text-red underline">
-        Delete contractor permanently
+        Delete service provider permanently
       </button>
     );
   }

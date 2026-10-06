@@ -17,8 +17,8 @@ export function AdminLayout() {
         <NavLink to="/admin/review" className={navClass}>
           {t("admin.nav.review")}
         </NavLink>
-        <NavLink to="/admin/contractors" className={navClass}>
-          {t("admin.nav.contractors")}
+        <NavLink to="/admin/service-providers" className={navClass}>
+          {t("admin.nav.service_providers")}
         </NavLink>
         <NavLink to="/admin/owners" className={navClass}>
           {t("admin.nav.owners")}

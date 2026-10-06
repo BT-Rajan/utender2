@@ -3,8 +3,24 @@ import enum
 
 class UserRole(str, enum.Enum):
     owner = "owner"
-    contractor = "contractor"
+    service_provider = "service_provider"
     admin = "admin"
+
+
+# Who a registered account represents in the marketplace (Step 3). Unset
+# until the person says so after signup: account created != stakeholder
+# established.
+class StakeholderType(str, enum.Enum):
+    individual = "individual"
+    organization = "organization"
+
+
+# A person's authority within an organization. admin = an authorized
+# representative who may act for, and manage, the organization's account;
+# member = belongs to it without that authority.
+class MembershipRole(str, enum.Enum):
+    admin = "admin"
+    member = "member"
 
 
 class Language(str, enum.Enum):
@@ -46,6 +62,10 @@ class VerificationStatus(str, enum.Enum):
     pending_review = "pending_review"
     changes_requested = "changes_requested"
     approved = "approved"
+    # Final decision: the application was refused (with a recorded reason).
+    # Unlike changes_requested the person can't resubmit; an admin can
+    # reopen it through the verification-status override.
+    rejected = "rejected"
 
 
 class DocumentStatus(str, enum.Enum):
@@ -85,8 +105,8 @@ class NotificationType(str, enum.Enum):
     payment_failed = "payment_failed"
     payment_override_granted = "payment_override_granted"
     payment_override_revoked = "payment_override_revoked"
-    contractor_suspended = "contractor_suspended"
-    contractor_reactivated = "contractor_reactivated"
+    service_provider_suspended = "service_provider_suspended"
+    service_provider_reactivated = "service_provider_reactivated"
     owner_verification_activated = "owner_verification_activated"
     owner_document_rejected = "owner_document_rejected"
     owner_document_approved = "owner_document_approved"
@@ -111,3 +131,5 @@ class NotificationType(str, enum.Enum):
     project_reactivated = "project_reactivated"
     offer_suspended = "offer_suspended"
     offer_reactivated = "offer_reactivated"
+    verification_changes_requested = "verification_changes_requested"
+    verification_rejected = "verification_rejected"

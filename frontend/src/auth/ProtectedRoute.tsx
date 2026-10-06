@@ -11,16 +11,16 @@ interface VerificationGatedProfile {
 }
 
 // Mirrors src/middleware.ts: must be logged in, must have the matching
-// role, and — for gated paths (contractor feed/subscribe/offer, owner
+// role, and — for gated paths (service provider feed/subscribe/offer, owner
 // dashboard/project pages) — must currently be an approved, non-suspended
 // account. Re-checked on every route entry rather than cached, since an
-// admin can flip either flag at any time. Owners and contractors share
-// the identical document-verification shape (ContractorProfile and
+// admin can flip either flag at any time. Owners and service providers share
+// the identical document-verification shape (ServiceProviderProfile and
 // OwnerProfile both expose verification_status/is_suspended), so one gate
 // implementation covers both — only the profile endpoint and the
 // not-yet-approved redirect target differ.
 const GATE_CONFIG: Partial<Record<UserRole, { endpoint: string; statusPath: string }>> = {
-  contractor: { endpoint: "/contractor/profile", statusPath: "/contractor/status" },
+  service_provider: { endpoint: "/service-provider/profile", statusPath: "/service-provider/status" },
   owner: { endpoint: "/owner/profile", statusPath: "/owner/status" },
 };
 

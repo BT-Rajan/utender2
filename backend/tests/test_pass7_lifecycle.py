@@ -14,8 +14,8 @@ def test_pass7_lifecycle():
 
 
     from app.auth.security import hash_password
-    from app.models.contractor import ContractorProfile
-    from app.models.document import ContractorDocument
+    from app.models.service_provider import ServiceProviderProfile
+    from app.models.document import ServiceProviderDocument
     from app.models.enums import DocumentStatus, ProjectStatus, UserRole
     from app.models.project import Project
     from app.models.user import User
@@ -37,19 +37,19 @@ def test_pass7_lifecycle():
     _owner_approve_db.get(_OwnerProfile, _owner_signup_r.json()['id']).verification_status = _OwnerVerificationStatus.approved
     _owner_approve_db.commit()
 
-    contractor_client = TestClient(app)
-    r = contractor_client.post(
+    service_provider_client = TestClient(app)
+    r = service_provider_client.post(
         "/auth/signup",
-        json={"email": "c1@example.com", "password": "password123", "full_name": "C1", "role": "contractor", "company_name": "Acme"},
+        json={"email": "c1@example.com", "password": "password123", "full_name": "C1", "role": "service_provider", "company_name": "Acme"},
     )
-    contractor_id = r.json()["id"]
+    service_provider_id = r.json()["id"]
 
-    # fully activate the contractor: approve docs, approve profile, grant override
-    for doc in db.query(ContractorDocument).filter_by(contractor_id=contractor_id).all():
+    # fully activate the service provider: approve docs, approve profile, grant override
+    for doc in db.query(ServiceProviderDocument).filter_by(service_provider_id=service_provider_id).all():
         doc.status = DocumentStatus.approved
     db.commit()
-    admin_client.post(f"/admin/review/contractors/{contractor_id}/approve")
-    admin_client.post(f"/admin/contractors/{contractor_id}/payment-override", json={"reason": "test activation"})
+    admin_client.post(f"/admin/review/service-providers/{service_provider_id}/approve")
+    admin_client.post(f"/admin/service-providers/{service_provider_id}/payment-override", json={"reason": "test activation"})
 
     future = (datetime.utcnow() + timedelta(days=7)).isoformat()
     past = (datetime.utcnow() - timedelta(hours=1)).isoformat()
@@ -75,14 +75,14 @@ def test_pass7_lifecycle():
     check("tender_type not locked yet", r.json()["tender_type_locked"] is False)
     project_id = r.json()["id"]
 
-    r = contractor_client.get(f"/projects/{project_id}")
-    check("draft project invisible to contractor", r.status_code == 404)
+    r = service_provider_client.get(f"/projects/{project_id}")
+    check("draft project invisible to service_provider", r.status_code == 404)
 
-    r = contractor_client.get("/contractor/feed")
+    r = service_provider_client.get("/service-provider/feed")
     check("draft project absent from feed", all(p["id"] != project_id for p in r.json()))
 
     # non-owner can't publish
-    r = contractor_client.post(f"/owner/projects/{project_id}/publish")
+    r = service_provider_client.post(f"/owner/projects/{project_id}/publish")
     check("non-owner cannot publish (403, wrong role)", r.status_code == 403)
 
     r = owner_client.post(f"/owner/projects/{project_id}/publish")
@@ -91,12 +91,12 @@ def test_pass7_lifecycle():
     r = owner_client.post(f"/owner/projects/{project_id}/publish")
     check("re-publishing an already-open project rejected", r.status_code == 400)
 
-    r = contractor_client.get(f"/projects/{project_id}")
-    check("published project now visible to contractor", r.status_code == 200)
+    r = service_provider_client.get(f"/projects/{project_id}")
+    check("published project now visible to service_provider", r.status_code == 200)
 
 
     # ---------- tender_type locking on first bid ----------
-    r = contractor_client.post(f"/projects/{project_id}/offers", json={"amount": "1000.00"})
+    r = service_provider_client.post(f"/projects/{project_id}/offers", json={"amount": "1000.00"})
     check("bid submitted", r.status_code == 200)
 
     r = owner_client.get(f"/projects/{project_id}")
@@ -159,8 +159,8 @@ def test_pass7_lifecycle():
     r = owner_client.post(f"/owner/projects/{project3_id}/cancel")
     check("cancel from open succeeds", r.status_code == 200 and r.json()["status"] == "canceled")
 
-    r = contractor_client.get(f"/projects/{project3_id}")
-    check("canceled project still viewable by contractor (not draft)", r.status_code == 200)
+    r = service_provider_client.get(f"/projects/{project3_id}")
+    check("canceled project still viewable by service provider (not draft)", r.status_code == 200)
 
 
     # ---------- auto-expire / auto-close on deadline (sync_expired_projects) ----------
@@ -169,7 +169,7 @@ def test_pass7_lifecycle():
         "/projects", data={"title": "Bathroom reno", "address": "1 Elm St", "bid_deadline": future, "status": "open"}
     )
     project4_id = r.json()["id"]
-    contractor_client.post(f"/projects/{project4_id}/offers", json={"amount": "500.00"})
+    service_provider_client.post(f"/projects/{project4_id}/offers", json={"amount": "500.00"})
 
     p4 = db.get(Project, project4_id)
     p4.bid_deadline = datetime.utcnow() - timedelta(minutes=1)
@@ -192,7 +192,7 @@ def test_pass7_lifecycle():
     synced5 = next(p for p in r.json() if p["id"] == project5_id)
     check("project with zero bids auto-expires past deadline", synced5["status"] == "expired")
 
-    # Same sync path is reachable via the contractor feed and via GET /projects/{id}
+    # Same sync path is reachable via the service provider feed and via GET /projects/{id}
     r = owner_client.post(
         "/projects", data={"title": "Siding repair", "address": "3 Elm St", "bid_deadline": future, "status": "open"}
     )
@@ -201,7 +201,7 @@ def test_pass7_lifecycle():
     p6.bid_deadline = datetime.utcnow() - timedelta(minutes=1)
     db.commit()
 
-    r = contractor_client.get("/contractor/feed")
+    r = service_provider_client.get("/service-provider/feed")
     check("expired project no longer in feed after sync", all(p["id"] != project6_id for p in r.json()))
 
     r = admin_client.get(f"/projects/{project6_id}")  # admin can always view regardless of status

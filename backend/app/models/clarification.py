@@ -10,7 +10,7 @@ from app.models.common import gen_uuid
 # Tender-specific Q&A (spec §2.7, D-008). One row per question; answer +
 # answered_at stay null until the owner responds. shared_with_all controls
 # whether other eligible bidders see this Q&A pair once answered — a
-# private clarification stays visible only to the asking contractor and
+# private clarification stays visible only to the asking service provider and
 # the owner.
 class Clarification(Base):
     __tablename__ = "clarifications"
@@ -19,8 +19,8 @@ class Clarification(Base):
     project_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    contractor_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("contractor_profiles.user_id", ondelete="CASCADE"), nullable=False
+    service_provider_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("service_provider_profiles.user_id", ondelete="CASCADE"), nullable=False
     )
     question: Mapped[str] = mapped_column(Text, nullable=False)
     answer: Mapped[str | None] = mapped_column(Text, nullable=True)

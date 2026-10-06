@@ -10,7 +10,7 @@ export function ClarificationsPanel({
   canAsk = true,
 }: {
   projectId: string;
-  role: "owner" | "contractor";
+  role: "owner" | "service_provider";
   canAsk?: boolean;
 }) {
   const { t } = useI18n();
@@ -70,8 +70,8 @@ export function ClarificationsPanel({
             <li key={c.id} className="border-b border-border pb-3 last:border-0">
               <div className="flex items-center gap-2 mb-1">
                 {role === "owner" &&
-                  (c.contractor_company_name ? (
-                    <span className="font-mono text-[10px] text-steel-light">{c.contractor_company_name}</span>
+                  (c.service_provider_company_name ? (
+                    <span className="font-mono text-[10px] text-steel-light">{c.service_provider_company_name}</span>
                   ) : (
                     <span className="font-mono text-[10px] text-steel-light italic">{t("clarifications.sealedBidder")}</span>
                   ))}
@@ -105,7 +105,7 @@ export function ClarificationsPanel({
         </ul>
       )}
 
-      {role === "contractor" && canAsk && (
+      {role === "service_provider" && canAsk && (
         <div className="border-t border-border pt-3">
           <textarea
             value={question}

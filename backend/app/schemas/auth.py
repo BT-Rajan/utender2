@@ -10,8 +10,8 @@ class SignupRequest(BaseModel):
     # of accepting it and quietly hashing only its first 72 bytes.
     password: str = Field(min_length=8, max_length=72)
     full_name: str
-    role: UserRole  # "owner" or "contractor" — admin accounts are never self-serve
-    company_name: str | None = None  # required in practice when role == contractor
+    role: UserRole  # "owner" or "service_provider" — admin accounts are never self-serve
+    company_name: str | None = None  # required in practice when role == service provider
 
 
 class LoginRequest(BaseModel):

@@ -10,7 +10,7 @@ settings = get_settings()
 
 # Drawings must stay accessible for exactly as long as the owner said
 # bidding is open — not an arbitrary short-lived link. Expiry is tied to
-# the project's bid_deadline (plus a small buffer so a contractor mid-review
+# the project's bid_deadline (plus a small buffer so a service provider mid-review
 # right at the deadline doesn't get cut off). Ported verbatim from
 # src/lib/storage.ts.
 ONE_HOUR = 60 * 60
@@ -50,7 +50,7 @@ class LocalFileStorage(Storage):
         self.root = Path(settings.storage_root).resolve()
 
     def _path(self, bucket: str, key: str) -> Path:
-        # Defense in depth: callers (drawings.py, contractor.py routers)
+        # Defense in depth: callers (drawings.py, service_provider.py routers)
         # already strip ".."/"."" path segments before a key ever reaches
         # here, but storage itself never trusts that alone — resolve the
         # final path and refuse anything that would land outside root,
@@ -119,7 +119,7 @@ class S3Storage(Storage):
     def _resolve_bucket(self, bucket: str) -> str:
         return {
             "project-drawings": settings.s3_bucket_drawings,
-            "contractor-documents": settings.s3_bucket_documents,
+            "service-provider-documents": settings.s3_bucket_documents,
             "owner-documents": settings.s3_bucket_owner_documents,
         }.get(bucket, bucket)
 

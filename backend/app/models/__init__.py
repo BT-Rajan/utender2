@@ -3,10 +3,11 @@ from app.models.auth_token import AuthToken
 from app.models.award_record import AwardRecord
 from app.models.clarification import Clarification
 from app.models.cms_content import CmsContent
-from app.models.contractor import ContractorProfile
-from app.models.document import ContractorDocument, DocumentRequirement, OwnerDocument
+from app.models.service_provider import ServiceProviderProfile
+from app.models.document import ServiceProviderDocument, DocumentRequirement, OwnerDocument
 from app.models.notification import Notification
 from app.models.offer import Offer, OfferRevision
+from app.models.organization import Organization, OrganizationMembership
 from app.models.owner import OwnerProfile
 from app.models.payment_override import PaymentOverride
 from app.models.project import Project, ProjectDrawing
@@ -18,10 +19,12 @@ from app.models.user import User
 __all__ = [
     "User",
     "AuthToken",
-    "ContractorProfile",
+    "ServiceProviderProfile",
     "DocumentRequirement",
-    "ContractorDocument",
+    "ServiceProviderDocument",
     "OwnerProfile",
+    "Organization",
+    "OrganizationMembership",
     "OwnerDocument",
     "Project",
     "ProjectDrawing",

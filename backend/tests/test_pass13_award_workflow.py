@@ -16,7 +16,7 @@ def test_pass13_award_workflow():
     from app.auth.security import hash_password
     from app.models.audit_log import AuditLog
     from app.models.award_record import AwardRecord
-    from app.models.document import ContractorDocument
+    from app.models.document import ServiceProviderDocument
     from app.models.enums import DocumentStatus, UserRole
     from app.models.user import User
 
@@ -37,24 +37,24 @@ def test_pass13_award_workflow():
     _owner_approve_db.commit()
 
 
-    def make_active_contractor(email, company):
+    def make_active_service_provider(email, company):
         client = TestClient(app)
         r = client.post(
             "/auth/signup",
-            json={"email": email, "password": "password123", "full_name": "C", "role": "contractor", "company_name": company},
+            json={"email": email, "password": "password123", "full_name": "C", "role": "service_provider", "company_name": company},
         )
         cid = r.json()["id"]
-        for doc in db.query(ContractorDocument).filter_by(contractor_id=cid).all():
+        for doc in db.query(ServiceProviderDocument).filter_by(service_provider_id=cid).all():
             doc.status = DocumentStatus.approved
         db.commit()
-        admin_client.post(f"/admin/review/contractors/{cid}/approve")
-        admin_client.post(f"/admin/contractors/{cid}/payment-override", json={"reason": "test activation"})
+        admin_client.post(f"/admin/review/service-providers/{cid}/approve")
+        admin_client.post(f"/admin/service-providers/{cid}/payment-override", json={"reason": "test activation"})
         return client, cid
 
 
-    c1, c1_id = make_active_contractor("c1@example.com", "Acme")
-    c2, c2_id = make_active_contractor("c2@example.com", "BuildCo")
-    c3, c3_id = make_active_contractor("c3@example.com", "ThirdCo")
+    c1, c1_id = make_active_service_provider("c1@example.com", "Acme")
+    c2, c2_id = make_active_service_provider("c2@example.com", "BuildCo")
+    c3, c3_id = make_active_service_provider("c3@example.com", "ThirdCo")
 
     future = (datetime.utcnow() + timedelta(days=7)).isoformat()
 
@@ -80,7 +80,7 @@ def test_pass13_award_workflow():
     record = db.query(AwardRecord).filter_by(project_id=project_id).first()
     check("AwardRecord row created", record is not None)
     check("AwardRecord.offer_id matches the winning offer", record.offer_id == offer1_id)
-    check("AwardRecord.contractor_id matches c1", record.contractor_id == c1_id)
+    check("AwardRecord.service_provider_id matches c1", record.service_provider_id == c1_id)
     check("AwardRecord.amount matches the winning bid", float(record.amount) == 5000.00)
     check("AwardRecord.awarded_by is the owner", record.awarded_by is not None)
 
@@ -93,25 +93,25 @@ def test_pass13_award_workflow():
     from app.models.offer import Offer
     from app.models.enums import OfferStatus
 
-    c3_offer = db.query(Offer).filter_by(project_id=project_id, contractor_id=c3_id).first()
+    c3_offer = db.query(Offer).filter_by(project_id=project_id, service_provider_id=c3_id).first()
     check("withdrawn offer STAYS withdrawn after award (not overwritten to rejected)", c3_offer.status == OfferStatus.withdrawn)
 
-    c2_offer = db.query(Offer).filter_by(project_id=project_id, contractor_id=c2_id).first()
+    c2_offer = db.query(Offer).filter_by(project_id=project_id, service_provider_id=c2_id).first()
     check("live losing offer correctly marked rejected", c2_offer.status == OfferStatus.rejected)
 
-    # GET /projects/{id}/award now works, for owner, admin, and the winning contractor
+    # GET /projects/{id}/award now works, for owner, admin, and the winning service provider
     r = owner_client.get(f"/projects/{project_id}/award")
     check("owner can view award record", r.status_code == 200)
-    check("award record includes winning company name", r.json()["contractor_company_name"] == "Acme")
+    check("award record includes winning company name", r.json()["service_provider_company_name"] == "Acme")
 
     r = admin_client.get(f"/projects/{project_id}/award")
     check("admin can view award record", r.status_code == 200)
 
     r = c1.get(f"/projects/{project_id}/award")
-    check("winning contractor can view award record", r.status_code == 200)
+    check("winning service provider can view award record", r.status_code == 200)
 
     r = c2.get(f"/projects/{project_id}/award")
-    check("losing (but eligible) contractor can also view award record", r.status_code == 200)
+    check("losing (but eligible) service provider can also view award record", r.status_code == 200)
 
     # double-award attempts are rejected
     r = owner_client.post(f"/owner/projects/{project_id}/offers/{offer1_id}/approve")

@@ -44,7 +44,7 @@ class ProjectOut(BaseModel):
     is_suspended: bool = False
     created_at: datetime
     offer_count: int = 0
-    my_offer_status: str | None = None  # only populated on the contractor feed
+    my_offer_status: str | None = None  # only populated on the service provider feed
 
 
 class ProjectDetailOut(ProjectOut):

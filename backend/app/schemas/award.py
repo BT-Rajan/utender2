@@ -10,10 +10,10 @@ class AwardRecordOut(BaseModel):
     id: str
     project_id: str
     offer_id: str
-    contractor_id: str
+    service_provider_id: str
     amount: Decimal
     project_revision: int
     offer_revision: int
     awarded_by: str
     created_at: datetime
-    contractor_company_name: str | None = None
+    service_provider_company_name: str | None = None

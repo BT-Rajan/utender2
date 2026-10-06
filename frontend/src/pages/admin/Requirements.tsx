@@ -6,14 +6,34 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { QueryError } from "@/components/QueryError";
 import { useI18n } from "@/i18n/I18nContext";
 
+// "" = applies to both individuals and organizations.
+type Scope = "" | "individual" | "organization";
+
+function ScopeSelect({ value, onChange }: { value: Scope; onChange: (v: Scope) => void }) {
+  const { t } = useI18n();
+  return (
+    <label className="flex items-center gap-1.5 font-mono text-[10.5px] text-navy">
+      {t("verification.scopeLabel")}
+      <select value={value} onChange={(e) => onChange(e.target.value as Scope)} className="border border-border rounded px-1.5 py-1 text-xs">
+        <option value="">{t("verification.scopeAll")}</option>
+        <option value="individual">{t("verification.scopeIndividual")}</option>
+        <option value="organization">{t("verification.scopeOrganization")}</option>
+      </select>
+    </label>
+  );
+}
+
 export function AdminRequirementsPage() {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isRequired, setIsRequired] = useState(true);
-  const [scopeFilter, setScopeFilter] = useState<"contractor" | "owner">("contractor");
+  const [scope, setScope] = useState<Scope>("");
+  const [requiresExpiry, setRequiresExpiry] = useState(false);
+  const [scopeFilter, setScopeFilter] = useState<"service_provider" | "owner">("service_provider");
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ id: string; name: string; description: string } | null>(null);
 
   const {
     data: requirements,
@@ -35,12 +55,21 @@ export function AdminRequirementsPage() {
     mutationFn: () =>
       apiFetch("/admin/requirements", {
         method: "POST",
-        body: { name, description: description || null, is_required: isRequired, applies_to: scopeFilter },
+        body: {
+          name,
+          description: description || null,
+          is_required: isRequired,
+          applies_to: scopeFilter,
+          applies_to_stakeholder: scope || null,
+          requires_expiry: requiresExpiry,
+        },
       }),
     onSuccess: () => {
       setName("");
       setDescription("");
       setIsRequired(true);
+      setScope("");
+      setRequiresExpiry(false);
       invalidate();
     },
     onError: (err) => onMutationError(err, t("admin.requirements.addError")),
@@ -50,6 +79,23 @@ export function AdminRequirementsPage() {
     mutationFn: ({ id, value }: { id: string; value: boolean }) =>
       apiFetch(`/admin/requirements/${id}`, { method: "PATCH", body: { is_required: value } }),
     onSuccess: invalidate,
+    onError: (err) => onMutationError(err, t("admin.requirements.updateError")),
+  });
+
+  const policyMutation = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
+      apiFetch(`/admin/requirements/${id}`, { method: "PATCH", body }),
+    onSuccess: invalidate,
+    onError: (err) => onMutationError(err, t("admin.requirements.updateError")),
+  });
+
+  const editMutation = useMutation({
+    mutationFn: (edit: { id: string; name: string; description: string }) =>
+      apiFetch(`/admin/requirements/${edit.id}`, { method: "PATCH", body: { name: edit.name, description: edit.description } }),
+    onSuccess: () => {
+      setEditing(null);
+      invalidate();
+    },
     onError: (err) => onMutationError(err, t("admin.requirements.updateError")),
   });
 
@@ -70,10 +116,10 @@ export function AdminRequirementsPage() {
       <div className="inline-flex border border-navy rounded-full overflow-hidden mb-6">
         <button
           type="button"
-          onClick={() => setScopeFilter("contractor")}
-          className={`font-mono text-xs px-4 py-1.5 uppercase tracking-wide ${scopeFilter === "contractor" ? "bg-navy text-white" : "bg-white text-navy"}`}
+          onClick={() => setScopeFilter("service_provider")}
+          className={`font-mono text-xs px-4 py-1.5 uppercase tracking-wide ${scopeFilter === "service_provider" ? "bg-navy text-white" : "bg-white text-navy"}`}
         >
-          {t("admin.requirements.forContractors")}
+          {t("admin.requirements.forServiceProviders")}
         </button>
         <button
           type="button"
@@ -104,14 +150,70 @@ export function AdminRequirementsPage() {
               <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${req.is_required ? "left-4" : "left-0.5"}`} />
             </button>
 
-            <div className="flex-1">
-              <div className="font-display font-semibold text-sm">{req.name}</div>
-              <div className="text-xs text-steel-light">{req.description}</div>
-            </div>
+            {editing?.id === req.id ? (
+              <form
+                className="flex-1 grid gap-1.5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  editMutation.mutate(editing);
+                }}
+              >
+                <input
+                  value={editing.name}
+                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                  required
+                  aria-label={t("admin.requirements.namePlaceholder")}
+                  className="border border-border rounded px-2.5 py-1.5 text-sm"
+                />
+                <input
+                  value={editing.description}
+                  onChange={(e) => setEditing({ ...editing, description: e.target.value })}
+                  placeholder={t("admin.requirements.descriptionPlaceholder")}
+                  className="border border-border rounded px-2.5 py-1.5 text-xs"
+                />
+                <div className="flex gap-2">
+                  <button type="submit" disabled={editMutation.isPending} className="bg-navy text-white text-xs font-semibold rounded px-3 py-1">
+                    {t("common.save")}
+                  </button>
+                  <button type="button" onClick={() => setEditing(null)} className="text-xs text-steel underline">
+                    {t("common.cancel")}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex-1">
+                <div className="font-display font-semibold text-sm">{req.name}</div>
+                <div className="text-xs text-steel-light">{req.description}</div>
+                <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                  <ScopeSelect
+                    value={req.applies_to_stakeholder ?? ""}
+                    onChange={(v) => policyMutation.mutate({ id: req.id, body: { applies_to_stakeholder: v || null } })}
+                  />
+                  <label className="flex items-center gap-1.5 font-mono text-[10.5px] text-navy">
+                    <input
+                      type="checkbox"
+                      checked={req.requires_expiry}
+                      onChange={(e) => policyMutation.mutate({ id: req.id, body: { requires_expiry: e.target.checked } })}
+                    />
+                    {t("verification.requiresExpiry")}
+                  </label>
+                </div>
+              </div>
+            )}
 
             <span className="font-mono text-[9.5px] uppercase text-steel-light">
               {req.is_required ? t("admin.requirements.required") : t("admin.requirements.optional")}
             </span>
+
+            {editing?.id !== req.id && (
+              <button
+                type="button"
+                onClick={() => setEditing({ id: req.id, name: req.name, description: req.description ?? "" })}
+                className="text-xs text-navy underline"
+              >
+                {t("admin.requirements.edit")}
+              </button>
+            )}
 
             <button
               type="button"
@@ -148,8 +250,15 @@ export function AdminRequirementsPage() {
         <label className="flex items-center gap-1.5 font-mono text-[11px] text-navy whitespace-nowrap">
           <input type="checkbox" checked={isRequired} onChange={(e) => setIsRequired(e.target.checked)} /> {t("admin.requirements.required")}
         </label>
+        <div className="sm:col-span-4 flex flex-wrap items-center gap-4">
+          <ScopeSelect value={scope} onChange={setScope} />
+          <label className="flex items-center gap-1.5 font-mono text-[11px] text-navy">
+            <input type="checkbox" checked={requiresExpiry} onChange={(e) => setRequiresExpiry(e.target.checked)} />
+            {t("verification.requiresExpiry")}
+          </label>
+        </div>
         <button type="submit" className="bg-navy hover:bg-navy-deep text-white text-xs font-semibold rounded px-3 py-2 whitespace-nowrap">
-          {scopeFilter === "owner" ? t("admin.requirements.addForOwners") : t("admin.requirements.addForContractors")}
+          {scopeFilter === "owner" ? t("admin.requirements.addForOwners") : t("admin.requirements.addForServiceProviders")}
         </button>
       </form>
     </main>

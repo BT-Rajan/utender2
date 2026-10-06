@@ -21,7 +21,7 @@ import app.services.tender_lifecycle as lifecycle_module
 from app.auth.security import hash_password
 from app.main import app
 from app.models.award_record import AwardRecord
-from app.models.contractor import ContractorProfile
+from app.models.service_provider import ServiceProviderProfile
 from app.models.enums import OfferStatus, UserRole, VerificationStatus
 from app.models.offer import Offer, OfferRevision
 from app.models.owner import OwnerProfile
@@ -52,15 +52,15 @@ def _owner(db, email="owner@example.com"):
     return c, uid
 
 
-def _contractor(db, email="c1@example.com", company="Acme Builders"):
+def _service_provider(db, email="c1@example.com", company="Acme Builders"):
     c = TestClient(app)
     r = c.post(
         "/auth/signup",
-        json={"email": email, "password": PASSWORD, "full_name": "C", "role": "contractor", "company_name": company},
+        json={"email": email, "password": PASSWORD, "full_name": "C", "role": "service_provider", "company_name": company},
     )
     assert r.status_code == 201, r.text
     uid = r.json()["id"]
-    p = db.get(ContractorProfile, uid)
+    p = db.get(ServiceProviderProfile, uid)
     p.verification_status = VerificationStatus.approved
     p.payment_override_active = True
     db.commit()
@@ -90,8 +90,8 @@ def _project(owner, tender_type="owner_visible", status="open", deadline=None) -
     return r.json()["id"]
 
 
-def _bid(contractor, pid, amount="1000.00", **extra):
-    return contractor.post(f"/projects/{pid}/offers", json={"amount": amount, **extra})
+def _bid(service_provider, pid, amount="1000.00", **extra):
+    return service_provider.post(f"/projects/{pid}/offers", json={"amount": amount, **extra})
 
 
 def _expire_deadline(db, pid, seconds=1):
@@ -107,8 +107,8 @@ def _offers(db, pid):
 def _awarded_tender(db):
     """owner_visible tender, two bids, closed, c1 awarded."""
     owner, _ = _owner(db)
-    c1, c1_id = _contractor(db, "c1@example.com")
-    c2, c2_id = _contractor(db, "c2@example.com", "BuildCo")
+    c1, c1_id = _service_provider(db, "c1@example.com")
+    c2, c2_id = _service_provider(db, "c2@example.com", "BuildCo")
     pid = _project(owner)
     o1 = _bid(c1, pid, "1000.00").json()["id"]
     o2 = _bid(c2, pid, "1100.00").json()["id"]
@@ -131,7 +131,7 @@ OWNER_ROUTES = [
     ("get", "/owner/projects/{pid}/offers/{oid}/history"),
     ("post", "/owner/projects/{pid}/offers/{oid}/approve"),
 ]
-CONTRACTOR_ROUTES = [
+SERVICE_PROVIDER_ROUTES = [
     ("post", "/projects/{pid}/offers"),
     ("post", "/projects/{pid}/offers/withdraw"),
     ("get", "/projects/{pid}/offers/mine"),
@@ -146,36 +146,36 @@ def _call(client, method, path, **kw):
 
 def test_anonymous_requests_are_rejected_on_every_tender_and_bid_route(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner)
     oid = _bid(c1, pid).json()["id"]
 
-    for method, path in OWNER_ROUTES + CONTRACTOR_ROUTES:
+    for method, path in OWNER_ROUTES + SERVICE_PROVIDER_ROUTES:
         r = _call(TestClient(app), method, path.format(pid=pid, oid=oid))
         assert r.status_code == 401, (method, path, r.status_code)
 
 
-def test_wrong_role_is_forbidden_on_owner_and_contractor_routes(db):
+def test_wrong_role_is_forbidden_on_owner_and_service_provider_routes(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     admin = _admin(db)
     pid = _project(owner)
     oid = _bid(c1, pid).json()["id"]
 
-    for method, path in OWNER_ROUTES:  # a contractor, and an admin, are not an owner
+    for method, path in OWNER_ROUTES:  # a service provider, and an admin, are not an owner
         for who in (c1, admin):
             r = _call(who, method, path.format(pid=pid, oid=oid))
             assert r.status_code == 403, ("non-owner", method, path, r.status_code)
-    for method, path in CONTRACTOR_ROUTES:  # an owner, and an admin, are not a contractor
+    for method, path in SERVICE_PROVIDER_ROUTES:  # an owner, and an admin, are not a service provider
         for who in (owner, admin):
             r = _call(who, method, path.format(pid=pid, oid=oid))
-            assert r.status_code == 403, ("non-contractor", method, path, r.status_code)
+            assert r.status_code == 403, ("non-service-provider", method, path, r.status_code)
 
 
 def test_another_owner_cannot_read_or_change_a_tender_they_do_not_own(db):
     owner_a, _ = _owner(db, "a@example.com")
     owner_b, _ = _owner(db, "b@example.com")
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner_a)
     oid = _bid(c1, pid).json()["id"]
 
@@ -198,27 +198,27 @@ def test_another_owner_cannot_read_or_change_a_tender_they_do_not_own(db):
     assert db.get(Offer, oid).status == OfferStatus.submitted
 
 
-def test_a_contractor_cannot_reach_or_withdraw_another_contractors_bid(db):
+def test_a_service_provider_cannot_reach_or_withdraw_another_service_providers_bid(db):
     owner, _ = _owner(db)
-    c1, c1_id = _contractor(db, "c1@example.com")
-    c2, _ = _contractor(db, "c2@example.com", "BuildCo")
+    c1, c1_id = _service_provider(db, "c1@example.com")
+    c2, _ = _service_provider(db, "c2@example.com", "BuildCo")
     pid = _project(owner)
     oid = _bid(c1, pid, "1000.00").json()["id"]
 
     assert c2.get(f"/projects/{pid}/offers/mine").json() is None  # sees only their own (none)
     assert c2.get(f"/projects/{pid}/offers/mine/history").json() == []
     assert c2.post(f"/projects/{pid}/offers/withdraw").status_code == 404  # "no offer of yours"
-    assert c2.get("/contractor/my-bids").json() == []
+    assert c2.get("/service-provider/my-bids").json() == []
     assert c2.get(f"/owner/projects/{pid}/offers/{oid}/history").status_code == 403
 
     db.expire_all()
     offer = db.get(Offer, oid)
-    assert offer.status == OfferStatus.submitted and offer.contractor_id == c1_id
+    assert offer.status == OfferStatus.submitted and offer.service_provider_id == c1_id
 
 
-def test_draft_tender_is_invisible_and_unbiddable_for_contractors(db):
+def test_draft_tender_is_invisible_and_unbiddable_for_service_providers(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner, status="draft")
 
     assert c1.get(f"/projects/{pid}").status_code == 404
@@ -234,7 +234,7 @@ def test_draft_tender_is_invisible_and_unbiddable_for_contractors(db):
 def test_invalid_lifecycle_transitions_are_rejected_and_change_nothing(db):
     owner, c1_id = None, None
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
 
     draft = _project(owner, status="draft")
     for action in ("close", "start-evaluation", "no-award"):
@@ -264,8 +264,8 @@ def test_invalid_lifecycle_transitions_are_rejected_and_change_nothing(db):
 
 
 def _awarded_tender_for(owner, db):
-    c1, _ = _contractor(db, "w1@example.com", "WinCo")
-    c2, _ = _contractor(db, "w2@example.com", "LoseCo")
+    c1, _ = _service_provider(db, "w1@example.com", "WinCo")
+    c2, _ = _service_provider(db, "w2@example.com", "LoseCo")
     pid = _project(owner)
     o1 = _bid(c1, pid, "1000.00").json()["id"]
     o2 = _bid(c2, pid, "1100.00").json()["id"]
@@ -276,8 +276,8 @@ def _awarded_tender_for(owner, db):
 
 def test_only_a_live_unsuspended_bid_can_be_awarded(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db, "c1@example.com")
-    c2, _ = _contractor(db, "c2@example.com", "BuildCo")
+    c1, _ = _service_provider(db, "c1@example.com")
+    c2, _ = _service_provider(db, "c2@example.com", "BuildCo")
     pid = _project(owner)
     o1 = _bid(c1, pid).json()["id"]
     o2 = _bid(c2, pid).json()["id"]
@@ -295,7 +295,7 @@ def test_only_a_live_unsuspended_bid_can_be_awarded(db):
 
 def test_bid_after_the_deadline_is_rejected_even_before_the_status_sync(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner)
     _expire_deadline(db, pid)  # status is still "open": nothing has read the project since
 
@@ -305,7 +305,7 @@ def test_bid_after_the_deadline_is_rejected_even_before_the_status_sync(db):
 
 def test_bid_exactly_at_the_deadline_is_rejected_and_one_instant_before_is_accepted(db, monkeypatch):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner)
     deadline = datetime(2031, 1, 1, 12, 0, 0)
     db.get(Project, pid).bid_deadline = deadline
@@ -329,8 +329,8 @@ def test_bid_exactly_at_the_deadline_is_rejected_and_one_instant_before_is_accep
 
 def test_client_supplied_fields_cannot_set_bid_state_or_identity(db):
     owner, _ = _owner(db)
-    c1, c1_id = _contractor(db, "c1@example.com")
-    _c2, c2_id = _contractor(db, "c2@example.com", "BuildCo")
+    c1, c1_id = _service_provider(db, "c1@example.com")
+    _c2, c2_id = _service_provider(db, "c2@example.com", "BuildCo")
     pid = _project(owner)
     other = _project(owner)
 
@@ -339,7 +339,7 @@ def test_client_supplied_fields_cannot_set_bid_state_or_identity(db):
         pid,
         "1000.00",
         status="approved",
-        contractor_id=c2_id,
+        service_provider_id=c2_id,
         project_id=other,
         revision=99,
         is_suspended=True,
@@ -348,7 +348,7 @@ def test_client_supplied_fields_cannot_set_bid_state_or_identity(db):
 
     assert r.status_code == 200, r.text
     offer = _offers(db, pid)[0]
-    assert (offer.status, offer.contractor_id, offer.project_id, offer.revision, offer.is_suspended) == (
+    assert (offer.status, offer.service_provider_id, offer.project_id, offer.revision, offer.is_suspended) == (
         OfferStatus.submitted,
         c1_id,
         pid,
@@ -365,7 +365,7 @@ def test_client_supplied_fields_cannot_set_bid_state_or_identity(db):
 
 def test_withdrawal_is_refused_once_bidding_has_closed(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner)
     oid = _bid(c1, pid).json()["id"]
     assert owner.post(f"/owner/projects/{pid}/close").status_code == 200
@@ -377,7 +377,7 @@ def test_withdrawal_is_refused_once_bidding_has_closed(db):
 
 def test_withdrawal_after_the_deadline_is_refused_even_before_the_status_sync(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner)
     oid = _bid(c1, pid).json()["id"]
     _expire_deadline(db, pid)
@@ -402,7 +402,7 @@ def test_awarded_and_rejected_bids_cannot_be_withdrawn(db):
 
 def test_withdraw_then_resubmit_before_the_deadline_still_works(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner)
     _bid(c1, pid, "1000.00")
     assert c1.post(f"/projects/{pid}/offers/withdraw").status_code == 200
@@ -415,7 +415,7 @@ def test_withdraw_then_resubmit_before_the_deadline_still_works(db):
 
 def test_a_submitted_bid_has_no_edit_route_other_than_resubmission(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner)
     oid = _bid(c1, pid, "1000.00").json()["id"]
 
@@ -436,7 +436,7 @@ def test_a_submitted_bid_has_no_edit_route_other_than_resubmission(db):
 
 def test_resubmitting_after_the_tender_closes_is_refused(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner)
     _bid(c1, pid, "1000.00")
     assert owner.post(f"/owner/projects/{pid}/close").status_code == 200
@@ -447,7 +447,7 @@ def test_resubmitting_after_the_tender_closes_is_refused(db):
 
 def test_extending_the_deadline_does_not_reopen_a_closed_tender(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner)
     _bid(c1, pid, "1000.00")
     assert owner.post(f"/owner/projects/{pid}/close").status_code == 200
@@ -461,7 +461,7 @@ def test_extending_the_deadline_does_not_reopen_a_closed_tender(db):
 
 def test_owner_cannot_pull_the_deadline_earlier_once_bids_exist(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner, deadline=_future(10))
     _bid(c1, pid)
 
@@ -477,32 +477,32 @@ def test_owner_cannot_pull_the_deadline_earlier_once_bids_exist(db):
 
 def test_cancelling_a_sealed_tender_before_its_deadline_does_not_unseal_its_bids(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner, "sealed")
     oid = _bid(c1, pid, "5000.00").json()["id"]
 
     assert owner.post(f"/owner/projects/{pid}/cancel").status_code == 200
 
     offers = owner.get(f"/owner/projects/{pid}/offers").json()
-    assert offers and all(o["amount"] is None and o["contractor_id"] is None and o["message"] is None for o in offers)
+    assert offers and all(o["amount"] is None and o["service_provider_id"] is None and o["message"] is None for o in offers)
     assert owner.get(f"/owner/projects/{pid}/offers/{oid}/history").status_code == 404
 
 
 def test_sealed_bids_stay_hidden_from_every_other_party_and_open_at_the_deadline(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db, "c1@example.com")
-    c2, _ = _contractor(db, "c2@example.com", "BuildCo")
+    c1, _ = _service_provider(db, "c1@example.com")
+    c2, _ = _service_provider(db, "c2@example.com", "BuildCo")
     pid = _project(owner, "sealed")
     _bid(c1, pid, "5000.00")
 
     assert c2.get(f"/projects/{pid}/offers/mine").json() is None
-    assert c2.get("/contractor/my-bids").json() == []
+    assert c2.get("/service-provider/my-bids").json() == []
     assert "5000" not in c2.get(f"/projects/{pid}").text
 
     _expire_deadline(db, pid)
     owner.get("/owner/projects")  # lazy sync
     opened = owner.get(f"/owner/projects/{pid}/offers").json()
-    assert opened and opened[0]["amount"] is not None and opened[0]["contractor_id"] is not None
+    assert opened and opened[0]["amount"] is not None and opened[0]["service_provider_id"] is not None
 
 
 # --------------------------------------------------------------------------
@@ -513,7 +513,7 @@ def test_sealed_bids_stay_hidden_from_every_other_party_and_open_at_the_deadline
 @pytest.mark.parametrize("amount", ["0", "-5", "NaN", "Infinity", "abc", "1e400", "10000000000", "99999999999.99"])
 def test_unusable_bid_amounts_are_controlled_rejections(db, amount):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner)
 
     r = _bid(c1, pid, amount)
@@ -524,7 +524,7 @@ def test_unusable_bid_amounts_are_controlled_rejections(db, amount):
 
 def test_the_largest_amount_the_column_can_hold_is_accepted_exactly(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner)
 
     assert _bid(c1, pid, "9999999999.99").status_code == 200
@@ -533,7 +533,7 @@ def test_the_largest_amount_the_column_can_hold_is_accepted_exactly(db):
 
 def test_overlong_text_fields_are_rejected_not_a_server_error(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner)
 
     assert _bid(c1, pid, "10.00", timeline_estimate="x" * 300).status_code == 422
@@ -543,7 +543,7 @@ def test_overlong_text_fields_are_rejected_not_a_server_error(db):
 
 def test_unknown_ids_are_controlled_rejections(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner)
     oid = _bid(c1, pid).json()["id"]
 
@@ -560,9 +560,9 @@ def test_unknown_ids_are_controlled_rejections(db):
 
 
 @needs_mysql
-def test_concurrent_first_bids_from_one_contractor_make_one_offer_and_no_errors(db):
+def test_concurrent_first_bids_from_one_service_provider_make_one_offer_and_no_errors(db):
     owner, _ = _owner(db)
-    _contractor(db, "c1@example.com")
+    _service_provider(db, "c1@example.com")
     pid = _project(owner)
     clients = [_login("c1@example.com") for _ in range(8)]
 
@@ -579,8 +579,8 @@ def test_concurrent_first_bids_from_one_contractor_make_one_offer_and_no_errors(
 @needs_mysql
 def test_concurrent_awards_of_different_offers_yield_exactly_one_award(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db, "c1@example.com")
-    c2, _ = _contractor(db, "c2@example.com", "BuildCo")
+    c1, _ = _service_provider(db, "c1@example.com")
+    c2, _ = _service_provider(db, "c2@example.com", "BuildCo")
     pid = _project(owner)
     o1 = _bid(c1, pid, "1000.00").json()["id"]
     o2 = _bid(c2, pid, "1100.00").json()["id"]
@@ -600,7 +600,7 @@ def test_concurrent_awards_of_different_offers_yield_exactly_one_award(db):
 @needs_mysql
 def test_a_bid_racing_a_close_is_never_accepted_after_the_close_commits(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner)
 
     # Play the owner's close mid-transaction: hold the project row, let the bid
@@ -628,7 +628,7 @@ def test_a_bid_racing_a_close_is_never_accepted_after_the_close_commits(db):
 
 def test_a_suspended_owner_cannot_drive_the_tender_lifecycle_or_award(db):
     owner, uid = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner)
     oid = _bid(c1, pid).json()["id"]
     db.get(OwnerProfile, uid).is_suspended = True

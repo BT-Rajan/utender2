@@ -12,9 +12,9 @@ from app.deps import require_admin
 from app.models.audit_log import AuditLog
 from app.models.award_record import AwardRecord
 from app.models.cms_content import CmsContent
-from app.models.contractor import ContractorProfile
-from app.models.document import ContractorDocument, DocumentRequirement, OwnerDocument
-from app.models.enums import DocumentStatus, Language, NotificationType, ProjectStatus, UserRole, VerificationStatus
+from app.models.service_provider import ServiceProviderProfile
+from app.models.document import ServiceProviderDocument, DocumentRequirement, OwnerDocument
+from app.models.enums import DocumentStatus, Language, NotificationType, ProjectStatus, StakeholderType, UserRole, VerificationStatus
 from app.models.offer import Offer, OfferRevision
 from app.models.owner import OwnerProfile
 from app.models.payment_override import PaymentOverride
@@ -22,9 +22,9 @@ from app.models.project import Project, ProjectDrawing
 from app.models.review import Review
 from app.models.user import User
 from app.schemas.cms import CmsContentOut, CmsContentUpsert
-from app.schemas.contractor import ContractorProfileOut, ContractorProfileUpdate
+from app.schemas.service_provider import ServiceProviderProfileOut, ServiceProviderProfileUpdate
 from app.schemas.document import (
-    ContractorDocumentOut,
+    ServiceProviderDocumentOut,
     DocumentExpiryUpdate,
     DocumentRequirementCreate,
     DocumentRequirementOut,
@@ -34,6 +34,8 @@ from app.schemas.document import (
 )
 from app.schemas.owner import OwnerProfileOut
 from app.services.audit import log_action
+from app.services.stakeholder import describe as describe_stakeholder
+from app.services.verification import assert_ready_to_approve, checklist, document_out_fields, profile_state_fields
 from app.services.notify import notify
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import is_sealed_and_open, lock_project
@@ -57,6 +59,8 @@ def add_requirement(payload: DocumentRequirementCreate, admin: User = Depends(re
         description=(payload.description or "").strip() or None,
         is_required=payload.is_required,
         applies_to=payload.applies_to,
+        applies_to_stakeholder=payload.applies_to_stakeholder,
+        requires_expiry=payload.requires_expiry,
         created_by=admin.id,
     )
     db.add(req)
@@ -66,8 +70,13 @@ def add_requirement(payload: DocumentRequirementCreate, admin: User = Depends(re
 
 
 class RequirementPatch(BaseModel):
+    name: str | None = None
+    description: str | None = None
     is_required: bool | None = None
     is_active: bool | None = None
+    # Send null explicitly to make a requirement apply to both stakeholder types.
+    applies_to_stakeholder: StakeholderType | None = None
+    requires_expiry: bool | None = None
 
 
 @router.patch("/requirements/{requirement_id}", response_model=DocumentRequirementOut)
@@ -94,11 +103,41 @@ def patch_requirement(
             previous_value="False",
             new_value="True",
         )
+    if payload.name is not None:
+        name = payload.name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Document name is required.")
+        if name != req.name:
+            log_action(
+                db,
+                actor_id=admin.id,
+                action="requirement.renamed",
+                target_type="document_requirement",
+                target_id=requirement_id,
+                previous_value=req.name,
+                new_value=name,
+            )
+            req.name = name
+    if payload.description is not None:
+        req.description = payload.description.strip() or None
+    if "applies_to_stakeholder" in payload.model_fields_set and payload.applies_to_stakeholder != req.applies_to_stakeholder:
+        log_action(
+            db,
+            actor_id=admin.id,
+            action="requirement.scope_changed",
+            target_type="document_requirement",
+            target_id=requirement_id,
+            previous_value=req.applies_to_stakeholder.value if req.applies_to_stakeholder else "all",
+            new_value=payload.applies_to_stakeholder.value if payload.applies_to_stakeholder else "all",
+        )
+        req.applies_to_stakeholder = payload.applies_to_stakeholder
+    if payload.requires_expiry is not None:
+        req.requires_expiry = payload.requires_expiry
     if payload.is_required is not None:
         req.is_required = payload.is_required
     if payload.is_active is not None:
         # Soft-remove: deactivate rather than hard-delete, so existing
-        # contractor_documents rows referencing this requirement stay
+        # service_provider_documents rows referencing this requirement stay
         # intact for audit history.
         req.is_active = payload.is_active
     db.commit()
@@ -108,111 +147,160 @@ def patch_requirement(
 
 # ---------- review queue ----------
 
+_ADMIN_LINK_SECONDS = 60 * 60 * 24  # admin review links: fixed 24h window, not deadline-tied like drawings
+
+
+class ApplicationDecision(BaseModel):
+    note: str | None = None
+
+
+def _side(profile) -> tuple[str, str]:
+    """(audit target_type, user-facing status link) for a profile."""
+    if isinstance(profile, OwnerProfile):
+        return "owner_profile", "/owner/status"
+    return "service_provider_profile", "/service-provider/status"
+
+
+def _decide_document(db: Session, admin: User, profile, requirement_id: str, decision: DocumentStatus, note: str | None, expires_on):
+    """Approve a document, or request its correction. A correction must say
+    what to fix; an approval of a requirement that carries an expiry must
+    record the expiry date. Every decision is audit-logged."""
+    if decision not in (DocumentStatus.approved, DocumentStatus.rejected):
+        raise HTTPException(status_code=400, detail="A document can only be approved or sent back for correction.")
+    entry = next(((r, d) for r, d in checklist(db, profile) if r.id == requirement_id), None)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    req, doc = entry
+    if doc.status == DocumentStatus.not_submitted:
+        raise HTTPException(status_code=400, detail="This document hasn't been uploaded yet.")
+    note = (note or "").strip() or None
+    if decision == DocumentStatus.rejected and not note:
+        raise HTTPException(status_code=400, detail="Say what needs to be corrected, so the account holder knows what to fix.")
+    if decision == DocumentStatus.approved and req.requires_expiry and not expires_on:
+        raise HTTPException(status_code=400, detail=f"{req.name} requires an expiry date when it is approved.")
+
+    previous = doc.status.value
+    doc.status = decision
+    doc.admin_note = note if decision == DocumentStatus.rejected else None
+    doc.reviewed_by = admin.id
+    doc.reviewed_at = datetime.utcnow()
+    doc.expires_on = expires_on if decision == DocumentStatus.approved else None
+    if decision == DocumentStatus.rejected:
+        # A correction sends the whole application back to the account holder.
+        profile.verification_status = VerificationStatus.changes_requested
+    db.commit()
+
+    target_type, link = _side(profile)
+    log_action(
+        db,
+        actor_id=admin.id,
+        action="document.approved" if decision == DocumentStatus.approved else "document.correction_requested",
+        target_type=target_type,
+        target_id=profile.user_id,
+        previous_value=f"{req.name}: {previous}",
+        new_value=f"{req.name}: {decision.value}" + (f" ({note})" if note else ""),
+    )
+    is_owner = isinstance(profile, OwnerProfile)
+    if decision == DocumentStatus.approved:
+        kind = NotificationType.owner_document_approved if is_owner else NotificationType.document_approved
+    else:
+        kind = NotificationType.owner_document_rejected if is_owner else NotificationType.document_rejected
+    notify(db, profile.user, kind, link=link, requirement_name=req.name, note=note or "")
+    db.refresh(doc)
+    return doc, req
+
+
+def _decide_application(db: Session, admin: User, profile, status: VerificationStatus, note: str | None) -> None:
+    note = (note or "").strip() or None
+    target_type, link = _side(profile)
+    is_owner = isinstance(profile, OwnerProfile)
+    if status == VerificationStatus.approved:
+        assert_ready_to_approve(db, profile)
+    elif status == VerificationStatus.changes_requested:
+        flagged = any(d.status == DocumentStatus.rejected for _, d in checklist(db, profile))
+        if not note and not flagged:
+            raise HTTPException(
+                status_code=400,
+                detail="Request a correction on a specific document, or say what needs to change.",
+            )
+    elif status == VerificationStatus.rejected and not note:
+        raise HTTPException(status_code=400, detail="Give the reason for rejecting this application.")
+
+    previous = profile.verification_status.value
+    profile.verification_status = status
+    profile.verification_note = note
+    db.commit()
+    log_action(
+        db,
+        actor_id=admin.id,
+        action="owner_verification_status.set" if is_owner else "verification_status.set",
+        target_type=target_type,
+        target_id=profile.user_id,
+        previous_value=previous,
+        new_value=status.value + (f" ({note})" if note else ""),
+    )
+    if status == VerificationStatus.approved:
+        kind = NotificationType.owner_verification_activated if is_owner else NotificationType.verification_activated
+        notify(db, profile.user, kind, link="/owner/dashboard" if is_owner else "/service-provider/dashboard")
+    else:
+        kind = NotificationType.verification_changes_requested if status == VerificationStatus.changes_requested else NotificationType.verification_rejected
+        notify(db, profile.user, kind, link=link, note=note or "")
+    db.refresh(profile)
+
+
 @router.get("/review/queue")
 def review_queue(db: Session = Depends(get_db)):
     profiles = (
-        db.query(ContractorProfile)
+        db.query(ServiceProviderProfile)
         .filter(
-            ContractorProfile.verification_status.in_(
+            ServiceProviderProfile.verification_status.in_(
                 [VerificationStatus.pending_review, VerificationStatus.changes_requested]
             )
         )
-        .order_by(ContractorProfile.created_at.asc())
+        .order_by(ServiceProviderProfile.created_at.asc())
         .all()
     )
     result = []
     for cp in profiles:
-        docs = (
-            db.query(ContractorDocument, DocumentRequirement)
-            .join(DocumentRequirement, ContractorDocument.requirement_id == DocumentRequirement.id)
-            .filter(ContractorDocument.contractor_id == cp.user_id)
-            .all()
-        )
+        docs = checklist(db, cp)
+        db.commit()
         expiry = 60 * 60 * 24  # admin review links: fixed 24h window, not deadline-tied like drawings
         storage = get_storage()
         result.append(
             {
-                "contractor": ContractorProfileOut(**_profile_fields(cp), email=None),
+                "service_provider": ServiceProviderProfileOut(**_profile_fields(cp), email=None),
+                "stakeholder": describe_stakeholder(cp, cp.user, db),
                 "documents": [
                     {
-                        **ContractorDocumentOut(
-                            id=d.id,
-                            contractor_id=d.contractor_id,
-                            requirement_id=d.requirement_id,
-                            status=d.status,
-                            admin_note=d.admin_note,
-                            reviewed_at=d.reviewed_at,
-                            submitted_at=d.submitted_at,
-                            expires_on=d.expires_on,
-                            requirement_name=r.name,
-                            requirement_description=r.description,
-                            requirement_is_required=r.is_required,
-                            requirement_effective_from=r.effective_from,
-                        ).model_dump(),
-                        "url": storage.signed_url("contractor-documents", d.file_path, expiry) if d.file_path else None,
+                        **ServiceProviderDocumentOut(**document_out_fields(d, r)).model_dump(),
+                        "url": storage.signed_url("service-provider-documents", d.file_path, expiry) if d.file_path else None,
                     }
-                    for d, r in docs
+                    for r, d in docs
                 ],
             }
         )
     return result
 
 
-@router.post("/review/documents", response_model=ContractorDocumentOut)
+@router.post("/review/documents", response_model=ServiceProviderDocumentOut)
 def review_document(payload: ReviewDocumentDecision, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
-    doc = (
-        db.query(ContractorDocument)
-        .filter(
-            ContractorDocument.contractor_id == payload.contractor_id,
-            ContractorDocument.requirement_id == payload.requirement_id,
-        )
-        .first()
-    )
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found.")
-    _get_active_contractor_profile(db, payload.contractor_id)
-
-    doc.status = payload.decision
-    doc.admin_note = (payload.note or "Document rejected — please re-upload.") if payload.decision == DocumentStatus.rejected else None
-    doc.reviewed_by = admin.id
-    doc.reviewed_at = datetime.utcnow()
-    if payload.decision == DocumentStatus.approved:
-        doc.expires_on = payload.expires_on
-    db.commit()
-
-    # A single rejected document sends the whole application back to
-    # "changes requested" immediately, so the contractor sees it without
-    # the admin needing a separate reject-application step.
-    if payload.decision == DocumentStatus.rejected:
-        cp = db.get(ContractorProfile, payload.contractor_id)
-        if cp:
-            cp.verification_status = VerificationStatus.changes_requested
-            db.commit()
-
-    requirement = db.get(DocumentRequirement, payload.requirement_id)
-    contractor_user = db.get(User, payload.contractor_id)
-    if contractor_user and requirement and payload.decision in (DocumentStatus.approved, DocumentStatus.rejected):
-        notification_type = (
-            NotificationType.document_approved if payload.decision == DocumentStatus.approved else NotificationType.document_rejected
-        )
-        notify(db, contractor_user, notification_type, link="/contractor/status", requirement_name=requirement.name)
-
-    db.refresh(doc)
-    return doc
+    cp = _get_active_service_provider_profile(db, payload.service_provider_id)
+    doc, req = _decide_document(db, admin, cp, payload.requirement_id, payload.decision, payload.note, payload.expires_on)
+    return ServiceProviderDocumentOut(**document_out_fields(doc, req))
 
 
-@router.patch("/documents/{document_id}/expiry", response_model=ContractorDocumentOut)
+@router.patch("/documents/{document_id}/expiry", response_model=ServiceProviderDocumentOut)
 def set_document_expiry(document_id: str, payload: DocumentExpiryUpdate, db: Session = Depends(get_db)):
-    doc = db.get(ContractorDocument, document_id)
+    doc = db.get(ServiceProviderDocument, document_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
     doc.expires_on = payload.expires_on
     db.commit()
     db.refresh(doc)
     requirement = db.get(DocumentRequirement, doc.requirement_id)
-    return ContractorDocumentOut(
+    return ServiceProviderDocumentOut(
         id=doc.id,
-        contractor_id=doc.contractor_id,
+        service_provider_id=doc.service_provider_id,
         requirement_id=doc.requirement_id,
         status=doc.status,
         admin_note=doc.admin_note,
@@ -226,127 +314,82 @@ def set_document_expiry(document_id: str, payload: DocumentExpiryUpdate, db: Ses
     )
 
 
-@router.post("/review/contractors/{contractor_id}/approve", response_model=ContractorProfileOut)
-def approve_contractor(contractor_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
-    docs = (
-        db.query(ContractorDocument, DocumentRequirement)
-        .join(DocumentRequirement, ContractorDocument.requirement_id == DocumentRequirement.id)
-        .filter(ContractorDocument.contractor_id == contractor_id)
-        .all()
-    )
-    # Guard: every required document must be approved before the overall
-    # application can be approved. Prevents a mis-click from activating an
-    # under-verified contractor.
-    missing_approval = any(r.is_required and d.status != DocumentStatus.approved for d, r in docs)
-    if missing_approval:
-        raise HTTPException(status_code=400, detail="All required documents must be approved before approving this contractor.")
-
-    cp = db.get(ContractorProfile, contractor_id)
-    if not cp:
-        raise HTTPException(status_code=404, detail="Contractor not found.")
-    previous = cp.verification_status.value
-    cp.verification_status = VerificationStatus.approved
-    db.commit()
-    db.refresh(cp)
-    log_action(
-        db,
-        actor_id=admin.id,
-        action="verification_status.set",
-        target_type="contractor_profile",
-        target_id=contractor_id,
-        previous_value=previous,
-        new_value=VerificationStatus.approved.value,
-    )
-    contractor_user = db.get(User, contractor_id)
-    if contractor_user:
-        notify(db, contractor_user, NotificationType.verification_activated, link="/contractor/dashboard")
-    return cp
+@router.post("/review/service-providers/{service_provider_id}/approve", response_model=ServiceProviderProfileOut)
+def approve_service_provider(service_provider_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    cp = _get_active_service_provider_profile(db, service_provider_id)
+    _decide_application(db, admin, cp, VerificationStatus.approved, None)
+    return ServiceProviderProfileOut(**_profile_fields(cp), email=cp.user.email)
 
 
-@router.post("/review/contractors/{contractor_id}/reject", response_model=ContractorProfileOut)
-def reject_application(contractor_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
-    cp = db.get(ContractorProfile, contractor_id)
-    if not cp:
-        raise HTTPException(status_code=404, detail="Contractor not found.")
-    previous = cp.verification_status.value
-    cp.verification_status = VerificationStatus.changes_requested
-    db.commit()
-    db.refresh(cp)
-    log_action(
-        db,
-        actor_id=admin.id,
-        action="verification_status.set",
-        target_type="contractor_profile",
-        target_id=contractor_id,
-        previous_value=previous,
-        new_value=VerificationStatus.changes_requested.value,
-    )
-    return cp
+@router.post("/review/service-providers/{service_provider_id}/request-changes", response_model=ServiceProviderProfileOut)
+def request_service_provider_changes(
+    service_provider_id: str, payload: ApplicationDecision | None = None, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+):
+    cp = _get_active_service_provider_profile(db, service_provider_id)
+    _decide_application(db, admin, cp, VerificationStatus.changes_requested, payload.note if payload else None)
+    return ServiceProviderProfileOut(**_profile_fields(cp), email=cp.user.email)
 
 
-# ---------- contractor management ----------
+@router.post("/review/service-providers/{service_provider_id}/reject", response_model=ServiceProviderProfileOut)
+def reject_service_provider(
+    service_provider_id: str, payload: ApplicationDecision, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+):
+    cp = _get_active_service_provider_profile(db, service_provider_id)
+    _decide_application(db, admin, cp, VerificationStatus.rejected, payload.note)
+    return ServiceProviderProfileOut(**_profile_fields(cp), email=cp.user.email)
 
-def _get_active_contractor_profile(db: Session, contractor_id: str) -> ContractorProfile:
+
+# ---------- service provider management ----------
+
+def _get_active_service_provider_profile(db: Session, service_provider_id: str) -> ServiceProviderProfile:
     """Same reasoning as _get_active_owner_profile below (defined once
     OwnerProfile existed and this mirror was written to match): the
     documented way to create an admin is to sign up as an owner OR
-    contractor and flip the role column, which leaves a real
-    contractor_profiles row behind for an account that's no longer a
-    contractor. Every mutation below goes through this instead of a bare
-    db.get(ContractorProfile, contractor_id)."""
-    cp = db.get(ContractorProfile, contractor_id)
-    user = db.get(User, contractor_id)
-    if not cp or not user or user.role != UserRole.contractor:
-        raise HTTPException(status_code=404, detail="Contractor not found.")
+    service provider and flip the role column, which leaves a real
+    service_provider_profiles row behind for an account that's no longer a
+    service provider. Every mutation below goes through this instead of a bare
+    db.get(ServiceProviderProfile, service_provider_id)."""
+    cp = db.get(ServiceProviderProfile, service_provider_id)
+    user = db.get(User, service_provider_id)
+    if not cp or not user or user.role != UserRole.service_provider:
+        raise HTTPException(status_code=404, detail="Service provider not found.")
     return cp
 
 
-@router.get("/contractors", response_model=list[ContractorProfileOut])
-def list_contractors(db: Session = Depends(get_db)):
+@router.get("/service-providers", response_model=list[ServiceProviderProfileOut])
+def list_service_providers(db: Session = Depends(get_db)):
     rows = (
-        db.query(ContractorProfile, User)
-        .join(User, ContractorProfile.user_id == User.id)
-        .filter(User.role == UserRole.contractor)
+        db.query(ServiceProviderProfile, User)
+        .join(User, ServiceProviderProfile.user_id == User.id)
+        .filter(User.role == UserRole.service_provider)
         .all()
     )
-    return [ContractorProfileOut(**_profile_fields(cp), email=u.email) for cp, u in rows]
+    return [ServiceProviderProfileOut(**_profile_fields(cp), email=u.email) for cp, u in rows]
 
 
-@router.get("/contractors/{contractor_id}")
-def contractor_detail(contractor_id: str, db: Session = Depends(get_db)):
-    cp = _get_active_contractor_profile(db, contractor_id)
-    user = db.get(User, contractor_id)
-    docs = (
-        db.query(ContractorDocument, DocumentRequirement)
-        .join(DocumentRequirement, ContractorDocument.requirement_id == DocumentRequirement.id)
-        .filter(ContractorDocument.contractor_id == contractor_id)
-        .all()
-    )
+@router.get("/service-providers/{service_provider_id}")
+def service_provider_detail(service_provider_id: str, db: Session = Depends(get_db)):
+    cp = _get_active_service_provider_profile(db, service_provider_id)
+    user = db.get(User, service_provider_id)
+    docs = checklist(db, cp)
+    db.commit()
+    storage = get_storage()
     return {
-        "contractor": ContractorProfileOut(**_profile_fields(cp), email=user.email if user else None),
+        "service_provider": ServiceProviderProfileOut(**_profile_fields(cp), email=user.email if user else None),
+        "stakeholder": describe_stakeholder(cp, user, db) if user else None,
         "documents": [
-            ContractorDocumentOut(
-                id=d.id,
-                contractor_id=d.contractor_id,
-                requirement_id=d.requirement_id,
-                status=d.status,
-                admin_note=d.admin_note,
-                reviewed_at=d.reviewed_at,
-                submitted_at=d.submitted_at,
-                expires_on=d.expires_on,
-                requirement_name=r.name,
-                requirement_description=r.description,
-                requirement_is_required=r.is_required,
-                requirement_effective_from=r.effective_from,
-            )
-            for d, r in docs
+            {
+                **ServiceProviderDocumentOut(**document_out_fields(d, r)).model_dump(),
+                "url": storage.signed_url("service-provider-documents", d.file_path, _ADMIN_LINK_SECONDS) if d.file_path else None,
+            }
+            for r, d in docs
         ],
     }
 
 
-@router.patch("/contractors/{contractor_id}", response_model=ContractorProfileOut)
-def update_contractor(contractor_id: str, payload: ContractorProfileUpdate, db: Session = Depends(get_db)):
-    cp = _get_active_contractor_profile(db, contractor_id)
+@router.patch("/service-providers/{service_provider_id}", response_model=ServiceProviderProfileOut)
+def update_service_provider(service_provider_id: str, payload: ServiceProviderProfileUpdate, db: Session = Depends(get_db)):
+    cp = _get_active_service_provider_profile(db, service_provider_id)
     if not payload.company_name.strip():
         raise HTTPException(status_code=400, detail="Company name is required.")
 
@@ -356,22 +399,22 @@ def update_contractor(contractor_id: str, payload: ContractorProfileUpdate, db: 
     cp.service_area = payload.service_area or None
     db.commit()
     db.refresh(cp)
-    user = db.get(User, contractor_id)
-    return ContractorProfileOut(**_profile_fields(cp), email=user.email if user else None)
+    user = db.get(User, service_provider_id)
+    return ServiceProviderProfileOut(**_profile_fields(cp), email=user.email if user else None)
 
 
 class VerificationStatusPatch(BaseModel):
     status: VerificationStatus
 
 
-@router.post("/contractors/{contractor_id}/verification-status", response_model=ContractorProfileOut)
+@router.post("/service-providers/{service_provider_id}/verification-status", response_model=ServiceProviderProfileOut)
 def set_verification_status(
-    contractor_id: str,
+    service_provider_id: str,
     payload: VerificationStatusPatch,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    cp = _get_active_contractor_profile(db, contractor_id)
+    cp = _get_active_service_provider_profile(db, service_provider_id)
     previous = cp.verification_status.value
     cp.verification_status = payload.status
     db.commit()
@@ -380,8 +423,8 @@ def set_verification_status(
         db,
         actor_id=admin.id,
         action="verification_status.set",
-        target_type="contractor_profile",
-        target_id=contractor_id,
+        target_type="service_provider_profile",
+        target_id=service_provider_id,
         previous_value=previous,
         new_value=payload.status.value,
     )
@@ -392,14 +435,14 @@ class SuspendPatch(BaseModel):
     suspended: bool
 
 
-@router.post("/contractors/{contractor_id}/suspend", response_model=ContractorProfileOut)
+@router.post("/service-providers/{service_provider_id}/suspend", response_model=ServiceProviderProfileOut)
 def set_suspended(
-    contractor_id: str,
+    service_provider_id: str,
     payload: SuspendPatch,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    cp = _get_active_contractor_profile(db, contractor_id)
+    cp = _get_active_service_provider_profile(db, service_provider_id)
     previous = cp.is_suspended
     cp.is_suspended = payload.suspended
     db.commit()
@@ -407,34 +450,34 @@ def set_suspended(
     log_action(
         db,
         actor_id=admin.id,
-        action="contractor.suspend" if payload.suspended else "contractor.reactivate",
-        target_type="contractor_profile",
-        target_id=contractor_id,
+        action="service_provider.suspend" if payload.suspended else "service_provider.reactivate",
+        target_type="service_provider_profile",
+        target_id=service_provider_id,
         previous_value=str(previous),
         new_value=str(payload.suspended),
     )
-    contractor_user = db.get(User, contractor_id)
-    if contractor_user:
+    service_provider_user = db.get(User, service_provider_id)
+    if service_provider_user:
         notify(
             db,
-            contractor_user,
-            NotificationType.contractor_suspended if payload.suspended else NotificationType.contractor_reactivated,
-            link="/contractor/dashboard",
+            service_provider_user,
+            NotificationType.service_provider_suspended if payload.suspended else NotificationType.service_provider_reactivated,
+            link="/service-provider/dashboard",
         )
     return cp
 
 
 # ---------- payment override (spec P0: admin can activate a verified
-# contractor's marketplace access without a real subscription, but only
+# service provider's marketplace access without a real subscription, but only
 # with a recorded reason — every grant/revoke is audited) ----------
 
 class PaymentOverrideGrant(BaseModel):
     reason: str
 
 
-@router.post("/contractors/{contractor_id}/payment-override", response_model=ContractorProfileOut)
+@router.post("/service-providers/{service_provider_id}/payment-override", response_model=ServiceProviderProfileOut)
 def grant_payment_override(
-    contractor_id: str,
+    service_provider_id: str,
     payload: PaymentOverrideGrant,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -443,10 +486,10 @@ def grant_payment_override(
     if not reason:
         raise HTTPException(status_code=400, detail="A reason is required to grant a payment override.")
 
-    cp = _get_active_contractor_profile(db, contractor_id)
+    cp = _get_active_service_provider_profile(db, service_provider_id)
 
     previous = cp.payment_override_active
-    db.add(PaymentOverride(contractor_id=contractor_id, granted_by=admin.id, reason=reason))
+    db.add(PaymentOverride(service_provider_id=service_provider_id, granted_by=admin.id, reason=reason))
     cp.payment_override_active = True
     db.commit()
     db.refresh(cp)
@@ -455,36 +498,36 @@ def grant_payment_override(
         db,
         actor_id=admin.id,
         action="payment_override.grant",
-        target_type="contractor_profile",
-        target_id=contractor_id,
+        target_type="service_provider_profile",
+        target_id=service_provider_id,
         previous_value=str(previous),
         new_value="True",
         reason=reason,
     )
 
-    user = db.get(User, contractor_id)
+    user = db.get(User, service_provider_id)
     if user:
-        notify(db, user, NotificationType.payment_override_granted, link="/contractor/dashboard")
-    return ContractorProfileOut(**_profile_fields(cp), email=user.email if user else None)
+        notify(db, user, NotificationType.payment_override_granted, link="/service-provider/dashboard")
+    return ServiceProviderProfileOut(**_profile_fields(cp), email=user.email if user else None)
 
 
 class PaymentOverrideRevoke(BaseModel):
     reason: str | None = None
 
 
-@router.post("/contractors/{contractor_id}/payment-override/revoke", response_model=ContractorProfileOut)
+@router.post("/service-providers/{service_provider_id}/payment-override/revoke", response_model=ServiceProviderProfileOut)
 def revoke_payment_override(
-    contractor_id: str,
+    service_provider_id: str,
     payload: PaymentOverrideRevoke,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    cp = _get_active_contractor_profile(db, contractor_id)
+    cp = _get_active_service_provider_profile(db, service_provider_id)
 
     previous = cp.payment_override_active
     active = (
         db.query(PaymentOverride)
-        .filter(PaymentOverride.contractor_id == contractor_id, PaymentOverride.revoked_at.is_(None))
+        .filter(PaymentOverride.service_provider_id == service_provider_id, PaymentOverride.revoked_at.is_(None))
         .order_by(PaymentOverride.created_at.desc())
         .first()
     )
@@ -499,24 +542,24 @@ def revoke_payment_override(
         db,
         actor_id=admin.id,
         action="payment_override.revoke",
-        target_type="contractor_profile",
-        target_id=contractor_id,
+        target_type="service_provider_profile",
+        target_id=service_provider_id,
         previous_value=str(previous),
         new_value="False",
         reason=payload.reason,
     )
 
-    user = db.get(User, contractor_id)
+    user = db.get(User, service_provider_id)
     if user:
-        notify(db, user, NotificationType.payment_override_revoked, link="/contractor/dashboard")
-    return ContractorProfileOut(**_profile_fields(cp), email=user.email if user else None)
+        notify(db, user, NotificationType.payment_override_revoked, link="/service-provider/dashboard")
+    return ServiceProviderProfileOut(**_profile_fields(cp), email=user.email if user else None)
 
 
-@router.get("/contractors/{contractor_id}/payment-overrides")
-def list_payment_overrides(contractor_id: str, db: Session = Depends(get_db)):
+@router.get("/service-providers/{service_provider_id}/payment-overrides")
+def list_payment_overrides(service_provider_id: str, db: Session = Depends(get_db)):
     rows = (
         db.query(PaymentOverride)
-        .filter(PaymentOverride.contractor_id == contractor_id)
+        .filter(PaymentOverride.service_provider_id == service_provider_id)
         .order_by(PaymentOverride.created_at.desc())
         .all()
     )
@@ -533,11 +576,11 @@ def list_payment_overrides(contractor_id: str, db: Session = Depends(get_db)):
     ]
 
 
-@router.get("/contractors/{contractor_id}/audit-log")
-def contractor_audit_log(contractor_id: str, db: Session = Depends(get_db)):
+@router.get("/service-providers/{service_provider_id}/audit-log")
+def service_provider_audit_log(service_provider_id: str, db: Session = Depends(get_db)):
     rows = (
         db.query(AuditLog)
-        .filter(AuditLog.target_type == "contractor_profile", AuditLog.target_id == contractor_id)
+        .filter(AuditLog.target_type == "service_provider_profile", AuditLog.target_id == service_provider_id)
         .order_by(AuditLog.created_at.desc())
         .all()
     )
@@ -575,7 +618,10 @@ def list_cms(db: Session = Depends(get_db)):
             return overrides[(key, lang)]
         return DEFAULT_CMS.get(key, {}).get(lang.value, "")
 
-    return [CmsEntry(key=k, en=resolve(k, Language.en), ar=resolve(k, Language.ar)) for k in sorted(keys)]
+    # Built-in keys first, in the order they appear on the site; any extra
+    # keys an admin stored outside the defaults follow alphabetically.
+    ordered = list(DEFAULT_CMS.keys()) + sorted(keys - DEFAULT_CMS.keys())
+    return [CmsEntry(key=k, en=resolve(k, Language.en), ar=resolve(k, Language.ar)) for k in ordered]
 
 
 @router.put("/cms/{key}/{language}", response_model=CmsContentOut)
@@ -625,41 +671,41 @@ def reset_cms(key: str, language: Language, admin: User = Depends(require_admin)
     return None
 
 
-# Permanently removes the contractor's account, which cascades through
-# contractor_profiles → contractor_documents/offers via FK ON DELETE
-# CASCADE. Blocked if the contractor has any reviews on record — those are
-# part of the platform's public reputation history and reviews.contractor_id
+# Permanently removes the service provider's account, which cascades through
+# service_provider_profiles → service_provider_documents/offers via FK ON DELETE
+# CASCADE. Blocked if the service provider has any reviews on record — those are
+# part of the platform's public reputation history and reviews.service_provider_id
 # has no cascade by design, so a hard delete would otherwise violate that
 # foreign key. Suspend instead to preserve history while cutting access.
-@router.delete("/contractors/{contractor_id}", status_code=204)
-def delete_contractor(contractor_id: str, db: Session = Depends(get_db)):
-    _get_active_contractor_profile(db, contractor_id)  # 404s outright for a since-promoted admin account
+@router.delete("/service-providers/{service_provider_id}", status_code=204)
+def delete_service_provider(service_provider_id: str, db: Session = Depends(get_db)):
+    _get_active_service_provider_profile(db, service_provider_id)  # 404s outright for a since-promoted admin account
 
-    review_count = db.query(Review).filter(Review.contractor_id == contractor_id).count()
+    review_count = db.query(Review).filter(Review.service_provider_id == service_provider_id).count()
     if review_count > 0:
         raise HTTPException(
             status_code=400,
-            detail="This contractor has completed projects with reviews on record. Suspend the account instead of deleting it, to keep that history intact.",
+            detail="This service provider has completed projects with reviews on record. Suspend the account instead of deleting it, to keep that history intact.",
         )
 
     docs_with_files = (
-        db.query(ContractorDocument.file_path)
-        .filter(ContractorDocument.contractor_id == contractor_id, ContractorDocument.file_path.isnot(None))
+        db.query(ServiceProviderDocument.file_path)
+        .filter(ServiceProviderDocument.service_provider_id == service_provider_id, ServiceProviderDocument.file_path.isnot(None))
         .all()
     )
     paths = [p[0] for p in docs_with_files if p[0]]
     if paths:
-        get_storage().delete("contractor-documents", paths)
+        get_storage().delete("service-provider-documents", paths)
 
-    user = db.get(User, contractor_id)
+    user = db.get(User, service_provider_id)
     if not user:
-        raise HTTPException(status_code=404, detail="Contractor not found.")
-    db.delete(user)  # cascades to contractor_profiles -> contractor_documents/offers
+        raise HTTPException(status_code=404, detail="Service provider not found.")
+    db.delete(user)  # cascades to service_provider_profiles -> service_provider_documents/offers
     db.commit()
     return None
 
 
-# ---------- owner management (mirrors the contractor management section
+# ---------- owner management (mirrors the service provider management section
 # above: list/detail, document review, verification approve/reject,
 # suspend, delete) ----------
 
@@ -672,6 +718,7 @@ def _owner_fields(op: OwnerProfile, user: User | None) -> dict:
         created_at=op.created_at,
         email=user.email if user else None,
         full_name=user.full_name if user else None,
+        **profile_state_fields(op),
     )
 
 
@@ -690,29 +737,16 @@ def _get_active_owner_profile(db: Session, owner_id: str) -> OwnerProfile:
     return op
 
 
-def _owner_documents(db: Session, owner_id: str) -> list[OwnerDocumentOut]:
-    rows = (
-        db.query(OwnerDocument, DocumentRequirement)
-        .join(DocumentRequirement, OwnerDocument.requirement_id == DocumentRequirement.id)
-        .filter(OwnerDocument.owner_id == owner_id)
-        .all()
-    )
+def _owner_documents(db: Session, owner_id: str) -> list[dict]:
+    docs = checklist(db, db.get(OwnerProfile, owner_id))
+    db.commit()
+    storage = get_storage()
     return [
-        OwnerDocumentOut(
-            id=d.id,
-            owner_id=d.owner_id,
-            requirement_id=d.requirement_id,
-            status=d.status,
-            admin_note=d.admin_note,
-            reviewed_at=d.reviewed_at,
-            submitted_at=d.submitted_at,
-            expires_on=d.expires_on,
-            requirement_name=r.name,
-            requirement_description=r.description,
-            requirement_is_required=r.is_required,
-            requirement_effective_from=r.effective_from,
-        )
-        for d, r in rows
+        {
+            **OwnerDocumentOut(**document_out_fields(d, r)).model_dump(),
+            "url": storage.signed_url("owner-documents", d.file_path, _ADMIN_LINK_SECONDS) if d.file_path else None,
+        }
+        for r, d in docs
     ]
 
 
@@ -720,7 +754,7 @@ def _owner_documents(db: Session, owner_id: str) -> list[OwnerDocumentOut]:
 def list_owners(db: Session = Depends(get_db)):
     # Filtered to users whose CURRENT role is still owner: the documented
     # way to create an admin account is to sign up as an owner (or
-    # contractor) and flip that row's role in the database (see README's
+    # service provider) and flip that row's role in the database (see README's
     # "Create your first admin"), which leaves a real owner_profiles row
     # behind for an account that is no longer an owner. Without this
     # filter, every admin created that way would show up in this list and
@@ -746,6 +780,7 @@ def owner_detail(owner_id: str, db: Session = Depends(get_db)):
     project_count = db.query(Project).filter(Project.owner_id == owner_id).count()
     return {
         "owner": OwnerProfileOut(**_owner_fields(op, user), project_count=project_count),
+        "stakeholder": describe_stakeholder(op, user, db),
         "documents": _owner_documents(db, owner_id),
     }
 
@@ -754,84 +789,44 @@ def owner_detail(owner_id: str, db: Session = Depends(get_db)):
 def review_owner_document(
     payload: ReviewOwnerDocumentDecision, admin: User = Depends(require_admin), db: Session = Depends(get_db)
 ):
-    doc = (
-        db.query(OwnerDocument)
-        .filter(OwnerDocument.owner_id == payload.owner_id, OwnerDocument.requirement_id == payload.requirement_id)
-        .first()
-    )
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found.")
-
-    _get_active_owner_profile(db, payload.owner_id)
-
-    doc.status = payload.decision
-    doc.admin_note = (payload.note or "Document rejected — please re-upload.") if payload.decision == DocumentStatus.rejected else None
-    doc.reviewed_by = admin.id
-    doc.reviewed_at = datetime.utcnow()
-    if payload.decision == DocumentStatus.approved:
-        doc.expires_on = payload.expires_on
-    db.commit()
-
-    if payload.decision == DocumentStatus.rejected:
-        op = db.get(OwnerProfile, payload.owner_id)
-        if op:
-            op.verification_status = VerificationStatus.changes_requested
-            db.commit()
-
-    requirement = db.get(DocumentRequirement, payload.requirement_id)
-    owner_user = db.get(User, payload.owner_id)
-    if owner_user and requirement and payload.decision in (DocumentStatus.approved, DocumentStatus.rejected):
-        notification_type = (
-            NotificationType.owner_document_approved
-            if payload.decision == DocumentStatus.approved
-            else NotificationType.owner_document_rejected
-        )
-        notify(db, owner_user, notification_type, link="/owner/status", requirement_name=requirement.name)
-
-    db.refresh(doc)
-    return doc
+    op = _get_active_owner_profile(db, payload.owner_id)
+    doc, req = _decide_document(db, admin, op, payload.requirement_id, payload.decision, payload.note, payload.expires_on)
+    return OwnerDocumentOut(**document_out_fields(doc, req))
 
 
 @router.post("/review/owners/{owner_id}/approve", response_model=OwnerProfileOut)
 def approve_owner(owner_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     op = _get_active_owner_profile(db, owner_id)
+    _decide_application(db, admin, op, VerificationStatus.approved, None)
+    return OwnerProfileOut(**_owner_fields(op, op.user))
 
-    docs = (
-        db.query(OwnerDocument, DocumentRequirement)
-        .join(DocumentRequirement, OwnerDocument.requirement_id == DocumentRequirement.id)
-        .filter(OwnerDocument.owner_id == owner_id)
-        .all()
-    )
-    missing_approval = any(r.is_required and d.status != DocumentStatus.approved for d, r in docs)
-    if missing_approval:
-        raise HTTPException(status_code=400, detail="All required documents must be approved before approving this owner.")
 
-    previous = op.verification_status.value
-    op.verification_status = VerificationStatus.approved
-    db.commit()
-    db.refresh(op)
-    log_action(
-        db,
-        actor_id=admin.id,
-        action="owner_verification_status.set",
-        target_type="owner_profile",
-        target_id=owner_id,
-        previous_value=previous,
-        new_value=VerificationStatus.approved.value,
-    )
-    owner_user = db.get(User, owner_id)
-    if owner_user:
-        notify(db, owner_user, NotificationType.owner_verification_activated, link="/owner/dashboard")
-    return OwnerProfileOut(**_owner_fields(op, owner_user))
+@router.post("/review/owners/{owner_id}/request-changes", response_model=OwnerProfileOut)
+def request_owner_changes(
+    owner_id: str, payload: ApplicationDecision | None = None, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+):
+    op = _get_active_owner_profile(db, owner_id)
+    _decide_application(db, admin, op, VerificationStatus.changes_requested, payload.note if payload else None)
+    return OwnerProfileOut(**_owner_fields(op, op.user))
 
 
 @router.post("/review/owners/{owner_id}/reject", response_model=OwnerProfileOut)
-def reject_owner_application(owner_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+def reject_owner(owner_id: str, payload: ApplicationDecision, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    op = _get_active_owner_profile(db, owner_id)
+    _decide_application(db, admin, op, VerificationStatus.rejected, payload.note)
+    return OwnerProfileOut(**_owner_fields(op, op.user))
+
+
+@router.post("/owners/{owner_id}/verification-status", response_model=OwnerProfileOut)
+def set_owner_verification_status(
+    owner_id: str, payload: VerificationStatusPatch, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+):
+    """Manual override, mirroring the service provider one -- e.g. to reopen a
+    rejected application."""
     op = _get_active_owner_profile(db, owner_id)
     previous = op.verification_status.value
-    op.verification_status = VerificationStatus.changes_requested
+    op.verification_status = payload.status
     db.commit()
-    db.refresh(op)
     log_action(
         db,
         actor_id=admin.id,
@@ -839,10 +834,9 @@ def reject_owner_application(owner_id: str, admin: User = Depends(require_admin)
         target_type="owner_profile",
         target_id=owner_id,
         previous_value=previous,
-        new_value=VerificationStatus.changes_requested.value,
+        new_value=payload.status.value,
     )
-    user = db.get(User, owner_id)
-    return OwnerProfileOut(**_owner_fields(op, user))
+    return OwnerProfileOut(**_owner_fields(op, op.user))
 
 
 class OwnerSuspendPatch(BaseModel):
@@ -878,12 +872,12 @@ def set_owner_suspended(
     return OwnerProfileOut(**_owner_fields(op, owner_user))
 
 
-# Permanently removes the owner's account. Unlike delete_contractor
-# (which only cascades to that contractor's own documents/offers —
+# Permanently removes the owner's account. Unlike delete_service_provider
+# (which only cascades to that service provider's own documents/offers —
 # projects and other bidders' data are untouched), projects.owner_id has
 # ON DELETE CASCADE: deleting an owner would silently wipe every project
 # they ever posted, including drawings, clarifications, and every
-# CONTRACTOR'S offers/reviews on those projects — data that belongs to
+# SERVICE_PROVIDER'S offers/reviews on those projects — data that belongs to
 # other users, not just this owner. That blast radius is too large for a
 # routine "remove this account" action, so deletion is blocked outright
 # once the owner has posted anything; suspend instead.
@@ -895,7 +889,7 @@ def delete_owner(owner_id: str, db: Session = Depends(get_db)):
     if project_count > 0:
         raise HTTPException(
             status_code=400,
-            detail="This owner has posted projects. Suspend the account instead of deleting it, to keep that project and offer history intact for the contractors involved.",
+            detail="This owner has posted projects. Suspend the account instead of deleting it, to keep that project and offer history intact for the service providers involved.",
         )
 
     docs_with_files = (
@@ -925,9 +919,9 @@ def delete_owner(owner_id: str, db: Session = Depends(get_db)):
 @router.get("/offers")
 def list_all_offers(db: Session = Depends(get_db)):
     rows = (
-        db.query(Offer, Project, ContractorProfile)
+        db.query(Offer, Project, ServiceProviderProfile)
         .join(Project, Offer.project_id == Project.id)
-        .outerjoin(ContractorProfile, Offer.contractor_id == ContractorProfile.user_id)
+        .outerjoin(ServiceProviderProfile, Offer.service_provider_id == ServiceProviderProfile.user_id)
         .order_by(Offer.created_at.desc())
         .all()
     )
@@ -938,8 +932,8 @@ def list_all_offers(db: Session = Depends(get_db)):
             "project_title": p.title,
             "project_status": p.status,
             "tender_type": p.tender_type,
-            "contractor_id": o.contractor_id,
-            "contractor_company_name": cp.company_name if cp else None,
+            "service_provider_id": o.service_provider_id,
+            "service_provider_company_name": cp.company_name if cp else None,
             "amount": str(o.amount) if o.amount is not None else None,
             "timeline_estimate": o.timeline_estimate,
             "status": o.status,
@@ -954,7 +948,7 @@ def list_all_offers(db: Session = Depends(get_db)):
 
 
 # ---------- project & offer moderation (admin edit/suspend/delete over
-# any owner's projects and any contractor's offers on them, per the same
+# any owner's projects and any service provider's offers on them, per the same
 # platform-wide oversight rationale as /admin/offers above) ----------
 
 def _project_admin_fields(p: Project, owner: User | None) -> dict:
@@ -976,15 +970,15 @@ def _project_admin_fields(p: Project, owner: User | None) -> dict:
     }
 
 
-def _offer_admin_fields(o: Offer, p: Project | None, cp: ContractorProfile | None) -> dict:
+def _offer_admin_fields(o: Offer, p: Project | None, cp: ServiceProviderProfile | None) -> dict:
     return {
         "id": o.id,
         "project_id": o.project_id,
         "project_title": p.title if p else None,
         "project_status": p.status if p else None,
         "tender_type": p.tender_type if p else None,
-        "contractor_id": o.contractor_id,
-        "contractor_company_name": cp.company_name if cp else None,
+        "service_provider_id": o.service_provider_id,
+        "service_provider_company_name": cp.company_name if cp else None,
         "amount": str(o.amount) if o.amount is not None else None,
         "timeline_estimate": o.timeline_estimate,
         "message": o.message,
@@ -1022,8 +1016,8 @@ def admin_project_detail(project_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Project not found.")
     owner = db.get(User, project.owner_id)
     offer_rows = (
-        db.query(Offer, ContractorProfile)
-        .outerjoin(ContractorProfile, Offer.contractor_id == ContractorProfile.user_id)
+        db.query(Offer, ServiceProviderProfile)
+        .outerjoin(ServiceProviderProfile, Offer.service_provider_id == ServiceProviderProfile.user_id)
         .filter(Offer.project_id == project_id)
         .order_by(Offer.created_at.desc())
         .all()
@@ -1138,9 +1132,9 @@ def suspend_project(
 
 # Blocked outright once the project has any offers on it — deleting it
 # would cascade through offers.project_id (ON DELETE CASCADE) and silently
-# erase every contractor's bid history on this project, data that belongs
+# erase every service provider's bid history on this project, data that belongs
 # to them, not just this owner. Suspend instead, same reasoning as
-# delete_owner/delete_contractor above.
+# delete_owner/delete_service_provider above.
 @router.delete("/projects/{project_id}", status_code=204)
 def delete_project(project_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     project = db.get(Project, project_id)
@@ -1151,7 +1145,7 @@ def delete_project(project_id: str, admin: User = Depends(require_admin), db: Se
     if offer_count > 0:
         raise HTTPException(
             status_code=400,
-            detail="This project has offers on it. Suspend it instead of deleting it, to keep that bid history intact for the contractors involved.",
+            detail="This project has offers on it. Suspend it instead of deleting it, to keep that bid history intact for the service providers involved.",
         )
 
     drawing_paths = [
@@ -1185,7 +1179,7 @@ class AdminOfferEdit(BaseModel):
 
 
 def _snapshot_offer_revision(db: Session, offer: Offer) -> None:
-    """Same append-only trail as the contractor's own edits in
+    """Same append-only trail as the service provider's own edits in
     routers/offers.py — an admin correcting a bid still leaves the pre-edit
     values recoverable in offer_revisions, never silently overwritten."""
     db.add(
@@ -1258,7 +1252,7 @@ def admin_edit_offer(
         previous_value=json.dumps({k: (None if v is None else str(v)) for k, v in previous_values.items()}),
         new_value=json.dumps({field: (lambda v: None if v is None else str(v))(getattr(offer, field)) for field in changed}),
     )
-    cp = db.get(ContractorProfile, offer.contractor_id)
+    cp = db.get(ServiceProviderProfile, offer.service_provider_id)
     return _offer_admin_fields(offer, project, cp)
 
 
@@ -1287,16 +1281,16 @@ def suspend_offer(
         new_value=str(payload.suspended),
     )
     project = db.get(Project, offer.project_id)
-    contractor_user = db.get(User, offer.contractor_id)
-    if contractor_user and project:
+    service_provider_user = db.get(User, offer.service_provider_id)
+    if service_provider_user and project:
         notify(
             db,
-            contractor_user,
+            service_provider_user,
             NotificationType.offer_suspended if payload.suspended else NotificationType.offer_reactivated,
-            link=f"/contractor/projects/{project.id}/offer",
+            link=f"/service-provider/projects/{project.id}/offer",
             project_title=project.title,
         )
-    cp = db.get(ContractorProfile, offer.contractor_id)
+    cp = db.get(ServiceProviderProfile, offer.service_provider_id)
     return _offer_admin_fields(offer, project, cp)
 
 
@@ -1320,7 +1314,7 @@ def delete_offer(offer_id: str, admin: User = Depends(require_admin), db: Sessio
     snapshot = json.dumps(
         {
             "project_id": offer.project_id,
-            "contractor_id": offer.contractor_id,
+            "service_provider_id": offer.service_provider_id,
             "amount": str(offer.amount),
             "status": offer.status.value,
         },
@@ -1338,7 +1332,7 @@ def delete_offer(offer_id: str, admin: User = Depends(require_admin), db: Sessio
     return None
 
 
-def _profile_fields(cp: ContractorProfile) -> dict:
+def _profile_fields(cp: ServiceProviderProfile) -> dict:
     return dict(
         user_id=cp.user_id,
         company_name=cp.company_name,
@@ -1354,4 +1348,5 @@ def _profile_fields(cp: ContractorProfile) -> dict:
         payment_override_active=cp.payment_override_active,
         marketplace_status=cp.marketplace_status,
         created_at=cp.created_at,
+        **profile_state_fields(cp),
     )

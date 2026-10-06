@@ -112,7 +112,7 @@ export function AdminOffersPage() {
                     <table className="w-full border-collapse">
                       <thead>
                         <tr>
-                          <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left py-2 px-4">{t("admin.offers.contractor")}</th>
+                          <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left py-2 px-4">{t("admin.offers.service_provider")}</th>
                           <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left py-2 px-2.5">{t("admin.offers.amount")}</th>
                           <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left py-2 px-2.5">{t("admin.offers.status")}</th>
                           <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left py-2 px-2.5">{t("admin.offers.submitted")}</th>
@@ -122,7 +122,7 @@ export function AdminOffersPage() {
                         {g.offers.map((o) => (
                           <tr key={o.id} className="border-t border-border">
                             <td className="py-2.5 px-4 text-[13px]">
-                              {o.contractor_company_name ?? "—"}
+                              {o.service_provider_company_name ?? "—"}
                               {o.revision > 1 && <span className="text-[11px] text-steel-light"> · {t("admin.offers.revised")} x{o.revision - 1}</span>}
                             </td>
                             <td className="py-2.5 px-2.5 font-mono font-semibold text-navy text-sm">

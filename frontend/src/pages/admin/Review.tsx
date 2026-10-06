@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
-import type { ContractorProfile, DocumentStatus } from "@/api/types";
+import type { ServiceProviderProfile, DocumentStatus } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { ApplicationDecisionControls, DocumentDecisionControls, type DocumentDecision } from "@/components/AdminReviewControls";
 import { QueryError } from "@/components/QueryError";
 
 interface QueueDocument {
@@ -15,6 +16,8 @@ interface QueueDocument {
   requirement_description: string | null;
   requirement_is_required: boolean | null;
   requirement_effective_from: string | null;
+  requirement_requires_expiry: boolean | null;
+  admin_note: string | null;
   url: string | null;
 }
 
@@ -32,7 +35,7 @@ function expiryLabel(d: QueueDocument): { text: string; tone: "expired" | "soon"
 }
 
 interface QueueEntry {
-  contractor: ContractorProfile;
+  service_provider: ServiceProviderProfile;
   documents: QueueDocument[];
 }
 
@@ -71,39 +74,46 @@ export function AdminReviewPage() {
     setError(err instanceof ApiError ? err.detail : fallback);
 
   const decisionMutation = useMutation({
-    mutationFn: (vars: { contractorId: string; requirementId: string; decision: "approved" | "rejected"; note?: string }) =>
+    mutationFn: (vars: { serviceProviderId: string; requirementId: string } & DocumentDecision) =>
       apiFetch("/admin/review/documents", {
         method: "POST",
-        body: { contractor_id: vars.contractorId, requirement_id: vars.requirementId, decision: vars.decision, note: vars.note ?? null },
+        body: {
+          service_provider_id: vars.serviceProviderId,
+          requirement_id: vars.requirementId,
+          decision: vars.decision,
+          note: vars.note ?? null,
+          expires_on: vars.expires_on ?? null,
+        },
       }),
     onSuccess: invalidate,
     onError: (err) => onMutationError(err, "Could not record that decision."),
   });
 
   const approveMutation = useMutation({
-    mutationFn: (contractorId: string) => apiFetch(`/admin/review/contractors/${contractorId}/approve`, { method: "POST" }),
+    mutationFn: (serviceProviderId: string) => apiFetch(`/admin/review/service-providers/${serviceProviderId}/approve`, { method: "POST" }),
     onSuccess: invalidate,
-    onError: (err) => onMutationError(err, "Could not approve this contractor."),
+    onError: (err) => onMutationError(err, "Could not approve this service provider."),
   });
 
-  const rejectMutation = useMutation({
-    mutationFn: (contractorId: string) => apiFetch(`/admin/review/contractors/${contractorId}/reject`, { method: "POST" }),
+  const applicationMutation = useMutation({
+    mutationFn: (vars: { serviceProviderId: string; action: "request-changes" | "reject"; note: string }) =>
+      apiFetch(`/admin/review/service-providers/${vars.serviceProviderId}/${vars.action}`, { method: "POST", body: { note: vars.note || null } }),
     onSuccess: invalidate,
-    onError: (err) => onMutationError(err, "Could not reject this application."),
+    onError: (err) => onMutationError(err, "Could not record that decision."),
   });
 
-  const active = selectedId ?? queue?.[0]?.contractor.user_id ?? null;
-  const selected = queue?.find((c) => c.contractor.user_id === active);
+  const active = selectedId ?? queue?.[0]?.service_provider.user_id ?? null;
+  const selected = queue?.find((c) => c.service_provider.user_id === active);
 
   const requiredDocs = selected?.documents.filter((d) => d.requirement_is_required) ?? [];
   const requiredApprovedCount = requiredDocs.filter((d) => d.status === "approved").length;
-  const readyToApprove = requiredDocs.length > 0 && requiredApprovedCount === requiredDocs.length;
+  const readyToApprove = requiredApprovedCount === requiredDocs.length;
 
   return (
     <main className="max-w-5xl mx-auto px-5 py-8">
       <div className="mb-6">
         <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">Admin · Applications</span>
-        <h1 className="font-display text-2xl font-semibold text-navy mb-1">Contractor applications</h1>
+        <h1 className="font-display text-2xl font-semibold text-navy mb-1">Service provider applications</h1>
         <p className="text-[13.5px] text-steel">{queue?.length ?? 0} pending review{queue?.length === 1 ? "" : "s"}.</p>
       </div>
 
@@ -118,17 +128,17 @@ export function AdminReviewPage() {
           <div className="space-y-2.5">
             {queue.map((entry) => (
               <button
-                key={entry.contractor.user_id}
+                key={entry.service_provider.user_id}
                 type="button"
-                onClick={() => setSelectedId(entry.contractor.user_id)}
+                onClick={() => setSelectedId(entry.service_provider.user_id)}
                 className={`block w-full text-left px-4 py-3.5 border rounded ${
-                  entry.contractor.user_id === active ? "border-l-[3px] border-l-amber bg-blue-tint border-border" : "border-border bg-white"
+                  entry.service_provider.user_id === active ? "border-l-[3px] border-l-amber bg-blue-tint border-border" : "border-border bg-white"
                 }`}
               >
-                <div className="font-display font-semibold text-sm">{entry.contractor.company_name}</div>
+                <div className="font-display font-semibold text-sm">{entry.service_provider.company_name}</div>
                 <div className="font-mono text-[10.5px] text-steel mt-1">
-                  {entry.contractor.primary_trade || "Trade not set"} · Submitted{" "}
-                  {new Date(entry.contractor.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  {entry.service_provider.primary_trade || "Trade not set"} · Submitted{" "}
+                  {new Date(entry.service_provider.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                 </div>
               </button>
             ))}
@@ -138,15 +148,15 @@ export function AdminReviewPage() {
             <div className="tblock rounded px-5.5 pt-5 pb-0">
               <div className="flex justify-between items-start gap-2 mb-1">
                 <div>
-                  <h3 className="font-display font-semibold text-lg">{selected.contractor.company_name}</h3>
-                  <p className="text-[12.5px] text-steel">{selected.contractor.primary_trade || "Trade not set"}</p>
+                  <h3 className="font-display font-semibold text-lg">{selected.service_provider.company_name}</h3>
+                  <p className="text-[12.5px] text-steel">{selected.service_provider.primary_trade || "Trade not set"}</p>
                 </div>
                 <span
                   className={`font-mono text-[10px] uppercase px-2.5 py-1 rounded-full ${statusBadge(
-                    selected.contractor.verification_status === "pending_review" ? "pending" : selected.contractor.verification_status
+                    selected.service_provider.verification_status === "pending_review" ? "pending" : selected.service_provider.verification_status
                   )}`}
                 >
-                  {selected.contractor.verification_status.replace("_", " ")}
+                  {selected.service_provider.verification_status.replace("_", " ")}
                 </span>
               </div>
 
@@ -187,55 +197,37 @@ export function AdminReviewPage() {
                         <span className="font-mono text-[10px] uppercase px-2 py-1 rounded-full bg-border text-steel">N/A</span>
                       )}
                       {d.status === "pending" && (
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              decisionMutation.mutate({ contractorId: selected.contractor.user_id, requirementId: d.requirement_id, decision: "approved" })
-                            }
-                            className="border border-navy text-navy hover:bg-navy hover:text-white text-xs font-semibold rounded px-3 py-1.5"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              decisionMutation.mutate({ contractorId: selected.contractor.user_id, requirementId: d.requirement_id, decision: "rejected" })
-                            }
-                            className="bg-red-tint text-red text-xs font-semibold rounded px-3 py-1.5"
-                          >
-                            Reject
-                          </button>
-                        </div>
+                        <DocumentDecisionControls
+                          requiresExpiry={!!d.requirement_requires_expiry}
+                          pending={decisionMutation.isPending}
+                          onDecide={(decision) =>
+                            decisionMutation.mutate({ serviceProviderId: selected.service_provider.user_id, requirementId: d.requirement_id, ...decision })
+                          }
+                        />
                       )}
                       {d.status === "rejected" && (
-                        <span className="font-mono text-[10px] uppercase px-2 py-1 rounded-full bg-red-tint text-red">Rejected</span>
+                        <div className="text-end">
+                          <span className="font-mono text-[10px] uppercase px-2 py-1 rounded-full bg-red-tint text-red">Correction requested</span>
+                          {d.admin_note && <div className="text-[11px] text-red mt-1 max-w-[16rem]">{d.admin_note}</div>}
+                        </div>
                       )}
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="flex gap-2.5 py-4.5 border-t border-border mt-1">
-                <button
-                  type="button"
-                  onClick={() => approveMutation.mutate(selected.contractor.user_id)}
-                  disabled={!readyToApprove}
-                  className="bg-navy hover:bg-navy-deep disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded px-4 py-2"
-                >
-                  Approve contractor
-                </button>
-                <button
-                  type="button"
-                  onClick={() => rejectMutation.mutate(selected.contractor.user_id)}
-                  className="bg-red-tint text-red text-sm font-semibold rounded px-4 py-2"
-                >
-                  Reject application
-                </button>
+              <div className="py-4.5 border-t border-border mt-1">
+                <ApplicationDecisionControls
+                  canApprove={readyToApprove}
+                  pending={approveMutation.isPending || applicationMutation.isPending}
+                  onApprove={() => approveMutation.mutate(selected.service_provider.user_id)}
+                  onRequestChanges={(note) => applicationMutation.mutate({ serviceProviderId: selected.service_provider.user_id, action: "request-changes", note })}
+                  onReject={(note) => applicationMutation.mutate({ serviceProviderId: selected.service_provider.user_id, action: "reject", note })}
+                />
               </div>
               {!readyToApprove && (
                 <p className="text-[11px] text-steel-light -mt-2 pb-4">
-                  All required documents must be approved before this contractor can be approved.
+                  All required documents must be approved before this service provider can be approved.
                 </p>
               )}
             </div>

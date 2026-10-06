@@ -15,6 +15,28 @@ const KEY_LABELS: Record<string, string> = {
   hero_subheading: "Homepage subheading",
   how_it_works_title: "\"How it works\" title",
   how_it_works_body: "\"How it works\" body",
+  home_roles_heading: "Roles section · heading",
+  home_roles_intro: "Roles section · introduction",
+  home_owner_title: "Owner card · title",
+  home_owner_who: "Owner card · who it's for",
+  home_owner_step_1: "Owner card · step 1",
+  home_owner_step_2: "Owner card · step 2",
+  home_owner_step_3: "Owner card · step 3",
+  home_owner_step_4: "Owner card · step 4",
+  home_owner_after: "Owner card · after signup (the live owner document checklist is listed under it)",
+  home_owner_cost: "Owner card · cost",
+  home_owner_cta: "Owner card · signup button",
+  home_provider_title: "Service provider card · title",
+  home_provider_who: "Service provider card · who it's for",
+  home_provider_step_1: "Service provider card · step 1",
+  home_provider_step_2: "Service provider card · step 2",
+  home_provider_step_3: "Service provider card · step 3",
+  home_provider_step_4: "Service provider card · step 4",
+  home_provider_after: "Service provider card · after signup (the live service provider document checklist is listed under it)",
+  home_provider_cost: "Service provider card · cost (live subscription prices from Stripe are listed under it — don't type prices here)",
+  home_provider_cta: "Service provider card · signup button",
+  signup_owner_hint: "Signup form · Owner explanation",
+  signup_provider_hint: "Signup form · Service provider explanation (live prices are added under it)",
 };
 
 function CmsRow({ entry }: { entry: CmsEntry }) {
@@ -109,7 +131,7 @@ export function AdminCmsPage() {
       <div className="mb-6">
         <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">Admin · Public site</span>
         <h1 className="font-display text-2xl font-semibold text-navy mb-1">Website content</h1>
-        <p className="text-[13.5px] text-steel">Edit the public homepage copy in both English and Arabic. Live statistics below are not editable — they're always the real numbers.</p>
+        <p className="text-[13.5px] text-steel">Edit the public homepage and signup copy in both English and Arabic. Live data is never typed here: statistics, the verification document checklists (managed under Document requirements) and subscription prices (the Stripe prices) are always shown from their real source.</p>
       </div>
 
       {isError ? (

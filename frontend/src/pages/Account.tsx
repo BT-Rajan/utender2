@@ -2,11 +2,12 @@ import { useState } from "react";
 import { useAuth } from "@/auth/AuthContext";
 import { apiFetch, ApiError } from "@/api/client";
 import { useI18n } from "@/i18n/I18nContext";
+import { StakeholderSummary, useIdentity } from "@/components/Stakeholder";
 import { AppHeader } from "@/components/AppHeader";
 
 const ROLE_HOME: Record<string, { label: string; href: string }> = {
   owner: { label: "Owner", href: "/owner/dashboard" },
-  contractor: { label: "Contractor", href: "/contractor/dashboard" },
+  service_provider: { label: "ServiceProvider", href: "/service-provider/dashboard" },
   admin: { label: "Site Admin", href: "/admin/requirements" },
 };
 
@@ -115,6 +116,22 @@ function ChangePasswordForm() {
   );
 }
 
+// Who is logged in, and who they act as on the marketplace.
+function IdentityCard() {
+  const { t } = useI18n();
+  const { data: identity } = useIdentity();
+  if (!identity?.stakeholder) return null;
+  return (
+    <section className="bg-white border border-border rounded px-5 py-4.5 mb-8 max-w-xl">
+      <h2 className="font-display text-lg font-semibold text-navy mb-1">{t("stakeholder.heading")}</h2>
+      <p className="text-[13px] text-steel mb-3">
+        {identity.person.full_name} · {identity.person.email}
+      </p>
+      <StakeholderSummary stakeholder={identity.stakeholder} />
+    </section>
+  );
+}
+
 export function AccountPage() {
   const { user } = useAuth();
   const roleInfo = ROLE_HOME[user?.role ?? "owner"];
@@ -124,6 +141,7 @@ export function AccountPage() {
       <AppHeader roleLabel={roleInfo.label} homeHref={roleInfo.href} />
       <main className="max-w-5xl mx-auto px-5 py-8">
         <EmailVerifyBanner />
+        <IdentityCard />
         <ChangePasswordForm />
       </main>
     </div>

@@ -20,12 +20,12 @@ class OfferOut(BaseModel):
 
     id: str
     project_id: str
-    # contractor_id, amount, message, and every contractor_* field below are
+    # service_provider_id, amount, message, and every service_provider_* field below are
     # redacted (set to None) whenever this offer is being viewed by the
     # project's owner on a sealed tender that's still open (spec §19-21,
-    # D-001) — see the `sealed` flag. A contractor's own bid, and any bid
+    # D-001) — see the `sealed` flag. A service provider's own bid, and any bid
     # once the tender is no longer open, is always shown in full.
-    contractor_id: str | None
+    service_provider_id: str | None
     amount: Decimal | None
     timeline_estimate: str | None
     message: str | None
@@ -34,9 +34,9 @@ class OfferOut(BaseModel):
     revision: int = 1
     created_at: datetime
     updated_at: datetime
-    contractor_company_name: str | None = None
-    contractor_avg_rating: Decimal | None = None
-    contractor_review_count: int | None = None
+    service_provider_company_name: str | None = None
+    service_provider_avg_rating: Decimal | None = None
+    service_provider_review_count: int | None = None
     sealed: bool = False
 
 

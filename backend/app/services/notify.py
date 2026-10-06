@@ -13,8 +13,8 @@ from app.models.user import User
 # kwargs the call site passes.
 _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
     NotificationType.bid_submitted: {
-        Language.en: ("New offer on {project_title}", "{contractor_name} submitted an offer on {project_title}."),
-        Language.ar: ("عرض جديد على {project_title}", "قدم {contractor_name} عرضًا على {project_title}."),
+        Language.en: ("New offer on {project_title}", "{service_provider_name} submitted an offer on {project_title}."),
+        Language.ar: ("عرض جديد على {project_title}", "قدم {service_provider_name} عرضًا على {project_title}."),
     },
     NotificationType.award_won: {
         Language.en: ("You won {project_title}", "Your offer on {project_title} was accepted."),
@@ -25,8 +25,8 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.ar: ("تحديث بخصوص {project_title}", "اختار مالك {project_title} عرضًا آخر."),
     },
     NotificationType.clarification_asked: {
-        Language.en: ("New question on {project_title}", "A contractor asked a question about {project_title}."),
-        Language.ar: ("سؤال جديد على {project_title}", "طرح أحد المقاولين سؤالاً حول {project_title}."),
+        Language.en: ("New question on {project_title}", "A service provider asked a question about {project_title}."),
+        Language.ar: ("سؤال جديد على {project_title}", "طرح أحد مزوّدي الخدمات سؤالاً حول {project_title}."),
     },
     NotificationType.clarification_answered: {
         Language.en: ("Your question was answered", "The owner of {project_title} answered your question."),
@@ -41,12 +41,12 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.ar: ("تمت الموافقة على المستند", "تمت الموافقة على مستند {requirement_name} الخاص بك."),
     },
     NotificationType.document_rejected: {
-        Language.en: ("Document needs attention", "Your {requirement_name} document was rejected — please re-upload."),
-        Language.ar: ("المستند يحتاج إلى مراجعة", "تم رفض مستند {requirement_name} الخاص بك — يرجى إعادة الرفع."),
+        Language.en: ("Document needs correction", "Your {requirement_name} document needs correction: {note} Please upload a corrected version."),
+        Language.ar: ("المستند يحتاج إلى تصحيح", "مستند {requirement_name} الخاص بك يحتاج إلى تصحيح: {note} يرجى رفع نسخة مصححة."),
     },
     NotificationType.verification_activated: {
-        Language.en: ("You're verified", "Your contractor account has been approved."),
-        Language.ar: ("تم التحقق من حسابك", "تمت الموافقة على حساب المقاول الخاص بك."),
+        Language.en: ("You're verified", "Your service provider account has been approved."),
+        Language.ar: ("تم التحقق من حسابك", "تمت الموافقة على حساب مزوّد الخدمة الخاص بك."),
     },
     NotificationType.payment_override_granted: {
         Language.en: ("Marketplace access activated", "An administrator activated full marketplace access on your account."),
@@ -56,13 +56,21 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.en: ("Marketplace access changed", "Your admin-granted marketplace access was revoked."),
         Language.ar: ("تغيّر الوصول إلى السوق", "تم إلغاء الوصول إلى السوق الذي منحه المسؤول لحسابك."),
     },
-    NotificationType.contractor_suspended: {
+    NotificationType.service_provider_suspended: {
         Language.en: ("Account suspended", "Your account has been suspended by a site admin."),
         Language.ar: ("تم تعليق الحساب", "تم تعليق حسابك من قبل مسؤول الموقع."),
     },
-    NotificationType.contractor_reactivated: {
+    NotificationType.service_provider_reactivated: {
         Language.en: ("Account reactivated", "Your account has been reactivated."),
         Language.ar: ("تم إعادة تفعيل الحساب", "تمت إعادة تفعيل حسابك."),
+    },
+    NotificationType.verification_changes_requested: {
+        Language.en: ("Verification needs changes", "Your verification needs changes before it can be approved. {note}"),
+        Language.ar: ("التحقق يحتاج إلى تعديلات", "يحتاج طلب التحقق الخاص بك إلى تعديلات قبل اعتماده. {note}"),
+    },
+    NotificationType.verification_rejected: {
+        Language.en: ("Verification rejected", "Your verification was rejected. Reason: {note}"),
+        Language.ar: ("تم رفض التحقق", "تم رفض طلب التحقق الخاص بك. السبب: {note}"),
     },
     NotificationType.tender_no_award: {
         Language.en: ("No award on {project_title}", "The owner decided not to award {project_title}."),
@@ -85,8 +93,8 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.ar: ("تمت الموافقة على المستند", "تمت الموافقة على مستند {requirement_name} الخاص بك."),
     },
     NotificationType.owner_document_rejected: {
-        Language.en: ("Document needs attention", "Your {requirement_name} document was rejected — please re-upload."),
-        Language.ar: ("المستند يحتاج إلى مراجعة", "تم رفض مستند {requirement_name} الخاص بك — يرجى إعادة الرفع."),
+        Language.en: ("Document needs correction", "Your {requirement_name} document needs correction: {note} Please upload a corrected version."),
+        Language.ar: ("المستند يحتاج إلى تصحيح", "مستند {requirement_name} الخاص بك يحتاج إلى تصحيح: {note} يرجى رفع نسخة مصححة."),
     },
     NotificationType.owner_suspended: {
         Language.en: ("Account suspended", "Your account has been suspended by a site admin."),
@@ -97,8 +105,8 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.ar: ("تم إعادة تفعيل الحساب", "تمت إعادة تفعيل حسابك."),
     },
     NotificationType.project_suspended: {
-        Language.en: ("{project_title} was suspended", "A site admin suspended this project — it's hidden from contractors until reactivated."),
-        Language.ar: ("تم تعليق {project_title}", "قام مسؤول الموقع بتعليق هذا المشروع — أصبح مخفيًا عن المقاولين حتى تتم إعادة تفعيله."),
+        Language.en: ("{project_title} was suspended", "A site admin suspended this project — it's hidden from service providers until reactivated."),
+        Language.ar: ("تم تعليق {project_title}", "قام مسؤول الموقع بتعليق هذا المشروع — أصبح مخفيًا عن مزوّدي الخدمات حتى تتم إعادة تفعيله."),
     },
     NotificationType.project_reactivated: {
         Language.en: ("{project_title} was reactivated", "A site admin reactivated this project."),
@@ -117,7 +125,7 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
 
 # Dedup policy (spec §2.10 "deduplicated"): if the recipient already has an
 # UNREAD notification of the same type pointing at the same link, a new
-# trigger of the same underlying event (e.g. a contractor revising their
+# trigger of the same underlying event (e.g. a service provider revising their
 # bid five times before the owner ever opens their inbox) doesn't pile up
 # a fresh row each time — the existing one already says "you have
 # something to check here." A new one is created only once that one has

@@ -15,7 +15,7 @@ import stripe
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.models.contractor import ContractorProfile
+from app.models.service_provider import ServiceProviderProfile
 from app.models.enums import VerificationStatus
 from app.models.owner import OwnerProfile
 from app.models.project import Project
@@ -50,15 +50,15 @@ def test_billing_portal_session_calls_the_real_stripe_sdk_attribute(db, monkeypa
     r = client.post(
         "/auth/signup",
         json={
-            "email": "contractor-reg@example.com",
+            "email": "service-provider-reg@example.com",
             "password": "password123",
-            "full_name": "Contractor",
-            "role": "contractor",
+            "full_name": "ServiceProvider",
+            "role": "service_provider",
             "company_name": "Acme Builders",
         },
     )
     assert r.status_code == 201, r.text
-    profile = db.get(ContractorProfile, r.json()["id"])
+    profile = db.get(ServiceProviderProfile, r.json()["id"])
     profile.verification_status = VerificationStatus.approved
     profile.stripe_customer_id = "cus_test_123"
     db.commit()
@@ -82,7 +82,7 @@ def test_billing_portal_session_calls_the_real_stripe_sdk_attribute(db, monkeypa
     assert r.json() == {"url": "https://billing.stripe.test/p/session_abc"}
     assert len(calls) == 1
     assert calls[0]["customer"] == "cus_test_123"
-    assert calls[0]["return_url"].endswith("/contractor/subscribe")
+    assert calls[0]["return_url"].endswith("/service-provider/subscribe")
 
 
 # --------------------------------------------------------------------------
