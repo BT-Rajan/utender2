@@ -7,6 +7,7 @@ class ProjectAmendmentRequest(BaseModel):
     title: str | None = None
     description: str | None = None
     trade: str | None = None
+    address: str | None = None
     bid_deadline: datetime | None = None
     reason: str | None = None
 

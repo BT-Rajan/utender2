@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError, API_URL } from "@/api/client";
@@ -90,6 +90,90 @@ function statusBadgeClasses(status: string) {
       // no_award, canceled, expired
       return "bg-red-tint text-red";
   }
+}
+
+// Stage 3.2: the requirement's basic identity -- what the work is and where --
+// editable while it is still a private draft.
+function DraftDetailsForm({ project }: { project: ProjectDetail }) {
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
+  const [title, setTitle] = useState(project.title);
+  const [trade, setTrade] = useState(project.trade ?? "");
+  const [address, setAddress] = useState(project.address);
+  const [description, setDescription] = useState(project.description ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setTitle(project.title);
+    setTrade(project.trade ?? "");
+    setAddress(project.address);
+    setDescription(project.description ?? "");
+  }, [project.title, project.trade, project.address, project.description]);
+
+  const dirty =
+    title !== project.title || trade !== (project.trade ?? "") || address !== project.address || description !== (project.description ?? "");
+
+  const save = useMutation({
+    mutationFn: () => apiFetch<ProjectDetail>(`/projects/${project.id}`, { method: "PATCH", body: { title, trade, address, description } }),
+    onSuccess: (data) => {
+      setError(null);
+      setSaved(true);
+      queryClient.setQueryData(["project", project.id], data);
+      queryClient.invalidateQueries({ queryKey: ["owner-projects"] });
+    },
+    onError: (err) => setError(err instanceof ApiError ? err.detail : t("draftDetails.saveError")),
+  });
+
+  const field = "w-full border border-border rounded px-3 py-2.5 text-sm";
+  const label = "block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5";
+  const hint = "text-xs text-steel-light mt-1";
+  return (
+    <section className="bg-white border border-border border-t-4 border-t-navy rounded px-6 py-5 mb-8 max-w-2xl">
+      <h2 className="font-display text-lg font-semibold text-navy mb-1">{t("draftDetails.heading")}</h2>
+      <p className="text-[13px] text-steel mb-4">{t("draftDetails.intro")}</p>
+      <ErrorBanner message={error} />
+      <form
+        className="grid gap-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setSaved(false);
+          save.mutate();
+        }}
+      >
+        <div>
+          <label htmlFor="draft-title" className={label}>{t("draftDetails.title")}</label>
+          <input id="draft-title" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={255} className={field} />
+          <p className={hint}>{t("draftDetails.titleHint")}</p>
+        </div>
+        <div>
+          <label htmlFor="draft-trade" className={label}>{t("draftDetails.category")}</label>
+          <input id="draft-trade" value={trade} onChange={(e) => setTrade(e.target.value)} maxLength={100} className={field} />
+          <p className={hint}>{t("draftDetails.categoryHint")}</p>
+        </div>
+        <div>
+          <label htmlFor="draft-address" className={label}>{t("draftDetails.location")}</label>
+          <input id="draft-address" value={address} onChange={(e) => setAddress(e.target.value)} required maxLength={500} className={field} />
+          <p className={hint}>{t("draftDetails.locationHint")}</p>
+        </div>
+        <div>
+          <label htmlFor="draft-description" className={label}>{t("draftDetails.description")}</label>
+          <textarea id="draft-description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className={`${field} resize-y`} />
+          <p className={hint}>{t("draftDetails.descriptionHint")}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={save.isPending || !dirty}
+            className="bg-navy hover:bg-navy-deep disabled:opacity-50 text-white text-sm font-semibold rounded px-5 py-2.5 w-fit"
+          >
+            {save.isPending ? t("draftDetails.saving") : t("draftDetails.save")}
+          </button>
+          {saved && !dirty && <span className="text-xs text-green">{t("draftDetails.saved")}</span>}
+        </div>
+      </form>
+    </section>
+  );
 }
 
 export function OwnerProjectDetailPage() {
@@ -190,6 +274,8 @@ export function OwnerProjectDetailPage() {
       </div>
 
       <ErrorBanner message={error} />
+
+      {project.status === "draft" && <DraftDetailsForm project={project} />}
 
       {(project.status === "draft" ||
         project.status === "open" ||

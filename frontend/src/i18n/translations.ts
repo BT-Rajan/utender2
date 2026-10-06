@@ -13,6 +13,23 @@ export interface Dictionary {
     optional: string;
     noDocuments: string;
   };
+  draftDetails: {
+    heading: string;
+    intro: string;
+    title: string;
+    titleHint: string;
+    category: string;
+    categoryHint: string;
+    location: string;
+    locationHint: string;
+    description: string;
+    descriptionHint: string;
+    save: string;
+    saving: string;
+    saved: string;
+    saveError: string;
+    notSet: string;
+  };
   verification: {
     scopeLabel: string;
     scopeAll: string;
@@ -607,6 +624,23 @@ export const en: Dictionary = {
     costLabel: "Cost",
     optional: "optional",
     noDocuments: "No documents are currently required.",
+  },
+  draftDetails: {
+    heading: "Requirement details",
+    intro: "The basics a service provider sees first: what the work is and where. This draft is private until you publish it.",
+    title: "Title",
+    titleHint: "Short and specific, e.g. \"Villa extension — ground floor majlis\".",
+    category: "Type of work",
+    categoryHint: "The trade or service needed, e.g. Construction, MEP, Interior fit-out, Landscaping.",
+    location: "Location",
+    locationHint: "Governorate, area and block, e.g. \"Hawalli — Salmiya, Block 4\".",
+    description: "What you're looking for",
+    descriptionHint: "A short overview of the project. Detailed scope and quantities come later.",
+    save: "Save draft",
+    saving: "Saving…",
+    saved: "Saved",
+    saveError: "Could not save the draft.",
+    notSet: "Not set",
   },
   verification: {
     scopeLabel: "Applies to",
@@ -1227,6 +1261,23 @@ export const ar: Dictionary = {
     costLabel: "التكلفة",
     optional: "اختياري",
     noDocuments: "لا توجد مستندات مطلوبة حاليًا.",
+  },
+  draftDetails: {
+    heading: "تفاصيل المتطلب",
+    intro: "الأساسيات التي يراها مزوّد الخدمة أولًا: ما هو العمل وأين. هذه المسودة خاصة بك حتى تنشرها.",
+    title: "العنوان",
+    titleHint: "قصير ومحدد، مثال: «توسعة فيلا — مجلس الدور الأرضي».",
+    category: "نوع العمل",
+    categoryHint: "الحرفة أو الخدمة المطلوبة، مثل: إنشاءات، أعمال كهروميكانيكية، تشطيبات داخلية، تنسيق حدائق.",
+    location: "الموقع",
+    locationHint: "المحافظة والمنطقة والقطعة، مثال: «حولي — السالمية، قطعة 4».",
+    description: "ما الذي تبحث عنه",
+    descriptionHint: "نبذة مختصرة عن المشروع. نطاق العمل التفصيلي والكميات لاحقًا.",
+    save: "حفظ المسودة",
+    saving: "جارٍ الحفظ…",
+    saved: "تم الحفظ",
+    saveError: "تعذر حفظ المسودة.",
+    notSet: "غير محدد",
   },
   verification: {
     scopeLabel: "ينطبق على",

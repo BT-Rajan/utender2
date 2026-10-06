@@ -199,6 +199,14 @@ def amend_project(
             changed.append("title")
             project.title = title
 
+    if payload.address is not None:
+        address = payload.address.strip()
+        if not address:
+            raise HTTPException(status_code=400, detail="Location cannot be empty.")
+        if address != project.address:
+            changed.append("address")
+            project.address = address
+
     if payload.description is not None and payload.description != project.description:
         changed.append("description")
         project.description = payload.description or None
@@ -229,6 +237,13 @@ def amend_project(
 
     if not changed:
         raise HTTPException(status_code=400, detail="No changes were provided.")
+
+    # A draft is still being written: nobody has seen it, so saving it is not
+    # an amendment -- no numbered record, no revision bump, no notifications.
+    if project.status == ProjectStatus.draft:
+        db.commit()
+        db.refresh(project)
+        return _serialize_detail(project, db)
 
     amendment_number = (
         db.query(ProjectAmendment).filter(ProjectAmendment.project_id == project_id).count() + 1
