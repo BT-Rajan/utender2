@@ -13,6 +13,24 @@ export interface Dictionary {
     optional: string;
     noDocuments: string;
   };
+  eligibility: {
+    heading: string;
+    hint: string;
+    providerType: string;
+    anyProvider: string;
+    organizationOnly: string;
+    qualificationsHeading: string;
+    qualificationsHint: string;
+    noQualifications: string;
+    save: string;
+    saved: string;
+    saveError: string;
+    openToAll: string;
+    notEligible: string;
+    notEligibleIntro: string;
+    backToFeed: string;
+    rulesLine: string;
+  };
   response: {
     heading: string;
     hint: string;
@@ -745,6 +763,24 @@ export const en: Dictionary = {
     costLabel: "Cost",
     optional: "optional",
     noDocuments: "No documents are currently required.",
+  },
+  eligibility: {
+    heading: "Who can respond",
+    hint: "Every provider must already be verified by U-Tender. Narrow it further only if the work genuinely needs it — each restriction reduces the offers you receive.",
+    providerType: "Provider type",
+    anyProvider: "Any verified provider (individual or organization)",
+    organizationOnly: "Registered organizations only",
+    qualificationsHeading: "Required qualifications",
+    qualificationsHint: "Providers must hold these documents, approved by U-Tender and not expired. The list is managed by the platform.",
+    noQualifications: "The platform has no provider qualifications to choose from yet.",
+    save: "Save eligibility",
+    saved: "Saved",
+    saveError: "Could not save eligibility.",
+    openToAll: "Open to every verified provider.",
+    notEligible: "Not eligible to respond",
+    notEligibleIntro: "You can't respond to this requirement:",
+    backToFeed: "Back to available projects",
+    rulesLine: "Who can respond",
   },
   response: {
     heading: "What providers must submit",
@@ -1503,6 +1539,24 @@ export const ar: Dictionary = {
     costLabel: "التكلفة",
     optional: "اختياري",
     noDocuments: "لا توجد مستندات مطلوبة حاليًا.",
+  },
+  eligibility: {
+    heading: "من يمكنه تقديم عرض",
+    hint: "يجب أن يكون كل مقدم خدمة موثقًا مسبقًا لدى U-Tender. لا تضيّق النطاق إلا إذا تطلّب العمل ذلك فعلًا — فكل قيد يقلل عدد العروض التي تصلك.",
+    providerType: "نوع مقدم الخدمة",
+    anyProvider: "أي مقدم خدمة موثق (فرد أو جهة)",
+    organizationOnly: "الجهات المسجلة فقط",
+    qualificationsHeading: "المؤهلات المطلوبة",
+    qualificationsHint: "يجب أن يحمل مقدم الخدمة هذه المستندات معتمدة من U-Tender وغير منتهية الصلاحية. تدير المنصة هذه القائمة.",
+    noQualifications: "لا توجد مؤهلات لمقدمي الخدمة على المنصة حتى الآن.",
+    save: "حفظ شروط الأهلية",
+    saved: "تم الحفظ",
+    saveError: "تعذر حفظ شروط الأهلية.",
+    openToAll: "متاح لجميع مقدمي الخدمة الموثقين.",
+    notEligible: "غير مؤهل لتقديم عرض",
+    notEligibleIntro: "لا يمكنك تقديم عرض لهذا الطلب:",
+    backToFeed: "العودة إلى المشاريع المتاحة",
+    rulesLine: "من يمكنه تقديم عرض",
   },
   response: {
     heading: "ما يجب على مقدمي الخدمة تقديمه",

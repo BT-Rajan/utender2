@@ -37,6 +37,9 @@ export interface Project {
   created_at: string;
   offer_count: number;
   my_offer_status: OfferStatus | null;
+  // Stage 3.9, provider feed only.
+  eligible?: boolean | null;
+  ineligible_reasons?: string[];
 }
 
 export interface Drawing {
@@ -59,6 +62,24 @@ export interface ProjectDetail extends Project {
   drawings: Drawing[];
   currency: string;
   response_requirements: ResponseRequirements;
+  provider_eligibility: ProviderEligibility;
+}
+
+export interface EligibilityQualification {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+export interface ProviderEligibility {
+  provider_type: "any" | "organization";
+  qualifications: EligibilityQualification[];
+}
+
+export interface EligibilityCheck {
+  eligible: boolean;
+  reasons: string[];
+  rules: ProviderEligibility;
 }
 
 export interface ResponseRequirements {

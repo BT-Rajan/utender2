@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError, API_URL } from "@/api/client";
-import type { Offer, OfferDocument, ProjectDetail } from "@/api/types";
+import type { EligibilityCheck, Offer, OfferDocument, ProjectDetail } from "@/api/types";
 import { formatDeadline, timeRemaining } from "@/lib/format";
 import { PageLoading } from "@/components/PageLoading";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { RequirementItemsView } from "@/components/RequirementItems";
 import { ClarificationsPanel } from "@/components/ClarificationsPanel";
 import { ResponseRequirementsSummary } from "@/components/ResponseRequirements";
+import { IneligibleNotice, eligibilitySummary } from "@/components/ProviderEligibility";
 import { useI18n } from "@/i18n/I18nContext";
 import { money } from "@/lib/money";
 import { formatWorkTiming } from "@/lib/dates";
@@ -65,14 +66,23 @@ export function ServiceProviderOfferPage() {
   // it (unpaid, unverified, etc.) — by design, so the response can't be
   // used to enumerate projects. Land back on the feed with a plain notice
   // instead of spinning forever.
+  // Stage 3.9: the full requirement is refused to a provider who isn't
+  // eligible for it; ask why before falling back to the generic notice.
+  const { data: eligibility, isError: eligibilityError } = useQuery({
+    queryKey: ["eligibility", id],
+    queryFn: () => apiFetch<EligibilityCheck>(`/projects/${id}/eligibility`),
+    enabled: !!id && projectError,
+    retry: false,
+  });
+  const ineligible = projectError && eligibility && !eligibility.eligible;
   useEffect(() => {
-    if (projectError) {
+    if (projectError && (eligibilityError || eligibility?.eligible)) {
       navigate("/service-provider/feed", {
         replace: true,
         state: { notice: t("service_provider.offer.notAvailableNotice") },
       });
     }
-  }, [projectError, navigate, t]);
+  }, [projectError, eligibility, eligibilityError, navigate, t]);
 
   const { data: existingOffer } = useQuery({
     queryKey: ["my-offer", id],
@@ -164,6 +174,16 @@ export function ServiceProviderOfferPage() {
     }
   }
 
+  if (ineligible) {
+    return (
+      <main className="max-w-2xl mx-auto px-5 py-8 grid gap-4">
+        <IneligibleNotice reasons={eligibility.reasons} />
+        <button type="button" onClick={() => navigate("/service-provider/feed")} className="text-sm text-blue underline w-fit">
+          {t("eligibility.backToFeed")}
+        </button>
+      </main>
+    );
+  }
   if (!project) return <PageLoading />;
 
   const biddingClosed = project.status !== "open" || new Date(project.bid_deadline) < new Date();
@@ -229,6 +249,12 @@ export function ServiceProviderOfferPage() {
         )}
       </div>
 
+      {!biddingClosed && (
+        <p className="mb-3 text-[12.5px] text-steel">
+          <span className="font-mono text-[11px] uppercase tracking-wide text-navy">{t("eligibility.rulesLine")}:</span>{" "}
+          {eligibilitySummary(t, project.provider_eligibility)}
+        </p>
+      )}
       {!biddingClosed && <ResponseRequirementsSummary project={project} />}
 
       <div className="mb-6">

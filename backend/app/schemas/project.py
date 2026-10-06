@@ -62,6 +62,10 @@ class ProjectOut(BaseModel):
     created_at: datetime
     offer_count: int = 0
     my_offer_status: str | None = None  # only populated on the service provider feed
+    # Stage 3.9, service provider feed only: whether this provider may respond,
+    # and if not, why.
+    eligible: bool | None = None
+    ineligible_reasons: list[str] = Field(default_factory=list)
 
 
 class ProjectItemIn(BaseModel):
@@ -107,6 +111,42 @@ class ResponseRequirements(BaseModel):
         return [ResponseDocument(name=d.name.strip(), required=d.required) for d in value]
 
 
+class ProviderEligibilityIn(BaseModel):
+    """Stage 3.9: who may respond to this requirement, beyond being a
+    verified provider with active access (always required). Both parts are
+    optional; the default is every such provider. Qualifications are ids of
+    the platform's own provider verification requirements (the admin-managed
+    DocumentRequirement list) -- nothing here names a specific document."""
+
+    provider_type: Literal["any", "organization"] = "any"
+    qualifications: list[str] = Field(default_factory=list, max_length=5)
+
+    @field_validator("qualifications")
+    @classmethod
+    def _unique(cls, value: list[str]) -> list[str]:
+        return list(dict.fromkeys(value))
+
+
+class EligibilityQualification(BaseModel):
+    id: str
+    name: str
+    description: str | None = None
+
+
+class ProviderEligibilityOut(BaseModel):
+    provider_type: Literal["any", "organization"] = "any"
+    qualifications: list[EligibilityQualification] = Field(default_factory=list)
+
+
+class EligibilityCheckOut(BaseModel):
+    """A provider's own standing against one requirement, with the reasons
+    when they can't respond -- never an unexplained refusal."""
+
+    eligible: bool
+    reasons: list[str] = Field(default_factory=list)
+    rules: ProviderEligibilityOut
+
+
 class ProjectItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -122,5 +162,6 @@ class ProjectDetailOut(ProjectOut):
     drawings: list[DrawingOut] = []
     pricing_basis: PricingBasis = PricingBasis.lump_sum
     items: list[ProjectItemOut] = []
+    provider_eligibility: ProviderEligibilityOut = Field(default_factory=ProviderEligibilityOut)
     response_requirements: ResponseRequirements = Field(default_factory=ResponseRequirements)
     currency: str = "KWD"

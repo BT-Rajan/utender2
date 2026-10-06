@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import StreamingResponse
 
 from app.db import get_db
-from app.deps import get_current_user, require_verified_owner
+from app.deps import get_current_user, require_approved_service_provider, require_verified_owner
 from app.models.award_record import AwardRecord
 from app.models.service_provider import ServiceProviderProfile
 from app.models.enums import NotificationType, OfferStatus, PricingBasis, ProjectStatus, TenderType, UserRole
@@ -18,7 +18,17 @@ from app.models.user import User
 from app.schemas.amendment import ProjectAmendmentOut, ProjectAmendmentRequest
 from app.schemas.award import AwardRecordOut
 from app.config import get_settings
-from app.schemas.project import DrawingOut, ProjectCreate, ProjectDetailOut, ProjectItemOut, ProjectItemsUpdate, ResponseRequirements
+from app.schemas.project import (
+    DrawingOut,
+    EligibilityCheckOut,
+    ProjectCreate,
+    ProjectDetailOut,
+    ProjectItemOut,
+    ProjectItemsUpdate,
+    ProviderEligibilityIn,
+    ResponseRequirements,
+)
+from app.services.eligibility import ineligibility_reasons, rules_out, validate_rules
 from app.services.drawings import DOCUMENT_CATEGORIES, upload_drawings_for_project
 from app.services.locations import clean_area, clean_governorate
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name
@@ -54,7 +64,14 @@ def _can_view_project(user: User, project: Project, db: Session) -> bool:
     if project.status == ProjectStatus.draft or project.is_suspended:
         return False
     profile = db.get(ServiceProviderProfile, user.id)
-    return bool(profile and profile.is_verified_active)
+    if not (profile and profile.is_verified_active):
+        return False
+    # Stage 3.9: and eligible for this particular requirement -- or already
+    # bidding on it (so a lapsed qualification never hides a provider's own
+    # bid; it only stops new or revised offers, see routers/offers.py).
+    if not ineligibility_reasons(db, project, profile):
+        return True
+    return db.query(Offer.id).filter(Offer.project_id == project.id, Offer.service_provider_id == user.id).first() is not None
 
 
 # The scope of work lives in Project.description (a TEXT column: 64 KB). A
@@ -417,6 +434,36 @@ def set_response_requirements(
     return _serialize_detail(project, db)
 
 
+@router.put("/{project_id}/eligibility", response_model=ProjectDetailOut)
+def set_provider_eligibility(
+    project_id: str, payload: ProviderEligibilityIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Stage 3.9: who may respond. Owner only, while a draft -- once
+    published, providers have decided whether to respond on these terms."""
+    project = db.get(Project, project_id)
+    if not project or project.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    _require_active_owner(user, db)
+    if project.status != ProjectStatus.draft:
+        raise HTTPException(status_code=409, detail="Eligibility can only be changed while the requirement is a draft.")
+    project.provider_eligibility = validate_rules(db, payload)
+    db.commit()
+    db.refresh(project)
+    return _serialize_detail(project, db)
+
+
+@router.get("/{project_id}/eligibility", response_model=EligibilityCheckOut)
+def my_eligibility(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """A provider's standing against one requirement, and why. Available at
+    the same level as the feed listing (platform-verified), so a provider who
+    can't open the full requirement can still see the reason."""
+    project = db.get(Project, project_id)
+    if not project or project.status == ProjectStatus.draft or project.is_suspended:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    reasons = ineligibility_reasons(db, project, db.get(ServiceProviderProfile, user.id))
+    return EligibilityCheckOut(eligible=not reasons, reasons=reasons, rules=rules_out(db, project))
+
+
 @router.get("/{project_id}/amendments", response_model=list[ProjectAmendmentOut])
 def list_amendments(project_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     project = db.get(Project, project_id)
@@ -660,6 +707,7 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
         drawings=drawings,
         pricing_basis=project.pricing_basis,
         items=[ProjectItemOut.model_validate(i) for i in project.items],
+        provider_eligibility=rules_out(db, project),
         response_requirements=ResponseRequirements(**(project.response_requirements or {})),
         currency=get_settings().marketplace_currency,
     )

@@ -17,12 +17,13 @@ from app.models.user import User
 from app.schemas.document import DocumentRequirementOut, OwnerDocumentOut
 from app.schemas.offer import OfferOut, OfferRevisionOut
 from app.schemas.owner import OwnerProfileOut
-from app.schemas.project import ProjectOut
+from app.schemas.project import EligibilityQualification, ProjectOut
 from app.schemas.review import ReviewCreate, ReviewOut
 from app.services.audit import log_action
 from app.services.email import notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify
+from app.services.eligibility import qualification_options
 from app.services.offer_response import documents_out
 from app.services.stakeholder import require_established
 from app.services.verification import (
@@ -38,6 +39,14 @@ from app.services.storage import get_storage
 from app.services.tender_lifecycle import is_sealed_and_open, lock_project, sync_expired_projects
 
 router = APIRouter(prefix="/owner", tags=["owner"])
+
+
+@router.get("/eligibility-qualifications", response_model=list[EligibilityQualification])
+def eligibility_qualifications(user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 3.9: the provider documents the platform verifies, which an owner
+    may require for a particular requirement. Managed by admins (Document
+    requirements); nothing is hard-coded."""
+    return [EligibilityQualification(id=r.id, name=r.name, description=r.description) for r in qualification_options(db)]
 
 
 def _get_owned_project(project_id: str, user: User, db: Session, *, lock: bool = False) -> Project:

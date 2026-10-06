@@ -54,6 +54,9 @@ class Project(Base):
     # schemas.project.ResponseRequirements). NULL = the defaults: price only,
     # everything else optional.
     response_requirements: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Stage 3.9: who may respond (see schemas.project.ProviderEligibilityIn).
+    # NULL = every verified provider with active access.
+    provider_eligibility: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     # Admin moderation flag — independent of the owner-driven lifecycle
     # `status` above. Hides the project from the service provider feed and blocks
     # new bids while set, but leaves `status` untouched so un-suspending

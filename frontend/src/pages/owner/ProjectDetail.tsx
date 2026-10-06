@@ -14,6 +14,7 @@ import { money } from "@/lib/money";
 import { formatWorkTiming } from "@/lib/dates";
 import { DraftDates } from "@/components/DraftDates";
 import { OfferResponseDetails, ResponseRequirementsEditor } from "@/components/ResponseRequirements";
+import { ProviderEligibilityEditor } from "@/components/ProviderEligibility";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
 import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
 
@@ -361,6 +362,7 @@ export function OwnerProjectDetailPage() {
       {project.status === "draft" && <DraftDates project={project} />}
       {project.status === "draft" && <RequirementItemsEditor project={project} />}
       {project.status === "draft" && <ResponseRequirementsEditor project={project} />}
+      {project.status === "draft" && <ProviderEligibilityEditor project={project} />}
 
       {(project.status === "draft" ||
         project.status === "open" ||

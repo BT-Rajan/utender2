@@ -15,6 +15,7 @@ from app.models.user import User
 from app.schemas.service_provider import ServiceProviderProfileOut, MyBidOut, SubmitForReview
 from app.schemas.document import ServiceProviderDocumentOut, DocumentRequirementOut
 from app.schemas.project import ProjectOut
+from app.services.eligibility import ineligibility_reasons
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.locations import clean_governorate
 from app.services.stakeholder import require_established
@@ -42,6 +43,13 @@ def active_requirements(user: User = Depends(require_service_provider), db: Sess
     stakeholder type right now."""
     cp = get_service_provider_profile(user, db)
     return applicable_requirements(db, UserRole.service_provider, cp.stakeholder_type)
+
+
+def _eligibility_fields(db: Session, project: Project, profile) -> dict:
+    # Stage 3.9: the listing stays visible to every verified provider (so an
+    # ineligible one can see the work exists and why they can't respond).
+    reasons = ineligibility_reasons(db, project, profile)
+    return {"eligible": not reasons, "ineligible_reasons": reasons}
 
 
 @router.get("/feed", response_model=list[ProjectOut])
@@ -72,6 +80,7 @@ def feed(
     query = query.order_by(Project.created_at.desc()) if sort == "newest" else query.order_by(Project.bid_deadline.asc())
     projects = query.all()
     my_offers = {o.project_id: o.status.value for o in db.query(Offer).filter(Offer.service_provider_id == user.id).all()}
+    profile = db.get(ServiceProviderProfile, user.id)
 
     out = []
     for p in projects:
@@ -100,6 +109,7 @@ def feed(
                 created_at=p.created_at,
                 offer_count=offer_count,
                 my_offer_status=my_offers.get(p.id),
+                **_eligibility_fields(db, p, profile),
             )
         )
     return out
