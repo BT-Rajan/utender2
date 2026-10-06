@@ -54,8 +54,10 @@ export function OwnerProjectNewPage() {
         <form
           ref={formRef}
           onSubmit={(e) => {
+            // The form's implicit submit (e.g. Enter in a field) only ever
+            // saves a draft; publishing needs the explicit "Post" button.
             e.preventDefault();
-            submitProject("open");
+            submitProject("draft");
           }}
           className="grid gap-[18px]"
         >
@@ -128,16 +130,16 @@ export function OwnerProjectNewPage() {
           </div>
           <div className="flex items-center gap-3 mt-1">
             <button
-              type="submit"
+              type="button"
               disabled={pending}
+              onClick={() => submitProject("open")}
               className="bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 w-fit"
             >
               {pending ? t("owner.projectNew.posting") : t("owner.projectNew.postProject")}
             </button>
             <button
-              type="button"
+              type="submit"
               disabled={pending}
-              onClick={() => submitProject("draft")}
               className="border border-navy text-navy hover:bg-navy hover:text-white disabled:opacity-60 text-sm font-semibold rounded px-5 py-2.5 w-fit"
             >
               {t("owner.projectNew.saveAsDraft")}

@@ -65,6 +65,7 @@ def test_pass5_payment_gate():
             "title": "Kitchen remodel",
             "address": "123 Main St",
             "bid_deadline": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+            "status": "open",  # published explicitly: a new project defaults to draft
         },
         files={"drawings": ("plan.pdf", b"%PDF-1.4 fake pdf content", "application/pdf")},
     )

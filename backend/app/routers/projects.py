@@ -18,7 +18,7 @@ from app.schemas.amendment import ProjectAmendmentOut, ProjectAmendmentRequest
 from app.schemas.award import AwardRecordOut
 from app.schemas.project import DrawingOut, ProjectCreate, ProjectDetailOut
 from app.services.drawings import upload_drawings_for_project
-from app.services.file_security import safe_relative_name
+from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name
 from app.services.email import notify_service_provider_tender_amended
 from app.services.notify import notify
 from app.services.storage import drawing_url_expiry_seconds, get_storage
@@ -80,7 +80,9 @@ async def create_project(
     trade: str | None = Form(None),
     bid_deadline: str = Form(...),
     tender_type: str = Form("owner_visible"),
-    status: str = Form("open"),
+    # Starting a requirement creates a draft unless the owner explicitly asks
+    # to publish; a client that omits status must never publish by accident.
+    status: str = Form(ProjectStatus.draft.value),
     drawings: list[UploadFile] = File(default=[]),
     user: User = Depends(require_verified_owner),
     db: Session = Depends(get_db),
@@ -100,6 +102,11 @@ async def create_project(
     if status_value == ProjectStatus.open and deadline <= datetime.utcnow():
         raise HTTPException(status_code=400, detail="Bid deadline must be in the future.")
 
+    # Reject disallowed drawing types before anything is created.
+    for f in drawings:
+        if f.filename:
+            assert_allowed_extension(f.filename, ALLOWED_DRAWING_EXTENSIONS)
+
     project = Project(
         owner_id=user.id,
         title=title,
@@ -116,10 +123,33 @@ async def create_project(
 
     real_files = [f for f in drawings if f.filename]
     if real_files:
-        await upload_drawings_for_project(db, get_storage(), project.id, real_files)
+        try:
+            await upload_drawings_for_project(db, get_storage(), project.id, real_files)
+        except Exception:
+            # A rejected file (wrong type, unsafe archive) fails the whole start:
+            # remove the project and anything already stored for it, so the
+            # owner is never left with a half-created requirement -- possibly
+            # already published -- that a retry would then duplicate.
+            _discard_project(db, project.id)
+            raise
         db.refresh(project)
 
     return _serialize_detail(project, db)
+
+
+def _discard_project(db: Session, project_id: str) -> None:
+    db.rollback()
+    project = db.get(Project, project_id)
+    if not project:
+        return
+    paths = [d.file_path for d in project.drawings]
+    db.delete(project)
+    db.commit()
+    if paths:
+        try:
+            get_storage().delete("project-drawings", paths)
+        except Exception:
+            pass  # unreferenced files are harmless; the record is what matters
 
 
 @router.get("/{project_id}", response_model=ProjectDetailOut)
