@@ -1,14 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ApiError } from "@/api/client";
-import { formatPlanPrice, usePricing, usePublicCms, type SignupRole } from "@/lib/publicInfo";
-
-function parseRole(value: string | null): SignupRole | null {
-  return value === "owner" || value === "contractor" ? value : null;
-}
+import { formatPlanPrice, parseRoleSlug, roleSlug, usePricing, usePublicCms, type SignupRole } from "@/lib/publicInfo";
 
 function RoleHint({ role }: { role: SignupRole | null }) {
   const { t, language } = useI18n();
@@ -25,32 +21,54 @@ function RoleHint({ role }: { role: SignupRole | null }) {
   );
 }
 
-function RoleFields({ role, setRole }: { role: SignupRole | null; setRole: (r: SignupRole) => void }) {
+function RoleFields({
+  role,
+  setRole,
+  clearRole,
+}: {
+  role: SignupRole | null;
+  setRole: (r: SignupRole) => void;
+  clearRole: () => void;
+}) {
   const { t } = useI18n();
+  const roleName = (r: SignupRole) => (r === "owner" ? t("auth.signup.propertyOwner") : t("auth.signup.contractor"));
   return (
     <>
-      <div>
-        <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">
-          {t("auth.signup.iAmA")}
-        </label>
-        <div className="flex border border-navy rounded overflow-hidden w-fit">
-          <button
-            type="button"
-            onClick={() => setRole("owner")}
-            className={`px-4 py-2 text-xs font-mono uppercase ${role === "owner" ? "bg-navy text-white" : "bg-white text-navy"}`}
-          >
-            {t("auth.signup.propertyOwner")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setRole("contractor")}
-            className={`px-4 py-2 text-xs font-mono uppercase border-s border-navy ${role === "contractor" ? "bg-navy text-white" : "bg-white text-navy"}`}
-          >
-            {t("auth.signup.contractor")}
-          </button>
+      {role ? (
+        // Role arrived from the landing page (or was just picked): show it as
+        // settled, not as a choice to make again.
+        <div>
+          <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">
+            {t("auth.signup.signingUpAs")}
+          </label>
+          <div className="flex items-center justify-between border border-navy rounded px-3 py-2.5">
+            <span className="font-display font-semibold text-navy">{roleName(role)}</span>
+            <button type="button" onClick={clearRole} className="text-xs text-steel underline">
+              {t("auth.signup.changeRole")}
+            </button>
+          </div>
+          <RoleHint role={role} />
         </div>
-        <RoleHint role={role} />
-      </div>
+      ) : (
+        <div>
+          <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">
+            {t("auth.signup.iAmA")}
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {(["owner", "contractor"] as const).map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRole(r)}
+                className="border border-navy rounded px-3 py-2.5 text-sm font-semibold text-navy hover:bg-navy hover:text-white"
+              >
+                {roleName(r)}
+              </button>
+            ))}
+          </div>
+          <RoleHint role={null} />
+        </div>
+      )}
 
       {role === "contractor" && (
         <div>
@@ -70,11 +88,21 @@ export function SignupPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  // The role chosen on the landing page arrives as ?role=owner|contractor.
-  // With no (or an unknown) role, nothing is preselected so the visitor
-  // must pick deliberately instead of silently signing up as an owner.
-  const role = parseRole(searchParams.get("role"));
-  const setRole = (r: SignupRole) => setSearchParams({ role: r }, { replace: true });
+  // The role chosen on the landing page arrives as ?role=owner or
+  // ?role=service_provider. With no (or an unknown) role nothing is
+  // preselected: the visitor picks one of the two here, never a guess.
+  const roleParam = searchParams.get("role");
+  const role = parseRoleSlug(roleParam);
+  const setRole = (r: SignupRole) => setSearchParams({ role: roleSlug(r) }, { replace: true });
+  const clearRole = () => setSearchParams({}, { replace: true });
+
+  // Normalise legacy (?role=contractor) or unknown values so the URL always
+  // shows the canonical slug, or nothing.
+  useEffect(() => {
+    if (roleParam === null) return;
+    const canonical = role ? roleSlug(role) : null;
+    if (roleParam !== canonical) setSearchParams(canonical ? { role: canonical } : {}, { replace: true });
+  }, [roleParam, role, setSearchParams]);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -88,14 +116,15 @@ export function SignupPage() {
     setPending(true);
     const form = new FormData(e.currentTarget);
     try {
-      await signup({
+      const me = await signup({
         email: form.get("email") as string,
         password: form.get("password") as string,
         full_name: form.get("full_name") as string,
         role,
         company_name: (form.get("company_name") as string) || undefined,
       });
-      navigate(role === "owner" ? "/owner/verify" : "/contractor/verify");
+      // Route by the role the backend persisted, not by what this form sent.
+      navigate(me.role === "owner" ? "/owner/verify" : "/contractor/verify");
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : t("auth.signup.genericError"));
     } finally {
@@ -123,7 +152,7 @@ export function SignupPage() {
       {error && <p className="text-xs bg-red-tint text-red border border-red rounded px-3 py-2.5 mb-4">{error}</p>}
 
       <form onSubmit={handleSubmit} className="grid gap-4">
-        <RoleFields role={role} setRole={setRole} />
+        <RoleFields role={role} setRole={setRole} clearRole={clearRole} />
 
         <div>
           <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">

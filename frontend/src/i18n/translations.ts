@@ -34,6 +34,8 @@ export interface Dictionary {
       propertyOwner: string;
       contractor: string;
       chooseRole: string;
+      signingUpAs: string;
+      changeRole: string;
       companyName: string;
       companyNameHint: string;
       fullName: string;
@@ -584,6 +586,8 @@ export const en: Dictionary = {
       propertyOwner: "Owner",
       contractor: "Service provider",
       chooseRole: "Choose Owner or Service provider to continue.",
+      signingUpAs: "Signing up as",
+      changeRole: "Change",
       companyName: "Company name",
       companyNameHint: "You'll submit verification documents after signing up.",
       fullName: "Full name",
@@ -1146,6 +1150,8 @@ export const ar: Dictionary = {
       propertyOwner: "مالك",
       contractor: "مزوّد خدمة",
       chooseRole: "اختر مالك أو مزوّد خدمة للمتابعة.",
+      signingUpAs: "التسجيل بصفة",
+      changeRole: "تغيير",
       companyName: "اسم الشركة",
       companyNameHint: "ستقوم بتقديم مستندات التحقق بعد إنشاء الحساب.",
       fullName: "الاسم الكامل",

@@ -99,3 +99,34 @@ def test_role_copy_is_admin_editable_and_listed_in_page_order(db):
 
     admin.put("/admin/cms/home_provider_title/en", json={"value": "Contractor"})
     assert anon.get("/public/cms", params={"language": "en"}).json()["home_provider_title"] == "Contractor"
+
+
+def test_signup_handoff_persists_the_chosen_role(db):
+    """Step 1 -> Step 2 boundary: the account exists, the role the visitor
+    chose is what the backend stored, and the user can authenticate."""
+    from app.models.contractor import ContractorProfile
+    from app.models.owner import OwnerProfile
+
+    for role, email, extra in (
+        ("owner", "own@example.com", {}),
+        ("contractor", "sp@example.com", {"company_name": "Acme"}),  # "service_provider" in public links
+    ):
+        signup = TestClient(app)
+        r = signup.post("/auth/signup", json={"email": email, "password": "password123", "full_name": "N", "role": role, **extra})
+        assert r.status_code == 201, r.text
+        assert r.json()["role"] == role
+        user_id = r.json()["id"]
+        assert db.get(User, user_id).role.value == role
+        profile_model = OwnerProfile if role == "owner" else ContractorProfile
+        assert db.get(profile_model, user_id) is not None
+        assert signup.get("/auth/me").json()["role"] == role
+
+        fresh = TestClient(app)
+        assert fresh.post("/auth/login", json={"email": email, "password": "password123"}).status_code == 200
+        assert fresh.get("/auth/me").json()["role"] == role
+
+    anon = TestClient(app)
+    base = {"email": "x@example.com", "password": "password123", "full_name": "X"}
+    assert anon.post("/auth/signup", json=base).status_code == 422  # no role -> never guessed
+    assert anon.post("/auth/signup", json={**base, "role": "admin"}).status_code == 400
+    assert anon.post("/auth/signup", json={**base, "role": "service_provider"}).status_code == 422

@@ -26,7 +26,7 @@ interface AuthContextValue {
   user: CurrentUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (payload: SignupPayload) => Promise<void>;
+  signup: (payload: SignupPayload) => Promise<CurrentUser>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -58,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signup = async (payload: SignupPayload) => {
     const me = await apiFetch<CurrentUser>("/auth/signup", { method: "POST", body: payload });
     setUser(me);
+    return me;
   };
 
   const logout = async () => {

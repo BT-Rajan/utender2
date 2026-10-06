@@ -7,6 +7,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { apiFetch } from "@/api/client";
 import {
   formatPlanPrice,
+  signupPath,
   usePricing,
   usePublicCms,
   usePublicRequirements,
@@ -93,7 +94,7 @@ function RoleCard({
       )}
 
       <Link
-        to={`/signup?role=${role}`}
+        to={signupPath(role)}
         className="mt-auto bg-amber hover:bg-amber-dark text-white text-sm font-semibold rounded px-5 py-2.5 text-center"
       >
         {cms[`${k}_cta`]}
@@ -195,10 +196,10 @@ export function HomePage() {
         ) : (
           // Content couldn't load (API down) — still give both signup paths.
           <div className="flex items-center justify-center gap-3">
-            <Link to="/signup?role=owner" className="border border-navy text-navy rounded px-5 py-2.5 text-sm font-semibold">
+            <Link to={signupPath("owner")} className="border border-navy text-navy rounded px-5 py-2.5 text-sm font-semibold">
               {t("auth.signup.propertyOwner")}
             </Link>
-            <Link to="/signup?role=contractor" className="border border-navy text-navy rounded px-5 py-2.5 text-sm font-semibold">
+            <Link to={signupPath("contractor")} className="border border-navy text-navy rounded px-5 py-2.5 text-sm font-semibold">
               {t("auth.signup.contractor")}
             </Link>
           </div>
