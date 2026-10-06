@@ -41,8 +41,8 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.ar: ("تمت الموافقة على المستند", "تمت الموافقة على مستند {requirement_name} الخاص بك."),
     },
     NotificationType.document_rejected: {
-        Language.en: ("Document needs attention", "Your {requirement_name} document was rejected — please re-upload."),
-        Language.ar: ("المستند يحتاج إلى مراجعة", "تم رفض مستند {requirement_name} الخاص بك — يرجى إعادة الرفع."),
+        Language.en: ("Document needs correction", "Your {requirement_name} document needs correction: {note} Please upload a corrected version."),
+        Language.ar: ("المستند يحتاج إلى تصحيح", "مستند {requirement_name} الخاص بك يحتاج إلى تصحيح: {note} يرجى رفع نسخة مصححة."),
     },
     NotificationType.verification_activated: {
         Language.en: ("You're verified", "Your service provider account has been approved."),
@@ -63,6 +63,14 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
     NotificationType.service_provider_reactivated: {
         Language.en: ("Account reactivated", "Your account has been reactivated."),
         Language.ar: ("تم إعادة تفعيل الحساب", "تمت إعادة تفعيل حسابك."),
+    },
+    NotificationType.verification_changes_requested: {
+        Language.en: ("Verification needs changes", "Your verification needs changes before it can be approved. {note}"),
+        Language.ar: ("التحقق يحتاج إلى تعديلات", "يحتاج طلب التحقق الخاص بك إلى تعديلات قبل اعتماده. {note}"),
+    },
+    NotificationType.verification_rejected: {
+        Language.en: ("Verification rejected", "Your verification was rejected. Reason: {note}"),
+        Language.ar: ("تم رفض التحقق", "تم رفض طلب التحقق الخاص بك. السبب: {note}"),
     },
     NotificationType.tender_no_award: {
         Language.en: ("No award on {project_title}", "The owner decided not to award {project_title}."),
@@ -85,8 +93,8 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.ar: ("تمت الموافقة على المستند", "تمت الموافقة على مستند {requirement_name} الخاص بك."),
     },
     NotificationType.owner_document_rejected: {
-        Language.en: ("Document needs attention", "Your {requirement_name} document was rejected — please re-upload."),
-        Language.ar: ("المستند يحتاج إلى مراجعة", "تم رفض مستند {requirement_name} الخاص بك — يرجى إعادة الرفع."),
+        Language.en: ("Document needs correction", "Your {requirement_name} document needs correction: {note} Please upload a corrected version."),
+        Language.ar: ("المستند يحتاج إلى تصحيح", "مستند {requirement_name} الخاص بك يحتاج إلى تصحيح: {note} يرجى رفع نسخة مصححة."),
     },
     NotificationType.owner_suspended: {
         Language.en: ("Account suspended", "Your account has been suspended by a site admin."),

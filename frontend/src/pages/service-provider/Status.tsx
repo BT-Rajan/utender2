@@ -3,6 +3,7 @@ import { apiFetch } from "@/api/client";
 import type { ServiceProviderDocument, ServiceProviderProfile } from "@/api/types";
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
+import { VerificationStateBanner } from "@/components/VerificationChecklist";
 
 function statusBadge(status: string) {
   switch (status) {
@@ -53,6 +54,15 @@ export function ServiceProviderStatusPage() {
     );
   }
 
+  // A final rejection (or any reviewer message) is shown as-is, with the reason.
+  if (profile.verification_status === "rejected") {
+    return (
+      <main className="max-w-2xl mx-auto px-5 py-8">
+        <VerificationStateBanner state={profile.verification_state} note={profile.verification_note} />
+      </main>
+    );
+  }
+
   const bannerClasses = profile.verification_status === "changes_requested" ? "border-red" : "border-amber";
   const bannerTitle =
     profile.verification_status === "changes_requested"
@@ -64,6 +74,9 @@ export function ServiceProviderStatusPage() {
       <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">{t("service_provider.status.eyebrow")}</span>
       <h1 className="font-display text-2xl font-semibold text-navy mb-1">{t("service_provider.status.heading")}</h1>
       <p className="text-[13.5px] text-steel mb-6">{profile.company_name}</p>
+      {profile.verification_note && (
+        <VerificationStateBanner state={profile.verification_state} note={profile.verification_note} />
+      )}
 
       <div className={`bg-white border border-l-4 rounded px-5 py-4 mb-6 flex items-center justify-between flex-wrap gap-3 ${bannerClasses}`}>
         <div>

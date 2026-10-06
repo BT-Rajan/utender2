@@ -139,8 +139,11 @@ export function StakeholderSection() {
       setError(null);
       setEditing(false);
       queryClient.setQueryData(["identity"], data);
-      // Display names (e.g. a service provider's trading name) may have changed.
-      queryClient.invalidateQueries({ queryKey: ["service-provider-profile"] });
+      // The verification checklist depends on the stakeholder type, and display
+      // names (e.g. a service provider's trading name) may have changed.
+      for (const key of ["owner-documents", "service-provider-documents", "owner-profile", "service-provider-profile"]) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
     },
     onError: (err) => setError(err instanceof ApiError ? err.detail : t("stakeholder.saveError")),
   });

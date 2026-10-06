@@ -10,12 +10,13 @@ import { StakeholderSummary, type Stakeholder } from "@/components/Stakeholder";
 import { useI18n } from "@/i18n/I18nContext";
 import { PageLoading } from "@/components/PageLoading";
 
-const STATUS_OPTIONS = ["incomplete", "pending_review", "changes_requested", "approved"] as const;
+const STATUS_OPTIONS = ["incomplete", "pending_review", "changes_requested", "approved", "rejected"] as const;
 
 const MARKETPLACE_STATUS_LABEL: Record<string, string> = {
   documents_incomplete: "Documents incomplete",
   submitted_for_review: "Submitted for review",
   changes_requested: "Changes requested",
+  rejected: "Rejected",
   payment_required: "Payment required",
   payment_restricted: "Payment restricted",
   verified_active: "Verified & active",
@@ -26,6 +27,7 @@ const MARKETPLACE_STATUS_BADGE: Record<string, string> = {
   documents_incomplete: "bg-blue-tint text-steel",
   submitted_for_review: "bg-amber/15 text-amber-dark",
   changes_requested: "bg-red-tint text-red",
+  rejected: "bg-red-tint text-red",
   payment_required: "bg-amber/15 text-amber-dark",
   payment_restricted: "bg-red-tint text-red",
   verified_active: "bg-green-tint text-green",

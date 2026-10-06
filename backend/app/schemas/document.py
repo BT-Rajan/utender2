@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from app.models.enums import DocumentStatus, UserRole
+from app.models.enums import DocumentStatus, StakeholderType, UserRole
 
 
 class DocumentRequirementOut(BaseModel):
@@ -14,6 +14,8 @@ class DocumentRequirementOut(BaseModel):
     is_required: bool
     is_active: bool
     applies_to: UserRole
+    applies_to_stakeholder: StakeholderType | None = None  # None = individuals and organizations
+    requires_expiry: bool = False
     effective_from: datetime
     created_at: datetime
 
@@ -23,6 +25,8 @@ class DocumentRequirementCreate(BaseModel):
     description: str | None = None
     is_required: bool = True
     applies_to: UserRole = UserRole.service_provider
+    applies_to_stakeholder: StakeholderType | None = None
+    requires_expiry: bool = False
 
     @field_validator("applies_to")
     @classmethod
@@ -49,6 +53,7 @@ class ServiceProviderDocumentOut(BaseModel):
     # Lets the admin UI flag "approved before this requirement's terms
     # last changed" without a second round trip.
     requirement_effective_from: datetime | None = None
+    requirement_requires_expiry: bool | None = None
 
 
 class ReviewDocumentDecision(BaseModel):
@@ -78,6 +83,7 @@ class OwnerDocumentOut(BaseModel):
     requirement_description: str | None = None
     requirement_is_required: bool | None = None
     requirement_effective_from: datetime | None = None
+    requirement_requires_expiry: bool | None = None
 
 
 class ReviewOwnerDocumentDecision(BaseModel):

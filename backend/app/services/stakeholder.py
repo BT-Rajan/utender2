@@ -27,7 +27,7 @@ from app.services.audit import log_action
 
 # Identity may only change while the profile is not under (or past) review --
 # otherwise an approved individual could become an unverified organization.
-EDITABLE_STATUSES = (VerificationStatus.incomplete, VerificationStatus.changes_requested)
+from app.services.verification import EDITABLE_STATUSES  # noqa: E402
 
 
 def stakeholder_profile(user: User, db: Session) -> OwnerProfile | ServiceProviderProfile | None:

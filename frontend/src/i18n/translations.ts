@@ -13,6 +13,28 @@ export interface Dictionary {
     optional: string;
     noDocuments: string;
   };
+  verification: {
+    scopeLabel: string;
+    scopeAll: string;
+    scopeIndividual: string;
+    scopeOrganization: string;
+    requiresExpiry: string;
+    expiryBadge: string;
+    state_not_started: string;
+    state_incomplete: string;
+    state_submitted: string;
+    state_under_review: string;
+    state_correction_required: string;
+    state_approved: string;
+    state_rejected: string;
+    stateLabel: string;
+    correctionNeeded: string;
+    reviewerMessage: string;
+    rejectedBody: string;
+    locked: string;
+    replace: string;
+    noRequirements: string;
+  };
   stakeholder: {
     heading: string;
     intro: string;
@@ -585,6 +607,28 @@ export const en: Dictionary = {
     costLabel: "Cost",
     optional: "optional",
     noDocuments: "No documents are currently required.",
+  },
+  verification: {
+    scopeLabel: "Applies to",
+    scopeAll: "Individuals and organizations",
+    scopeIndividual: "Individuals only",
+    scopeOrganization: "Organizations only",
+    requiresExpiry: "Expiry date required on approval",
+    expiryBadge: "Expiry required",
+    state_not_started: "Not started",
+    state_incomplete: "In progress",
+    state_submitted: "Submitted, awaiting review",
+    state_under_review: "Under review",
+    state_correction_required: "Correction required",
+    state_approved: "Approved",
+    state_rejected: "Rejected",
+    stateLabel: "Verification",
+    correctionNeeded: "Correction needed:",
+    reviewerMessage: "Message from the reviewer:",
+    rejectedBody: "Your verification was rejected. If you think this is a mistake, contact support.",
+    locked: "Documents can't be changed while your verification is under review or after a decision.",
+    replace: "Replace",
+    noRequirements: "No documents are currently required for this account.",
   },
   stakeholder: {
     heading: "Who does this account represent?",
@@ -1183,6 +1227,28 @@ export const ar: Dictionary = {
     costLabel: "التكلفة",
     optional: "اختياري",
     noDocuments: "لا توجد مستندات مطلوبة حاليًا.",
+  },
+  verification: {
+    scopeLabel: "ينطبق على",
+    scopeAll: "الأفراد والجهات",
+    scopeIndividual: "الأفراد فقط",
+    scopeOrganization: "الجهات فقط",
+    requiresExpiry: "يلزم تاريخ انتهاء عند الاعتماد",
+    expiryBadge: "يلزم تاريخ انتهاء",
+    state_not_started: "لم يبدأ",
+    state_incomplete: "قيد الإكمال",
+    state_submitted: "تم الإرسال، بانتظار المراجعة",
+    state_under_review: "قيد المراجعة",
+    state_correction_required: "مطلوب تصحيح",
+    state_approved: "معتمد",
+    state_rejected: "مرفوض",
+    stateLabel: "التحقق",
+    correctionNeeded: "مطلوب تصحيح:",
+    reviewerMessage: "رسالة من المراجع:",
+    rejectedBody: "تم رفض طلب التحقق الخاص بك. إذا كنت تعتقد أن ذلك خطأ، تواصل مع الدعم.",
+    locked: "لا يمكن تغيير المستندات أثناء مراجعة طلب التحقق أو بعد اتخاذ قرار بشأنه.",
+    replace: "استبدال",
+    noRequirements: "لا توجد مستندات مطلوبة حاليًا لهذا الحساب.",
   },
   stakeholder: {
     heading: "من يمثّل هذا الحساب؟",

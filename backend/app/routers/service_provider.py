@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import get_service_provider_profile, get_current_user, require_approved_service_provider, require_service_provider
 from app.models.service_provider import ServiceProviderProfile
-from app.models.document import ServiceProviderDocument, DocumentRequirement
-from app.models.enums import DocumentStatus, ProjectStatus, UserRole, VerificationStatus
+from app.models.document import DocumentRequirement
+from app.models.enums import DocumentStatus, ProjectStatus, UserRole
 from app.models.offer import Offer
 from app.models.project import Project
 from app.models.user import User
@@ -17,6 +17,15 @@ from app.schemas.document import ServiceProviderDocumentOut, DocumentRequirement
 from app.schemas.project import ProjectOut
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.stakeholder import require_established
+from app.services.verification import (
+    applicable_requirements,
+    assert_editable,
+    assert_ready_to_submit,
+    checklist,
+    document_out_fields,
+    mark_submitted,
+    profile_state_fields,
+)
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import sync_expired_projects
 
@@ -28,11 +37,10 @@ router = APIRouter(prefix="/service-provider", tags=["service_provider"])
 # admin-only write endpoints under /admin/requirements.
 @router.get("/requirements", response_model=list[DocumentRequirementOut])
 def active_requirements(user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
-    return (
-        db.query(DocumentRequirement)
-        .filter(DocumentRequirement.is_active.is_(True), DocumentRequirement.applies_to == UserRole.service_provider)
-        .all()
-    )
+    """The admin-configured requirements that apply to this account's
+    stakeholder type right now."""
+    cp = get_service_provider_profile(user, db)
+    return applicable_requirements(db, UserRole.service_provider, cp.stakeholder_type)
 
 
 @router.get("/feed", response_model=list[ProjectOut])
@@ -137,29 +145,10 @@ def profile(user: User = Depends(require_service_provider), db: Session = Depend
 
 @router.get("/documents", response_model=list[ServiceProviderDocumentOut])
 def list_documents(user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
-    rows = (
-        db.query(ServiceProviderDocument, DocumentRequirement)
-        .join(DocumentRequirement, ServiceProviderDocument.requirement_id == DocumentRequirement.id)
-        .filter(ServiceProviderDocument.service_provider_id == user.id)
-        .all()
-    )
-    return [
-        ServiceProviderDocumentOut(
-            id=d.id,
-            service_provider_id=d.service_provider_id,
-            requirement_id=d.requirement_id,
-            status=d.status,
-            admin_note=d.admin_note,
-            reviewed_at=d.reviewed_at,
-            submitted_at=d.submitted_at,
-            expires_on=d.expires_on,
-            requirement_name=r.name,
-            requirement_description=r.description,
-            requirement_is_required=r.is_required,
-            requirement_effective_from=r.effective_from,
-        )
-        for d, r in rows
-    ]
+    """This account's checklist: one row per applicable requirement."""
+    rows = checklist(db, get_service_provider_profile(user, db))
+    db.commit()
+    return [ServiceProviderDocumentOut(**document_out_fields(d, r)) for r, d in rows]
 
 
 @router.post("/documents/{requirement_id}/upload", response_model=ServiceProviderDocumentOut)
@@ -169,11 +158,9 @@ async def upload_document(
     user: User = Depends(require_service_provider),
     db: Session = Depends(get_db),
 ):
-    doc = (
-        db.query(ServiceProviderDocument)
-        .filter(ServiceProviderDocument.service_provider_id == user.id, ServiceProviderDocument.requirement_id == requirement_id)
-        .first()
-    )
+    cp = get_service_provider_profile(user, db)
+    assert_editable(cp)
+    doc = next((d for r, d in checklist(db, cp) if r.id == requirement_id), None)
     if not doc:
         raise HTTPException(status_code=404, detail="Document requirement not found for this service provider.")
 
@@ -189,45 +176,22 @@ async def upload_document(
     doc.file_path = path
     doc.status = DocumentStatus.pending
     doc.submitted_at = datetime.utcnow()
-    doc.admin_note = None  # clear any prior rejection note on re-upload
+    doc.admin_note = None  # clear any prior correction note on re-upload
     doc.expires_on = None  # a fresh submission needs a fresh review before any expiry applies
     db.commit()
     db.refresh(doc)
-
-    requirement = db.get(DocumentRequirement, requirement_id)
-    return ServiceProviderDocumentOut(
-        id=doc.id,
-        service_provider_id=doc.service_provider_id,
-        requirement_id=doc.requirement_id,
-        status=doc.status,
-        admin_note=doc.admin_note,
-        reviewed_at=doc.reviewed_at,
-        submitted_at=doc.submitted_at,
-        expires_on=doc.expires_on,
-        requirement_name=requirement.name if requirement else None,
-        requirement_description=requirement.description if requirement else None,
-        requirement_is_required=requirement.is_required if requirement else None,
-        requirement_effective_from=requirement.effective_from if requirement else None,
-    )
+    return ServiceProviderDocumentOut(**document_out_fields(doc, db.get(DocumentRequirement, requirement_id)))
 
 
 @router.post("/submit-for-review", response_model=ServiceProviderProfileOut)
 def submit_for_review(payload: SubmitForReview, user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
-    require_established(get_service_provider_profile(user, db))
-    docs = (
-        db.query(ServiceProviderDocument, DocumentRequirement)
-        .join(DocumentRequirement, ServiceProviderDocument.requirement_id == DocumentRequirement.id)
-        .filter(ServiceProviderDocument.service_provider_id == user.id)
-        .all()
-    )
-    missing_required = any(r.is_required and d.status == DocumentStatus.not_submitted for d, r in docs)
-    if missing_required:
-        raise HTTPException(status_code=400, detail="All required documents must be uploaded before submitting for review.")
-
     cp = get_service_provider_profile(user, db)
+    require_established(cp)
+    assert_editable(cp)
+    assert_ready_to_submit(db, cp)
     cp.company_name = payload.company_name
     cp.license_number = payload.license_number
-    cp.verification_status = VerificationStatus.pending_review
+    mark_submitted(cp)
     db.commit()
     db.refresh(cp)
     return ServiceProviderProfileOut(**_profile_fields(cp), email=user.email)
@@ -249,4 +213,5 @@ def _profile_fields(cp: ServiceProviderProfile) -> dict:
         payment_override_active=cp.payment_override_active,
         marketplace_status=cp.marketplace_status,
         created_at=cp.created_at,
+        **profile_state_fields(cp),
     )

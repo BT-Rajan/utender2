@@ -9,7 +9,7 @@ export type ProjectStatus =
   | "expired";
 export type TenderType = "sealed" | "owner_visible";
 export type OfferStatus = "submitted" | "approved" | "rejected" | "withdrawn";
-export type VerificationStatus = "incomplete" | "pending_review" | "changes_requested" | "approved";
+export type VerificationStatus = "incomplete" | "pending_review" | "changes_requested" | "approved" | "rejected";
 export type DocumentStatus = "not_submitted" | "pending" | "approved" | "rejected";
 export type SubscriptionStatus = "trialing" | "active" | "past_due" | "canceled";
 
@@ -89,12 +89,16 @@ export interface ServiceProviderProfile {
     | "documents_incomplete"
     | "submitted_for_review"
     | "changes_requested"
+    | "rejected"
     | "payment_required"
     | "payment_restricted"
     | "verified_active"
     | "suspended";
   created_at: string;
   email?: string | null;
+  verification_state: VerificationState;
+  verification_note: string | null;
+  verification_submitted_at: string | null;
 }
 
 export interface DocumentRequirement {
@@ -104,6 +108,8 @@ export interface DocumentRequirement {
   is_required: boolean;
   is_active: boolean;
   applies_to: "owner" | "service_provider";
+  applies_to_stakeholder: "individual" | "organization" | null; // null = both
+  requires_expiry: boolean;
   effective_from: string;
   created_at: string;
 }
@@ -121,18 +127,33 @@ export interface ServiceProviderDocument {
   requirement_description: string | null;
   requirement_is_required: boolean | null;
   requirement_effective_from: string | null;
+  requirement_requires_expiry?: boolean | null;
+  url?: string | null; // admin views only: a signed, time-limited link
 }
 
 export interface OwnerProfile {
   user_id: string;
   verification_status: VerificationStatus;
   is_suspended: boolean;
-  marketplace_status: "documents_incomplete" | "submitted_for_review" | "changes_requested" | "verified_active" | "suspended";
+  marketplace_status: "documents_incomplete" | "submitted_for_review" | "changes_requested" | "rejected" | "verified_active" | "suspended";
   created_at: string;
   email?: string | null;
   full_name?: string | null;
   project_count: number;
+  verification_state: VerificationState;
+  verification_note: string | null;
+  verification_submitted_at: string | null;
 }
+
+// Step 4 lifecycle, derived server-side (verification_status stays the stored truth).
+export type VerificationState =
+  | "not_started"
+  | "incomplete"
+  | "submitted"
+  | "under_review"
+  | "correction_required"
+  | "approved"
+  | "rejected";
 
 export interface OwnerDocument {
   id: string;
@@ -147,6 +168,8 @@ export interface OwnerDocument {
   requirement_description: string | null;
   requirement_is_required: boolean | null;
   requirement_effective_from: string | null;
+  requirement_requires_expiry?: boolean | null;
+  url?: string | null; // admin views only: a signed, time-limited link
 }
 
 export interface AdminOffer {

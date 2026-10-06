@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
-import type { ServiceProviderDocument, DocumentRequirement, ServiceProviderProfile } from "@/api/types";
+import type { ServiceProviderDocument, ServiceProviderProfile } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { StakeholderSection, useIdentity } from "@/components/Stakeholder";
+import { VerificationChecklist, VerificationStateBanner, isVerificationEditable } from "@/components/VerificationChecklist";
 import { useI18n } from "@/i18n/I18nContext";
 
 export function ServiceProviderVerifyPage() {
@@ -25,10 +26,6 @@ export function ServiceProviderVerifyPage() {
     setLicenseNumber(profile.license_number ?? "");
   }, [profile]);
 
-  const { data: requirements } = useQuery({
-    queryKey: ["service-provider-requirements"],
-    queryFn: () => apiFetch<DocumentRequirement[]>("/service-provider/requirements"),
-  });
   const { data: docs } = useQuery({
     queryKey: ["service-provider-documents"],
     queryFn: () => apiFetch<ServiceProviderDocument[]>("/service-provider/documents"),
@@ -43,6 +40,7 @@ export function ServiceProviderVerifyPage() {
     onSuccess: () => {
       setError(null);
       queryClient.invalidateQueries({ queryKey: ["service-provider-documents"] });
+      queryClient.invalidateQueries({ queryKey: ["service-provider-profile"] });
     },
     onError: (err) => setError(err instanceof ApiError ? err.detail : t("service_provider.verify.uploadError")),
   });
@@ -54,8 +52,7 @@ export function ServiceProviderVerifyPage() {
 
   const { data: identity } = useIdentity();
   const established = !!identity?.stakeholder?.status.stakeholder_established;
-
-  const statusFor = (requirementId: string) => docs?.find((d) => d.requirement_id === requirementId)?.status ?? "not_submitted";
+  const editable = isVerificationEditable(profile?.verification_state);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,9 +72,11 @@ export function ServiceProviderVerifyPage() {
 
       <StakeholderSection />
 
+      {profile && <VerificationStateBanner state={profile.verification_state} note={profile.verification_note} />}
+
       <ErrorBanner message={error} />
 
-      <form onSubmit={handleSubmit} className="mb-10 grid gap-4 max-w-md">
+      <form onSubmit={handleSubmit} className="mb-10 grid gap-4 max-w-2xl">
         <div>
           <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">{t("service_provider.verify.companyName")}</label>
           <input
@@ -96,48 +95,21 @@ export function ServiceProviderVerifyPage() {
           />
         </div>
 
-        <div className="overflow-x-auto">
-        <table className="w-full border-collapse mt-4">
-          <thead>
-            <tr className="text-left">
-              <th className="font-mono text-[10px] uppercase text-steel border-b-2 border-navy py-2">{t("service_provider.verify.document")}</th>
-              <th className="font-mono text-[10px] uppercase text-steel border-b-2 border-navy py-2">{t("service_provider.verify.statusCol")}</th>
-              <th className="border-b-2 border-navy py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {requirements?.map((req) => (
-              <tr key={req.id} className="border-b border-border">
-                <td className="py-3">
-                  <div className="font-display font-semibold text-sm">{req.name}</div>
-                  <div className="text-xs text-steel-light">{req.description}</div>
-                  <span className="font-mono text-[9.5px] uppercase text-steel-light">
-                    {req.is_required ? t("service_provider.verify.required") : t("service_provider.verify.optional")}
-                  </span>
-                </td>
-                <td className="py-3 font-mono text-xs capitalize">{statusFor(req.id).replace("_", " ")}</td>
-                <td className="py-3">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="file"
-                      required
-                      className="text-xs"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) uploadMutation.mutate({ requirementId: req.id, file });
-                      }}
-                    />
-                  </label>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
+        <VerificationChecklist
+          documents={docs ?? []}
+          editable={editable}
+          onUpload={(requirementId, file) => uploadMutation.mutate({ requirementId, file })}
+          labels={{
+            document: t("service_provider.verify.document"),
+            status: t("service_provider.verify.statusCol"),
+            required: t("service_provider.verify.required"),
+            optional: t("service_provider.verify.optional"),
+          }}
+        />
 
         <button
           type="submit"
-          disabled={submitMutation.isPending || !established}
+          disabled={submitMutation.isPending || !established || !editable}
           className="mt-4 bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 w-fit"
         >
           {submitMutation.isPending ? t("service_provider.verify.submitting") : t("service_provider.verify.submit")}

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Text, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -19,6 +19,10 @@ class OwnerProfile(Base):
     verification_status: Mapped[VerificationStatus] = mapped_column(
         Enum(VerificationStatus, native_enum=True), nullable=False, default=VerificationStatus.incomplete
     )
+    # When the current application was last submitted, and the admin's
+    # message for an application-level decision (changes requested / rejected).
+    verification_submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    verification_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_suspended: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Step 3 stakeholder identity. This profile is the marketplace actor for
     # its side (it owns the verification state, and every project/offer/
@@ -54,4 +58,6 @@ class OwnerProfile(Base):
             return "submitted_for_review"
         if self.verification_status == VerificationStatus.changes_requested:
             return "changes_requested"
+        if self.verification_status == VerificationStatus.rejected:
+            return "rejected"
         return "verified_active"

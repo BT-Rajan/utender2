@@ -5,7 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 from app.models.common import gen_uuid
-from app.models.enums import DocumentStatus, UserRole
+from app.models.enums import DocumentStatus, StakeholderType, UserRole
 
 
 class DocumentRequirement(Base):
@@ -29,6 +29,14 @@ class DocumentRequirement(Base):
     # for audit purposes without a full historical-snapshot table. Adding
     # a requirement never retroactively blocks an already-approved
     # service provider — nothing re-checks past approvals against new rows.
+    # Which stakeholders of that role it applies to: individuals, organizations,
+    # or (NULL) both. Selected in exactly one place,
+    # services.verification.applicable_requirements -- a future country (or
+    # other) scope belongs there too.
+    applies_to_stakeholder: Mapped[StakeholderType | None] = mapped_column(Enum(StakeholderType, native_enum=True), nullable=True)
+    # The reviewing admin must record an expiry date when approving this
+    # document (e.g. a licence that lapses).
+    requires_expiry: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     effective_from: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

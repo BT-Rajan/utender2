@@ -6,12 +6,31 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { QueryError } from "@/components/QueryError";
 import { useI18n } from "@/i18n/I18nContext";
 
+// "" = applies to both individuals and organizations.
+type Scope = "" | "individual" | "organization";
+
+function ScopeSelect({ value, onChange }: { value: Scope; onChange: (v: Scope) => void }) {
+  const { t } = useI18n();
+  return (
+    <label className="flex items-center gap-1.5 font-mono text-[10.5px] text-navy">
+      {t("verification.scopeLabel")}
+      <select value={value} onChange={(e) => onChange(e.target.value as Scope)} className="border border-border rounded px-1.5 py-1 text-xs">
+        <option value="">{t("verification.scopeAll")}</option>
+        <option value="individual">{t("verification.scopeIndividual")}</option>
+        <option value="organization">{t("verification.scopeOrganization")}</option>
+      </select>
+    </label>
+  );
+}
+
 export function AdminRequirementsPage() {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isRequired, setIsRequired] = useState(true);
+  const [scope, setScope] = useState<Scope>("");
+  const [requiresExpiry, setRequiresExpiry] = useState(false);
   const [scopeFilter, setScopeFilter] = useState<"service_provider" | "owner">("service_provider");
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string; name: string; description: string } | null>(null);
@@ -36,12 +55,21 @@ export function AdminRequirementsPage() {
     mutationFn: () =>
       apiFetch("/admin/requirements", {
         method: "POST",
-        body: { name, description: description || null, is_required: isRequired, applies_to: scopeFilter },
+        body: {
+          name,
+          description: description || null,
+          is_required: isRequired,
+          applies_to: scopeFilter,
+          applies_to_stakeholder: scope || null,
+          requires_expiry: requiresExpiry,
+        },
       }),
     onSuccess: () => {
       setName("");
       setDescription("");
       setIsRequired(true);
+      setScope("");
+      setRequiresExpiry(false);
       invalidate();
     },
     onError: (err) => onMutationError(err, t("admin.requirements.addError")),
@@ -50,6 +78,13 @@ export function AdminRequirementsPage() {
   const toggleRequiredMutation = useMutation({
     mutationFn: ({ id, value }: { id: string; value: boolean }) =>
       apiFetch(`/admin/requirements/${id}`, { method: "PATCH", body: { is_required: value } }),
+    onSuccess: invalidate,
+    onError: (err) => onMutationError(err, t("admin.requirements.updateError")),
+  });
+
+  const policyMutation = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
+      apiFetch(`/admin/requirements/${id}`, { method: "PATCH", body }),
     onSuccess: invalidate,
     onError: (err) => onMutationError(err, t("admin.requirements.updateError")),
   });
@@ -149,6 +184,20 @@ export function AdminRequirementsPage() {
               <div className="flex-1">
                 <div className="font-display font-semibold text-sm">{req.name}</div>
                 <div className="text-xs text-steel-light">{req.description}</div>
+                <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                  <ScopeSelect
+                    value={req.applies_to_stakeholder ?? ""}
+                    onChange={(v) => policyMutation.mutate({ id: req.id, body: { applies_to_stakeholder: v || null } })}
+                  />
+                  <label className="flex items-center gap-1.5 font-mono text-[10.5px] text-navy">
+                    <input
+                      type="checkbox"
+                      checked={req.requires_expiry}
+                      onChange={(e) => policyMutation.mutate({ id: req.id, body: { requires_expiry: e.target.checked } })}
+                    />
+                    {t("verification.requiresExpiry")}
+                  </label>
+                </div>
               </div>
             )}
 
@@ -201,6 +250,13 @@ export function AdminRequirementsPage() {
         <label className="flex items-center gap-1.5 font-mono text-[11px] text-navy whitespace-nowrap">
           <input type="checkbox" checked={isRequired} onChange={(e) => setIsRequired(e.target.checked)} /> {t("admin.requirements.required")}
         </label>
+        <div className="sm:col-span-4 flex flex-wrap items-center gap-4">
+          <ScopeSelect value={scope} onChange={setScope} />
+          <label className="flex items-center gap-1.5 font-mono text-[11px] text-navy">
+            <input type="checkbox" checked={requiresExpiry} onChange={(e) => setRequiresExpiry(e.target.checked)} />
+            {t("verification.requiresExpiry")}
+          </label>
+        </div>
         <button type="submit" className="bg-navy hover:bg-navy-deep text-white text-xs font-semibold rounded px-3 py-2 whitespace-nowrap">
           {scopeFilter === "owner" ? t("admin.requirements.addForOwners") : t("admin.requirements.addForServiceProviders")}
         </button>

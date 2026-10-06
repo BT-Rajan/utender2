@@ -7,8 +7,8 @@ from app.db import get_db
 from app.deps import get_owner_profile, require_owner
 from app.models.award_record import AwardRecord
 from app.models.service_provider import ServiceProviderProfile
-from app.models.document import DocumentRequirement, OwnerDocument
-from app.models.enums import DocumentStatus, NotificationType, OfferStatus, ProjectStatus, UserRole, VerificationStatus
+from app.models.document import DocumentRequirement
+from app.models.enums import DocumentStatus, NotificationType, OfferStatus, ProjectStatus, UserRole
 from app.models.offer import Offer, OfferRevision
 from app.models.owner import OwnerProfile
 from app.models.project import Project
@@ -24,6 +24,15 @@ from app.services.email import notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify
 from app.services.stakeholder import require_established
+from app.services.verification import (
+    applicable_requirements,
+    assert_editable,
+    assert_ready_to_submit,
+    checklist,
+    document_out_fields,
+    mark_submitted,
+    profile_state_fields,
+)
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import is_sealed_and_open, lock_project, sync_expired_projects
 
@@ -389,11 +398,9 @@ def submit_review(payload: ReviewCreate, user: User = Depends(require_owner), db
 
 @router.get("/requirements", response_model=list[DocumentRequirementOut])
 def owner_active_requirements(user: User = Depends(require_owner), db: Session = Depends(get_db)):
-    return (
-        db.query(DocumentRequirement)
-        .filter(DocumentRequirement.is_active.is_(True), DocumentRequirement.applies_to == UserRole.owner)
-        .all()
-    )
+    """The admin-configured requirements that apply to this account's
+    stakeholder type right now."""
+    return applicable_requirements(db, UserRole.owner, get_owner_profile(user, db).stakeholder_type)
 
 
 def _owner_profile_out(op: OwnerProfile, user: User) -> OwnerProfileOut:
@@ -405,6 +412,7 @@ def _owner_profile_out(op: OwnerProfile, user: User) -> OwnerProfileOut:
         created_at=op.created_at,
         email=user.email,
         full_name=user.full_name,
+        **profile_state_fields(op),
     )
 
 
@@ -416,29 +424,10 @@ def owner_verification_profile(user: User = Depends(require_owner), db: Session 
 
 @router.get("/documents", response_model=list[OwnerDocumentOut])
 def list_owner_documents(user: User = Depends(require_owner), db: Session = Depends(get_db)):
-    rows = (
-        db.query(OwnerDocument, DocumentRequirement)
-        .join(DocumentRequirement, OwnerDocument.requirement_id == DocumentRequirement.id)
-        .filter(OwnerDocument.owner_id == user.id)
-        .all()
-    )
-    return [
-        OwnerDocumentOut(
-            id=d.id,
-            owner_id=d.owner_id,
-            requirement_id=d.requirement_id,
-            status=d.status,
-            admin_note=d.admin_note,
-            reviewed_at=d.reviewed_at,
-            submitted_at=d.submitted_at,
-            expires_on=d.expires_on,
-            requirement_name=r.name,
-            requirement_description=r.description,
-            requirement_is_required=r.is_required,
-            requirement_effective_from=r.effective_from,
-        )
-        for d, r in rows
-    ]
+    """This account's checklist: one row per applicable requirement."""
+    rows = checklist(db, get_owner_profile(user, db))
+    db.commit()
+    return [OwnerDocumentOut(**document_out_fields(d, r)) for r, d in rows]
 
 
 @router.post("/documents/{requirement_id}/upload", response_model=OwnerDocumentOut)
@@ -448,11 +437,9 @@ async def upload_owner_document(
     user: User = Depends(require_owner),
     db: Session = Depends(get_db),
 ):
-    doc = (
-        db.query(OwnerDocument)
-        .filter(OwnerDocument.owner_id == user.id, OwnerDocument.requirement_id == requirement_id)
-        .first()
-    )
+    op = get_owner_profile(user, db)
+    assert_editable(op)
+    doc = next((d for r, d in checklist(db, op) if r.id == requirement_id), None)
     if not doc:
         raise HTTPException(status_code=404, detail="Document requirement not found for this owner.")
 
@@ -472,39 +459,16 @@ async def upload_owner_document(
     doc.expires_on = None
     db.commit()
     db.refresh(doc)
-
-    requirement = db.get(DocumentRequirement, requirement_id)
-    return OwnerDocumentOut(
-        id=doc.id,
-        owner_id=doc.owner_id,
-        requirement_id=doc.requirement_id,
-        status=doc.status,
-        admin_note=doc.admin_note,
-        reviewed_at=doc.reviewed_at,
-        submitted_at=doc.submitted_at,
-        expires_on=doc.expires_on,
-        requirement_name=requirement.name if requirement else None,
-        requirement_description=requirement.description if requirement else None,
-        requirement_is_required=requirement.is_required if requirement else None,
-        requirement_effective_from=requirement.effective_from if requirement else None,
-    )
+    return OwnerDocumentOut(**document_out_fields(doc, db.get(DocumentRequirement, requirement_id)))
 
 
 @router.post("/submit-for-review", response_model=OwnerProfileOut)
 def owner_submit_for_review(user: User = Depends(require_owner), db: Session = Depends(get_db)):
-    require_established(get_owner_profile(user, db))
-    docs = (
-        db.query(OwnerDocument, DocumentRequirement)
-        .join(DocumentRequirement, OwnerDocument.requirement_id == DocumentRequirement.id)
-        .filter(OwnerDocument.owner_id == user.id)
-        .all()
-    )
-    missing_required = any(r.is_required and d.status == DocumentStatus.not_submitted for d, r in docs)
-    if missing_required:
-        raise HTTPException(status_code=400, detail="All required documents must be uploaded before submitting for review.")
-
     profile = get_owner_profile(user, db)
-    profile.verification_status = VerificationStatus.pending_review
+    require_established(profile)
+    assert_editable(profile)
+    assert_ready_to_submit(db, profile)
+    mark_submitted(profile)
     db.commit()
     db.refresh(profile)
     return _owner_profile_out(profile, user)

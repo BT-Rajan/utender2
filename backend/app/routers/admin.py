@@ -14,7 +14,7 @@ from app.models.award_record import AwardRecord
 from app.models.cms_content import CmsContent
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import ServiceProviderDocument, DocumentRequirement, OwnerDocument
-from app.models.enums import DocumentStatus, Language, NotificationType, ProjectStatus, UserRole, VerificationStatus
+from app.models.enums import DocumentStatus, Language, NotificationType, ProjectStatus, StakeholderType, UserRole, VerificationStatus
 from app.models.offer import Offer, OfferRevision
 from app.models.owner import OwnerProfile
 from app.models.payment_override import PaymentOverride
@@ -35,6 +35,7 @@ from app.schemas.document import (
 from app.schemas.owner import OwnerProfileOut
 from app.services.audit import log_action
 from app.services.stakeholder import describe as describe_stakeholder
+from app.services.verification import assert_ready_to_approve, checklist, document_out_fields, profile_state_fields
 from app.services.notify import notify
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import is_sealed_and_open, lock_project
@@ -58,6 +59,8 @@ def add_requirement(payload: DocumentRequirementCreate, admin: User = Depends(re
         description=(payload.description or "").strip() or None,
         is_required=payload.is_required,
         applies_to=payload.applies_to,
+        applies_to_stakeholder=payload.applies_to_stakeholder,
+        requires_expiry=payload.requires_expiry,
         created_by=admin.id,
     )
     db.add(req)
@@ -71,6 +74,9 @@ class RequirementPatch(BaseModel):
     description: str | None = None
     is_required: bool | None = None
     is_active: bool | None = None
+    # Send null explicitly to make a requirement apply to both stakeholder types.
+    applies_to_stakeholder: StakeholderType | None = None
+    requires_expiry: bool | None = None
 
 
 @router.patch("/requirements/{requirement_id}", response_model=DocumentRequirementOut)
@@ -114,6 +120,19 @@ def patch_requirement(
             req.name = name
     if payload.description is not None:
         req.description = payload.description.strip() or None
+    if "applies_to_stakeholder" in payload.model_fields_set and payload.applies_to_stakeholder != req.applies_to_stakeholder:
+        log_action(
+            db,
+            actor_id=admin.id,
+            action="requirement.scope_changed",
+            target_type="document_requirement",
+            target_id=requirement_id,
+            previous_value=req.applies_to_stakeholder.value if req.applies_to_stakeholder else "all",
+            new_value=payload.applies_to_stakeholder.value if payload.applies_to_stakeholder else "all",
+        )
+        req.applies_to_stakeholder = payload.applies_to_stakeholder
+    if payload.requires_expiry is not None:
+        req.requires_expiry = payload.requires_expiry
     if payload.is_required is not None:
         req.is_required = payload.is_required
     if payload.is_active is not None:
@@ -127,6 +146,107 @@ def patch_requirement(
 
 
 # ---------- review queue ----------
+
+_ADMIN_LINK_SECONDS = 60 * 60 * 24  # admin review links: fixed 24h window, not deadline-tied like drawings
+
+
+class ApplicationDecision(BaseModel):
+    note: str | None = None
+
+
+def _side(profile) -> tuple[str, str]:
+    """(audit target_type, user-facing status link) for a profile."""
+    if isinstance(profile, OwnerProfile):
+        return "owner_profile", "/owner/status"
+    return "service_provider_profile", "/service-provider/status"
+
+
+def _decide_document(db: Session, admin: User, profile, requirement_id: str, decision: DocumentStatus, note: str | None, expires_on):
+    """Approve a document, or request its correction. A correction must say
+    what to fix; an approval of a requirement that carries an expiry must
+    record the expiry date. Every decision is audit-logged."""
+    if decision not in (DocumentStatus.approved, DocumentStatus.rejected):
+        raise HTTPException(status_code=400, detail="A document can only be approved or sent back for correction.")
+    entry = next(((r, d) for r, d in checklist(db, profile) if r.id == requirement_id), None)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    req, doc = entry
+    if doc.status == DocumentStatus.not_submitted:
+        raise HTTPException(status_code=400, detail="This document hasn't been uploaded yet.")
+    note = (note or "").strip() or None
+    if decision == DocumentStatus.rejected and not note:
+        raise HTTPException(status_code=400, detail="Say what needs to be corrected, so the account holder knows what to fix.")
+    if decision == DocumentStatus.approved and req.requires_expiry and not expires_on:
+        raise HTTPException(status_code=400, detail=f"{req.name} requires an expiry date when it is approved.")
+
+    previous = doc.status.value
+    doc.status = decision
+    doc.admin_note = note if decision == DocumentStatus.rejected else None
+    doc.reviewed_by = admin.id
+    doc.reviewed_at = datetime.utcnow()
+    doc.expires_on = expires_on if decision == DocumentStatus.approved else None
+    if decision == DocumentStatus.rejected:
+        # A correction sends the whole application back to the account holder.
+        profile.verification_status = VerificationStatus.changes_requested
+    db.commit()
+
+    target_type, link = _side(profile)
+    log_action(
+        db,
+        actor_id=admin.id,
+        action="document.approved" if decision == DocumentStatus.approved else "document.correction_requested",
+        target_type=target_type,
+        target_id=profile.user_id,
+        previous_value=f"{req.name}: {previous}",
+        new_value=f"{req.name}: {decision.value}" + (f" ({note})" if note else ""),
+    )
+    is_owner = isinstance(profile, OwnerProfile)
+    if decision == DocumentStatus.approved:
+        kind = NotificationType.owner_document_approved if is_owner else NotificationType.document_approved
+    else:
+        kind = NotificationType.owner_document_rejected if is_owner else NotificationType.document_rejected
+    notify(db, profile.user, kind, link=link, requirement_name=req.name, note=note or "")
+    db.refresh(doc)
+    return doc, req
+
+
+def _decide_application(db: Session, admin: User, profile, status: VerificationStatus, note: str | None) -> None:
+    note = (note or "").strip() or None
+    target_type, link = _side(profile)
+    is_owner = isinstance(profile, OwnerProfile)
+    if status == VerificationStatus.approved:
+        assert_ready_to_approve(db, profile)
+    elif status == VerificationStatus.changes_requested:
+        flagged = any(d.status == DocumentStatus.rejected for _, d in checklist(db, profile))
+        if not note and not flagged:
+            raise HTTPException(
+                status_code=400,
+                detail="Request a correction on a specific document, or say what needs to change.",
+            )
+    elif status == VerificationStatus.rejected and not note:
+        raise HTTPException(status_code=400, detail="Give the reason for rejecting this application.")
+
+    previous = profile.verification_status.value
+    profile.verification_status = status
+    profile.verification_note = note
+    db.commit()
+    log_action(
+        db,
+        actor_id=admin.id,
+        action="owner_verification_status.set" if is_owner else "verification_status.set",
+        target_type=target_type,
+        target_id=profile.user_id,
+        previous_value=previous,
+        new_value=status.value + (f" ({note})" if note else ""),
+    )
+    if status == VerificationStatus.approved:
+        kind = NotificationType.owner_verification_activated if is_owner else NotificationType.verification_activated
+        notify(db, profile.user, kind, link="/owner/dashboard" if is_owner else "/service-provider/dashboard")
+    else:
+        kind = NotificationType.verification_changes_requested if status == VerificationStatus.changes_requested else NotificationType.verification_rejected
+        notify(db, profile.user, kind, link=link, note=note or "")
+    db.refresh(profile)
+
 
 @router.get("/review/queue")
 def review_queue(db: Session = Depends(get_db)):
@@ -142,12 +262,8 @@ def review_queue(db: Session = Depends(get_db)):
     )
     result = []
     for cp in profiles:
-        docs = (
-            db.query(ServiceProviderDocument, DocumentRequirement)
-            .join(DocumentRequirement, ServiceProviderDocument.requirement_id == DocumentRequirement.id)
-            .filter(ServiceProviderDocument.service_provider_id == cp.user_id)
-            .all()
-        )
+        docs = checklist(db, cp)
+        db.commit()
         expiry = 60 * 60 * 24  # admin review links: fixed 24h window, not deadline-tied like drawings
         storage = get_storage()
         result.append(
@@ -156,23 +272,10 @@ def review_queue(db: Session = Depends(get_db)):
                 "stakeholder": describe_stakeholder(cp, cp.user, db),
                 "documents": [
                     {
-                        **ServiceProviderDocumentOut(
-                            id=d.id,
-                            service_provider_id=d.service_provider_id,
-                            requirement_id=d.requirement_id,
-                            status=d.status,
-                            admin_note=d.admin_note,
-                            reviewed_at=d.reviewed_at,
-                            submitted_at=d.submitted_at,
-                            expires_on=d.expires_on,
-                            requirement_name=r.name,
-                            requirement_description=r.description,
-                            requirement_is_required=r.is_required,
-                            requirement_effective_from=r.effective_from,
-                        ).model_dump(),
+                        **ServiceProviderDocumentOut(**document_out_fields(d, r)).model_dump(),
                         "url": storage.signed_url("service-provider-documents", d.file_path, expiry) if d.file_path else None,
                     }
-                    for d, r in docs
+                    for r, d in docs
                 ],
             }
         )
@@ -181,45 +284,9 @@ def review_queue(db: Session = Depends(get_db)):
 
 @router.post("/review/documents", response_model=ServiceProviderDocumentOut)
 def review_document(payload: ReviewDocumentDecision, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
-    doc = (
-        db.query(ServiceProviderDocument)
-        .filter(
-            ServiceProviderDocument.service_provider_id == payload.service_provider_id,
-            ServiceProviderDocument.requirement_id == payload.requirement_id,
-        )
-        .first()
-    )
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found.")
-    _get_active_service_provider_profile(db, payload.service_provider_id)
-
-    doc.status = payload.decision
-    doc.admin_note = (payload.note or "Document rejected — please re-upload.") if payload.decision == DocumentStatus.rejected else None
-    doc.reviewed_by = admin.id
-    doc.reviewed_at = datetime.utcnow()
-    if payload.decision == DocumentStatus.approved:
-        doc.expires_on = payload.expires_on
-    db.commit()
-
-    # A single rejected document sends the whole application back to
-    # "changes requested" immediately, so the service provider sees it without
-    # the admin needing a separate reject-application step.
-    if payload.decision == DocumentStatus.rejected:
-        cp = db.get(ServiceProviderProfile, payload.service_provider_id)
-        if cp:
-            cp.verification_status = VerificationStatus.changes_requested
-            db.commit()
-
-    requirement = db.get(DocumentRequirement, payload.requirement_id)
-    service_provider_user = db.get(User, payload.service_provider_id)
-    if service_provider_user and requirement and payload.decision in (DocumentStatus.approved, DocumentStatus.rejected):
-        notification_type = (
-            NotificationType.document_approved if payload.decision == DocumentStatus.approved else NotificationType.document_rejected
-        )
-        notify(db, service_provider_user, notification_type, link="/service-provider/status", requirement_name=requirement.name)
-
-    db.refresh(doc)
-    return doc
+    cp = _get_active_service_provider_profile(db, payload.service_provider_id)
+    doc, req = _decide_document(db, admin, cp, payload.requirement_id, payload.decision, payload.note, payload.expires_on)
+    return ServiceProviderDocumentOut(**document_out_fields(doc, req))
 
 
 @router.patch("/documents/{document_id}/expiry", response_model=ServiceProviderDocumentOut)
@@ -249,60 +316,27 @@ def set_document_expiry(document_id: str, payload: DocumentExpiryUpdate, db: Ses
 
 @router.post("/review/service-providers/{service_provider_id}/approve", response_model=ServiceProviderProfileOut)
 def approve_service_provider(service_provider_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
-    docs = (
-        db.query(ServiceProviderDocument, DocumentRequirement)
-        .join(DocumentRequirement, ServiceProviderDocument.requirement_id == DocumentRequirement.id)
-        .filter(ServiceProviderDocument.service_provider_id == service_provider_id)
-        .all()
-    )
-    # Guard: every required document must be approved before the overall
-    # application can be approved. Prevents a mis-click from activating an
-    # under-verified service provider.
-    missing_approval = any(r.is_required and d.status != DocumentStatus.approved for d, r in docs)
-    if missing_approval:
-        raise HTTPException(status_code=400, detail="All required documents must be approved before approving this service provider.")
+    cp = _get_active_service_provider_profile(db, service_provider_id)
+    _decide_application(db, admin, cp, VerificationStatus.approved, None)
+    return ServiceProviderProfileOut(**_profile_fields(cp), email=cp.user.email)
 
-    cp = db.get(ServiceProviderProfile, service_provider_id)
-    if not cp:
-        raise HTTPException(status_code=404, detail="Service provider not found.")
-    previous = cp.verification_status.value
-    cp.verification_status = VerificationStatus.approved
-    db.commit()
-    db.refresh(cp)
-    log_action(
-        db,
-        actor_id=admin.id,
-        action="verification_status.set",
-        target_type="service_provider_profile",
-        target_id=service_provider_id,
-        previous_value=previous,
-        new_value=VerificationStatus.approved.value,
-    )
-    service_provider_user = db.get(User, service_provider_id)
-    if service_provider_user:
-        notify(db, service_provider_user, NotificationType.verification_activated, link="/service-provider/dashboard")
-    return cp
+
+@router.post("/review/service-providers/{service_provider_id}/request-changes", response_model=ServiceProviderProfileOut)
+def request_service_provider_changes(
+    service_provider_id: str, payload: ApplicationDecision | None = None, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+):
+    cp = _get_active_service_provider_profile(db, service_provider_id)
+    _decide_application(db, admin, cp, VerificationStatus.changes_requested, payload.note if payload else None)
+    return ServiceProviderProfileOut(**_profile_fields(cp), email=cp.user.email)
 
 
 @router.post("/review/service-providers/{service_provider_id}/reject", response_model=ServiceProviderProfileOut)
-def reject_application(service_provider_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
-    cp = db.get(ServiceProviderProfile, service_provider_id)
-    if not cp:
-        raise HTTPException(status_code=404, detail="Service provider not found.")
-    previous = cp.verification_status.value
-    cp.verification_status = VerificationStatus.changes_requested
-    db.commit()
-    db.refresh(cp)
-    log_action(
-        db,
-        actor_id=admin.id,
-        action="verification_status.set",
-        target_type="service_provider_profile",
-        target_id=service_provider_id,
-        previous_value=previous,
-        new_value=VerificationStatus.changes_requested.value,
-    )
-    return cp
+def reject_service_provider(
+    service_provider_id: str, payload: ApplicationDecision, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+):
+    cp = _get_active_service_provider_profile(db, service_provider_id)
+    _decide_application(db, admin, cp, VerificationStatus.rejected, payload.note)
+    return ServiceProviderProfileOut(**_profile_fields(cp), email=cp.user.email)
 
 
 # ---------- service provider management ----------
@@ -337,31 +371,18 @@ def list_service_providers(db: Session = Depends(get_db)):
 def service_provider_detail(service_provider_id: str, db: Session = Depends(get_db)):
     cp = _get_active_service_provider_profile(db, service_provider_id)
     user = db.get(User, service_provider_id)
-    docs = (
-        db.query(ServiceProviderDocument, DocumentRequirement)
-        .join(DocumentRequirement, ServiceProviderDocument.requirement_id == DocumentRequirement.id)
-        .filter(ServiceProviderDocument.service_provider_id == service_provider_id)
-        .all()
-    )
+    docs = checklist(db, cp)
+    db.commit()
+    storage = get_storage()
     return {
         "service_provider": ServiceProviderProfileOut(**_profile_fields(cp), email=user.email if user else None),
         "stakeholder": describe_stakeholder(cp, user, db) if user else None,
         "documents": [
-            ServiceProviderDocumentOut(
-                id=d.id,
-                service_provider_id=d.service_provider_id,
-                requirement_id=d.requirement_id,
-                status=d.status,
-                admin_note=d.admin_note,
-                reviewed_at=d.reviewed_at,
-                submitted_at=d.submitted_at,
-                expires_on=d.expires_on,
-                requirement_name=r.name,
-                requirement_description=r.description,
-                requirement_is_required=r.is_required,
-                requirement_effective_from=r.effective_from,
-            )
-            for d, r in docs
+            {
+                **ServiceProviderDocumentOut(**document_out_fields(d, r)).model_dump(),
+                "url": storage.signed_url("service-provider-documents", d.file_path, _ADMIN_LINK_SECONDS) if d.file_path else None,
+            }
+            for r, d in docs
         ],
     }
 
@@ -697,6 +718,7 @@ def _owner_fields(op: OwnerProfile, user: User | None) -> dict:
         created_at=op.created_at,
         email=user.email if user else None,
         full_name=user.full_name if user else None,
+        **profile_state_fields(op),
     )
 
 
@@ -715,29 +737,16 @@ def _get_active_owner_profile(db: Session, owner_id: str) -> OwnerProfile:
     return op
 
 
-def _owner_documents(db: Session, owner_id: str) -> list[OwnerDocumentOut]:
-    rows = (
-        db.query(OwnerDocument, DocumentRequirement)
-        .join(DocumentRequirement, OwnerDocument.requirement_id == DocumentRequirement.id)
-        .filter(OwnerDocument.owner_id == owner_id)
-        .all()
-    )
+def _owner_documents(db: Session, owner_id: str) -> list[dict]:
+    docs = checklist(db, db.get(OwnerProfile, owner_id))
+    db.commit()
+    storage = get_storage()
     return [
-        OwnerDocumentOut(
-            id=d.id,
-            owner_id=d.owner_id,
-            requirement_id=d.requirement_id,
-            status=d.status,
-            admin_note=d.admin_note,
-            reviewed_at=d.reviewed_at,
-            submitted_at=d.submitted_at,
-            expires_on=d.expires_on,
-            requirement_name=r.name,
-            requirement_description=r.description,
-            requirement_is_required=r.is_required,
-            requirement_effective_from=r.effective_from,
-        )
-        for d, r in rows
+        {
+            **OwnerDocumentOut(**document_out_fields(d, r)).model_dump(),
+            "url": storage.signed_url("owner-documents", d.file_path, _ADMIN_LINK_SECONDS) if d.file_path else None,
+        }
+        for r, d in docs
     ]
 
 
@@ -780,84 +789,44 @@ def owner_detail(owner_id: str, db: Session = Depends(get_db)):
 def review_owner_document(
     payload: ReviewOwnerDocumentDecision, admin: User = Depends(require_admin), db: Session = Depends(get_db)
 ):
-    doc = (
-        db.query(OwnerDocument)
-        .filter(OwnerDocument.owner_id == payload.owner_id, OwnerDocument.requirement_id == payload.requirement_id)
-        .first()
-    )
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found.")
-
-    _get_active_owner_profile(db, payload.owner_id)
-
-    doc.status = payload.decision
-    doc.admin_note = (payload.note or "Document rejected — please re-upload.") if payload.decision == DocumentStatus.rejected else None
-    doc.reviewed_by = admin.id
-    doc.reviewed_at = datetime.utcnow()
-    if payload.decision == DocumentStatus.approved:
-        doc.expires_on = payload.expires_on
-    db.commit()
-
-    if payload.decision == DocumentStatus.rejected:
-        op = db.get(OwnerProfile, payload.owner_id)
-        if op:
-            op.verification_status = VerificationStatus.changes_requested
-            db.commit()
-
-    requirement = db.get(DocumentRequirement, payload.requirement_id)
-    owner_user = db.get(User, payload.owner_id)
-    if owner_user and requirement and payload.decision in (DocumentStatus.approved, DocumentStatus.rejected):
-        notification_type = (
-            NotificationType.owner_document_approved
-            if payload.decision == DocumentStatus.approved
-            else NotificationType.owner_document_rejected
-        )
-        notify(db, owner_user, notification_type, link="/owner/status", requirement_name=requirement.name)
-
-    db.refresh(doc)
-    return doc
+    op = _get_active_owner_profile(db, payload.owner_id)
+    doc, req = _decide_document(db, admin, op, payload.requirement_id, payload.decision, payload.note, payload.expires_on)
+    return OwnerDocumentOut(**document_out_fields(doc, req))
 
 
 @router.post("/review/owners/{owner_id}/approve", response_model=OwnerProfileOut)
 def approve_owner(owner_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     op = _get_active_owner_profile(db, owner_id)
+    _decide_application(db, admin, op, VerificationStatus.approved, None)
+    return OwnerProfileOut(**_owner_fields(op, op.user))
 
-    docs = (
-        db.query(OwnerDocument, DocumentRequirement)
-        .join(DocumentRequirement, OwnerDocument.requirement_id == DocumentRequirement.id)
-        .filter(OwnerDocument.owner_id == owner_id)
-        .all()
-    )
-    missing_approval = any(r.is_required and d.status != DocumentStatus.approved for d, r in docs)
-    if missing_approval:
-        raise HTTPException(status_code=400, detail="All required documents must be approved before approving this owner.")
 
-    previous = op.verification_status.value
-    op.verification_status = VerificationStatus.approved
-    db.commit()
-    db.refresh(op)
-    log_action(
-        db,
-        actor_id=admin.id,
-        action="owner_verification_status.set",
-        target_type="owner_profile",
-        target_id=owner_id,
-        previous_value=previous,
-        new_value=VerificationStatus.approved.value,
-    )
-    owner_user = db.get(User, owner_id)
-    if owner_user:
-        notify(db, owner_user, NotificationType.owner_verification_activated, link="/owner/dashboard")
-    return OwnerProfileOut(**_owner_fields(op, owner_user))
+@router.post("/review/owners/{owner_id}/request-changes", response_model=OwnerProfileOut)
+def request_owner_changes(
+    owner_id: str, payload: ApplicationDecision | None = None, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+):
+    op = _get_active_owner_profile(db, owner_id)
+    _decide_application(db, admin, op, VerificationStatus.changes_requested, payload.note if payload else None)
+    return OwnerProfileOut(**_owner_fields(op, op.user))
 
 
 @router.post("/review/owners/{owner_id}/reject", response_model=OwnerProfileOut)
-def reject_owner_application(owner_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+def reject_owner(owner_id: str, payload: ApplicationDecision, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    op = _get_active_owner_profile(db, owner_id)
+    _decide_application(db, admin, op, VerificationStatus.rejected, payload.note)
+    return OwnerProfileOut(**_owner_fields(op, op.user))
+
+
+@router.post("/owners/{owner_id}/verification-status", response_model=OwnerProfileOut)
+def set_owner_verification_status(
+    owner_id: str, payload: VerificationStatusPatch, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+):
+    """Manual override, mirroring the service provider one -- e.g. to reopen a
+    rejected application."""
     op = _get_active_owner_profile(db, owner_id)
     previous = op.verification_status.value
-    op.verification_status = VerificationStatus.changes_requested
+    op.verification_status = payload.status
     db.commit()
-    db.refresh(op)
     log_action(
         db,
         actor_id=admin.id,
@@ -865,10 +834,9 @@ def reject_owner_application(owner_id: str, admin: User = Depends(require_admin)
         target_type="owner_profile",
         target_id=owner_id,
         previous_value=previous,
-        new_value=VerificationStatus.changes_requested.value,
+        new_value=payload.status.value,
     )
-    user = db.get(User, owner_id)
-    return OwnerProfileOut(**_owner_fields(op, user))
+    return OwnerProfileOut(**_owner_fields(op, op.user))
 
 
 class OwnerSuspendPatch(BaseModel):
@@ -1380,4 +1348,5 @@ def _profile_fields(cp: ServiceProviderProfile) -> dict:
         payment_override_active=cp.payment_override_active,
         marketplace_status=cp.marketplace_status,
         created_at=cp.created_at,
+        **profile_state_fields(cp),
     )

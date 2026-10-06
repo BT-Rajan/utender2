@@ -62,6 +62,10 @@ class VerificationStatus(str, enum.Enum):
     pending_review = "pending_review"
     changes_requested = "changes_requested"
     approved = "approved"
+    # Final decision: the application was refused (with a recorded reason).
+    # Unlike changes_requested the person can't resubmit; an admin can
+    # reopen it through the verification-status override.
+    rejected = "rejected"
 
 
 class DocumentStatus(str, enum.Enum):
@@ -127,3 +131,5 @@ class NotificationType(str, enum.Enum):
     project_reactivated = "project_reactivated"
     offer_suspended = "offer_suspended"
     offer_reactivated = "offer_reactivated"
+    verification_changes_requested = "verification_changes_requested"
+    verification_rejected = "verification_rejected"

@@ -27,6 +27,12 @@ class ServiceProviderProfileOut(BaseModel):
     marketplace_status: str
     created_at: datetime
     email: str | None = None
+    # Step 4 lifecycle: not_started | incomplete | submitted | under_review |
+    # correction_required | approved | rejected (derived; verification_status
+    # stays the stored source of truth).
+    verification_state: str = "not_started"
+    verification_note: str | None = None
+    verification_submitted_at: datetime | None = None
 
 
 class ServiceProviderProfileUpdate(BaseModel):

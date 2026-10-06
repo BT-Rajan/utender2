@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import type { AdminProject, OwnerDocument, OwnerProfile } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { ApplicationDecisionControls, DocumentDecisionControls, type DocumentDecision } from "@/components/AdminReviewControls";
 import { StakeholderSummary, type Stakeholder } from "@/components/Stakeholder";
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
@@ -48,8 +49,11 @@ export function AdminOwnerDetailPage() {
   const onMutationError = (err: unknown, fallback: string) => setError(err instanceof ApiError ? err.detail : fallback);
 
   const reviewDocMutation = useMutation({
-    mutationFn: ({ requirementId, decision }: { requirementId: string; decision: "approved" | "rejected" }) =>
-      apiFetch("/admin/review/owner-documents", { method: "POST", body: { owner_id: id, requirement_id: requirementId, decision } }),
+    mutationFn: ({ requirementId, decision, note, expires_on }: { requirementId: string } & DocumentDecision) =>
+      apiFetch("/admin/review/owner-documents", {
+        method: "POST",
+        body: { owner_id: id, requirement_id: requirementId, decision, note: note ?? null, expires_on: expires_on ?? null },
+      }),
     onSuccess: invalidate,
     onError: (err) => onMutationError(err, t("admin.ownerDetail.docReviewError")),
   });
@@ -60,8 +64,9 @@ export function AdminOwnerDetailPage() {
     onError: (err) => onMutationError(err, t("admin.ownerDetail.approveError")),
   });
 
-  const rejectMutation = useMutation({
-    mutationFn: () => apiFetch(`/admin/review/owners/${id}/reject`, { method: "POST" }),
+  const applicationMutation = useMutation({
+    mutationFn: ({ action, note }: { action: "request-changes" | "reject"; note: string }) =>
+      apiFetch(`/admin/review/owners/${id}/${action}`, { method: "POST", body: { note: note || null } }),
     onSuccess: invalidate,
     onError: (err) => onMutationError(err, t("admin.ownerDetail.rejectError")),
   });
@@ -118,6 +123,11 @@ export function AdminOwnerDetailPage() {
                 <tr key={d.id} className="border-b border-border">
                   <td className="py-3">
                     <div className="font-display font-semibold text-[13.5px]">{d.requirement_name}</div>
+                    {d.url && (
+                      <a href={d.url} target="_blank" rel="noreferrer" className="text-[11.5px] text-navy underline">
+                        View document
+                      </a>
+                    )}
                     {d.admin_note && <div className="text-[11px] text-red">{d.admin_note}</div>}
                   </td>
                   <td className="py-3">
@@ -125,24 +135,11 @@ export function AdminOwnerDetailPage() {
                   </td>
                   <td className="py-3">
                     {d.status === "pending" && (
-                      <div className="flex gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => reviewDocMutation.mutate({ requirementId: d.requirement_id, decision: "approved" })}
-                          disabled={reviewDocMutation.isPending}
-                          className="bg-green-tint text-green text-xs font-semibold rounded px-2.5 py-1"
-                        >
-                          {t("admin.ownerDetail.approve")}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => reviewDocMutation.mutate({ requirementId: d.requirement_id, decision: "rejected" })}
-                          disabled={reviewDocMutation.isPending}
-                          className="bg-red-tint text-red text-xs font-semibold rounded px-2.5 py-1"
-                        >
-                          {t("admin.ownerDetail.reject")}
-                        </button>
-                      </div>
+                      <DocumentDecisionControls
+                        requiresExpiry={!!d.requirement_requires_expiry}
+                        pending={reviewDocMutation.isPending}
+                        onDecide={(decision) => reviewDocMutation.mutate({ requirementId: d.requirement_id, ...decision })}
+                      />
                     )}
                   </td>
                 </tr>
@@ -155,26 +152,16 @@ export function AdminOwnerDetailPage() {
         <div className="bg-white border border-border rounded px-5 py-4.5">
           <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-3">{t("admin.ownerDetail.applicationHeading")}</h3>
           <p className="text-[11.5px] text-steel-light mb-3">
-            {t("admin.ownerDetail.currentStatus")}: <span className="font-mono uppercase">{owner.verification_status.replace("_", " ")}</span>
+            {t("admin.ownerDetail.currentStatus")}: <span className="font-mono uppercase">{t(`verification.state_${owner.verification_state}`)}</span>
           </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => approveMutation.mutate()}
-              disabled={approveMutation.isPending || owner.verification_status === "approved"}
-              className="bg-navy hover:bg-navy-deep disabled:opacity-40 text-white text-xs font-semibold rounded px-4 py-2"
-            >
-              {t("admin.ownerDetail.approveApplication")}
-            </button>
-            <button
-              type="button"
-              onClick={() => rejectMutation.mutate()}
-              disabled={rejectMutation.isPending}
-              className="border border-red text-red text-xs font-semibold rounded px-4 py-2 disabled:opacity-40"
-            >
-              {t("admin.ownerDetail.requestChanges")}
-            </button>
-          </div>
+          {owner.verification_note && <p className="text-[12px] text-navy mb-3">{owner.verification_note}</p>}
+          <ApplicationDecisionControls
+            canApprove={owner.verification_status !== "approved" && documents.every((d) => !d.requirement_is_required || d.status === "approved")}
+            pending={approveMutation.isPending || applicationMutation.isPending}
+            onApprove={() => approveMutation.mutate()}
+            onRequestChanges={(note) => applicationMutation.mutate({ action: "request-changes", note })}
+            onReject={(note) => applicationMutation.mutate({ action: "reject", note })}
+          />
         </div>
 
         <div className="bg-white border border-border rounded px-5 py-4.5">
