@@ -9,6 +9,7 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { RequirementItemsView } from "@/components/RequirementItems";
 import { ClarificationsPanel } from "@/components/ClarificationsPanel";
 import { useI18n } from "@/i18n/I18nContext";
+import { formatWorkTiming } from "@/lib/dates";
 import { sortDocuments } from "@/lib/documents";
 import { formatArea } from "@/lib/location";
 
@@ -125,6 +126,7 @@ export function ServiceProviderOfferPage() {
           <div className="font-mono text-[11.5px] text-white/70 mt-0.5">
             {formatArea(t, project.governorate, project.area)}
             {project.address && ` — ${project.address}`} · {t("service_provider.offer.deadlineLabel")} {formatDeadline(project.bid_deadline)}
+            {formatWorkTiming(t, project) && ` · ${formatWorkTiming(t, project)}`}
           </div>
         </div>
         <span className="font-mono text-[10px] uppercase tracking-wide px-2.5 py-1 rounded-full bg-white/15">

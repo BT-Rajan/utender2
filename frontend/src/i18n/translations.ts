@@ -13,6 +13,26 @@ export interface Dictionary {
     optional: string;
     noDocuments: string;
   };
+  dates: {
+    heading: string;
+    responseHeading: string;
+    responseHint: string;
+    workHeading: string;
+    workHint: string;
+    start: string;
+    finishBy: string;
+    completion: string;
+    duration: string;
+    durationOr: string;
+    save: string;
+    saved: string;
+    saveError: string;
+    pastDeadline: string;
+    work: string;
+    from: string;
+    until: string;
+    days: string;
+  };
   documents: {
     drawing: string;
     boq: string;
@@ -686,6 +706,26 @@ export const en: Dictionary = {
     costLabel: "Cost",
     optional: "optional",
     noDocuments: "No documents are currently required.",
+  },
+  dates: {
+    heading: "Dates",
+    responseHeading: "Offer deadline",
+    responseHint: "When service providers must have submitted their offers. Offers are refused after this moment. In your local time.",
+    workHeading: "Expected work timing",
+    workHint: "When you expect the work itself to happen, so providers can check their availability. Optional; leave blank if it doesn't apply.",
+    start: "Expected start",
+    finishBy: "Finish by",
+    completion: "Expected completion date",
+    duration: "Duration (days)",
+    durationOr: "or",
+    save: "Save dates",
+    saved: "Saved",
+    saveError: "Could not save the dates.",
+    pastDeadline: "This deadline has passed. Set a future one before publishing.",
+    work: "Work",
+    from: "from {date}",
+    until: "until {date}",
+    days: "{n} days",
   },
   documents: {
     drawing: "Drawing",
@@ -1385,6 +1425,26 @@ export const ar: Dictionary = {
     costLabel: "التكلفة",
     optional: "اختياري",
     noDocuments: "لا توجد مستندات مطلوبة حاليًا.",
+  },
+  dates: {
+    heading: "التواريخ",
+    responseHeading: "الموعد النهائي لتقديم العروض",
+    responseHint: "الوقت الذي يجب أن يقدّم فيه مزوّدو الخدمات عروضهم. تُرفض العروض بعد هذه اللحظة. بتوقيتك المحلي.",
+    workHeading: "التوقيت المتوقع للعمل",
+    workHint: "متى تتوقع تنفيذ العمل نفسه، ليتمكن مزوّدو الخدمات من التحقق من توفرهم. اختياري؛ اتركه فارغًا إن لم ينطبق.",
+    start: "البدء المتوقع",
+    finishBy: "الانتهاء بحلول",
+    completion: "تاريخ الإنجاز المتوقع",
+    duration: "المدة (أيام)",
+    durationOr: "أو",
+    save: "حفظ التواريخ",
+    saved: "تم الحفظ",
+    saveError: "تعذر حفظ التواريخ.",
+    pastDeadline: "انقضى هذا الموعد. حدّد موعدًا مستقبليًا قبل النشر.",
+    work: "العمل",
+    from: "من {date}",
+    until: "حتى {date}",
+    days: "{n} يوم",
   },
   documents: {
     drawing: "مخطط",

@@ -1,9 +1,10 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import PricingBasis, ProjectStatus, TenderType
+from app.schemas.common import UTCDateTime
 
 
 class ProjectCreate(BaseModel):
@@ -44,7 +45,14 @@ class ProjectOut(BaseModel):
     area: str | None = None
     description: str | None
     trade: str | None
-    bid_deadline: datetime
+    # The one authoritative response deadline (enforced server-side by
+    # tender_lifecycle.bidding_is_open). Sent as UTC ("...Z").
+    bid_deadline: UTCDateTime
+    # Stage 3.7: when the owner expects the work to happen -- distinct from
+    # the response deadline above. All optional.
+    expected_start_date: date | None = None
+    expected_completion_date: date | None = None
+    expected_duration_days: int | None = None
     status: ProjectStatus
     tender_type: TenderType
     tender_type_locked: bool

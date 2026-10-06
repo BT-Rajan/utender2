@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiFetch, ApiError } from "@/api/client";
 import type { ProjectDetail, TenderType } from "@/api/types";
 import { useI18n } from "@/i18n/I18nContext";
+import { localInputToUtcIso } from "@/lib/dates";
 import { KUWAIT_GOVERNORATES } from "@/lib/location";
 
 export function OwnerProjectNewPage() {
@@ -29,6 +30,8 @@ export function OwnerProjectNewPage() {
       setError(t("owner.projectNew.validationError"));
       return;
     }
+    // datetime-local is the owner's local time; send the instant explicitly.
+    form.set("bid_deadline", localInputToUtcIso(form.get("bid_deadline") as string));
     form.set("tender_type", tenderType);
     form.set("status", status);
 

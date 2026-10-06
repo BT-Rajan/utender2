@@ -1,8 +1,8 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -28,7 +28,13 @@ class Project(Base):
     area: Mapped[str | None] = mapped_column(String(100), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     trade: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # The response deadline: the one authoritative closing time for offers.
     bid_deadline: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    # Stage 3.7: when the owner expects the work itself to happen (calendar
+    # dates, no time of day). Optional; a completion date or a duration.
+    expected_start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    expected_completion_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    expected_duration_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[ProjectStatus] = mapped_column(
         Enum(ProjectStatus, native_enum=True), nullable=False, default=ProjectStatus.open, index=True
     )

@@ -6,6 +6,7 @@ import type { ServiceProviderProfile, Project } from "@/api/types";
 import { formatDeadline, timeRemaining } from "@/lib/format";
 import { QueryError } from "@/components/QueryError";
 import { useI18n } from "@/i18n/I18nContext";
+import { formatWorkTiming } from "@/lib/dates";
 import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
 
 export function ServiceProviderFeedPage() {
@@ -128,7 +129,10 @@ export function ServiceProviderFeedPage() {
               <div className="flex justify-between items-start gap-2">
                 <div>
                   <h3 className="font-display font-semibold text-[16.5px] mb-0.5">{p.title}</h3>
-                  <p className="text-[12.5px] text-steel mb-3">{formatArea(t, p.governorate, p.area)}</p>
+                  <p className="text-[12.5px] text-steel mb-3">
+                    {formatArea(t, p.governorate, p.area)}
+                    {formatWorkTiming(t, p) && <span className="block text-[11.5px]">{formatWorkTiming(t, p)}</span>}
+                  </p>
                 </div>
                 {p.my_offer_status && (
                   <span className="font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-green-tint text-green whitespace-nowrap">

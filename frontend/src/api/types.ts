@@ -23,6 +23,11 @@ export interface Project {
   governorate: string | null;
   area: string | null;
   description: string | null;
+  // Stage 3.7: expected work timing (calendar dates, "YYYY-MM-DD"), separate
+  // from bid_deadline -- the response deadline, sent as UTC ("...Z").
+  expected_start_date: string | null;
+  expected_completion_date: string | null;
+  expected_duration_days: number | null;
   trade: string | null;
   bid_deadline: string;
   status: ProjectStatus;

@@ -10,6 +10,8 @@ import { RequirementItemsEditor, RequirementItemsView } from "@/components/Requi
 import { PageLoading } from "@/components/PageLoading";
 import { ClarificationsPanel } from "@/components/ClarificationsPanel";
 import { useI18n } from "@/i18n/I18nContext";
+import { formatWorkTiming } from "@/lib/dates";
+import { DraftDates } from "@/components/DraftDates";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
 import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
 
@@ -354,6 +356,7 @@ export function OwnerProjectDetailPage() {
       <ErrorBanner message={error} />
 
       {project.status === "draft" && <DraftDetailsForm project={project} />}
+      {project.status === "draft" && <DraftDates project={project} />}
       {project.status === "draft" && <RequirementItemsEditor project={project} />}
 
       {(project.status === "draft" ||
@@ -524,6 +527,7 @@ export function OwnerProjectDetailPage() {
             }`}
           >
             ⏱ {timeRemaining(project.bid_deadline)} — {new Date(project.bid_deadline).toLocaleString()}
+            {formatWorkTiming(t, project) && <div className="mt-1 text-steel">{formatWorkTiming(t, project)}</div>}
           </div>
           {project.description && (
             <div className="mt-4 text-sm text-steel">

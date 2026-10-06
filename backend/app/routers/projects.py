@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -70,6 +70,26 @@ def _check_scope_length(text: str | None) -> None:
         )
 
 
+MAX_DURATION_DAYS = 3650
+
+
+def _check_execution_timing(deadline: datetime, start: date | None, completion: date | None, duration: int | None) -> None:
+    """Stage 3.7: reject expected work timing that contradicts itself or the
+    response deadline. Work can't be expected to start (or finish) before
+    providers have even finished responding."""
+    if completion and duration:
+        raise HTTPException(status_code=400, detail="Give either an expected completion date or a duration, not both.")
+    if duration is not None and not 1 <= duration <= MAX_DURATION_DAYS:
+        raise HTTPException(status_code=400, detail=f"Duration must be between 1 and {MAX_DURATION_DAYS} days.")
+    if start and completion and completion < start:
+        raise HTTPException(status_code=400, detail="The expected completion date can't be before the expected start date.")
+    response_closes = deadline.date()
+    if start and start < response_closes:
+        raise HTTPException(status_code=400, detail="Work can't be expected to start before the response deadline.")
+    if completion and completion < response_closes:
+        raise HTTPException(status_code=400, detail="Work can't be expected to finish before the response deadline.")
+
+
 def _parse_bid_deadline(raw: str) -> datetime:
     """Parses an ISO 8601 deadline into the naive-UTC datetime this app stores
     everywhere (see `datetime.utcnow()` throughout). A value carrying an
@@ -97,6 +117,9 @@ async def create_project(
     description: str | None = Form(None),
     trade: str | None = Form(None),
     bid_deadline: str = Form(...),
+    expected_start_date: date | None = Form(None),
+    expected_completion_date: date | None = Form(None),
+    expected_duration_days: int | None = Form(None),
     tender_type: str = Form("owner_visible"),
     # Starting a requirement creates a draft unless the owner explicitly asks
     # to publish; a client that omits status must never publish by accident.
@@ -121,6 +144,7 @@ async def create_project(
     deadline = _parse_bid_deadline(bid_deadline)
     if status_value == ProjectStatus.open and deadline <= datetime.utcnow():
         raise HTTPException(status_code=400, detail="Bid deadline must be in the future.")
+    _check_execution_timing(deadline, expected_start_date, expected_completion_date, expected_duration_days)
 
     # Reject disallowed drawing types before anything is created.
     for f in drawings:
@@ -136,6 +160,9 @@ async def create_project(
         description=description or None,
         trade=trade or None,
         bid_deadline=deadline,
+        expected_start_date=expected_start_date,
+        expected_completion_date=expected_completion_date,
+        expected_duration_days=expected_duration_days,
         tender_type=tender_type_value,
         status=status_value,
     )
@@ -269,6 +296,15 @@ def amend_project(
         deadline_extended = new_deadline > project.bid_deadline
         changed.append("bid_deadline")
         project.bid_deadline = new_deadline
+
+    for field in ("expected_start_date", "expected_completion_date", "expected_duration_days"):
+        if field in payload.model_fields_set and getattr(payload, field) != getattr(project, field):
+            changed.append(field)
+            setattr(project, field, getattr(payload, field))
+    if changed:
+        _check_execution_timing(
+            project.bid_deadline, project.expected_start_date, project.expected_completion_date, project.expected_duration_days
+        )
 
     if not changed:
         raise HTTPException(status_code=400, detail="No changes were provided.")
@@ -593,6 +629,9 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
         description=project.description,
         trade=project.trade,
         bid_deadline=project.bid_deadline,
+        expected_start_date=project.expected_start_date,
+        expected_completion_date=project.expected_completion_date,
+        expected_duration_days=project.expected_duration_days,
         status=project.status,
         tender_type=project.tender_type,
         tender_type_locked=project.tender_type_locked,
