@@ -13,6 +13,40 @@ export interface Dictionary {
     optional: string;
     noDocuments: string;
   };
+  stakeholder: {
+    heading: string;
+    intro: string;
+    individual_owner: string;
+    individual_owner_hint: string;
+    organization_owner: string;
+    organization_owner_hint: string;
+    individual_service_provider: string;
+    individual_service_provider_hint: string;
+    organization_service_provider: string;
+    organization_service_provider_hint: string;
+    legalName: string;
+    position: string;
+    positionPlaceholder: string;
+    authorized: string;
+    save: string;
+    saving: string;
+    change: string;
+    saveError: string;
+    actingAs: string;
+    typeIndividual: string;
+    typeOrganization: string;
+    representative: string;
+    member: string;
+    yourRole: string;
+    locked: string;
+    mustEstablish: string;
+    notEstablished: string;
+    accountCreated: string;
+    established: string;
+    verified: string;
+    eligible: string;
+    adminHeading: string;
+  };
   pricing: { monthly: string; annual: string; perMonth: string; perYear: string; unavailable: string };
   header: { logOut: string; account: string };
   language: { label: string; en: string; ar: string };
@@ -552,6 +586,40 @@ export const en: Dictionary = {
     optional: "optional",
     noDocuments: "No documents are currently required.",
   },
+  stakeholder: {
+    heading: "Who does this account represent?",
+    intro: "Your login is always you personally. Tell us whether you use U-Tender for yourself or on behalf of an organization: verification and everything you do on the platform are recorded under that identity.",
+    individual_owner: "Myself",
+    individual_owner_hint: "I'm a landowner, project owner or buyer acting personally.",
+    organization_owner: "An organization",
+    organization_owner_hint: "A company, government body or other organization I'm authorized to act for.",
+    individual_service_provider: "Myself",
+    individual_service_provider_hint: "I provide services as an individual or sole trader.",
+    organization_service_provider: "A company",
+    organization_service_provider_hint: "A contracting or service company I'm authorized to act for.",
+    legalName: "Organization's legal name",
+    position: "Your position (optional)",
+    positionPlaceholder: "e.g. General Manager",
+    authorized: "I confirm I'm authorized to act on behalf of this organization.",
+    save: "Continue",
+    saving: "Saving…",
+    change: "Change",
+    saveError: "Could not save. Try again.",
+    actingAs: "Acting as",
+    typeIndividual: "Individual",
+    typeOrganization: "Organization",
+    representative: "Authorized representative",
+    member: "Member",
+    yourRole: "Your role",
+    locked: "This can't be changed while verification is under review or after it's approved.",
+    mustEstablish: "Answer \"Who does this account represent?\" above before submitting for review.",
+    notEstablished: "Not established yet",
+    accountCreated: "Account created",
+    established: "Identity established",
+    verified: "Verified",
+    eligible: "Eligible to participate",
+    adminHeading: "Represents",
+  },
   pricing: {
     monthly: "Monthly",
     annual: "Annual",
@@ -728,9 +796,9 @@ export const en: Dictionary = {
     },
     verify: {
       eyebrow: "Service provider · Account verification",
-      heading: "Verify your company",
+      heading: "Verify your account",
       description: "Submit the documents below so a site admin can activate your account.",
-      companyName: "Company name",
+      companyName: "Name shown to owners (trading name)",
       licenseNumber: "License number",
       document: "Document",
       statusCol: "Status",
@@ -1116,6 +1184,40 @@ export const ar: Dictionary = {
     optional: "اختياري",
     noDocuments: "لا توجد مستندات مطلوبة حاليًا.",
   },
+  stakeholder: {
+    heading: "من يمثّل هذا الحساب؟",
+    intro: "تسجيل الدخول يخصك أنت شخصيًا دائمًا. أخبرنا هل تستخدم U-Tender لنفسك أم نيابةً عن جهة: يتم التحقق من هذه الهوية وتُسجَّل باسمها كل أنشطتك على المنصة.",
+    individual_owner: "نفسي",
+    individual_owner_hint: "أنا مالك أرض أو صاحب مشروع أو مشترٍ أتصرف بصفتي الشخصية.",
+    organization_owner: "جهة",
+    organization_owner_hint: "شركة أو جهة حكومية أو أي جهة أخرى مخوّل بالتصرف نيابةً عنها.",
+    individual_service_provider: "نفسي",
+    individual_service_provider_hint: "أقدّم الخدمات بصفتي الفردية أو كتاجر فرد.",
+    organization_service_provider: "شركة",
+    organization_service_provider_hint: "شركة مقاولات أو خدمات مخوّل بالتصرف نيابةً عنها.",
+    legalName: "الاسم القانوني للجهة",
+    position: "منصبك (اختياري)",
+    positionPlaceholder: "مثال: المدير العام",
+    authorized: "أؤكد أنني مخوّل بالتصرف نيابةً عن هذه الجهة.",
+    save: "متابعة",
+    saving: "جارٍ الحفظ…",
+    change: "تغيير",
+    saveError: "تعذر الحفظ. حاول مرة أخرى.",
+    actingAs: "تتصرف بصفة",
+    typeIndividual: "فرد",
+    typeOrganization: "جهة",
+    representative: "الممثل المفوّض",
+    member: "عضو",
+    yourRole: "دورك",
+    locked: "لا يمكن تغيير ذلك أثناء مراجعة التحقق أو بعد اعتماده.",
+    mustEstablish: "أجب عن سؤال «من يمثّل هذا الحساب؟» أعلاه قبل الإرسال للمراجعة.",
+    notEstablished: "لم يُحدَّد بعد",
+    accountCreated: "تم إنشاء الحساب",
+    established: "تم تحديد الهوية",
+    verified: "تم التحقق",
+    eligible: "مؤهل للمشاركة",
+    adminHeading: "يمثّل",
+  },
   pricing: {
     monthly: "شهري",
     annual: "سنوي",
@@ -1292,9 +1394,9 @@ export const ar: Dictionary = {
     },
     verify: {
       eyebrow: "مزوّد خدمة · التحقق من الحساب",
-      heading: "تحقق من شركتك",
+      heading: "تحقق من حسابك",
       description: "قدّم المستندات أدناه ليتمكن مسؤول الموقع من تفعيل حسابك.",
-      companyName: "اسم الشركة",
+      companyName: "الاسم الظاهر للملاك (الاسم التجاري)",
       licenseNumber: "رقم الترخيص",
       document: "المستند",
       statusCol: "الحالة",

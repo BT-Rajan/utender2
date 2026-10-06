@@ -6,6 +6,8 @@ import type { AuditLogEntry, ServiceProviderProfile, PaymentOverrideRecord } fro
 import { stars } from "@/lib/format";
 import { DeleteServiceProviderForm } from "@/components/DeleteServiceProviderForm";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { StakeholderSummary, type Stakeholder } from "@/components/Stakeholder";
+import { useI18n } from "@/i18n/I18nContext";
 import { PageLoading } from "@/components/PageLoading";
 
 const STATUS_OPTIONS = ["incomplete", "pending_review", "changes_requested", "approved"] as const;
@@ -168,13 +170,14 @@ function ActivityLogPanel({ serviceProviderId }: { serviceProviderId: string }) 
 }
 
 export function AdminServiceProviderDetailPage() {
+  const { t } = useI18n();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data: detail } = useQuery({
     queryKey: ["admin-service-provider", id],
-    queryFn: () => apiFetch<{ service_provider: ServiceProviderProfile }>(`/admin/service-providers/${id}`),
+    queryFn: () => apiFetch<{ service_provider: ServiceProviderProfile; stakeholder: Stakeholder }>(`/admin/service-providers/${id}`),
     enabled: !!id,
   });
   const service_provider = detail?.service_provider;
@@ -242,6 +245,13 @@ export function AdminServiceProviderDetailPage() {
       </div>
 
       <ErrorBanner message={error} />
+
+      {detail?.stakeholder && (
+        <div className="bg-white border border-border rounded px-5 py-4.5 mb-6">
+          <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-3">{t("stakeholder.adminHeading")}</h3>
+          <StakeholderSummary stakeholder={detail.stakeholder} viewerIsAdmin />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-6 items-start">
         <form

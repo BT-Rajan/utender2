@@ -130,6 +130,9 @@ class Client:
         r = self.session.post(self._url(path), **kwargs)
         return r
 
+    def put(self, path: str, **kwargs):
+        return self.session.put(self._url(path), **kwargs)
+
     def get(self, path: str, **kwargs):
         return self.session.get(self._url(path), **kwargs)
 
@@ -160,6 +163,13 @@ def signup_or_login(base_url: str, email: str, full_name: str, role: str, compan
 
 
 def upload_and_submit(client: Client, requirements_path: str, upload_path_tmpl: str, submit_path: str, submit_payload: dict | None = None) -> None:
+    # Step 3: say who the account represents before verification. Seeded
+    # service providers are companies (organizations); owners are individuals.
+    if submit_payload and submit_payload.get("company_name"):
+        stakeholder = {"type": "organization", "legal_name": submit_payload["company_name"], "position": "General Manager", "authorized": True}
+    else:
+        stakeholder = {"type": "individual"}
+    expect_ok(client.put("/account/stakeholder", json=stakeholder), "establish who the account represents")
     r = client.get(requirements_path)
     r.raise_for_status()
     for req in r.json():

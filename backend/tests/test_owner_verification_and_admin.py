@@ -124,7 +124,10 @@ def test_owner_blocked_from_posting_until_approved_then_unblocked():
         assert r.status_code == 200, r.text
         assert r.json()["status"] == "pending"
 
-    # Submit for review.
+    # Submit for review -- refused until the account says who it represents.
+    r = owner_client.post("/owner/submit-for-review")
+    assert r.status_code == 400, r.text
+    assert owner_client.put("/account/stakeholder", json={"type": "individual"}).status_code == 200
     r = owner_client.post("/owner/submit-for-review")
     assert r.status_code == 200
     assert r.json()["verification_status"] == "pending_review"
@@ -187,6 +190,7 @@ def test_admin_document_rejection_reopens_owner_for_changes():
     reqs = owner_client.get("/owner/requirements").json()
     for req in reqs:
         owner_client.post(f"/owner/documents/{req['id']}/upload", files={"file": ("doc.pdf", b"x", "application/pdf")})
+    owner_client.put("/account/stakeholder", json={"type": "individual"})
     owner_client.post("/owner/submit-for-review")
 
     from app.models.owner import OwnerProfile

@@ -19,7 +19,6 @@ interface SignupPayload {
   password: string;
   full_name: string;
   role: "owner" | "service_provider";
-  company_name?: string;
 }
 
 interface AuthContextValue {

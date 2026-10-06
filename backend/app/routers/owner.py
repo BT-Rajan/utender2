@@ -23,6 +23,7 @@ from app.services.audit import log_action
 from app.services.email import notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify
+from app.services.stakeholder import require_established
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import is_sealed_and_open, lock_project, sync_expired_projects
 
@@ -491,6 +492,7 @@ async def upload_owner_document(
 
 @router.post("/submit-for-review", response_model=OwnerProfileOut)
 def owner_submit_for_review(user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    require_established(get_owner_profile(user, db))
     docs = (
         db.query(OwnerDocument, DocumentRequirement)
         .join(DocumentRequirement, OwnerDocument.requirement_id == DocumentRequirement.id)

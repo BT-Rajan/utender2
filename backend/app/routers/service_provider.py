@@ -16,6 +16,7 @@ from app.schemas.service_provider import ServiceProviderProfileOut, MyBidOut, Su
 from app.schemas.document import ServiceProviderDocumentOut, DocumentRequirementOut
 from app.schemas.project import ProjectOut
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
+from app.services.stakeholder import require_established
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import sync_expired_projects
 
@@ -212,6 +213,7 @@ async def upload_document(
 
 @router.post("/submit-for-review", response_model=ServiceProviderProfileOut)
 def submit_for_review(payload: SubmitForReview, user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
+    require_established(get_service_provider_profile(user, db))
     docs = (
         db.query(ServiceProviderDocument, DocumentRequirement)
         .join(DocumentRequirement, ServiceProviderDocument.requirement_id == DocumentRequirement.id)

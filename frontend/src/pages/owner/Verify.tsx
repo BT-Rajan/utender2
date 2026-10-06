@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import type { DocumentRequirement, OwnerDocument } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { StakeholderSection, useIdentity } from "@/components/Stakeholder";
 import { useI18n } from "@/i18n/I18nContext";
 import { useState } from "react";
 
@@ -39,6 +40,9 @@ export function OwnerVerifyPage() {
     onSuccess: () => navigate("/owner/status"),
   });
 
+  const { data: identity } = useIdentity();
+  const established = !!identity?.stakeholder?.status.stakeholder_established;
+
   const statusFor = (requirementId: string) => docs?.find((d) => d.requirement_id === requirementId)?.status ?? "not_submitted";
 
   async function handleSubmit(e: React.FormEvent) {
@@ -56,6 +60,8 @@ export function OwnerVerifyPage() {
       <span className="font-mono text-[11px] uppercase tracking-widest text-amber-dark block mb-2">{t("owner.verify.eyebrow")}</span>
       <h1 className="font-display text-2xl font-semibold text-navy mb-2">{t("owner.verify.heading")}</h1>
       <p className="text-sm text-steel mb-8">{t("owner.verify.description")}</p>
+
+      <StakeholderSection />
 
       <ErrorBanner message={error} />
 
@@ -101,11 +107,12 @@ export function OwnerVerifyPage() {
 
         <button
           type="submit"
-          disabled={submitMutation.isPending}
+          disabled={submitMutation.isPending || !established}
           className="mt-4 bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 w-fit"
         >
           {submitMutation.isPending ? t("owner.verify.submitting") : t("owner.verify.submit")}
         </button>
+        {identity && !established && <p className="text-xs text-amber-dark">{t("stakeholder.mustEstablish")}</p>}
       </form>
     </main>
   );

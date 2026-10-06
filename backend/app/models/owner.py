@@ -4,7 +4,7 @@ from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
-from app.models.enums import VerificationStatus
+from app.models.enums import StakeholderType, VerificationStatus
 
 
 # Mirrors ServiceProviderProfile's shape for the parts that apply to owners too
@@ -20,8 +20,18 @@ class OwnerProfile(Base):
         Enum(VerificationStatus, native_enum=True), nullable=False, default=VerificationStatus.incomplete
     )
     is_suspended: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Step 3 stakeholder identity. This profile is the marketplace actor for
+    # its side (it owns the verification state, and every project/offer/
+    # review points at it); stakeholder_type says whether it represents the
+    # person themselves or an organization, and organization_id which one.
+    # NULL stakeholder_type = account created, stakeholder not yet established.
+    stakeholder_type: Mapped[StakeholderType | None] = mapped_column(Enum(StakeholderType, native_enum=True), nullable=True)
+    organization_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=True, unique=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
+    organization = relationship("Organization")
     user = relationship("User", back_populates="owner_profile")
 
     # THE single source of truth for whether this owner may post/manage

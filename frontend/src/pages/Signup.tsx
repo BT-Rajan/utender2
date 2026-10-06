@@ -70,15 +70,6 @@ function RoleFields({
         </div>
       )}
 
-      {role === "service_provider" && (
-        <div>
-          <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
-            {t("auth.signup.companyName")}
-          </label>
-          <input name="company_name" required className="w-full border border-border rounded px-3 py-2.5 text-sm" />
-          <p className="text-xs text-steel-light mt-1">{t("auth.signup.companyNameHint")}</p>
-        </div>
-      )}
     </>
   );
 }
@@ -119,7 +110,6 @@ export function SignupPage() {
         password: form.get("password") as string,
         full_name: form.get("full_name") as string,
         role,
-        company_name: (form.get("company_name") as string) || undefined,
       });
       // Route by the role the backend persisted, not by what this form sent.
       navigate(me.role === "owner" ? "/owner/verify" : "/service-provider/verify");

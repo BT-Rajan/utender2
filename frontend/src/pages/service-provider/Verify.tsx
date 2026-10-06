@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
-import type { ServiceProviderDocument, DocumentRequirement } from "@/api/types";
+import type { ServiceProviderDocument, DocumentRequirement, ServiceProviderProfile } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { StakeholderSection, useIdentity } from "@/components/Stakeholder";
 import { useI18n } from "@/i18n/I18nContext";
 
 export function ServiceProviderVerifyPage() {
@@ -13,6 +14,16 @@ export function ServiceProviderVerifyPage() {
   const [companyName, setCompanyName] = useState("");
   const [licenseNumber, setLicenseNumber] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const { data: profile } = useQuery({
+    queryKey: ["service-provider-profile"],
+    queryFn: () => apiFetch<ServiceProviderProfile>("/service-provider/profile"),
+  });
+  useEffect(() => {
+    if (!profile) return;
+    setCompanyName(profile.company_name ?? "");
+    setLicenseNumber(profile.license_number ?? "");
+  }, [profile]);
 
   const { data: requirements } = useQuery({
     queryKey: ["service-provider-requirements"],
@@ -41,6 +52,9 @@ export function ServiceProviderVerifyPage() {
     onSuccess: () => navigate("/service-provider/status"),
   });
 
+  const { data: identity } = useIdentity();
+  const established = !!identity?.stakeholder?.status.stakeholder_established;
+
   const statusFor = (requirementId: string) => docs?.find((d) => d.requirement_id === requirementId)?.status ?? "not_submitted";
 
   async function handleSubmit(e: React.FormEvent) {
@@ -58,6 +72,8 @@ export function ServiceProviderVerifyPage() {
       <span className="font-mono text-[11px] uppercase tracking-widest text-amber-dark block mb-2">{t("service_provider.verify.eyebrow")}</span>
       <h1 className="font-display text-2xl font-semibold text-navy mb-2">{t("service_provider.verify.heading")}</h1>
       <p className="text-sm text-steel mb-8">{t("service_provider.verify.description")}</p>
+
+      <StakeholderSection />
 
       <ErrorBanner message={error} />
 
@@ -121,11 +137,12 @@ export function ServiceProviderVerifyPage() {
 
         <button
           type="submit"
-          disabled={submitMutation.isPending}
+          disabled={submitMutation.isPending || !established}
           className="mt-4 bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 w-fit"
         >
           {submitMutation.isPending ? t("service_provider.verify.submitting") : t("service_provider.verify.submit")}
         </button>
+        {identity && !established && <p className="text-xs text-amber-dark">{t("stakeholder.mustEstablish")}</p>}
       </form>
     </main>
   );

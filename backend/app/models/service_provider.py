@@ -5,7 +5,7 @@ from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, Numeric, St
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
-from app.models.enums import SubscriptionStatus, VerificationStatus
+from app.models.enums import StakeholderType, SubscriptionStatus, VerificationStatus
 
 
 class ServiceProviderProfile(Base):
@@ -20,6 +20,15 @@ class ServiceProviderProfile(Base):
         Enum(VerificationStatus, native_enum=True), nullable=False, default=VerificationStatus.incomplete
     )
     is_suspended: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Step 3 stakeholder identity. This profile is the marketplace actor for
+    # its side (it owns the verification state, and every project/offer/
+    # review points at it); stakeholder_type says whether it represents the
+    # person themselves or an organization, and organization_id which one.
+    # NULL stakeholder_type = account created, stakeholder not yet established.
+    stakeholder_type: Mapped[StakeholderType | None] = mapped_column(Enum(StakeholderType, native_enum=True), nullable=True)
+    organization_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=True, unique=True
+    )
     avg_rating: Mapped[Decimal] = mapped_column(Numeric(2, 1), default=Decimal("0"))
     review_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -37,6 +46,7 @@ class ServiceProviderProfile(Base):
     payment_override_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
+    organization = relationship("Organization")
     user = relationship("User", back_populates="service_provider_profile")
 
     @property

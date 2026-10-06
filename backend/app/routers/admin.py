@@ -34,6 +34,7 @@ from app.schemas.document import (
 )
 from app.schemas.owner import OwnerProfileOut
 from app.services.audit import log_action
+from app.services.stakeholder import describe as describe_stakeholder
 from app.services.notify import notify
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import is_sealed_and_open, lock_project
@@ -152,6 +153,7 @@ def review_queue(db: Session = Depends(get_db)):
         result.append(
             {
                 "service_provider": ServiceProviderProfileOut(**_profile_fields(cp), email=None),
+                "stakeholder": describe_stakeholder(cp, cp.user, db),
                 "documents": [
                     {
                         **ServiceProviderDocumentOut(
@@ -343,6 +345,7 @@ def service_provider_detail(service_provider_id: str, db: Session = Depends(get_
     )
     return {
         "service_provider": ServiceProviderProfileOut(**_profile_fields(cp), email=user.email if user else None),
+        "stakeholder": describe_stakeholder(cp, user, db) if user else None,
         "documents": [
             ServiceProviderDocumentOut(
                 id=d.id,
@@ -768,6 +771,7 @@ def owner_detail(owner_id: str, db: Session = Depends(get_db)):
     project_count = db.query(Project).filter(Project.owner_id == owner_id).count()
     return {
         "owner": OwnerProfileOut(**_owner_fields(op, user), project_count=project_count),
+        "stakeholder": describe_stakeholder(op, user, db),
         "documents": _owner_documents(db, owner_id),
     }
 

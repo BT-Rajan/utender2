@@ -7,6 +7,22 @@ class UserRole(str, enum.Enum):
     admin = "admin"
 
 
+# Who a registered account represents in the marketplace (Step 3). Unset
+# until the person says so after signup: account created != stakeholder
+# established.
+class StakeholderType(str, enum.Enum):
+    individual = "individual"
+    organization = "organization"
+
+
+# A person's authority within an organization. admin = an authorized
+# representative who may act for, and manage, the organization's account;
+# member = belongs to it without that authority.
+class MembershipRole(str, enum.Enum):
+    admin = "admin"
+    member = "member"
+
+
 class Language(str, enum.Enum):
     en = "en"
     ar = "ar"

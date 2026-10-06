@@ -85,8 +85,8 @@ DEFAULT_CMS: dict[str, dict[str, str]] = {
         "ar": "لديك متطلب وتريد استلام العروض. مجاني — سترفع مستندات التحقق في الخطوة التالية.",
     },
     "signup_provider_hint": {
-        "en": "You want to find requirements and submit offers. You'll verify your company next; submitting offers needs a paid subscription.",
-        "ar": "تريد إيجاد المتطلبات وتقديم العروض. ستتحقق من شركتك في الخطوة التالية؛ تقديم العروض يتطلب اشتراكًا مدفوعًا.",
+        "en": "You want to find requirements and submit offers. Next you'll tell us whether you work as an individual or for a company, and verify it; submitting offers needs a paid subscription.",
+        "ar": "تريد إيجاد المتطلبات وتقديم العروض. ستخبرنا بعد ذلك هل تعمل بصفتك الفردية أم لصالح شركة، ثم تتحقق من ذلك؛ تقديم العروض يتطلب اشتراكًا مدفوعًا.",
     },
 }
 
