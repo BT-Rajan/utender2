@@ -1,5 +1,5 @@
 """Seeds a running U-Tender instance with realistic Kuwait-flavored demo
-data: owners, contractors, projects, and offers covering every lifecycle
+data: owners, service providers, projects, and offers covering every lifecycle
 state and admin-moderation feature built into the app, so there's
 something real to click through immediately after a deploy.
 
@@ -41,9 +41,9 @@ OWNERS = [
     {"email": "owner.almutairi@example.com", "full_name": "Sara Al-Mutairi", "approve": False},  # left pending
 ]
 
-CONTRACTORS = [
+SERVICE_PROVIDERS = [
     {
-        "email": "contractor.diyar@example.com",
+        "email": "service_provider.diyar@example.com",
         "full_name": "Ahmad Al-Fadhli",
         "company_name": "Al Diyar General Trading & Contracting Co. W.L.L.",
         "primary_trade": "General Contracting",
@@ -51,7 +51,7 @@ CONTRACTORS = [
         "status": "active",
     },
     {
-        "email": "contractor.gulfmep@example.com",
+        "email": "service_provider.gulfmep@example.com",
         "full_name": "Bader Al-Enezi",
         "company_name": "Gulf Coast MEP Contracting Co.",
         "primary_trade": "MEP (Mechanical/Electrical/Plumbing)",
@@ -59,7 +59,7 @@ CONTRACTORS = [
         "status": "active",
     },
     {
-        "email": "contractor.desertrose@example.com",
+        "email": "service_provider.desertrose@example.com",
         "full_name": "Talal Al-Shammari",
         "company_name": "Desert Rose Landscaping & Civil Works",
         "primary_trade": "Landscaping",
@@ -67,7 +67,7 @@ CONTRACTORS = [
         "status": "active",
     },
     {
-        "email": "contractor.manara@example.com",
+        "email": "service_provider.manara@example.com",
         "full_name": "Nasser Al-Otaibi",
         "company_name": "Al Manara Finishing & Interiors",
         "primary_trade": "Finishing & Interior Fit-Out",
@@ -75,7 +75,7 @@ CONTRACTORS = [
         "status": "active",
     },
     {
-        "email": "contractor.bahar@example.com",
+        "email": "service_provider.bahar@example.com",
         "full_name": "Khaled Al-Dosari",
         "company_name": "Al Bahar Interiors W.L.L.",
         "primary_trade": "Finishing & Interior Fit-Out",
@@ -83,7 +83,7 @@ CONTRACTORS = [
         "status": "pending",  # left pending for the admin review queue
     },
     {
-        "email": "contractor.national@example.com",
+        "email": "service_provider.national@example.com",
         "full_name": "Salem Al-Kandari",
         "company_name": "National Construction Group",
         "primary_trade": "Civil Works",
@@ -196,7 +196,7 @@ def main() -> None:
         sys.exit(1)
     log(f"logged in as admin ({args.admin_email})")
 
-    step("Contractor document requirements")
+    step("ServiceProvider document requirements")
     existing = {r["name"] for r in admin.get("/admin/requirements").json()}
     for name, desc in [
         ("Commercial License", "Kuwait Municipality commercial license for the contracting company."),
@@ -204,10 +204,10 @@ def main() -> None:
     ]:
         if name not in existing:
             expect_ok(
-                admin.post("/admin/requirements", json={"name": name, "description": desc, "is_required": True, "applies_to": "contractor"}),
+                admin.post("/admin/requirements", json={"name": name, "description": desc, "is_required": True, "applies_to": "service_provider"}),
                 f"add requirement {name}",
             )
-            log(f"added contractor requirement: {name}")
+            log(f"added service provider requirement: {name}")
         else:
             log(f"requirement already exists: {name}")
 
@@ -225,26 +225,26 @@ def main() -> None:
         else:
             log(f"left {o['full_name']} pending review (for the admin queue)")
 
-    step("Contractors")
-    contractor_clients: dict[str, Client] = {}
-    for cinfo in CONTRACTORS:
-        c = signup_or_login(args.api_url, cinfo["email"], cinfo["full_name"], "contractor", cinfo["company_name"])
-        contractor_clients[cinfo["email"]] = c
-        contractor_id = c.get("/auth/me").json()["id"]
+    step("ServiceProviders")
+    service_provider_clients: dict[str, Client] = {}
+    for cinfo in SERVICE_PROVIDERS:
+        c = signup_or_login(args.api_url, cinfo["email"], cinfo["full_name"], "service_provider", cinfo["company_name"])
+        service_provider_clients[cinfo["email"]] = c
+        service_provider_id = c.get("/auth/me").json()["id"]
         upload_and_submit(
-            c, "/contractor/requirements", "/contractor/documents/{id}/upload", "/contractor/submit-for-review",
+            c, "/service-provider/requirements", "/service-provider/documents/{id}/upload", "/service-provider/submit-for-review",
             submit_payload={"company_name": cinfo["company_name"]},
         )
         if cinfo["status"] in ("active", "suspended"):
-            approve_all_documents(admin, contractor_id, f"/admin/contractors/{contractor_id}", "/admin/review/documents", "contractor_id")
-            expect_ok(admin.post(f"/admin/review/contractors/{contractor_id}/approve"), f"approve contractor {cinfo['company_name']}")
+            approve_all_documents(admin, service_provider_id, f"/admin/service-providers/{service_provider_id}", "/admin/review/documents", "service_provider_id")
+            expect_ok(admin.post(f"/admin/review/service-providers/{service_provider_id}/approve"), f"approve service provider {cinfo['company_name']}")
             expect_ok(
-                admin.post(f"/admin/contractors/{contractor_id}/payment-override", json={"reason": "Kuwait demo dataset -- marketplace access without a real subscription."}),
+                admin.post(f"/admin/service-providers/{service_provider_id}/payment-override", json={"reason": "Kuwait demo dataset -- marketplace access without a real subscription."}),
                 f"grant payment override to {cinfo['company_name']}",
             )
             expect_ok(
                 admin.patch(
-                    f"/admin/contractors/{contractor_id}",
+                    f"/admin/service-providers/{service_provider_id}",
                     json={
                         "company_name": cinfo["company_name"],
                         "license_number": None,
@@ -252,12 +252,12 @@ def main() -> None:
                         "service_area": cinfo["service_area"],
                     },
                 ),
-                f"update contractor profile for {cinfo['company_name']}",
+                f"update service provider profile for {cinfo['company_name']}",
             )
-            log(f"approved + activated contractor {cinfo['company_name']}")
+            log(f"approved + activated service provider {cinfo['company_name']}")
             if cinfo["status"] == "suspended":
-                expect_ok(admin.post(f"/admin/contractors/{contractor_id}/suspend", json={"suspended": True}), f"suspend contractor {cinfo['company_name']}")
-                log(f"suspended contractor {cinfo['company_name']} (demo state)")
+                expect_ok(admin.post(f"/admin/service-providers/{service_provider_id}/suspend", json={"suspended": True}), f"suspend service provider {cinfo['company_name']}")
+                log(f"suspended service provider {cinfo['company_name']} (demo state)")
         else:
             log(f"left {cinfo['company_name']} pending review (for the admin queue)")
 
@@ -268,10 +268,10 @@ def main() -> None:
     owner_b = owner_clients[OWNERS[1]["email"]]  # Al-Rashidi
     owner_c = owner_clients[OWNERS[2]["email"]]  # Al-Azmi
 
-    c_diyar = contractor_clients["contractor.diyar@example.com"]
-    c_gulfmep = contractor_clients["contractor.gulfmep@example.com"]
-    c_desertrose = contractor_clients["contractor.desertrose@example.com"]
-    c_manara = contractor_clients["contractor.manara@example.com"]
+    c_diyar = service_provider_clients["service_provider.diyar@example.com"]
+    c_gulfmep = service_provider_clients["service_provider.gulfmep@example.com"]
+    c_desertrose = service_provider_clients["service_provider.desertrose@example.com"]
+    c_manara = service_provider_clients["service_provider.manara@example.com"]
 
     def create_project(owner: Client, title: str, address: str, description: str, trade: str, days: int, tender_type: str = "owner_visible", status: str = "open") -> str:
         r = owner.post(
@@ -340,8 +340,8 @@ def main() -> None:
     )
     log("open, will be admin-suspended (demo state): Diwaniya Renovation — Andalous")
 
-    def submit_offer(contractor: Client, project_id: str, amount: str, timeline: str, message: str) -> str:
-        r = contractor.post(f"/projects/{project_id}/offers", json={"amount": amount, "timeline_estimate": timeline, "message": message})
+    def submit_offer(service_provider: Client, project_id: str, amount: str, timeline: str, message: str) -> str:
+        r = service_provider.post(f"/projects/{project_id}/offers", json={"amount": amount, "timeline_estimate": timeline, "message": message})
         r.raise_for_status()
         return r.json()["id"]
 
@@ -380,7 +380,7 @@ def main() -> None:
     expect_ok(owner_a.post(f"/owner/projects/{p_facade}/offers/{o_facade_winner}/approve"), "award facade project")
     manara_id = c_manara.get("/auth/me").json()["id"]
     expect_ok(
-        owner_a.post("/owner/reviews", json={"project_id": p_facade, "contractor_id": manara_id, "rating": 5, "comment": "Excellent work, finished ahead of schedule."}),
+        owner_a.post("/owner/reviews", json={"project_id": p_facade, "service_provider_id": manara_id, "rating": 5, "comment": "Excellent work, finished ahead of schedule."}),
         "submit review for facade project",
     )
     log("Commercial Building Facade — awarded to Al Manara Finishing & Interiors, review submitted")
@@ -391,7 +391,7 @@ def main() -> None:
 
     step("Admin moderation demo state")
     expect_ok(admin.post(f"/admin/projects/{p_diwaniya}/suspend", json={"suspended": True}), "suspend diwaniya project")
-    log("Diwaniya Renovation — suspended by admin (hidden from contractor feed)")
+    log("Diwaniya Renovation — suspended by admin (hidden from service provider feed)")
     expect_ok(admin.post(f"/admin/offers/{o_mosque_1}/suspend", json={"suspended": True}), "suspend mosque offer")
     log("Gulf Coast MEP's offer on the Mosque project — suspended by admin")
 
@@ -402,9 +402,9 @@ def main() -> None:
     print("Sample logins:")
     print(f"  Owner (approved):      {OWNERS[0]['email']}")
     print(f"  Owner (pending):       {OWNERS[3]['email']}")
-    print(f"  Contractor (active):   {CONTRACTORS[0]['email']}")
-    print(f"  Contractor (pending):  {CONTRACTORS[4]['email']}")
-    print(f"  Contractor (suspended):{CONTRACTORS[5]['email']}")
+    print(f"  Service provider (active):   {SERVICE_PROVIDERS[0]['email']}")
+    print(f"  Service provider (pending):  {SERVICE_PROVIDERS[4]['email']}")
+    print(f"  Service provider (suspended):{SERVICE_PROVIDERS[5]['email']}")
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ from app.auth.security import (
 from app.config import get_settings
 from app.db import get_db
 from app.deps import get_current_user
-from app.models.contractor import ContractorProfile
+from app.models.service_provider import ServiceProviderProfile
 from app.models.enums import AuthTokenType, UserRole
 from app.models.owner import OwnerProfile
 from app.models.revoked_token import RevokedToken
@@ -77,7 +77,7 @@ def _revoke_refresh_token(db: Session, refresh_token: str | None) -> None:
 
 @router.post("/signup", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 def signup(payload: SignupRequest, response: Response, db: Session = Depends(get_db)):
-    if payload.role not in (UserRole.owner, UserRole.contractor):
+    if payload.role not in (UserRole.owner, UserRole.service_provider):
         raise HTTPException(status_code=400, detail="Only owner or service provider accounts can self-register.")
 
     email = payload.email.strip().lower()
@@ -95,9 +95,9 @@ def signup(payload: SignupRequest, response: Response, db: Session = Depends(get
     db.add(user)
     db.flush()  # assigns user.id without committing yet
 
-    if payload.role == UserRole.contractor:
+    if payload.role == UserRole.service_provider:
         company_name = payload.company_name or payload.full_name
-        db.add(ContractorProfile(user_id=user.id, company_name=company_name))
+        db.add(ServiceProviderProfile(user_id=user.id, company_name=company_name))
         db.flush()
         ensure_document_rows(db, user.id)
     elif payload.role == UserRole.owner:

@@ -12,7 +12,7 @@ export function AdminRequirementsPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isRequired, setIsRequired] = useState(true);
-  const [scopeFilter, setScopeFilter] = useState<"contractor" | "owner">("contractor");
+  const [scopeFilter, setScopeFilter] = useState<"service_provider" | "owner">("service_provider");
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string; name: string; description: string } | null>(null);
 
@@ -81,10 +81,10 @@ export function AdminRequirementsPage() {
       <div className="inline-flex border border-navy rounded-full overflow-hidden mb-6">
         <button
           type="button"
-          onClick={() => setScopeFilter("contractor")}
-          className={`font-mono text-xs px-4 py-1.5 uppercase tracking-wide ${scopeFilter === "contractor" ? "bg-navy text-white" : "bg-white text-navy"}`}
+          onClick={() => setScopeFilter("service_provider")}
+          className={`font-mono text-xs px-4 py-1.5 uppercase tracking-wide ${scopeFilter === "service_provider" ? "bg-navy text-white" : "bg-white text-navy"}`}
         >
-          {t("admin.requirements.forContractors")}
+          {t("admin.requirements.forServiceProviders")}
         </button>
         <button
           type="button"
@@ -202,7 +202,7 @@ export function AdminRequirementsPage() {
           <input type="checkbox" checked={isRequired} onChange={(e) => setIsRequired(e.target.checked)} /> {t("admin.requirements.required")}
         </label>
         <button type="submit" className="bg-navy hover:bg-navy-deep text-white text-xs font-semibold rounded px-3 py-2 whitespace-nowrap">
-          {scopeFilter === "owner" ? t("admin.requirements.addForOwners") : t("admin.requirements.addForContractors")}
+          {scopeFilter === "owner" ? t("admin.requirements.addForOwners") : t("admin.requirements.addForServiceProviders")}
         </button>
       </form>
     </main>

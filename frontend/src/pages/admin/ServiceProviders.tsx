@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/api/client";
-import type { ContractorProfile } from "@/api/types";
+import type { ServiceProviderProfile } from "@/api/types";
 import { stars } from "@/lib/format";
 import { QueryError } from "@/components/QueryError";
 
@@ -28,14 +28,14 @@ const MARKETPLACE_BADGE: Record<string, string> = {
   suspended: "bg-red-tint text-red",
 };
 
-export function AdminContractorsPage() {
+export function AdminServiceProvidersPage() {
   const {
-    data: contractors,
+    data: service_providers,
     isError,
     refetch,
   } = useQuery({
-    queryKey: ["admin-contractors"],
-    queryFn: () => apiFetch<ContractorProfile[]>("/admin/contractors"),
+    queryKey: ["admin-service-providers"],
+    queryFn: () => apiFetch<ServiceProviderProfile[]>("/admin/service-providers"),
   });
 
   return (
@@ -43,12 +43,12 @@ export function AdminContractorsPage() {
       <div className="mb-6">
         <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">Admin · Service providers</span>
         <h1 className="font-display text-2xl font-semibold text-navy mb-1">All service providers</h1>
-        <p className="text-[13.5px] text-steel">{contractors?.length ?? 0} total. Edit details, change verification status, suspend, or delete.</p>
+        <p className="text-[13.5px] text-steel">{service_providers?.length ?? 0} total. Edit details, change verification status, suspend, or delete.</p>
       </div>
 
       {isError ? (
         <QueryError onRetry={() => refetch()} />
-      ) : !contractors?.length ? (
+      ) : !service_providers?.length ? (
         <div className="border border-dashed border-border rounded p-10 text-center text-sm text-steel">No service providers have signed up yet.</div>
       ) : (
         <div className="overflow-x-auto">
@@ -63,7 +63,7 @@ export function AdminContractorsPage() {
             </tr>
           </thead>
           <tbody>
-            {contractors.map((c) => (
+            {service_providers.map((c) => (
               <tr key={c.user_id} className="border-b border-border">
                 <td className="py-3 px-2.5">
                   <div className="font-display font-semibold text-[13.5px]">{c.company_name}</div>
@@ -91,7 +91,7 @@ export function AdminContractorsPage() {
                 </td>
                 <td className="py-3 px-2.5">
                   <Link
-                    to={`/admin/contractors/${c.user_id}`}
+                    to={`/admin/service-providers/${c.user_id}`}
                     className="border border-navy text-navy hover:bg-navy hover:text-white text-xs font-semibold rounded px-3 py-1.5"
                   >
                     Manage

@@ -7,10 +7,10 @@ from app.db import Base
 from app.models.enums import VerificationStatus
 
 
-# Mirrors ContractorProfile's shape for the parts that apply to owners too
+# Mirrors ServiceProviderProfile's shape for the parts that apply to owners too
 # (document-backed verification + suspension) — owners have no payment/
 # subscription concept, so this is deliberately smaller than
-# ContractorProfile rather than a shared base class, to avoid dragging
+# ServiceProviderProfile rather than a shared base class, to avoid dragging
 # payment-gate fields onto a role that was never meant to have them.
 class OwnerProfile(Base):
     __tablename__ = "owner_profiles"
@@ -25,14 +25,14 @@ class OwnerProfile(Base):
     user = relationship("User", back_populates="owner_profile")
 
     # THE single source of truth for whether this owner may post/manage
-    # projects — mirrors ContractorProfile.is_verified_active. Never check
+    # projects — mirrors ServiceProviderProfile.is_verified_active. Never check
     # verification_status or is_suspended independently at a call site.
     @property
     def is_verified_active(self) -> bool:
         return self.verification_status == VerificationStatus.approved and not self.is_suspended
 
     # Human-facing lifecycle status, purely derived — same four
-    # document-flow states contractors have, minus the payment states
+    # document-flow states service providers have, minus the payment states
     # that don't apply to owners.
     @property
     def marketplace_status(self) -> str:

@@ -15,7 +15,7 @@ def test_pass6_admin_management():
 
 
     from app.auth.security import hash_password
-    from app.models.document import ContractorDocument, DocumentRequirement
+    from app.models.document import ServiceProviderDocument, DocumentRequirement
     from app.models.enums import DocumentStatus, UserRole
     from app.models.user import User
 
@@ -29,19 +29,19 @@ def test_pass6_admin_management():
     r = admin_client.post("/auth/login", json={"email": "admin@example.com", "password": "adminpass123"})
     check("admin login ok", r.status_code == 200)
 
-    contractor_client = TestClient(app)
-    r = contractor_client.post(
+    service_provider_client = TestClient(app)
+    r = service_provider_client.post(
         "/auth/signup",
         json={
-            "email": "contractor1@example.com",
+            "email": "service_provider1@example.com",
             "password": "password123",
-            "full_name": "Contractor",
-            "role": "contractor",
+            "full_name": "ServiceProvider",
+            "role": "service_provider",
             "company_name": "Acme Builders",
         },
     )
-    check("contractor signup ok", r.status_code == 201)
-    contractor_id = r.json()["id"]
+    check("service_provider signup ok", r.status_code == 201)
+    service_provider_id = r.json()["id"]
 
     # ---------- requirement created, then made required later ----------
     r = admin_client.post("/admin/requirements", json={"name": "Insurance certificate", "description": "Proof of liability coverage.", "is_required": False})
@@ -55,15 +55,15 @@ def test_pass6_admin_management():
     db.commit()
     original_effective_from = backdated.isoformat()
 
-    # contractor now has a not_submitted row for it (ensure_document_rows ran at signup for pre-existing reqs only —
+    # service provider now has a not_submitted row for it (ensure_document_rows ran at signup for pre-existing reqs only —
     # this one was created after signup, so it won't auto-exist; call the endpoint that lists active requirements to confirm it's visible)
-    r = contractor_client.get("/contractor/requirements")
-    check("new requirement visible to contractor", any(x["id"] == requirement_id for x in r.json()))
+    r = service_provider_client.get("/service-provider/requirements")
+    check("new requirement visible to service_provider", any(x["id"] == requirement_id for x in r.json()))
 
-    # Directly create + approve a ContractorDocument row for this requirement,
+    # Directly create + approve a ServiceProviderDocument row for this requirement,
     # submitted "in the past" relative to a later effective_from bump.
-    doc = ContractorDocument(
-        contractor_id=contractor_id,
+    doc = ServiceProviderDocument(
+        service_provider_id=service_provider_id,
         requirement_id=requirement_id,
         status=DocumentStatus.approved,
         submitted_at=datetime.utcnow() - timedelta(days=10),
@@ -80,10 +80,10 @@ def test_pass6_admin_management():
     new_effective_from = r.json()["effective_from"]
     check("effective_from bumped on optional->required transition", new_effective_from != original_effective_from)
 
-    r = admin_client.get(f"/admin/contractors/{contractor_id}")
+    r = admin_client.get(f"/admin/service-providers/{service_provider_id}")
     stale_doc = next(d for d in r.json()["documents"] if d["requirement_id"] == requirement_id)
     check(
-        "admin contractor detail exposes requirement_effective_from newer than submission",
+        "admin service provider detail exposes requirement_effective_from newer than submission",
         stale_doc["requirement_effective_from"] is not None
         and datetime.fromisoformat(stale_doc["requirement_effective_from"].replace("Z", "+00:00")).replace(tzinfo=None)
         > (doc.submitted_at),
@@ -103,7 +103,7 @@ def test_pass6_admin_management():
     r = admin_client.post(
         "/admin/review/documents",
         json={
-            "contractor_id": contractor_id,
+            "service_provider_id": service_provider_id,
             "requirement_id": requirement_id,
             "decision": "approved",
             "expires_on": "2027-06-01",
@@ -126,7 +126,7 @@ def test_pass6_admin_management():
 
 
     # ---------- review_queue no longer 500s (PASS5 regression caught + fixed in PASS6) ----------
-    cp = db.get(__import__("app.models.contractor", fromlist=["ContractorProfile"]).ContractorProfile, contractor_id)
+    cp = db.get(__import__("app.models.service_provider", fromlist=["ServiceProviderProfile"]).ServiceProviderProfile, service_provider_id)
     from app.models.enums import VerificationStatus
 
     cp.verification_status = VerificationStatus.pending_review
@@ -134,8 +134,8 @@ def test_pass6_admin_management():
 
     r = admin_client.get("/admin/review/queue")
     check("review queue endpoint returns 200 (was broken: missing required schema fields)", r.status_code == 200)
-    check("review queue contractor payload includes marketplace_status", "marketplace_status" in r.json()[0]["contractor"])
-    check("review queue contractor payload includes payment_override_active", "payment_override_active" in r.json()[0]["contractor"])
+    check("review queue service provider payload includes marketplace_status", "marketplace_status" in r.json()[0]["service_provider"])
+    check("review queue service provider payload includes payment_override_active", "payment_override_active" in r.json()[0]["service_provider"])
     check(
         "review queue document payload includes expires_on + requirement_effective_from",
         "expires_on" in r.json()[0]["documents"][0] and "requirement_effective_from" in r.json()[0]["documents"][0],
@@ -143,27 +143,27 @@ def test_pass6_admin_management():
 
 
     # ---------- audit log ----------
-    r = admin_client.post(f"/admin/contractors/{contractor_id}/suspend", json={"suspended": True})
+    r = admin_client.post(f"/admin/service-providers/{service_provider_id}/suspend", json={"suspended": True})
     check("suspend succeeds", r.status_code == 200)
-    r = admin_client.post(f"/admin/contractors/{contractor_id}/suspend", json={"suspended": False})
+    r = admin_client.post(f"/admin/service-providers/{service_provider_id}/suspend", json={"suspended": False})
     check("reactivate succeeds", r.status_code == 200)
 
-    r = admin_client.get(f"/admin/contractors/{contractor_id}/audit-log")
+    r = admin_client.get(f"/admin/service-providers/{service_provider_id}/audit-log")
     check("audit log endpoint returns 200", r.status_code == 200)
     actions = [row["action"] for row in r.json()]
-    check("audit log contains suspend action", "contractor.suspend" in actions)
-    check("audit log contains reactivate action", "contractor.reactivate" in actions)
+    check("audit log contains suspend action", "service_provider.suspend" in actions)
+    check("audit log contains reactivate action", "service_provider.reactivate" in actions)
     check("audit log contains requirement.made_required action", "requirement.made_required" in actions or True)  # target_type differs, see below
 
-    # requirement.made_required is logged against target_type="document_requirement", not contractor_profile,
-    # so it correctly does NOT show up in the per-contractor audit log above.
+    # requirement.made_required is logged against target_type="document_requirement", not service_provider_profile,
+    # so it correctly does NOT show up in the per-service-provider audit log above.
     check(
-        "requirement audit entries are NOT mixed into the contractor's log (different target_type)",
+        "requirement audit entries are NOT mixed into the service provider's log (different target_type)",
         "requirement.made_required" not in actions,
     )
 
     # non-admin cannot read audit log
-    r = contractor_client.get(f"/admin/contractors/{contractor_id}/audit-log")
+    r = service_provider_client.get(f"/admin/service-providers/{service_provider_id}/audit-log")
     check("non-admin blocked from audit log", r.status_code == 403)
 
 

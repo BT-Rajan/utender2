@@ -11,14 +11,14 @@ from app.models.enums import OfferStatus
 
 class Offer(Base):
     __tablename__ = "offers"
-    __table_args__ = (UniqueConstraint("project_id", "contractor_id", name="uq_project_contractor"),)
+    __table_args__ = (UniqueConstraint("project_id", "service_provider_id", name="uq_project_service_provider"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
     project_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    contractor_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("contractor_profiles.user_id", ondelete="CASCADE"), nullable=False, index=True
+    service_provider_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("service_provider_profiles.user_id", ondelete="CASCADE"), nullable=False, index=True
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     timeline_estimate: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -38,7 +38,7 @@ class Offer(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    contractor_profile = relationship("ContractorProfile")
+    service_provider_profile = relationship("ServiceProviderProfile")
 
 
 # Immutable log of every prior state of an Offer, written just before the

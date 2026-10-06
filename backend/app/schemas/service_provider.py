@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 from app.models.enums import OfferStatus, ProjectStatus, SubscriptionStatus, VerificationStatus
 
 
-class ContractorProfileOut(BaseModel):
+class ServiceProviderProfileOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     user_id: str
@@ -29,7 +29,7 @@ class ContractorProfileOut(BaseModel):
     email: str | None = None
 
 
-class ContractorProfileUpdate(BaseModel):
+class ServiceProviderProfileUpdate(BaseModel):
     company_name: str
     license_number: str | None = None
     primary_trade: str | None = None

@@ -19,7 +19,7 @@ class AwardRecord(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
     project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     offer_id: Mapped[str] = mapped_column(String(36), ForeignKey("offers.id"), nullable=False)
-    contractor_id: Mapped[str] = mapped_column(String(36), ForeignKey("contractor_profiles.user_id"), nullable=False)
+    service_provider_id: Mapped[str] = mapped_column(String(36), ForeignKey("service_provider_profiles.user_id"), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     project_revision: Mapped[int] = mapped_column(Integer, nullable=False)
     offer_revision: Mapped[int] = mapped_column(Integer, nullable=False)

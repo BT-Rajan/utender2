@@ -2,12 +2,12 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/api/client";
-import type { ContractorProfile, Project } from "@/api/types";
+import type { ServiceProviderProfile, Project } from "@/api/types";
 import { formatDeadline, timeRemaining } from "@/lib/format";
 import { QueryError } from "@/components/QueryError";
 import { useI18n } from "@/i18n/I18nContext";
 
-export function ContractorFeedPage() {
+export function ServiceProviderFeedPage() {
   const { t } = useI18n();
   const location = useLocation() as { state?: { notice?: string } };
   const [search, setSearch] = useState("");
@@ -15,13 +15,13 @@ export function ContractorFeedPage() {
   const [sort, setSort] = useState<"deadline" | "newest">("deadline");
 
   const { data: profile } = useQuery({
-    queryKey: ["contractor-profile"],
-    queryFn: () => apiFetch<ContractorProfile>("/contractor/profile"),
+    queryKey: ["service-provider-profile"],
+    queryFn: () => apiFetch<ServiceProviderProfile>("/service-provider/profile"),
   });
 
   const { data: trades } = useQuery({
-    queryKey: ["contractor-feed-trades"],
-    queryFn: () => apiFetch<string[]>("/contractor/feed/trades"),
+    queryKey: ["service-provider-feed-trades"],
+    queryFn: () => apiFetch<string[]>("/service-provider/feed/trades"),
   });
 
   const {
@@ -29,19 +29,19 @@ export function ContractorFeedPage() {
     isError,
     refetch,
   } = useQuery({
-    queryKey: ["contractor-feed", search, trade, sort],
+    queryKey: ["service-provider-feed", search, trade, sort],
     queryFn: () => {
       const params = new URLSearchParams();
       if (search.trim()) params.set("search", search.trim());
       if (trade) params.set("trade", trade);
       params.set("sort", sort);
-      return apiFetch<Project[]>(`/contractor/feed?${params.toString()}`);
+      return apiFetch<Project[]>(`/service-provider/feed?${params.toString()}`);
     },
   });
 
   // marketplace_status is the backend's single derived source of truth for
   // full access (verification approved AND — real subscription OR admin
-  // override), never the raw subscription_status alone: a contractor with
+  // override), never the raw subscription_status alone: a service provider with
   // an admin-granted payment override has no Stripe subscription at all,
   // but is fully active.
   const isSubscribed = profile?.marketplace_status === "verified_active";
@@ -50,9 +50,9 @@ export function ContractorFeedPage() {
   return (
     <main className="max-w-5xl mx-auto px-5 py-8">
       <div className="mb-6">
-        <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">{t("contractor.feed.eyebrow")}</span>
-        <h1 className="font-display text-2xl font-semibold text-navy mb-1">{t("contractor.feed.heading")}</h1>
-        <p className="text-[13.5px] text-steel">{sort === "newest" ? t("contractor.feed.sortedNewest") : t("contractor.feed.sortedClosest")}</p>
+        <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">{t("service_provider.feed.eyebrow")}</span>
+        <h1 className="font-display text-2xl font-semibold text-navy mb-1">{t("service_provider.feed.heading")}</h1>
+        <p className="text-[13.5px] text-steel">{sort === "newest" ? t("service_provider.feed.sortedNewest") : t("service_provider.feed.sortedClosest")}</p>
       </div>
 
       {location.state?.notice && (
@@ -61,9 +61,9 @@ export function ContractorFeedPage() {
 
       {!isSubscribed && (
         <div className="bg-blue-tint border border-blue rounded px-5 py-4 mb-6 flex items-center justify-between flex-wrap gap-3">
-          <p className="text-sm text-navy">{t("contractor.feed.subscribeBanner")}</p>
-          <Link to="/contractor/subscribe" className="bg-amber hover:bg-amber-dark text-white text-xs font-semibold rounded px-4 py-2 whitespace-nowrap">
-            {t("contractor.feed.viewPlans")}
+          <p className="text-sm text-navy">{t("service_provider.feed.subscribeBanner")}</p>
+          <Link to="/service-provider/subscribe" className="bg-amber hover:bg-amber-dark text-white text-xs font-semibold rounded px-4 py-2 whitespace-nowrap">
+            {t("service_provider.feed.viewPlans")}
           </Link>
         </div>
       )}
@@ -72,7 +72,7 @@ export function ContractorFeedPage() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder={t("contractor.feed.searchPlaceholder")}
+          placeholder={t("service_provider.feed.searchPlaceholder")}
           className="border border-border rounded px-3 py-2 text-sm flex-1 min-w-[200px]"
         />
         <select
@@ -80,7 +80,7 @@ export function ContractorFeedPage() {
           onChange={(e) => setTrade(e.target.value)}
           className="border border-border rounded px-3 py-2 text-sm font-mono"
         >
-          <option value="">{t("contractor.feed.allTrades")}</option>
+          <option value="">{t("service_provider.feed.allTrades")}</option>
           {trades?.map((tr) => (
             <option key={tr} value={tr}>
               {tr}
@@ -92,8 +92,8 @@ export function ContractorFeedPage() {
           onChange={(e) => setSort(e.target.value as "deadline" | "newest")}
           className="border border-border rounded px-3 py-2 text-sm font-mono"
         >
-          <option value="deadline">{t("contractor.feed.sortClosest")}</option>
-          <option value="newest">{t("contractor.feed.sortNewest")}</option>
+          <option value="deadline">{t("service_provider.feed.sortClosest")}</option>
+          <option value="newest">{t("service_provider.feed.sortNewest")}</option>
         </select>
       </div>
 
@@ -101,7 +101,7 @@ export function ContractorFeedPage() {
 
       {!isError && !projects?.length && (
         <div className="border border-dashed border-border rounded p-10 text-center text-sm text-steel">
-          {filtersActive ? t("contractor.feed.noMatch") : t("contractor.feed.noOpenProjects")}
+          {filtersActive ? t("service_provider.feed.noMatch") : t("service_provider.feed.noOpenProjects")}
         </div>
       )}
 
@@ -116,22 +116,22 @@ export function ContractorFeedPage() {
                 </div>
                 {p.my_offer_status && (
                   <span className="font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-green-tint text-green whitespace-nowrap">
-                    {p.my_offer_status === "submitted" ? t("contractor.feed.bidPlaced") : p.my_offer_status}
+                    {p.my_offer_status === "submitted" ? t("service_provider.feed.bidPlaced") : p.my_offer_status}
                   </span>
                 )}
               </div>
               <p className="font-mono text-xs text-blue">{timeRemaining(p.bid_deadline)}</p>
               <div className="tblock-strip mt-4">
                 <div className="tblock-field">
-                  <span className="k">{t("contractor.feed.deadline")}</span>
+                  <span className="k">{t("service_provider.feed.deadline")}</span>
                   <span className="v">{formatDeadline(p.bid_deadline)}</span>
                 </div>
                 <div className="tblock-field">
-                  <span className="k">{t("contractor.feed.offersSoFar")}</span>
+                  <span className="k">{t("service_provider.feed.offersSoFar")}</span>
                   <span className="v">{p.offer_count}</span>
                 </div>
                 <div className="tblock-field">
-                  <span className="k">{t("contractor.feed.trade")}</span>
+                  <span className="k">{t("service_provider.feed.trade")}</span>
                   <span className="v">{p.trade || "—"}</span>
                 </div>
               </div>
@@ -139,15 +139,15 @@ export function ContractorFeedPage() {
               {!isSubscribed && (
                 <div className="absolute inset-0 bg-navy/90 flex flex-col items-center justify-center text-center gap-2.5 px-4">
                   <div className="text-xl">🔒</div>
-                  <strong className="font-display text-white text-sm">{t("contractor.feed.lockedTitle")}</strong>
-                  <p className="text-[11.5px] text-white/70 max-w-[220px]">{t("contractor.feed.lockedDescription")}</p>
+                  <strong className="font-display text-white text-sm">{t("service_provider.feed.lockedTitle")}</strong>
+                  <p className="text-[11.5px] text-white/70 max-w-[220px]">{t("service_provider.feed.lockedDescription")}</p>
                 </div>
               )}
             </div>
           );
 
           return isSubscribed ? (
-            <Link key={p.id} to={`/contractor/projects/${p.id}/offer`}>
+            <Link key={p.id} to={`/service-provider/projects/${p.id}/offer`}>
               {card}
             </Link>
           ) : (

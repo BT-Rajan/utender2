@@ -28,11 +28,11 @@ def test_public_requirements_follow_admin_edits(db):
     r = admin.post("/admin/requirements", json={"name": "Civil ID", "is_required": True, "applies_to": "owner"})
     assert r.status_code == 201, r.text
     req_id = r.json()["id"]
-    admin.post("/admin/requirements", json={"name": "Commercial License", "applies_to": "contractor"})
+    admin.post("/admin/requirements", json={"name": "Commercial License", "applies_to": "service_provider"})
 
     owner_docs = anon.get("/public/requirements", params={"role": "owner"}).json()
     assert [d["name"] for d in owner_docs] == ["Civil ID"]
-    assert [d["name"] for d in anon.get("/public/requirements", params={"role": "contractor"}).json()] == ["Commercial License"]
+    assert [d["name"] for d in anon.get("/public/requirements", params={"role": "service_provider"}).json()] == ["Commercial License"]
     assert anon.get("/public/requirements", params={"role": "admin"}).status_code == 400
 
     # Rename + describe, then retire: the public checklist follows each edit.
@@ -97,19 +97,19 @@ def test_role_copy_is_admin_editable_and_listed_in_page_order(db):
     assert keys[:2] == ["hero_heading", "hero_subheading"]
     assert keys.index("home_owner_title") < keys.index("home_provider_title")
 
-    admin.put("/admin/cms/home_provider_title/en", json={"value": "Contractor"})
-    assert anon.get("/public/cms", params={"language": "en"}).json()["home_provider_title"] == "Contractor"
+    admin.put("/admin/cms/home_provider_title/en", json={"value": "ServiceProvider"})
+    assert anon.get("/public/cms", params={"language": "en"}).json()["home_provider_title"] == "ServiceProvider"
 
 
 def test_signup_handoff_persists_the_chosen_role(db):
     """Step 1 -> Step 2 boundary: the account exists, the role the visitor
     chose is what the backend stored, and the user can authenticate."""
-    from app.models.contractor import ContractorProfile
+    from app.models.service_provider import ServiceProviderProfile
     from app.models.owner import OwnerProfile
 
     for role, email, extra in (
         ("owner", "own@example.com", {}),
-        ("contractor", "sp@example.com", {"company_name": "Acme"}),  # "service_provider" in public links
+        ("service_provider", "sp@example.com", {"company_name": "Acme"}),
     ):
         signup = TestClient(app)
         r = signup.post("/auth/signup", json={"email": email, "password": "password123", "full_name": "N", "role": role, **extra})
@@ -117,7 +117,7 @@ def test_signup_handoff_persists_the_chosen_role(db):
         assert r.json()["role"] == role
         user_id = r.json()["id"]
         assert db.get(User, user_id).role.value == role
-        profile_model = OwnerProfile if role == "owner" else ContractorProfile
+        profile_model = OwnerProfile if role == "owner" else ServiceProviderProfile
         assert db.get(profile_model, user_id) is not None
         assert signup.get("/auth/me").json()["role"] == role
 
@@ -129,4 +129,4 @@ def test_signup_handoff_persists_the_chosen_role(db):
     base = {"email": "x@example.com", "password": "password123", "full_name": "X"}
     assert anon.post("/auth/signup", json=base).status_code == 422  # no role -> never guessed
     assert anon.post("/auth/signup", json={**base, "role": "admin"}).status_code == 400
-    assert anon.post("/auth/signup", json={**base, "role": "service_provider"}).status_code == 422
+    assert anon.post("/auth/signup", json={**base, "role": "provider"}).status_code == 422  # unknown role

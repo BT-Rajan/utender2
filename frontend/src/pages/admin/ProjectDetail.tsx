@@ -66,7 +66,7 @@ function OfferRow({ offer, projectId, t }: { offer: AdminOffer; projectId: strin
       <tr className="border-b border-border bg-blue-tint/30">
         <td colSpan={5} className="py-3 px-2.5">
           <div className="text-[11.5px] font-mono uppercase tracking-wide text-steel mb-2">
-            {t("admin.projectDetail.editOfferHeading")} — {offer.contractor_company_name ?? "—"}
+            {t("admin.projectDetail.editOfferHeading")} — {offer.service_provider_company_name ?? "—"}
           </div>
           {error && <div className="text-[11.5px] text-red mb-2">{error}</div>}
           <div className="grid sm:grid-cols-3 gap-2 mb-2">
@@ -111,7 +111,7 @@ function OfferRow({ offer, projectId, t }: { offer: AdminOffer; projectId: strin
   return (
     <tr className="border-b border-border">
       <td className="py-3 px-2.5">
-        <div className="text-[13px]">{offer.contractor_company_name ?? "—"}</div>
+        <div className="text-[13px]">{offer.service_provider_company_name ?? "—"}</div>
         {offer.is_suspended && (
           <span className="font-mono text-[10px] uppercase px-2 py-0.5 rounded-full bg-red-tint text-red">
             {t("admin.projectDetail.offerSuspendedBadge")}
@@ -298,7 +298,7 @@ export function AdminProjectDetailPage() {
               <table className="w-full border-collapse">
                 <thead>
                   <tr>
-                    <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("admin.projectDetail.contractorCol")}</th>
+                    <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("admin.projectDetail.serviceProviderCol")}</th>
                     <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("admin.projectDetail.amountCol")}</th>
                     <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("admin.projectDetail.timelineCol")}</th>
                     <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("admin.projectDetail.statusCol")}</th>

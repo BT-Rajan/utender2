@@ -32,7 +32,7 @@ export interface Dictionary {
       heading: string;
       iAmA: string;
       propertyOwner: string;
-      contractor: string;
+      service_provider: string;
       chooseRole: string;
       signingUpAs: string;
       changeRole: string;
@@ -98,7 +98,7 @@ export interface Dictionary {
     askError: string;
     answerError: string;
   };
-  contractor: {
+  service_provider: {
     roleLabel: string;
     dashboard: {
       kpiActiveBids: string;
@@ -215,7 +215,7 @@ export interface Dictionary {
       biddingClosedNotice: string;
       yourFinalOffer: string;
       awardedTo: string;
-      anotherContractor: string;
+      anotherServiceProvider: string;
       noAwardNotice: string;
       bidAmount: string;
       timeline: string;
@@ -328,15 +328,15 @@ export interface Dictionary {
       sealedBidsReceived: string;
       sealedExplanation: string;
       noOffersYet: string;
-      contractorCol: string;
+      serviceProviderCol: string;
       ratingCol: string;
       bidCol: string;
       timelineCol: string;
       revisedSuffix: string;
       approve: string;
       closeToAwardHint: string;
-      rateContractor: string;
-      theContractor: string;
+      rateServiceProvider: string;
+      theServiceProvider: string;
       submittedOn: string;
       ratingPlaceholder: string;
       submitReview: string;
@@ -384,7 +384,7 @@ export interface Dictionary {
     nav: {
       requirements: string;
       review: string;
-      contractors: string;
+      service_providers: string;
       owners: string;
       offers: string;
       projects: string;
@@ -439,7 +439,7 @@ export interface Dictionary {
       total: string;
       empty: string;
       project: string;
-      contractor: string;
+      service_provider: string;
       amount: string;
       status: string;
       tenderType: string;
@@ -485,7 +485,7 @@ export interface Dictionary {
       deleteError: string;
       offersHeading: string;
       noOffers: string;
-      contractorCol: string;
+      serviceProviderCol: string;
       amountCol: string;
       timelineCol: string;
       statusCol: string;
@@ -511,7 +511,7 @@ export interface Dictionary {
       eyebrow: string;
       heading: string;
       description: string;
-      forContractors: string;
+      forServiceProviders: string;
       forOwners: string;
       emptyForScope: string;
       toggleRequiredFor: string;
@@ -521,7 +521,7 @@ export interface Dictionary {
       namePlaceholder: string;
       descriptionPlaceholder: string;
       addForOwners: string;
-      addForContractors: string;
+      addForServiceProviders: string;
       edit: string;
       addError: string;
       updateError: string;
@@ -584,7 +584,7 @@ export const en: Dictionary = {
       heading: "Create an account",
       iAmA: "I am a...",
       propertyOwner: "Owner",
-      contractor: "Service provider",
+      service_provider: "Service provider",
       chooseRole: "Choose Owner or Service provider to continue.",
       signingUpAs: "Signing up as",
       changeRole: "Change",
@@ -654,7 +654,7 @@ export const en: Dictionary = {
     askError: "Could not submit your question.",
     answerError: "Could not submit your answer.",
   },
-  contractor: {
+  service_provider: {
     roleLabel: "Service provider",
     dashboard: {
       kpiActiveBids: "Active bids",
@@ -773,7 +773,7 @@ export const en: Dictionary = {
       biddingClosedNotice: "Bidding on this project has closed.",
       yourFinalOffer: "Your final offer:",
       awardedTo: "Awarded to",
-      anotherContractor: "another service provider",
+      anotherServiceProvider: "another service provider",
       noAwardNotice: "The owner decided not to award this project.",
       bidAmount: "Your bid amount (USD)",
       timeline: "Estimated timeline",
@@ -887,15 +887,15 @@ export const en: Dictionary = {
       sealedExplanation:
         "This is a sealed tender — bidder identities and amounts stay hidden from you until bidding closes. Close bidding to reveal and evaluate them.",
       noOffersYet: "No offers yet. Service providers can bid until the deadline above.",
-      contractorCol: "Service provider",
+      serviceProviderCol: "Service provider",
       ratingCol: "Rating",
       bidCol: "Bid",
       timelineCol: "Timeline",
       revisedSuffix: "revised x",
       approve: "Approve",
       closeToAwardHint: "Close bidding to award",
-      rateContractor: "Rate",
-      theContractor: "the service provider",
+      rateServiceProvider: "Rate",
+      theServiceProvider: "the service provider",
       submittedOn: "Submitted",
       ratingPlaceholder: "How did the work go? Optional, but helps other owners.",
       submitReview: "Submit review",
@@ -945,7 +945,7 @@ export const en: Dictionary = {
     nav: {
       requirements: "Document requirements",
       review: "Review applications",
-      contractors: "All service providers",
+      service_providers: "All service providers",
       owners: "All owners",
       offers: "All offers",
       projects: "All projects",
@@ -1001,7 +1001,7 @@ export const en: Dictionary = {
       total: "total",
       empty: "No offers have been submitted yet.",
       project: "Project",
-      contractor: "Service provider",
+      service_provider: "Service provider",
       amount: "Amount",
       status: "Status",
       tenderType: "Tender type",
@@ -1048,7 +1048,7 @@ export const en: Dictionary = {
       deleteError: "Could not delete this project.",
       offersHeading: "Offers on this project",
       noOffers: "No offers have been submitted on this project.",
-      contractorCol: "Service provider",
+      serviceProviderCol: "Service provider",
       amountCol: "Amount",
       timelineCol: "Timeline",
       statusCol: "Status",
@@ -1075,7 +1075,7 @@ export const en: Dictionary = {
       heading: "Required documents",
       description:
         "Turn requirements on or off, or remove one entirely. Changes apply to new submissions right away — accounts already approved aren't affected.",
-      forContractors: "For service providers",
+      forServiceProviders: "For service providers",
       forOwners: "For owners",
       emptyForScope: "No requirements set up for this group yet.",
       toggleRequiredFor: "Toggle required for",
@@ -1085,7 +1085,7 @@ export const en: Dictionary = {
       namePlaceholder: "Document name, e.g. Civil ID",
       descriptionPlaceholder: "Short description shown to the applicant",
       addForOwners: "+ Add owner requirement",
-      addForContractors: "+ Add service provider requirement",
+      addForServiceProviders: "+ Add service provider requirement",
       edit: "Edit",
       addError: "Could not add requirement.",
       updateError: "Could not update requirement.",
@@ -1148,7 +1148,7 @@ export const ar: Dictionary = {
       heading: "إنشاء حساب",
       iAmA: "أنا...",
       propertyOwner: "مالك",
-      contractor: "مزوّد خدمة",
+      service_provider: "مزوّد خدمة",
       chooseRole: "اختر مالك أو مزوّد خدمة للمتابعة.",
       signingUpAs: "التسجيل بصفة",
       changeRole: "تغيير",
@@ -1218,7 +1218,7 @@ export const ar: Dictionary = {
     askError: "تعذر إرسال سؤالك.",
     answerError: "تعذر إرسال إجابتك.",
   },
-  contractor: {
+  service_provider: {
     roleLabel: "مزوّد خدمة",
     dashboard: {
       kpiActiveBids: "العروض النشطة",
@@ -1337,7 +1337,7 @@ export const ar: Dictionary = {
       biddingClosedNotice: "أُغلق تقديم العروض على هذا المشروع.",
       yourFinalOffer: "عرضك النهائي:",
       awardedTo: "تم الترسية على",
-      anotherContractor: "مزوّد خدمة آخر",
+      anotherServiceProvider: "مزوّد خدمة آخر",
       noAwardNotice: "قرر المالك عدم ترسية هذا المشروع.",
       bidAmount: "قيمة عرضك (دولار أمريكي)",
       timeline: "الجدول الزمني المتوقع",
@@ -1451,15 +1451,15 @@ export const ar: Dictionary = {
       sealedExplanation:
         "هذا عطاء مغلق (سري) — تبقى هويات مزوّدي الخدمات وقيم عروضهم مخفية عنك حتى يُغلق تقديم العروض. أغلق تقديم العروض لكشفها وتقييمها.",
       noOffersYet: "لا توجد عروض بعد. يمكن لمزوّدي الخدمات تقديم عروض حتى الموعد النهائي أعلاه.",
-      contractorCol: "مزوّد الخدمة",
+      serviceProviderCol: "مزوّد الخدمة",
       ratingCol: "التقييم",
       bidCol: "العرض",
       timelineCol: "الجدول الزمني",
       revisedSuffix: "مُعدَّل ×",
       approve: "قبول",
       closeToAwardHint: "أغلق تقديم العروض للترسية",
-      rateContractor: "قيّم",
-      theContractor: "مزوّد الخدمة",
+      rateServiceProvider: "قيّم",
+      theServiceProvider: "مزوّد الخدمة",
       submittedOn: "تاريخ التقديم",
       ratingPlaceholder: "كيف سار العمل؟ اختياري، لكنه يساعد الملاك الآخرين.",
       submitReview: "إرسال التقييم",
@@ -1509,7 +1509,7 @@ export const ar: Dictionary = {
     nav: {
       requirements: "متطلبات المستندات",
       review: "مراجعة الطلبات",
-      contractors: "جميع مزوّدي الخدمات",
+      service_providers: "جميع مزوّدي الخدمات",
       owners: "جميع الملاك",
       offers: "جميع العروض",
       projects: "جميع المشاريع",
@@ -1565,7 +1565,7 @@ export const ar: Dictionary = {
       total: "الإجمالي",
       empty: "لم يتم تقديم أي عروض بعد.",
       project: "المشروع",
-      contractor: "مزوّد الخدمة",
+      service_provider: "مزوّد الخدمة",
       amount: "القيمة",
       status: "الحالة",
       tenderType: "نوع العطاء",
@@ -1612,7 +1612,7 @@ export const ar: Dictionary = {
       deleteError: "تعذر حذف هذا المشروع.",
       offersHeading: "العروض على هذا المشروع",
       noOffers: "لم يتم تقديم أي عروض على هذا المشروع.",
-      contractorCol: "مزوّد الخدمة",
+      serviceProviderCol: "مزوّد الخدمة",
       amountCol: "القيمة",
       timelineCol: "الجدول الزمني",
       statusCol: "الحالة",
@@ -1639,7 +1639,7 @@ export const ar: Dictionary = {
       heading: "المستندات المطلوبة",
       description:
         "فعّل أو عطّل المتطلبات، أو أزل أحدها نهائيًا. تُطبَّق التغييرات على الطلبات الجديدة فورًا — الحسابات التي تمت الموافقة عليها سابقًا لا تتأثر.",
-      forContractors: "لمزوّدي الخدمات",
+      forServiceProviders: "لمزوّدي الخدمات",
       forOwners: "للملاك",
       emptyForScope: "لا توجد متطلبات مُعدة لهذه المجموعة بعد.",
       toggleRequiredFor: "تبديل حالة الإلزام لـ",
@@ -1649,7 +1649,7 @@ export const ar: Dictionary = {
       namePlaceholder: "اسم المستند، مثال: الهوية المدنية",
       descriptionPlaceholder: "وصف مختصر يظهر لمقدم الطلب",
       addForOwners: "+ إضافة متطلب للملاك",
-      addForContractors: "+ إضافة متطلب لمزوّدي الخدمات",
+      addForServiceProviders: "+ إضافة متطلب لمزوّدي الخدمات",
       edit: "تعديل",
       addError: "تعذر إضافة المتطلب.",
       updateError: "تعذر تحديث المتطلب.",

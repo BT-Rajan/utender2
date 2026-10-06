@@ -33,7 +33,7 @@ class Project(Base):
     )
     tender_type_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Admin moderation flag — independent of the owner-driven lifecycle
-    # `status` above. Hides the project from the contractor feed and blocks
+    # `status` above. Hides the project from the service provider feed and blocks
     # new bids while set, but leaves `status` untouched so un-suspending
     # restores exactly the state the project was in before.
     is_suspended: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -57,7 +57,7 @@ class ProjectDrawing(Base):
     file_name: Mapped[str] = mapped_column(String(500), nullable=False)
     # Versioning (spec §2.8, §25, §67): a revised drawing is a NEW row, not
     # an overwrite of the old one. is_current marks which row is the one
-    # contractors should look at; superseded rows stay in the database and
+    # service providers should look at; superseded rows stay in the database and
     # in storage for audit purposes.
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     is_current: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

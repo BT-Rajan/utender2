@@ -11,7 +11,7 @@ class OwnerProfileOut(BaseModel):
     user_id: str
     verification_status: VerificationStatus
     is_suspended: bool
-    # Derived, never stored — same shape as ContractorProfileOut's
+    # Derived, never stored — same shape as ServiceProviderProfileOut's
     # marketplace_status: one of documents_incomplete, submitted_for_review,
     # changes_requested, verified_active, suspended.
     marketplace_status: str

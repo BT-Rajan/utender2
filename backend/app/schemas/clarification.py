@@ -19,10 +19,10 @@ class ClarificationOut(BaseModel):
     project_id: str
     # None when redacted for the owner on a still-sealed-and-open tender
     # (spec §19-21, D-001) — see clarifications.py's list_clarifications.
-    contractor_id: str | None
+    service_provider_id: str | None
     question: str
     answer: str | None
     shared_with_all: bool
     created_at: datetime
     answered_at: datetime | None
-    contractor_company_name: str | None = None
+    service_provider_company_name: str | None = None

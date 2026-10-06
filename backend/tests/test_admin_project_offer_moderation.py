@@ -1,4 +1,4 @@
-"""Admin moderation over every owner's projects and every contractor's
+"""Admin moderation over every owner's projects and every service provider's
 offers on them: list/detail (including a per-owner drill-down), edit,
 suspend/reactivate, and delete -- added after the owner-verification pass
 in response to a follow-up user request ("i also want to see the posted
@@ -37,21 +37,21 @@ def _make_approved_owner(db, email="owner1@example.com"):
     return client, owner_id
 
 
-def _make_active_contractor(db, admin_client, email, company):
-    from app.models.document import ContractorDocument
+def _make_active_service_provider(db, admin_client, email, company):
+    from app.models.document import ServiceProviderDocument
     from app.models.enums import DocumentStatus
 
     client = TestClient(app)
     r = client.post(
         "/auth/signup",
-        json={"email": email, "password": "password123", "full_name": "C", "role": "contractor", "company_name": company},
+        json={"email": email, "password": "password123", "full_name": "C", "role": "service_provider", "company_name": company},
     )
     cid = r.json()["id"]
-    for doc in db.query(ContractorDocument).filter_by(contractor_id=cid).all():
+    for doc in db.query(ServiceProviderDocument).filter_by(service_provider_id=cid).all():
         doc.status = DocumentStatus.approved
     db.commit()
-    admin_client.post(f"/admin/review/contractors/{cid}/approve")
-    admin_client.post(f"/admin/contractors/{cid}/payment-override", json={"reason": "test"})
+    admin_client.post(f"/admin/review/service-providers/{cid}/approve")
+    admin_client.post(f"/admin/service-providers/{cid}/payment-override", json={"reason": "test"})
     return client, cid
 
 
@@ -87,7 +87,7 @@ def test_admin_project_detail_shows_offers_unredacted_even_when_sealed():
     db = db_module.SessionLocal()
     admin_client = _signup_admin(db)
     owner_client, owner_id = _make_approved_owner(db)
-    c1, c1_id = _make_active_contractor(db, admin_client, "c1@example.com", "Acme")
+    c1, c1_id = _make_active_service_provider(db, admin_client, "c1@example.com", "Acme")
 
     r = owner_client.post(
         "/projects",
@@ -101,9 +101,9 @@ def test_admin_project_detail_shows_offers_unredacted_even_when_sealed():
     body = r.json()
     assert body["project"]["title"] == "Sealed job"
     assert len(body["offers"]) == 1
-    assert body["offers"][0]["contractor_id"] == c1_id
+    assert body["offers"][0]["service_provider_id"] == c1_id
     assert body["offers"][0]["amount"] == "5000.00"
-    assert body["offers"][0]["contractor_company_name"] == "Acme"
+    assert body["offers"][0]["service_provider_company_name"] == "Acme"
 
 
 def test_admin_edit_project_fields():
@@ -133,19 +133,19 @@ def test_admin_suspend_project_hides_from_feed_and_blocks_bidding():
     db = db_module.SessionLocal()
     admin_client = _signup_admin(db)
     owner_client, owner_id = _make_approved_owner(db)
-    c1, c1_id = _make_active_contractor(db, admin_client, "c1@example.com", "Acme")
+    c1, c1_id = _make_active_service_provider(db, admin_client, "c1@example.com", "Acme")
 
     r = owner_client.post("/projects", data={"title": "Deck", "address": "1 Main St", "bid_deadline": _future(), "status": "open"})
     project_id = r.json()["id"]
 
-    r = c1.get("/contractor/feed")
+    r = c1.get("/service-provider/feed")
     assert any(p["id"] == project_id for p in r.json())
 
     r = admin_client.post(f"/admin/projects/{project_id}/suspend", json={"suspended": True})
     assert r.status_code == 200
     assert r.json()["is_suspended"] is True
 
-    r = c1.get("/contractor/feed")
+    r = c1.get("/service-provider/feed")
     assert all(p["id"] != project_id for p in r.json())
 
     r = c1.get(f"/projects/{project_id}")
@@ -163,7 +163,7 @@ def test_admin_suspend_project_hides_from_feed_and_blocks_bidding():
 
     r = admin_client.post(f"/admin/projects/{project_id}/suspend", json={"suspended": False})
     assert r.status_code == 200
-    r = c1.get("/contractor/feed")
+    r = c1.get("/service-provider/feed")
     assert any(p["id"] == project_id for p in r.json())
     r = owner_client.get("/notifications")
     assert any(n["type"] == "project_reactivated" for n in r.json())
@@ -173,7 +173,7 @@ def test_admin_delete_project_guard_and_success():
     db = db_module.SessionLocal()
     admin_client = _signup_admin(db)
     owner_client, owner_id = _make_approved_owner(db)
-    c1, c1_id = _make_active_contractor(db, admin_client, "c1@example.com", "Acme")
+    c1, c1_id = _make_active_service_provider(db, admin_client, "c1@example.com", "Acme")
 
     r = owner_client.post("/projects", data={"title": "Has offer", "address": "1 Main St", "bid_deadline": _future(), "status": "open"})
     project_with_offer = r.json()["id"]
@@ -197,7 +197,7 @@ def test_admin_edit_offer_snapshots_revision():
     db = db_module.SessionLocal()
     admin_client = _signup_admin(db)
     owner_client, owner_id = _make_approved_owner(db)
-    c1, c1_id = _make_active_contractor(db, admin_client, "c1@example.com", "Acme")
+    c1, c1_id = _make_active_service_provider(db, admin_client, "c1@example.com", "Acme")
 
     r = owner_client.post("/projects", data={"title": "Deck", "address": "1 Main St", "bid_deadline": _future(), "status": "open"})
     project_id = r.json()["id"]
@@ -226,8 +226,8 @@ def test_admin_suspend_offer_hides_from_owner_evaluation_and_blocks_award():
     db = db_module.SessionLocal()
     admin_client = _signup_admin(db)
     owner_client, owner_id = _make_approved_owner(db)
-    c1, c1_id = _make_active_contractor(db, admin_client, "c1@example.com", "Acme")
-    c2, c2_id = _make_active_contractor(db, admin_client, "c2@example.com", "BuildCo")
+    c1, c1_id = _make_active_service_provider(db, admin_client, "c1@example.com", "Acme")
+    c2, c2_id = _make_active_service_provider(db, admin_client, "c2@example.com", "BuildCo")
 
     r = owner_client.post("/projects", data={"title": "Deck", "address": "1 Main St", "bid_deadline": _future(), "status": "open"})
     project_id = r.json()["id"]
@@ -267,8 +267,8 @@ def test_admin_delete_offer_guard_and_success():
     db = db_module.SessionLocal()
     admin_client = _signup_admin(db)
     owner_client, owner_id = _make_approved_owner(db)
-    c1, c1_id = _make_active_contractor(db, admin_client, "c1@example.com", "Acme")
-    c2, c2_id = _make_active_contractor(db, admin_client, "c2@example.com", "BuildCo")
+    c1, c1_id = _make_active_service_provider(db, admin_client, "c1@example.com", "Acme")
+    c2, c2_id = _make_active_service_provider(db, admin_client, "c2@example.com", "BuildCo")
 
     r = owner_client.post("/projects", data={"title": "Deck", "address": "1 Main St", "bid_deadline": _future(), "status": "open"})
     project_id = r.json()["id"]

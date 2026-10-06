@@ -1,21 +1,21 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.document import ContractorDocument, DocumentRequirement, OwnerDocument
+from app.models.document import ServiceProviderDocument, DocumentRequirement, OwnerDocument
 from app.models.enums import UserRole
 
 
-# Called once when a contractor account is first created, so the
+# Called once when a service provider account is first created, so the
 # verification checklist has a "not_submitted" row per active,
-# contractor-scoped requirement to render immediately. Skips requirements
-# the contractor already has a row for, so re-running this (e.g. a retry)
+# service-provider-scoped requirement to render immediately. Skips requirements
+# the service provider already has a row for, so re-running this (e.g. a retry)
 # never duplicates one — mirrors ensureDocumentRows in the original
-# src/app/contractor/verify/actions.ts.
-def ensure_document_rows(db: Session, contractor_id: str) -> None:
+# src/app/service-provider/verify/actions.ts.
+def ensure_document_rows(db: Session, service_provider_id: str) -> None:
     requirement_ids = set(
         db.scalars(
             select(DocumentRequirement.id).where(
-                DocumentRequirement.is_active.is_(True), DocumentRequirement.applies_to == UserRole.contractor
+                DocumentRequirement.is_active.is_(True), DocumentRequirement.applies_to == UserRole.service_provider
             )
         ).all()
     )
@@ -24,13 +24,13 @@ def ensure_document_rows(db: Session, contractor_id: str) -> None:
 
     existing_ids = set(
         db.scalars(
-            select(ContractorDocument.requirement_id).where(ContractorDocument.contractor_id == contractor_id)
+            select(ServiceProviderDocument.requirement_id).where(ServiceProviderDocument.service_provider_id == service_provider_id)
         ).all()
     )
 
     missing_ids = requirement_ids - existing_ids
     for requirement_id in missing_ids:
-        db.add(ContractorDocument(contractor_id=contractor_id, requirement_id=requirement_id))
+        db.add(ServiceProviderDocument(service_provider_id=service_provider_id, requirement_id=requirement_id))
     db.commit()
 
 

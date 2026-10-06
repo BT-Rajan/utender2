@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 
-def test_pass14_contractor_dashboard():
+def test_pass14_service_provider_dashboard():
     results = []
 
 
@@ -14,7 +14,7 @@ def test_pass14_contractor_dashboard():
 
 
     from app.auth.security import hash_password
-    from app.models.document import ContractorDocument
+    from app.models.document import ServiceProviderDocument
     from app.models.enums import DocumentStatus, UserRole
     from app.models.user import User
 
@@ -34,25 +34,25 @@ def test_pass14_contractor_dashboard():
     _owner_approve_db.get(_OwnerProfile, _owner_signup_r.json()['id']).verification_status = _OwnerVerificationStatus.approved
     _owner_approve_db.commit()
 
-    contractor_client = TestClient(app)
-    r = contractor_client.post(
+    service_provider_client = TestClient(app)
+    r = service_provider_client.post(
         "/auth/signup",
-        json={"email": "c1@example.com", "password": "password123", "full_name": "C", "role": "contractor", "company_name": "Acme"},
+        json={"email": "c1@example.com", "password": "password123", "full_name": "C", "role": "service_provider", "company_name": "Acme"},
     )
     cid = r.json()["id"]
 
     future = (datetime.utcnow() + timedelta(days=7)).isoformat()
 
-    # ---------- my-bids works even before verification (unverified contractor, no bids yet) ----------
-    r = contractor_client.get("/contractor/my-bids")
+    # ---------- my-bids works even before verification (unverified service provider, no bids yet) ----------
+    r = service_provider_client.get("/service-provider/my-bids")
     check("my-bids accessible before verification (empty list)", r.status_code == 200 and r.json() == [])
 
-    # ---------- activate contractor and place bids ----------
-    for doc in db.query(ContractorDocument).filter_by(contractor_id=cid).all():
+    # ---------- activate service provider and place bids ----------
+    for doc in db.query(ServiceProviderDocument).filter_by(service_provider_id=cid).all():
         doc.status = DocumentStatus.approved
     db.commit()
-    admin_client.post(f"/admin/review/contractors/{cid}/approve")
-    admin_client.post(f"/admin/contractors/{cid}/payment-override", json={"reason": "test activation"})
+    admin_client.post(f"/admin/review/service-providers/{cid}/approve")
+    admin_client.post(f"/admin/service-providers/{cid}/payment-override", json={"reason": "test activation"})
 
     r = owner_client.post("/projects", data={"title": "Roof job", "address": "1 Main St", "bid_deadline": future, "status": "open"})
     project1_id = r.json()["id"]
@@ -61,12 +61,12 @@ def test_pass14_contractor_dashboard():
     r = owner_client.post("/projects", data={"title": "Deck job", "address": "3 Pine Rd", "bid_deadline": future, "status": "open"})
     project3_id = r.json()["id"]
 
-    contractor_client.post(f"/projects/{project1_id}/offers", json={"amount": "1000.00"})
-    contractor_client.post(f"/projects/{project2_id}/offers", json={"amount": "2000.00"})
-    contractor_client.post(f"/projects/{project3_id}/offers", json={"amount": "3000.00"})
-    contractor_client.post(f"/projects/{project3_id}/offers/withdraw")
+    service_provider_client.post(f"/projects/{project1_id}/offers", json={"amount": "1000.00"})
+    service_provider_client.post(f"/projects/{project2_id}/offers", json={"amount": "2000.00"})
+    service_provider_client.post(f"/projects/{project3_id}/offers", json={"amount": "3000.00"})
+    service_provider_client.post(f"/projects/{project3_id}/offers/withdraw")
 
-    r = contractor_client.get("/contractor/my-bids")
+    r = service_provider_client.get("/service-provider/my-bids")
     check("my-bids returns 3 bids total (including withdrawn)", r.status_code == 200 and len(r.json()) == 3)
 
     bids = {b["project_id"]: b for b in r.json()}
@@ -81,24 +81,24 @@ def test_pass14_contractor_dashboard():
     offer1_id = bids[project1_id]["offer_id"]
     owner_client.post(f"/owner/projects/{project1_id}/offers/{offer1_id}/approve")
 
-    r = contractor_client.get("/contractor/my-bids")
+    r = service_provider_client.get("/service-provider/my-bids")
     bids2 = {b["project_id"]: b for b in r.json()}
     check("awarded bid shows offer_status=approved", bids2[project1_id]["offer_status"] == "approved")
     check("awarded bid shows project_status=awarded", bids2[project1_id]["project_status"] == "awarded")
 
-    # a different contractor with no bids sees an empty list, not another contractor's bids
+    # a different service provider with no bids sees an empty list, not another service provider's bids
     c2 = TestClient(app)
-    c2.post("/auth/signup", json={"email": "c2@example.com", "password": "password123", "full_name": "C2", "role": "contractor", "company_name": "BuildCo"})
-    r = c2.get("/contractor/my-bids")
-    check("a contractor with no bids gets an empty list, not someone else's", r.status_code == 200 and r.json() == [])
+    c2.post("/auth/signup", json={"email": "c2@example.com", "password": "password123", "full_name": "C2", "role": "service_provider", "company_name": "BuildCo"})
+    r = c2.get("/service-provider/my-bids")
+    check("a service provider with no bids gets an empty list, not someone else's", r.status_code == 200 and r.json() == [])
 
-    # owner cannot access the contractor-only endpoint
-    r = owner_client.get("/contractor/my-bids")
-    check("owner blocked from /contractor/my-bids (403)", r.status_code == 403)
+    # owner cannot access the service-provider-only endpoint
+    r = owner_client.get("/service-provider/my-bids")
+    check("owner blocked from /service-provider/my-bids (403)", r.status_code == 403)
 
     # admin cannot access it either (role-scoped, not admin-scoped)
-    r = admin_client.get("/contractor/my-bids")
-    check("admin blocked from /contractor/my-bids (403)", r.status_code == 403)
+    r = admin_client.get("/service-provider/my-bids")
+    check("admin blocked from /service-provider/my-bids (403)", r.status_code == 403)
 
 
     failed = [n for n, ok in results if not ok]

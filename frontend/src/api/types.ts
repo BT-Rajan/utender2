@@ -46,7 +46,7 @@ export interface ProjectDetail extends Project {
 export interface Offer {
   id: string;
   project_id: string;
-  contractor_id: string | null;
+  service_provider_id: string | null;
   amount: string | null;
   timeline_estimate: string | null;
   message: string | null;
@@ -55,9 +55,9 @@ export interface Offer {
   revision: number;
   created_at: string;
   updated_at: string;
-  contractor_company_name?: string | null;
-  contractor_avg_rating?: string | null;
-  contractor_review_count?: number | null;
+  service_provider_company_name?: string | null;
+  service_provider_avg_rating?: string | null;
+  service_provider_review_count?: number | null;
   sealed: boolean;
 }
 
@@ -72,7 +72,7 @@ export interface OfferRevision {
   recorded_at: string;
 }
 
-export interface ContractorProfile {
+export interface ServiceProviderProfile {
   user_id: string;
   company_name: string;
   license_number: string | null;
@@ -103,14 +103,14 @@ export interface DocumentRequirement {
   description: string | null;
   is_required: boolean;
   is_active: boolean;
-  applies_to: "owner" | "contractor";
+  applies_to: "owner" | "service_provider";
   effective_from: string;
   created_at: string;
 }
 
-export interface ContractorDocument {
+export interface ServiceProviderDocument {
   id: string;
-  contractor_id: string;
+  service_provider_id: string;
   requirement_id: string;
   status: DocumentStatus;
   admin_note: string | null;
@@ -155,8 +155,8 @@ export interface AdminOffer {
   project_title: string;
   project_status: ProjectStatus;
   tender_type: TenderType;
-  contractor_id: string | null;
-  contractor_company_name: string | null;
+  service_provider_id: string | null;
+  service_provider_company_name: string | null;
   amount: string | null;
   timeline_estimate: string | null;
   message?: string | null;
@@ -194,13 +194,13 @@ export interface Clarification {
   id: string;
   project_id: string;
   // null when redacted for the owner on a still-sealed-and-open tender.
-  contractor_id: string | null;
+  service_provider_id: string | null;
   question: string;
   answer: string | null;
   shared_with_all: boolean;
   created_at: string;
   answered_at: string | null;
-  contractor_company_name: string | null;
+  service_provider_company_name: string | null;
 }
 
 export interface ProjectAmendment {

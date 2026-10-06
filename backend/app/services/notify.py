@@ -13,8 +13,8 @@ from app.models.user import User
 # kwargs the call site passes.
 _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
     NotificationType.bid_submitted: {
-        Language.en: ("New offer on {project_title}", "{contractor_name} submitted an offer on {project_title}."),
-        Language.ar: ("عرض جديد على {project_title}", "قدم {contractor_name} عرضًا على {project_title}."),
+        Language.en: ("New offer on {project_title}", "{service_provider_name} submitted an offer on {project_title}."),
+        Language.ar: ("عرض جديد على {project_title}", "قدم {service_provider_name} عرضًا على {project_title}."),
     },
     NotificationType.award_won: {
         Language.en: ("You won {project_title}", "Your offer on {project_title} was accepted."),
@@ -56,11 +56,11 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.en: ("Marketplace access changed", "Your admin-granted marketplace access was revoked."),
         Language.ar: ("تغيّر الوصول إلى السوق", "تم إلغاء الوصول إلى السوق الذي منحه المسؤول لحسابك."),
     },
-    NotificationType.contractor_suspended: {
+    NotificationType.service_provider_suspended: {
         Language.en: ("Account suspended", "Your account has been suspended by a site admin."),
         Language.ar: ("تم تعليق الحساب", "تم تعليق حسابك من قبل مسؤول الموقع."),
     },
-    NotificationType.contractor_reactivated: {
+    NotificationType.service_provider_reactivated: {
         Language.en: ("Account reactivated", "Your account has been reactivated."),
         Language.ar: ("تم إعادة تفعيل الحساب", "تمت إعادة تفعيل حسابك."),
     },
@@ -117,7 +117,7 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
 
 # Dedup policy (spec §2.10 "deduplicated"): if the recipient already has an
 # UNREAD notification of the same type pointing at the same link, a new
-# trigger of the same underlying event (e.g. a contractor revising their
+# trigger of the same underlying event (e.g. a service provider revising their
 # bid five times before the owner ever opens their inbox) doesn't pile up
 # a fresh row each time — the existing one already says "you have
 # something to check here." A new one is created only once that one has

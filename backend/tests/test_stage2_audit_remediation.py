@@ -20,7 +20,7 @@ from app.config import Settings
 from app.main import app
 from app.middleware import MaxBodySizeMiddleware
 from app.models.audit_log import AuditLog
-from app.models.contractor import ContractorProfile
+from app.models.service_provider import ServiceProviderProfile
 from app.models.enums import AuthTokenType, UserRole, VerificationStatus
 from app.models.offer import Offer
 from app.models.owner import OwnerProfile
@@ -50,15 +50,15 @@ def _owner(db, email="owner@example.com"):
     return client, uid
 
 
-def _contractor(db, email="c1@example.com", company="Acme Builders"):
+def _service_provider(db, email="c1@example.com", company="Acme Builders"):
     client = TestClient(app)
     r = client.post(
         "/auth/signup",
-        json={"email": email, "password": PASSWORD, "full_name": "Contractor", "role": "contractor", "company_name": company},
+        json={"email": email, "password": PASSWORD, "full_name": "ServiceProvider", "role": "service_provider", "company_name": company},
     )
     assert r.status_code == 201, r.text
     uid = r.json()["id"]
-    profile = db.get(ContractorProfile, uid)
+    profile = db.get(ServiceProviderProfile, uid)
     profile.verification_status = VerificationStatus.approved
     profile.payment_override_active = True
     db.commit()
@@ -83,8 +83,8 @@ def _project(owner, tender_type="owner_visible", status="open") -> str:
     return r.json()["id"]
 
 
-def _bid(contractor, project_id, amount="1000.00") -> str:
-    r = contractor.post(f"/projects/{project_id}/offers", json={"amount": amount})
+def _bid(service_provider, project_id, amount="1000.00") -> str:
+    r = service_provider.post(f"/projects/{project_id}/offers", json={"amount": amount})
     assert r.status_code in (200, 201), r.text
     return r.json()["id"]
 
@@ -96,7 +96,7 @@ def _bid(contractor, project_id, amount="1000.00") -> str:
 
 def test_r1_owner_cannot_close_a_sealed_tender_before_its_deadline(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner, "sealed")
     _bid(c1, pid, "5000.00")
 
@@ -106,7 +106,7 @@ def test_r1_owner_cannot_close_a_sealed_tender_before_its_deadline(db):
     db.expire_all()
     assert db.get(Project, pid).status.value == "open"
     offers = owner.get(f"/owner/projects/{pid}/offers").json()
-    assert offers and all(o["amount"] is None and o["contractor_id"] is None and o["sealed"] is True for o in offers)
+    assert offers and all(o["amount"] is None and o["service_provider_id"] is None and o["sealed"] is True for o in offers)
 
 
 def test_r1_owner_visible_tender_can_still_be_closed_early(db):
@@ -118,7 +118,7 @@ def test_r1_owner_visible_tender_can_still_be_closed_early(db):
 
 def test_r1_sealed_tender_opens_normally_when_its_deadline_passes(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     pid = _project(owner, "sealed")
     _bid(c1, pid, "5000.00")
 
@@ -138,7 +138,7 @@ def test_r1_sealed_tender_opens_normally_when_its_deadline_passes(db):
 
 def test_r2_admin_cannot_edit_an_awarded_offer(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     admin, _ = _admin(db)
     pid = _project(owner)
     offer_id = _bid(c1, pid, "1000.00")
@@ -154,7 +154,7 @@ def test_r2_admin_cannot_edit_an_awarded_offer(db):
 
 def test_r2_admin_cannot_edit_a_bid_while_its_tender_is_sealed_and_open(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     admin, _ = _admin(db)
     pid = _project(owner, "sealed")
     offer_id = _bid(c1, pid, "5000.00")
@@ -168,7 +168,7 @@ def test_r2_admin_cannot_edit_a_bid_while_its_tender_is_sealed_and_open(db):
 
 def test_r2_admin_edit_still_works_and_audit_records_old_and_new_values(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     admin, admin_id = _admin(db)
     pid = _project(owner, "owner_visible")
     offer_id = _bid(c1, pid, "1000.00")
@@ -190,7 +190,7 @@ def test_r2_admin_edit_still_works_and_audit_records_old_and_new_values(db):
 
 def test_r3_admin_deleting_a_project_and_an_offer_is_audited(db):
     owner, _ = _owner(db)
-    c1, _ = _contractor(db)
+    c1, _ = _service_provider(db)
     admin, admin_id = _admin(db)
 
     empty_pid = _project(owner)

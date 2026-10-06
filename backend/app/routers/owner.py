@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import get_owner_profile, require_owner
 from app.models.award_record import AwardRecord
-from app.models.contractor import ContractorProfile
+from app.models.service_provider import ServiceProviderProfile
 from app.models.document import DocumentRequirement, OwnerDocument
 from app.models.enums import DocumentStatus, NotificationType, OfferStatus, ProjectStatus, UserRole, VerificationStatus
 from app.models.offer import Offer, OfferRevision
@@ -20,7 +20,7 @@ from app.schemas.owner import OwnerProfileOut
 from app.schemas.project import ProjectOut
 from app.schemas.review import ReviewCreate, ReviewOut
 from app.services.audit import log_action
-from app.services.email import notify_contractor_offer_decision
+from app.services.email import notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify
 from app.services.storage import get_storage
@@ -71,8 +71,8 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
     # until an admin reactivates it" moderation intent as a suspended
     # project, applied per-bid instead of per-project.
     query = (
-        db.query(Offer, ContractorProfile)
-        .join(ContractorProfile, Offer.contractor_id == ContractorProfile.user_id)
+        db.query(Offer, ServiceProviderProfile)
+        .join(ServiceProviderProfile, Offer.service_provider_id == ServiceProviderProfile.user_id)
         .filter(Offer.project_id == project_id, Offer.is_suspended.is_(False))
     )
     # Sorting by amount would itself leak relative ranking on a sealed
@@ -90,7 +90,7 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
             OfferOut(
                 id=o.id,
                 project_id=o.project_id,
-                contractor_id=None,
+                service_provider_id=None,
                 amount=None,
                 timeline_estimate=None,
                 message=None,
@@ -107,7 +107,7 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
         OfferOut(
             id=o.id,
             project_id=o.project_id,
-            contractor_id=o.contractor_id,
+            service_provider_id=o.service_provider_id,
             amount=o.amount,
             timeline_estimate=o.timeline_estimate,
             message=o.message,
@@ -115,9 +115,9 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
             revision=o.revision,
             created_at=o.created_at,
             updated_at=o.updated_at,
-            contractor_company_name=cp.company_name,
-            contractor_avg_rating=cp.avg_rating,
-            contractor_review_count=cp.review_count,
+            service_provider_company_name=cp.company_name,
+            service_provider_avg_rating=cp.avg_rating,
+            service_provider_review_count=cp.review_count,
         )
         for o, cp in offers
     ]
@@ -168,7 +168,7 @@ def approve_offer(project_id: str, offer_id: str, user: User = Depends(require_o
     if winning_offer.is_suspended:
         raise HTTPException(status_code=400, detail="This offer has been suspended by an admin and cannot be awarded.")
 
-    # Only other LIVE bids get marked rejected — a bid the contractor
+    # Only other LIVE bids get marked rejected — a bid the service provider
     # already withdrew stays withdrawn, not overwritten into a status that
     # never actually happened.
     other_offers = (
@@ -193,7 +193,7 @@ def approve_offer(project_id: str, offer_id: str, user: User = Depends(require_o
         AwardRecord(
             project_id=project_id,
             offer_id=winning_offer.id,
-            contractor_id=winning_offer.contractor_id,
+            service_provider_id=winning_offer.service_provider_id,
             amount=winning_offer.amount,
             project_revision=project.revision,
             offer_revision=winning_offer.revision,
@@ -208,19 +208,19 @@ def approve_offer(project_id: str, offer_id: str, user: User = Depends(require_o
         action="project.award",
         target_type="project",
         target_id=project_id,
-        new_value=f"offer:{winning_offer.id} contractor:{winning_offer.contractor_id} amount:{winning_offer.amount}",
+        new_value=f"offer:{winning_offer.id} service_provider:{winning_offer.service_provider_id} amount:{winning_offer.amount}",
     )
 
     # Best-effort — notification failures never roll back the award itself.
-    winner_user = db.get(User, winning_offer.contractor_id)
+    winner_user = db.get(User, winning_offer.service_provider_id)
     if winner_user:
-        notify_contractor_offer_decision(winner_user.email, project.title, approved=True)
-        notify(db, winner_user, NotificationType.award_won, link=f"/contractor/projects/{project_id}/offer", project_title=project.title)
+        notify_service_provider_offer_decision(winner_user.email, project.title, approved=True)
+        notify(db, winner_user, NotificationType.award_won, link=f"/service-provider/projects/{project_id}/offer", project_title=project.title)
     for o in other_offers:
-        loser_user = db.get(User, o.contractor_id)
+        loser_user = db.get(User, o.service_provider_id)
         if loser_user:
-            notify_contractor_offer_decision(loser_user.email, project.title, approved=False)
-            notify(db, loser_user, NotificationType.award_lost, link=f"/contractor/projects/{project_id}/offer", project_title=project.title)
+            notify_service_provider_offer_decision(loser_user.email, project.title, approved=False)
+            notify(db, loser_user, NotificationType.award_lost, link=f"/service-provider/projects/{project_id}/offer", project_title=project.title)
 
     db.refresh(project)
     offer_count = db.query(Offer).filter(Offer.project_id == project_id).count()
@@ -285,15 +285,15 @@ def start_evaluation(project_id: str, user: User = Depends(require_owner), db: S
 
 def _notify_bidders(db: Session, project: Project, notification_type: NotificationType) -> None:
     bidder_ids = (
-        db.query(Offer.contractor_id)
+        db.query(Offer.service_provider_id)
         .filter(Offer.project_id == project.id, Offer.status != OfferStatus.withdrawn)
         .distinct()
         .all()
     )
-    for (contractor_id,) in bidder_ids:
-        bidder = db.get(User, contractor_id)
+    for (service_provider_id,) in bidder_ids:
+        bidder = db.get(User, service_provider_id)
         if bidder:
-            notify(db, bidder, notification_type, link=f"/contractor/projects/{project.id}/offer", project_title=project.title)
+            notify(db, bidder, notification_type, link=f"/service-provider/projects/{project.id}/offer", project_title=project.title)
 
 
 @router.post("/projects/{project_id}/no-award", response_model=ProjectOut)
@@ -344,11 +344,11 @@ def submit_review(payload: ReviewCreate, user: User = Depends(require_owner), db
     if existing:
         raise HTTPException(status_code=400, detail="A review already exists for this project.")
 
-    # The contractor being reviewed is derived from the project's own
-    # AwardRecord, never trusted from the request body — payload.contractor_id
+    # The service provider being reviewed is derived from the project's own
+    # AwardRecord, never trusted from the request body — payload.service_provider_id
     # is otherwise a free-text client-supplied ID with only a "some real
-    # contractor exists" FK constraint behind it, letting an owner rate ANY
-    # contractor's public profile under cover of an unrelated awarded
+    # service provider exists" FK constraint behind it, letting an owner rate ANY
+    # service provider's public profile under cover of an unrelated awarded
     # project (a real IDOR, found and fixed in PASS 17's security audit).
     award = db.query(AwardRecord).filter(AwardRecord.project_id == payload.project_id).first()
     if not award:
@@ -357,22 +357,22 @@ def submit_review(payload: ReviewCreate, user: User = Depends(require_owner), db
     review = Review(
         project_id=payload.project_id,
         owner_id=user.id,
-        contractor_id=award.contractor_id,
+        service_provider_id=award.service_provider_id,
         rating=payload.rating,
         comment=payload.comment or None,
     )
     db.add(review)
     db.commit()
 
-    # Recompute the contractor's public average rather than trusting an
+    # Recompute the service provider's public average rather than trusting an
     # incrementally-maintained counter, so it can never drift out of sync.
-    # Uses the same server-derived award.contractor_id as above — never
-    # payload.contractor_id.
-    all_reviews = db.query(Review.rating).filter(Review.contractor_id == award.contractor_id).all()
+    # Uses the same server-derived award.service_provider_id as above — never
+    # payload.service_provider_id.
+    all_reviews = db.query(Review.rating).filter(Review.service_provider_id == award.service_provider_id).all()
     review_count = len(all_reviews)
     avg_rating = round(sum(r[0] for r in all_reviews) / review_count, 1) if review_count else 0
 
-    profile = db.get(ContractorProfile, award.contractor_id)
+    profile = db.get(ServiceProviderProfile, award.service_provider_id)
     if profile:
         profile.avg_rating = avg_rating
         profile.review_count = review_count
@@ -382,8 +382,8 @@ def submit_review(payload: ReviewCreate, user: User = Depends(require_owner), db
     return review
 
 
-# ---------- owner verification (mirrors the contractor document-review
-# flow in routers/contractor.py, scoped to DocumentRequirement.applies_to
+# ---------- owner verification (mirrors the service provider document-review
+# flow in routers/service-provider.py, scoped to DocumentRequirement.applies_to
 # == owner) ----------
 
 @router.get("/requirements", response_model=list[DocumentRequirementOut])

@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
-import type { AuditLogEntry, ContractorProfile, PaymentOverrideRecord } from "@/api/types";
+import type { AuditLogEntry, ServiceProviderProfile, PaymentOverrideRecord } from "@/api/types";
 import { stars } from "@/lib/format";
-import { DeleteContractorForm } from "@/components/DeleteContractorForm";
+import { DeleteServiceProviderForm } from "@/components/DeleteServiceProviderForm";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { PageLoading } from "@/components/PageLoading";
 
@@ -30,25 +30,25 @@ const MARKETPLACE_STATUS_BADGE: Record<string, string> = {
   suspended: "bg-red-tint text-red",
 };
 
-function MarketplaceAccessPanel({ contractorId, contractor }: { contractorId: string; contractor: ContractorProfile }) {
+function MarketplaceAccessPanel({ serviceProviderId, service_provider }: { serviceProviderId: string; service_provider: ServiceProviderProfile }) {
   const queryClient = useQueryClient();
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const { data: overrides } = useQuery({
-    queryKey: ["admin-payment-overrides", contractorId],
-    queryFn: () => apiFetch<PaymentOverrideRecord[]>(`/admin/contractors/${contractorId}/payment-overrides`),
+    queryKey: ["admin-payment-overrides", serviceProviderId],
+    queryFn: () => apiFetch<PaymentOverrideRecord[]>(`/admin/service-providers/${serviceProviderId}/payment-overrides`),
   });
 
   const invalidate = () => {
     setError(null);
-    queryClient.invalidateQueries({ queryKey: ["admin-contractor", contractorId] });
-    queryClient.invalidateQueries({ queryKey: ["admin-payment-overrides", contractorId] });
-    queryClient.invalidateQueries({ queryKey: ["admin-audit-log", contractorId] });
+    queryClient.invalidateQueries({ queryKey: ["admin-service-provider", serviceProviderId] });
+    queryClient.invalidateQueries({ queryKey: ["admin-payment-overrides", serviceProviderId] });
+    queryClient.invalidateQueries({ queryKey: ["admin-audit-log", serviceProviderId] });
   };
 
   const grantMutation = useMutation({
-    mutationFn: () => apiFetch(`/admin/contractors/${contractorId}/payment-override`, { method: "POST", body: { reason } }),
+    mutationFn: () => apiFetch(`/admin/service-providers/${serviceProviderId}/payment-override`, { method: "POST", body: { reason } }),
     onSuccess: () => {
       setReason("");
       invalidate();
@@ -58,7 +58,7 @@ function MarketplaceAccessPanel({ contractorId, contractor }: { contractorId: st
 
   const revokeMutation = useMutation({
     mutationFn: () =>
-      apiFetch(`/admin/contractors/${contractorId}/payment-override/revoke`, { method: "POST", body: { reason: reason || null } }),
+      apiFetch(`/admin/service-providers/${serviceProviderId}/payment-override/revoke`, { method: "POST", body: { reason: reason || null } }),
     onSuccess: () => {
       setReason("");
       invalidate();
@@ -66,28 +66,28 @@ function MarketplaceAccessPanel({ contractorId, contractor }: { contractorId: st
     onError: (err) => setError(err instanceof ApiError ? err.detail : "Could not revoke override."),
   });
 
-  const label = MARKETPLACE_STATUS_LABEL[contractor.marketplace_status] ?? contractor.marketplace_status;
-  const badge = MARKETPLACE_STATUS_BADGE[contractor.marketplace_status] ?? "bg-blue-tint text-steel";
+  const label = MARKETPLACE_STATUS_LABEL[service_provider.marketplace_status] ?? service_provider.marketplace_status;
+  const badge = MARKETPLACE_STATUS_BADGE[service_provider.marketplace_status] ?? "bg-blue-tint text-steel";
 
   return (
     <div className="bg-white border border-border rounded px-5 py-4.5">
       <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-3">Marketplace access</h3>
       <div className="flex items-center gap-2 mb-3">
         <span className={`font-mono text-[10px] uppercase px-2.5 py-1 rounded-full ${badge}`}>{label}</span>
-        {contractor.payment_override_active && (
+        {service_provider.payment_override_active && (
           <span className="font-mono text-[10px] uppercase px-2.5 py-1 rounded-full bg-blue-tint text-blue">Admin override active</span>
         )}
       </div>
       <p className="text-[11.5px] text-steel-light mb-3">
-        Subscription: {contractor.subscription_status || "none"}
-        {contractor.subscription_current_period_end &&
-          ` · renews ${new Date(contractor.subscription_current_period_end).toLocaleDateString()}`}
+        Subscription: {service_provider.subscription_status || "none"}
+        {service_provider.subscription_current_period_end &&
+          ` · renews ${new Date(service_provider.subscription_current_period_end).toLocaleDateString()}`}
       </p>
 
       <ErrorBanner message={error} />
 
       <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
-        {contractor.payment_override_active ? "Revoke reason (optional)" : "Override reason (required)"}
+        {service_provider.payment_override_active ? "Revoke reason (optional)" : "Override reason (required)"}
       </label>
       <textarea
         value={reason}
@@ -96,7 +96,7 @@ function MarketplaceAccessPanel({ contractorId, contractor }: { contractorId: st
         placeholder="Why is this override needed? This is recorded permanently."
         className="w-full border border-border rounded px-3 py-2 text-sm mb-2 resize-y"
       />
-      {contractor.payment_override_active ? (
+      {service_provider.payment_override_active ? (
         <button
           type="button"
           onClick={() => revokeMutation.mutate()}
@@ -135,10 +135,10 @@ function MarketplaceAccessPanel({ contractorId, contractor }: { contractorId: st
   );
 }
 
-function ActivityLogPanel({ contractorId }: { contractorId: string }) {
+function ActivityLogPanel({ serviceProviderId }: { serviceProviderId: string }) {
   const { data: entries } = useQuery({
-    queryKey: ["admin-audit-log", contractorId],
-    queryFn: () => apiFetch<AuditLogEntry[]>(`/admin/contractors/${contractorId}/audit-log`),
+    queryKey: ["admin-audit-log", serviceProviderId],
+    queryFn: () => apiFetch<AuditLogEntry[]>(`/admin/service-providers/${serviceProviderId}/audit-log`),
   });
 
   if (!entries?.length) return null;
@@ -167,17 +167,17 @@ function ActivityLogPanel({ contractorId }: { contractorId: string }) {
   );
 }
 
-export function AdminContractorDetailPage() {
+export function AdminServiceProviderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data: detail } = useQuery({
-    queryKey: ["admin-contractor", id],
-    queryFn: () => apiFetch<{ contractor: ContractorProfile }>(`/admin/contractors/${id}`),
+    queryKey: ["admin-service-provider", id],
+    queryFn: () => apiFetch<{ service_provider: ServiceProviderProfile }>(`/admin/service-providers/${id}`),
     enabled: !!id,
   });
-  const contractor = detail?.contractor;
+  const service_provider = detail?.service_provider;
 
   const [companyName, setCompanyName] = useState("");
   const [licenseNumber, setLicenseNumber] = useState("");
@@ -187,25 +187,25 @@ export function AdminContractorDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!contractor) return;
-    setCompanyName(contractor.company_name);
-    setLicenseNumber(contractor.license_number ?? "");
-    setPrimaryTrade(contractor.primary_trade ?? "");
-    setServiceArea(contractor.service_area ?? "");
-    setStatusValue(contractor.verification_status);
-  }, [contractor?.user_id]);
+    if (!service_provider) return;
+    setCompanyName(service_provider.company_name);
+    setLicenseNumber(service_provider.license_number ?? "");
+    setPrimaryTrade(service_provider.primary_trade ?? "");
+    setServiceArea(service_provider.service_area ?? "");
+    setStatusValue(service_provider.verification_status);
+  }, [service_provider?.user_id]);
 
   const invalidate = () => {
     setError(null);
-    queryClient.invalidateQueries({ queryKey: ["admin-contractor", id] });
-    queryClient.invalidateQueries({ queryKey: ["admin-contractors"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-service-provider", id] });
+    queryClient.invalidateQueries({ queryKey: ["admin-service-providers"] });
   };
   const onMutationError = (err: unknown, fallback: string) =>
     setError(err instanceof ApiError ? err.detail : fallback);
 
   const updateMutation = useMutation({
     mutationFn: () =>
-      apiFetch(`/admin/contractors/${id}`, {
+      apiFetch(`/admin/service-providers/${id}`, {
         method: "PATCH",
         body: { company_name: companyName, license_number: licenseNumber || null, primary_trade: primaryTrade || null, service_area: serviceArea || null },
       }),
@@ -214,31 +214,31 @@ export function AdminContractorDetailPage() {
   });
 
   const statusMutation = useMutation({
-    mutationFn: () => apiFetch(`/admin/contractors/${id}/verification-status`, { method: "POST", body: { status: statusValue } }),
+    mutationFn: () => apiFetch(`/admin/service-providers/${id}/verification-status`, { method: "POST", body: { status: statusValue } }),
     onSuccess: invalidate,
     onError: (err) => onMutationError(err, "Could not update verification status."),
   });
 
   const suspendMutation = useMutation({
-    mutationFn: () => apiFetch(`/admin/contractors/${id}/suspend`, { method: "POST", body: { suspended: !contractor?.is_suspended } }),
+    mutationFn: () => apiFetch(`/admin/service-providers/${id}/suspend`, { method: "POST", body: { suspended: !service_provider?.is_suspended } }),
     onSuccess: invalidate,
     onError: (err) => onMutationError(err, "Could not update account access."),
   });
 
-  if (!contractor) return <PageLoading />;
+  if (!service_provider) return <PageLoading />;
 
   return (
     <main className="max-w-3xl mx-auto px-5 py-8">
       <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">Admin · Service providers</span>
       <div className="flex items-start justify-between flex-wrap gap-3 mb-6">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-navy mb-1">{contractor.company_name}</h1>
+          <h1 className="font-display text-2xl font-semibold text-navy mb-1">{service_provider.company_name}</h1>
           <p className="text-[13.5px] text-steel">
-            <span className="text-amber">{stars(Number(contractor.avg_rating))}</span>{" "}
-            <span className="font-mono text-steel">({contractor.review_count} reviews)</span>
+            <span className="text-amber">{stars(Number(service_provider.avg_rating))}</span>{" "}
+            <span className="font-mono text-steel">({service_provider.review_count} reviews)</span>
           </p>
         </div>
-        {contractor.is_suspended && <span className="font-mono text-[10px] uppercase px-2.5 py-1 rounded-full bg-red-tint text-red">Suspended</span>}
+        {service_provider.is_suspended && <span className="font-mono text-[10px] uppercase px-2.5 py-1 rounded-full bg-red-tint text-red">Suspended</span>}
       </div>
 
       <ErrorBanner message={error} />
@@ -295,32 +295,32 @@ export function AdminContractorDetailPage() {
             <p className="text-[11px] text-steel-light mt-2">Admin override — bypasses the per-document review flow. Use with care.</p>
           </div>
 
-          <MarketplaceAccessPanel contractorId={contractor.user_id} contractor={contractor} />
+          <MarketplaceAccessPanel serviceProviderId={service_provider.user_id} service_provider={service_provider} />
 
           <div className="bg-white border border-border rounded px-5 py-4.5">
             <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-3">Account access</h3>
             <button
               type="button"
               onClick={() => suspendMutation.mutate()}
-              className={`text-xs font-semibold rounded px-4 py-2 w-full ${contractor.is_suspended ? "bg-green-tint text-green" : "bg-red-tint text-red"}`}
+              className={`text-xs font-semibold rounded px-4 py-2 w-full ${service_provider.is_suspended ? "bg-green-tint text-green" : "bg-red-tint text-red"}`}
             >
-              {contractor.is_suspended ? "Reactivate account" : "Suspend account"}
+              {service_provider.is_suspended ? "Reactivate account" : "Suspend account"}
             </button>
             <p className="text-[11px] text-steel-light mt-2">
-              {contractor.is_suspended
+              {service_provider.is_suspended
                 ? "This service provider can't view projects, drawings, or submit offers until reactivated."
                 : "Immediately blocks the service provider from the feed and offers, without deleting anything."}
             </p>
           </div>
 
-          <ActivityLogPanel contractorId={contractor.user_id} />
+          <ActivityLogPanel serviceProviderId={service_provider.user_id} />
 
           <div className="bg-white border border-red/30 rounded px-5 py-4.5">
             <h3 className="font-mono text-[11px] uppercase tracking-wide text-red mb-3">Danger zone</h3>
-            <DeleteContractorForm
-              contractorId={contractor.user_id}
-              companyName={contractor.company_name}
-              onDeleted={() => navigate("/admin/contractors")}
+            <DeleteServiceProviderForm
+              serviceProviderId={service_provider.user_id}
+              companyName={service_provider.company_name}
+              onDeleted={() => navigate("/admin/service-providers")}
             />
           </div>
         </div>

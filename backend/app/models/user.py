@@ -24,8 +24,8 @@ class User(Base):
     email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    contractor_profile = relationship(
-        "ContractorProfile", back_populates="user", uselist=False, cascade="all, delete-orphan"
+    service_provider_profile = relationship(
+        "ServiceProviderProfile", back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
     owner_profile = relationship(
         "OwnerProfile", back_populates="user", uselist=False, cascade="all, delete-orphan"

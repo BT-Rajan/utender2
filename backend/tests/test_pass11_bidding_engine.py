@@ -14,7 +14,7 @@ def test_pass11_bidding_engine():
 
 
     from app.auth.security import hash_password
-    from app.models.document import ContractorDocument
+    from app.models.document import ServiceProviderDocument
     from app.models.enums import DocumentStatus, UserRole
     from app.models.user import User
 
@@ -35,23 +35,23 @@ def test_pass11_bidding_engine():
     _owner_approve_db.commit()
 
 
-    def make_active_contractor(email, company):
+    def make_active_service_provider(email, company):
         client = TestClient(app)
         r = client.post(
             "/auth/signup",
-            json={"email": email, "password": "password123", "full_name": "C", "role": "contractor", "company_name": company},
+            json={"email": email, "password": "password123", "full_name": "C", "role": "service_provider", "company_name": company},
         )
         cid = r.json()["id"]
-        for doc in db.query(ContractorDocument).filter_by(contractor_id=cid).all():
+        for doc in db.query(ServiceProviderDocument).filter_by(service_provider_id=cid).all():
             doc.status = DocumentStatus.approved
         db.commit()
-        admin_client.post(f"/admin/review/contractors/{cid}/approve")
-        admin_client.post(f"/admin/contractors/{cid}/payment-override", json={"reason": "test activation"})
+        admin_client.post(f"/admin/review/service-providers/{cid}/approve")
+        admin_client.post(f"/admin/service-providers/{cid}/payment-override", json={"reason": "test activation"})
         return client, cid
 
 
-    c1, c1_id = make_active_contractor("c1@example.com", "Acme")
-    c2, c2_id = make_active_contractor("c2@example.com", "BuildCo")
+    c1, c1_id = make_active_service_provider("c1@example.com", "Acme")
+    c2, c2_id = make_active_service_provider("c2@example.com", "BuildCo")
 
     future = (datetime.utcnow() + timedelta(days=7)).isoformat()
 
@@ -97,8 +97,8 @@ def test_pass11_bidding_engine():
     # owner sees revision count for a non-sealed project (no redaction)
     r = c2.post(f"/projects/{open_project_id}/offers", json={"amount": "1200.00"})
     r = owner_client.get(f"/owner/projects/{open_project_id}/offers")
-    c2_offer = next(o for o in r.json() if o["contractor_id"] == c2_id)
-    check("owner sees real contractor_id on owner-visible tender", c2_offer["contractor_id"] == c2_id)
+    c2_offer = next(o for o in r.json() if o["service_provider_id"] == c2_id)
+    check("owner sees real service_provider_id on owner-visible tender", c2_offer["service_provider_id"] == c2_id)
     check("owner sees real amount on owner-visible tender", float(c2_offer["amount"]) == 1200.00)
     check("sealed flag is False on owner-visible tender", c2_offer["sealed"] is False)
 
@@ -116,9 +116,9 @@ def test_pass11_bidding_engine():
     r = owner_client.get(f"/owner/projects/{sealed_project_id}/offers")
     check("owner sees 2 bids exist while sealed+open", len(r.json()) == 2)
     check("ALL amounts hidden while sealed+open", all(o["amount"] is None for o in r.json()))
-    check("ALL contractor_ids hidden while sealed+open", all(o["contractor_id"] is None for o in r.json()))
+    check("ALL service_provider_ids hidden while sealed+open", all(o["service_provider_id"] is None for o in r.json()))
     check("ALL messages hidden while sealed+open", all(o["message"] is None for o in r.json()))
-    check("ALL company names hidden while sealed+open", all(o["contractor_company_name"] is None for o in r.json()))
+    check("ALL company names hidden while sealed+open", all(o["service_provider_company_name"] is None for o in r.json()))
     check("sealed flag is True on every row", all(o["sealed"] is True for o in r.json()))
 
     sealed_offer_ids = [o["id"] for o in r.json()]
@@ -129,9 +129,9 @@ def test_pass11_bidding_engine():
     r = owner_client.get(f"/owner/projects/{sealed_project_id}/offers/{sealed_offer_ids[1]}/history")
     check("second sealed offer's history also blocked", r.status_code == 404)
 
-    # contractor still sees their OWN full bid even while sealed
+    # service provider still sees their OWN full bid even while sealed
     r = c1.get(f"/projects/{sealed_project_id}/offers/mine")
-    check("contractor sees their own amount even on a sealed tender", float(r.json()["amount"]) == 5000.00)
+    check("service_provider sees their own amount even on a sealed tender", float(r.json()["amount"]) == 5000.00)
 
     # once bidding closes, the seal lifts. A sealed tender closes only when its deadline
     # passes -- the owner can no longer close it early (audit remediation R1) -- so expire it.
@@ -142,7 +142,7 @@ def test_pass11_bidding_engine():
     owner_client.get("/owner/projects")  # lazy deadline sync, exactly as production does on any read
     r = owner_client.get(f"/owner/projects/{sealed_project_id}/offers")
     check("after close, amounts are revealed", all(o["amount"] is not None for o in r.json()))
-    check("after close, contractor identities are revealed", all(o["contractor_id"] is not None for o in r.json()))
+    check("after close, service provider identities are revealed", all(o["service_provider_id"] is not None for o in r.json()))
     check("after close, sealed flag is False", all(o["sealed"] is False for o in r.json()))
     revealed_amounts = sorted(float(o["amount"]) for o in r.json())
     check("revealed amounts match what was actually bid", revealed_amounts == [4500.0, 5000.0])

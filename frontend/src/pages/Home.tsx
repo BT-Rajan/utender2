@@ -18,7 +18,7 @@ import {
 
 interface PublicStats {
   open_tenders: number;
-  verified_contractors: number;
+  verified_service_providers: number;
   awarded_projects: number;
   total_awarded_value: string;
 }
@@ -78,8 +78,8 @@ function RoleCard({
       {documents && documents.length === 0 && <p className="text-[13px] text-steel mb-4">{t("home.noDocuments")}</p>}
 
       <Label>{t("home.costLabel")}</Label>
-      <p className={`text-[13.5px] mb-2 ${role === "contractor" ? "text-navy font-semibold" : "text-steel"}`}>{cms[`${k}_cost`]}</p>
-      {role === "contractor" && plans && (
+      <p className={`text-[13.5px] mb-2 ${role === "service_provider" ? "text-navy font-semibold" : "text-steel"}`}>{cms[`${k}_cost`]}</p>
+      {role === "service_provider" && plans && (
         <ul className="mb-4 text-[13.5px] text-navy font-semibold">
           {plans.length > 0 ? (
             plans.map((p) => (
@@ -118,7 +118,7 @@ export function HomePage() {
 
   const { data: cms } = usePublicCms(language, !user);
   const { data: ownerDocs } = usePublicRequirements("owner", !user);
-  const { data: providerDocs } = usePublicRequirements("contractor", !user);
+  const { data: providerDocs } = usePublicRequirements("service_provider", !user);
   const { data: plans } = usePricing(!user);
   const { data: stats } = useQuery({
     queryKey: ["public-stats"],
@@ -131,10 +131,10 @@ export function HomePage() {
   if (user) {
     if (user.role === "admin") return <Navigate to="/admin/requirements" replace />;
     if (user.role === "owner") return <Navigate to="/owner/dashboard" replace />;
-    // The contractor dashboard itself branches on marketplace_status —
+    // The service provider dashboard itself branches on marketplace_status —
     // documents incomplete, pending review, payment required, active, or
     // suspended all land there and get the right prompt.
-    return <Navigate to="/contractor/dashboard" replace />;
+    return <Navigate to="/service-provider/dashboard" replace />;
   }
 
   return (
@@ -178,7 +178,7 @@ export function HomePage() {
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-14">
           <StatCard value={String(stats.open_tenders)} label={t("home.statOpen")} />
-          <StatCard value={String(stats.verified_contractors)} label={t("home.statVerified")} />
+          <StatCard value={String(stats.verified_service_providers)} label={t("home.statVerified")} />
           <StatCard value={String(stats.awarded_projects)} label={t("home.statAwarded")} />
         </div>
       )}
@@ -190,7 +190,7 @@ export function HomePage() {
             <p className="text-[14px] text-steel mb-7 text-center max-w-2xl mx-auto">{cms.home_roles_intro}</p>
             <div className="grid sm:grid-cols-2 gap-4">
               <RoleCard role="owner" cms={cms} documents={ownerDocs} plans={plans} />
-              <RoleCard role="contractor" cms={cms} documents={providerDocs} plans={plans} />
+              <RoleCard role="service_provider" cms={cms} documents={providerDocs} plans={plans} />
             </div>
           </>
         ) : (
@@ -199,8 +199,8 @@ export function HomePage() {
             <Link to={signupPath("owner")} className="border border-navy text-navy rounded px-5 py-2.5 text-sm font-semibold">
               {t("auth.signup.propertyOwner")}
             </Link>
-            <Link to={signupPath("contractor")} className="border border-navy text-navy rounded px-5 py-2.5 text-sm font-semibold">
-              {t("auth.signup.contractor")}
+            <Link to={signupPath("service_provider")} className="border border-navy text-navy rounded px-5 py-2.5 text-sm font-semibold">
+              {t("auth.signup.service_provider")}
             </Link>
           </div>
         )}

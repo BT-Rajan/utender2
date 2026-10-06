@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
-import type { ContractorProfile } from "@/api/types";
+import type { ServiceProviderProfile } from "@/api/types";
 import { PageLoading } from "@/components/PageLoading";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
@@ -22,10 +22,10 @@ function PlanToggle({
 }) {
   const { t, language } = useI18n();
   const features = [
-    t("contractor.subscribe.feature1"),
-    t("contractor.subscribe.feature2"),
-    t("contractor.subscribe.feature3"),
-    t("contractor.subscribe.feature4"),
+    t("service_provider.subscribe.feature1"),
+    t("service_provider.subscribe.feature2"),
+    t("service_provider.subscribe.feature3"),
+    t("service_provider.subscribe.feature4"),
   ];
   // Prices are the live Stripe prices checkout will charge (/public/pricing).
   const monthly = plans.find((p) => p.plan === "monthly");
@@ -49,7 +49,7 @@ function PlanToggle({
               className={`font-mono text-xs px-4.5 py-2 uppercase tracking-wide ${i > 0 ? "border-s border-navy" : ""} ${selected?.plan === p.plan ? "bg-navy text-white" : "bg-white text-navy"}`}
             >
               {t(`pricing.${p.plan}`)}
-              {p.plan === "annual" && savingPercent > 0 && ` — ${t("contractor.subscribe.save").replace("{percent}", String(savingPercent))}`}
+              {p.plan === "annual" && savingPercent > 0 && ` — ${t("service_provider.subscribe.save").replace("{percent}", String(savingPercent))}`}
             </button>
           ))}
         </div>
@@ -64,8 +64,8 @@ function PlanToggle({
             </div>
             <p className="text-xs text-steel mt-2 mb-5">
               {selected.interval === "year"
-                ? t("contractor.subscribe.priceAnnualNote").replace("{amount}", formatMoney(selected.amount, selected.currency, language))
-                : t("contractor.subscribe.priceMonthlyNote")}
+                ? t("service_provider.subscribe.priceAnnualNote").replace("{amount}", formatMoney(selected.amount, selected.currency, language))
+                : t("service_provider.subscribe.priceMonthlyNote")}
             </p>
           </>
         ) : (
@@ -84,21 +84,21 @@ function PlanToggle({
           disabled={pending || !selected}
           className="bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 w-full"
         >
-          {t("contractor.subscribe.start")}
+          {t("service_provider.subscribe.start")}
         </button>
       </div>
     </div>
   );
 }
 
-export function ContractorSubscribePage() {
+export function ServiceProviderSubscribePage() {
   const { t } = useI18n();
   const [plan, setPlan] = useState<"monthly" | "annual">("monthly");
   const [error, setError] = useState<string | null>(null);
 
   const { data: profile } = useQuery({
-    queryKey: ["contractor-profile"],
-    queryFn: () => apiFetch<ContractorProfile>("/contractor/profile"),
+    queryKey: ["service-provider-profile"],
+    queryFn: () => apiFetch<ServiceProviderProfile>("/service-provider/profile"),
   });
 
   const { data: plans, isLoading: plansLoading } = usePricing();
@@ -110,7 +110,7 @@ export function ContractorSubscribePage() {
     onSuccess: (data) => {
       window.location.href = data.url;
     },
-    onError: (err) => setError(err instanceof ApiError ? err.detail : t("contractor.subscribe.checkoutError")),
+    onError: (err) => setError(err instanceof ApiError ? err.detail : t("service_provider.subscribe.checkoutError")),
   });
 
   const portalMutation = useMutation({
@@ -118,14 +118,14 @@ export function ContractorSubscribePage() {
     onSuccess: (data) => {
       window.location.href = data.url;
     },
-    onError: (err) => setError(err instanceof ApiError ? err.detail : t("contractor.subscribe.portalError")),
+    onError: (err) => setError(err instanceof ApiError ? err.detail : t("service_provider.subscribe.portalError")),
   });
 
   if (!profile || plansLoading) return <PageLoading />;
 
   const hasRealSubscription = profile.subscription_status === "active" || profile.subscription_status === "trialing";
   // marketplace_status already folds in an admin payment override, so a
-  // contractor can be fully active (verified_active) with no Stripe
+  // service provider can be fully active (verified_active) with no Stripe
   // subscription at all — that state gets its own message rather than
   // being lumped in with "Subscribe to bid".
   const isActive = profile.marketplace_status === "verified_active";
@@ -133,12 +133,12 @@ export function ContractorSubscribePage() {
 
   return (
     <main className="max-w-3xl mx-auto px-5 py-8">
-      <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">{t("contractor.subscribe.eyebrow")}</span>
+      <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">{t("service_provider.subscribe.eyebrow")}</span>
       <h1 className="font-display text-2xl font-semibold text-navy mb-1">
-        {isActive ? t("contractor.subscribe.headingActive") : t("contractor.subscribe.headingInactive")}
+        {isActive ? t("service_provider.subscribe.headingActive") : t("service_provider.subscribe.headingInactive")}
       </h1>
       <p className="text-[13.5px] text-steel mb-7">
-        {isActive ? t("contractor.subscribe.subheadingActive") : t("contractor.subscribe.subheadingInactive")}
+        {isActive ? t("service_provider.subscribe.subheadingActive") : t("service_provider.subscribe.subheadingInactive")}
       </p>
 
       <ErrorBanner message={error} />
@@ -146,12 +146,12 @@ export function ContractorSubscribePage() {
       {isActive ? (
         <div className="bg-white border border-border border-t-4 border-t-green rounded px-7 py-7 max-w-md">
           <span className="font-mono text-[10px] uppercase px-2.5 py-1 rounded-full bg-green-tint text-green">
-            {overrideOnly ? t("contractor.subscribe.overrideBadge") : profile.subscription_status}
+            {overrideOnly ? t("service_provider.subscribe.overrideBadge") : profile.subscription_status}
           </span>
-          {overrideOnly && <p className="text-sm text-steel mt-3">{t("contractor.subscribe.overrideMessage")}</p>}
+          {overrideOnly && <p className="text-sm text-steel mt-3">{t("service_provider.subscribe.overrideMessage")}</p>}
           {!overrideOnly && profile.subscription_current_period_end && (
             <p className="text-sm text-steel mt-3">
-              {t("contractor.subscribe.renews")} {new Date(profile.subscription_current_period_end).toLocaleDateString()}
+              {t("service_provider.subscribe.renews")} {new Date(profile.subscription_current_period_end).toLocaleDateString()}
             </p>
           )}
           {!overrideOnly && (
@@ -160,7 +160,7 @@ export function ContractorSubscribePage() {
               onClick={() => portalMutation.mutate()}
               className="mt-5 border border-navy text-navy hover:bg-navy hover:text-white text-sm font-semibold rounded px-5 py-2.5"
             >
-              {t("contractor.subscribe.manageBilling")}
+              {t("service_provider.subscribe.manageBilling")}
             </button>
           )}
         </div>
@@ -173,7 +173,7 @@ export function ContractorSubscribePage() {
             onSubscribe={() => checkoutMutation.mutate()}
             pending={checkoutMutation.isPending}
           />
-          <p className="text-xs text-steel-light mt-6 max-w-md">{t("contractor.subscribe.checkoutNote")}</p>
+          <p className="text-xs text-steel-light mt-6 max-w-md">{t("service_provider.subscribe.checkoutNote")}</p>
         </>
       )}
     </main>

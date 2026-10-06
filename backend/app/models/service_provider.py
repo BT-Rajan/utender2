@@ -8,8 +8,8 @@ from app.db import Base
 from app.models.enums import SubscriptionStatus, VerificationStatus
 
 
-class ContractorProfile(Base):
-    __tablename__ = "contractor_profiles"
+class ServiceProviderProfile(Base):
+    __tablename__ = "service_provider_profiles"
 
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     company_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -37,7 +37,7 @@ class ContractorProfile(Base):
     payment_override_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    user = relationship("User", back_populates="contractor_profile")
+    user = relationship("User", back_populates="service_provider_profile")
 
     @property
     def is_payment_active(self) -> bool:

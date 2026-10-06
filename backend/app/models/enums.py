@@ -3,7 +3,7 @@ import enum
 
 class UserRole(str, enum.Enum):
     owner = "owner"
-    contractor = "contractor"
+    service_provider = "service_provider"
     admin = "admin"
 
 
@@ -85,8 +85,8 @@ class NotificationType(str, enum.Enum):
     payment_failed = "payment_failed"
     payment_override_granted = "payment_override_granted"
     payment_override_revoked = "payment_override_revoked"
-    contractor_suspended = "contractor_suspended"
-    contractor_reactivated = "contractor_reactivated"
+    service_provider_suspended = "service_provider_suspended"
+    service_provider_reactivated = "service_provider_reactivated"
     owner_verification_activated = "owner_verification_activated"
     owner_document_rejected = "owner_document_rejected"
     owner_document_approved = "owner_document_approved"

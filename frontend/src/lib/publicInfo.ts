@@ -7,28 +7,17 @@ import type { Language } from "@/i18n/I18nContext";
 // and the verification checklist from the admin-managed document
 // requirements. Never hardcode either in copy — read them from here.
 
-export type SignupRole = "owner" | "contractor";
+export type SignupRole = "owner" | "service_provider";
 
 // Step 1 -> Step 2 handoff. The landing page's role CTAs link to
 // /signup?role=owner or /signup?role=service_provider; the signup form
-// sends the matching stored role value ("owner" / "contractor") to
-// POST /auth/signup, which persists it. This is the one place the public
-// slug and the stored value are mapped.
-const ROLE_SLUGS: Record<SignupRole, string> = { owner: "owner", contractor: "service_provider" };
-
+// sends that same role value to POST /auth/signup, which persists it.
 export function signupPath(role: SignupRole): string {
-  return `/signup?role=${ROLE_SLUGS[role]}`;
+  return `/signup?role=${role}`;
 }
 
-export function roleSlug(role: SignupRole): string {
-  return ROLE_SLUGS[role];
-}
-
-// "contractor" is still accepted so older links keep working.
-export function parseRoleSlug(value: string | null): SignupRole | null {
-  if (value === "owner") return "owner";
-  if (value === "service_provider" || value === "contractor") return "contractor";
-  return null;
+export function parseRole(value: string | null): SignupRole | null {
+  return value === "owner" || value === "service_provider" ? value : null;
 }
 
 export interface PlanPrice {

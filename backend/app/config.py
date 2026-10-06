@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     storage_signing_secret: str = "change-me-in-production"
 
     s3_bucket_drawings: str = "project-drawings"
-    s3_bucket_documents: str = "contractor-documents"
+    s3_bucket_documents: str = "service-provider-documents"
     s3_bucket_owner_documents: str = "owner-documents"
     s3_region: str | None = None
     s3_endpoint_url: str | None = None  # set for MinIO / S3-compatible hosts

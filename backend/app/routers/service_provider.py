@@ -5,31 +5,31 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import get_contractor_profile, get_current_user, require_approved_contractor, require_contractor
-from app.models.contractor import ContractorProfile
-from app.models.document import ContractorDocument, DocumentRequirement
+from app.deps import get_service_provider_profile, get_current_user, require_approved_service_provider, require_service_provider
+from app.models.service_provider import ServiceProviderProfile
+from app.models.document import ServiceProviderDocument, DocumentRequirement
 from app.models.enums import DocumentStatus, ProjectStatus, UserRole, VerificationStatus
 from app.models.offer import Offer
 from app.models.project import Project
 from app.models.user import User
-from app.schemas.contractor import ContractorProfileOut, MyBidOut, SubmitForReview
-from app.schemas.document import ContractorDocumentOut, DocumentRequirementOut
+from app.schemas.service_provider import ServiceProviderProfileOut, MyBidOut, SubmitForReview
+from app.schemas.document import ServiceProviderDocumentOut, DocumentRequirementOut
 from app.schemas.project import ProjectOut
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import sync_expired_projects
 
-router = APIRouter(prefix="/contractor", tags=["contractor"])
+router = APIRouter(prefix="/service-provider", tags=["service_provider"])
 
 
-# Any authenticated contractor can read the active checklist — mirrors the
+# Any authenticated service provider can read the active checklist — mirrors the
 # original "requirements_read" RLS policy (using (true)) rather than the
 # admin-only write endpoints under /admin/requirements.
 @router.get("/requirements", response_model=list[DocumentRequirementOut])
-def active_requirements(user: User = Depends(require_contractor), db: Session = Depends(get_db)):
+def active_requirements(user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
     return (
         db.query(DocumentRequirement)
-        .filter(DocumentRequirement.is_active.is_(True), DocumentRequirement.applies_to == UserRole.contractor)
+        .filter(DocumentRequirement.is_active.is_(True), DocumentRequirement.applies_to == UserRole.service_provider)
         .all()
     )
 
@@ -39,11 +39,11 @@ def feed(
     trade: str | None = None,
     search: str | None = None,
     sort: str = "deadline",  # "deadline" (closing soonest, default) | "newest"
-    user: User = Depends(require_approved_contractor),
+    user: User = Depends(require_approved_service_provider),
     db: Session = Depends(get_db),
 ):
     # The feed itself requires verification approval (mirrors middleware.ts's
-    # contractorGatedPaths) — subscription is a separate, softer gate applied
+    # serviceProviderGatedPaths) — subscription is a separate, softer gate applied
     # only to drawings and offer submission below, not to seeing the feed.
     sync_expired_projects(db)
     query = db.query(Project).filter(Project.status == ProjectStatus.open, Project.is_suspended.is_(False))
@@ -56,7 +56,7 @@ def feed(
 
     query = query.order_by(Project.created_at.desc()) if sort == "newest" else query.order_by(Project.bid_deadline.asc())
     projects = query.all()
-    my_offers = {o.project_id: o.status.value for o in db.query(Offer).filter(Offer.contractor_id == user.id).all()}
+    my_offers = {o.project_id: o.status.value for o in db.query(Offer).filter(Offer.service_provider_id == user.id).all()}
 
     out = []
     for p in projects:
@@ -82,7 +82,7 @@ def feed(
 
 
 @router.get("/feed/trades", response_model=list[str])
-def feed_trades(user: User = Depends(require_approved_contractor), db: Session = Depends(get_db)):
+def feed_trades(user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
     """Distinct trades among currently open projects, for populating the
     feed's filter control — only values actually worth filtering by."""
     sync_expired_projects(db)
@@ -97,17 +97,17 @@ def feed_trades(user: User = Depends(require_approved_contractor), db: Session =
 
 
 @router.get("/my-bids", response_model=list[MyBidOut])
-def my_bids(user: User = Depends(require_contractor), db: Session = Depends(get_db)):
-    """Every offer this contractor has ever placed, across all projects —
+def my_bids(user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
+    """Every offer this service provider has ever placed, across all projects —
     the dashboard's single source for 'active bids' / 'won' counts and the
     My Bids list. Requires only the role, not verification/payment: a
-    contractor should always be able to see what they've already bid on
+    service provider should always be able to see what they've already bid on
     even if their access later lapses."""
     sync_expired_projects(db)
     rows = (
         db.query(Offer, Project)
         .join(Project, Offer.project_id == Project.id)
-        .filter(Offer.contractor_id == user.id)
+        .filter(Offer.service_provider_id == user.id)
         .order_by(Offer.updated_at.desc())
         .all()
     )
@@ -128,24 +128,24 @@ def my_bids(user: User = Depends(require_contractor), db: Session = Depends(get_
     ]
 
 
-@router.get("/profile", response_model=ContractorProfileOut)
-def profile(user: User = Depends(require_contractor), db: Session = Depends(get_db)):
-    cp = get_contractor_profile(user, db)
-    return ContractorProfileOut(**_profile_fields(cp), email=user.email)
+@router.get("/profile", response_model=ServiceProviderProfileOut)
+def profile(user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
+    cp = get_service_provider_profile(user, db)
+    return ServiceProviderProfileOut(**_profile_fields(cp), email=user.email)
 
 
-@router.get("/documents", response_model=list[ContractorDocumentOut])
-def list_documents(user: User = Depends(require_contractor), db: Session = Depends(get_db)):
+@router.get("/documents", response_model=list[ServiceProviderDocumentOut])
+def list_documents(user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
     rows = (
-        db.query(ContractorDocument, DocumentRequirement)
-        .join(DocumentRequirement, ContractorDocument.requirement_id == DocumentRequirement.id)
-        .filter(ContractorDocument.contractor_id == user.id)
+        db.query(ServiceProviderDocument, DocumentRequirement)
+        .join(DocumentRequirement, ServiceProviderDocument.requirement_id == DocumentRequirement.id)
+        .filter(ServiceProviderDocument.service_provider_id == user.id)
         .all()
     )
     return [
-        ContractorDocumentOut(
+        ServiceProviderDocumentOut(
             id=d.id,
-            contractor_id=d.contractor_id,
+            service_provider_id=d.service_provider_id,
             requirement_id=d.requirement_id,
             status=d.status,
             admin_note=d.admin_note,
@@ -161,20 +161,20 @@ def list_documents(user: User = Depends(require_contractor), db: Session = Depen
     ]
 
 
-@router.post("/documents/{requirement_id}/upload", response_model=ContractorDocumentOut)
+@router.post("/documents/{requirement_id}/upload", response_model=ServiceProviderDocumentOut)
 async def upload_document(
     requirement_id: str,
     file: UploadFile = File(...),
-    user: User = Depends(require_contractor),
+    user: User = Depends(require_service_provider),
     db: Session = Depends(get_db),
 ):
     doc = (
-        db.query(ContractorDocument)
-        .filter(ContractorDocument.contractor_id == user.id, ContractorDocument.requirement_id == requirement_id)
+        db.query(ServiceProviderDocument)
+        .filter(ServiceProviderDocument.service_provider_id == user.id, ServiceProviderDocument.requirement_id == requirement_id)
         .first()
     )
     if not doc:
-        raise HTTPException(status_code=404, detail="Document requirement not found for this contractor.")
+        raise HTTPException(status_code=404, detail="Document requirement not found for this service provider.")
 
     assert_allowed_extension(file.filename, ALLOWED_DOCUMENT_EXTENSIONS)
     content = await file.read()
@@ -183,7 +183,7 @@ async def upload_document(
 
     safe_name = sanitize_path_segment(file.filename)
     path = f"{user.id}/{requirement_id}/{int(datetime.utcnow().timestamp() * 1000)}-{safe_name}"
-    get_storage().save("contractor-documents", path, content, file.content_type or "application/octet-stream")
+    get_storage().save("service-provider-documents", path, content, file.content_type or "application/octet-stream")
 
     doc.file_path = path
     doc.status = DocumentStatus.pending
@@ -194,9 +194,9 @@ async def upload_document(
     db.refresh(doc)
 
     requirement = db.get(DocumentRequirement, requirement_id)
-    return ContractorDocumentOut(
+    return ServiceProviderDocumentOut(
         id=doc.id,
-        contractor_id=doc.contractor_id,
+        service_provider_id=doc.service_provider_id,
         requirement_id=doc.requirement_id,
         status=doc.status,
         admin_note=doc.admin_note,
@@ -210,28 +210,28 @@ async def upload_document(
     )
 
 
-@router.post("/submit-for-review", response_model=ContractorProfileOut)
-def submit_for_review(payload: SubmitForReview, user: User = Depends(require_contractor), db: Session = Depends(get_db)):
+@router.post("/submit-for-review", response_model=ServiceProviderProfileOut)
+def submit_for_review(payload: SubmitForReview, user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
     docs = (
-        db.query(ContractorDocument, DocumentRequirement)
-        .join(DocumentRequirement, ContractorDocument.requirement_id == DocumentRequirement.id)
-        .filter(ContractorDocument.contractor_id == user.id)
+        db.query(ServiceProviderDocument, DocumentRequirement)
+        .join(DocumentRequirement, ServiceProviderDocument.requirement_id == DocumentRequirement.id)
+        .filter(ServiceProviderDocument.service_provider_id == user.id)
         .all()
     )
     missing_required = any(r.is_required and d.status == DocumentStatus.not_submitted for d, r in docs)
     if missing_required:
         raise HTTPException(status_code=400, detail="All required documents must be uploaded before submitting for review.")
 
-    cp = get_contractor_profile(user, db)
+    cp = get_service_provider_profile(user, db)
     cp.company_name = payload.company_name
     cp.license_number = payload.license_number
     cp.verification_status = VerificationStatus.pending_review
     db.commit()
     db.refresh(cp)
-    return ContractorProfileOut(**_profile_fields(cp), email=user.email)
+    return ServiceProviderProfileOut(**_profile_fields(cp), email=user.email)
 
 
-def _profile_fields(cp: ContractorProfile) -> dict:
+def _profile_fields(cp: ServiceProviderProfile) -> dict:
     return dict(
         user_id=cp.user_id,
         company_name=cp.company_name,

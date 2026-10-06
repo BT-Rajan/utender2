@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.security import decode_token_payload, token_matches_password
 from app.db import get_db
-from app.models.contractor import ContractorProfile
+from app.models.service_provider import ServiceProviderProfile
 from app.models.enums import UserRole
 from app.models.owner import OwnerProfile
 from app.models.user import User
@@ -50,21 +50,21 @@ def require_role(*roles: UserRole):
 
 require_admin = require_role(UserRole.admin)
 require_owner = require_role(UserRole.owner)
-require_contractor = require_role(UserRole.contractor)
+require_service_provider = require_role(UserRole.service_provider)
 
 
-# Mirrors middleware.ts's contractor-specific third check: verification and
+# Mirrors middleware.ts's service-provider-specific third check: verification and
 # suspension state must be re-derived on every request, not just at login,
 # since an admin can flip either at any time. This is the *verification*
 # gate alone — enough to browse the feed and manage one's own profile, but
-# not enough to see drawings or bid (see require_marketplace_active_contractor
+# not enough to see drawings or bid (see require_marketplace_active_service_provider
 # below for the P0 rule that adds the payment gate on top of this one).
-def require_approved_contractor(user: User = Depends(require_contractor), db: Session = Depends(get_db)) -> User:
-    profile = db.get(ContractorProfile, user.id)
+def require_approved_service_provider(user: User = Depends(require_service_provider), db: Session = Depends(get_db)) -> User:
+    profile = db.get(ServiceProviderProfile, user.id)
     if not profile or profile.verification_status.value != "approved" or profile.is_suspended:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="not_approved",  # frontend redirects to /contractor/status on this code
+            detail="not_approved",  # frontend redirects to /service-provider/status on this code
         )
     return user
 
@@ -74,30 +74,30 @@ def require_approved_contractor(user: User = Depends(require_contractor), db: Se
 # project's drawings, downloading them, and submitting or revising a bid —
 # requires BOTH an approved verification AND active payment, where "active
 # payment" is a real Stripe subscription OR an admin-granted, audited
-# PaymentOverride. ContractorProfile.is_verified_active is the single
+# PaymentOverride. ServiceProviderProfile.is_verified_active is the single
 # source of truth for this; never re-derive the check inline at a call
 # site (that's exactly how the pre-PASS-5 code drifted: submit_offer used
 # to check is_subscribed alone, which silently ignored payment_override_active).
-def require_marketplace_active_contractor(user: User = Depends(require_contractor), db: Session = Depends(get_db)) -> User:
-    profile = db.get(ContractorProfile, user.id)
+def require_marketplace_active_service_provider(user: User = Depends(require_service_provider), db: Session = Depends(get_db)) -> User:
+    profile = db.get(ServiceProviderProfile, user.id)
     if not profile or not profile.is_verified_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="payment_required",  # frontend redirects to /contractor/subscribe on this code
+            detail="payment_required",  # frontend redirects to /service-provider/subscribe on this code
         )
     return user
 
 
-def get_contractor_profile(user: User, db: Session) -> ContractorProfile:
-    profile = db.get(ContractorProfile, user.id)
+def get_service_provider_profile(user: User, db: Session) -> ServiceProviderProfile:
+    profile = db.get(ServiceProviderProfile, user.id)
     if not profile:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service provider profile not found")
     return profile
 
 
-# Owner-side mirror of require_approved_contractor: an owner must be
+# Owner-side mirror of require_approved_service_provider: an owner must be
 # document-verified and not suspended before posting or managing a
-# project. Re-derived every request, same reasoning as the contractor
+# project. Re-derived every request, same reasoning as the service provider
 # gate — an admin can flip either flag at any time.
 def require_verified_owner(user: User = Depends(require_owner), db: Session = Depends(get_db)) -> User:
     profile = db.get(OwnerProfile, user.id)

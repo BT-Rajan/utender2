@@ -4,15 +4,15 @@ import { useAuth } from "@/auth/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ApiError } from "@/api/client";
-import { formatPlanPrice, parseRoleSlug, roleSlug, usePricing, usePublicCms, type SignupRole } from "@/lib/publicInfo";
+import { formatPlanPrice, parseRole, usePricing, usePublicCms, type SignupRole } from "@/lib/publicInfo";
 
 function RoleHint({ role }: { role: SignupRole | null }) {
   const { t, language } = useI18n();
   const { data: cms } = usePublicCms(language);
-  const { data: plans } = usePricing(role === "contractor");
+  const { data: plans } = usePricing(role === "service_provider");
   if (!role) return <p className="text-xs mt-1.5 text-amber-dark">{t("auth.signup.chooseRole")}</p>;
   const hint = cms?.[role === "owner" ? "signup_owner_hint" : "signup_provider_hint"];
-  const prices = role === "contractor" && plans && plans.length > 0 ? plans.map((p) => formatPlanPrice(p, language, t)).join(" · ") : null;
+  const prices = role === "service_provider" && plans && plans.length > 0 ? plans.map((p) => formatPlanPrice(p, language, t)).join(" · ") : null;
   return (
     <p className="text-xs mt-1.5 text-steel">
       {hint}
@@ -31,7 +31,7 @@ function RoleFields({
   clearRole: () => void;
 }) {
   const { t } = useI18n();
-  const roleName = (r: SignupRole) => (r === "owner" ? t("auth.signup.propertyOwner") : t("auth.signup.contractor"));
+  const roleName = (r: SignupRole) => (r === "owner" ? t("auth.signup.propertyOwner") : t("auth.signup.service_provider"));
   return (
     <>
       {role ? (
@@ -55,7 +55,7 @@ function RoleFields({
             {t("auth.signup.iAmA")}
           </label>
           <div className="grid grid-cols-2 gap-2">
-            {(["owner", "contractor"] as const).map((r) => (
+            {(["owner", "service_provider"] as const).map((r) => (
               <button
                 key={r}
                 type="button"
@@ -70,7 +70,7 @@ function RoleFields({
         </div>
       )}
 
-      {role === "contractor" && (
+      {role === "service_provider" && (
         <div>
           <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
             {t("auth.signup.companyName")}
@@ -92,16 +92,14 @@ export function SignupPage() {
   // ?role=service_provider. With no (or an unknown) role nothing is
   // preselected: the visitor picks one of the two here, never a guess.
   const roleParam = searchParams.get("role");
-  const role = parseRoleSlug(roleParam);
-  const setRole = (r: SignupRole) => setSearchParams({ role: roleSlug(r) }, { replace: true });
+  const role = parseRole(roleParam);
+  const setRole = (r: SignupRole) => setSearchParams({ role: r }, { replace: true });
   const clearRole = () => setSearchParams({}, { replace: true });
 
-  // Normalise legacy (?role=contractor) or unknown values so the URL always
-  // shows the canonical slug, or nothing.
+  // Drop an unknown ?role= value so the URL never claims a role that
+  // isn't selected.
   useEffect(() => {
-    if (roleParam === null) return;
-    const canonical = role ? roleSlug(role) : null;
-    if (roleParam !== canonical) setSearchParams(canonical ? { role: canonical } : {}, { replace: true });
+    if (roleParam !== null && role === null) setSearchParams({}, { replace: true });
   }, [roleParam, role, setSearchParams]);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -124,7 +122,7 @@ export function SignupPage() {
         company_name: (form.get("company_name") as string) || undefined,
       });
       // Route by the role the backend persisted, not by what this form sent.
-      navigate(me.role === "owner" ? "/owner/verify" : "/contractor/verify");
+      navigate(me.role === "owner" ? "/owner/verify" : "/service-provider/verify");
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : t("auth.signup.genericError"));
     } finally {

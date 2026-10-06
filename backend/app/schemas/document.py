@@ -22,21 +22,21 @@ class DocumentRequirementCreate(BaseModel):
     name: str
     description: str | None = None
     is_required: bool = True
-    applies_to: UserRole = UserRole.contractor
+    applies_to: UserRole = UserRole.service_provider
 
     @field_validator("applies_to")
     @classmethod
     def _no_admin_requirements(cls, value: UserRole) -> UserRole:
         if value == UserRole.admin:
-            raise ValueError("Document requirements can only apply to owners or contractors.")
+            raise ValueError("Document requirements can only apply to owners or service providers.")
         return value
 
 
-class ContractorDocumentOut(BaseModel):
+class ServiceProviderDocumentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    contractor_id: str
+    service_provider_id: str
     requirement_id: str
     status: DocumentStatus
     admin_note: str | None
@@ -52,7 +52,7 @@ class ContractorDocumentOut(BaseModel):
 
 
 class ReviewDocumentDecision(BaseModel):
-    contractor_id: str
+    service_provider_id: str
     requirement_id: str
     decision: DocumentStatus
     note: str | None = None

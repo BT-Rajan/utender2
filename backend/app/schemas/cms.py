@@ -22,7 +22,7 @@ class CmsContentUpsert(BaseModel):
 
 class PublicStatsOut(BaseModel):
     open_tenders: int
-    verified_contractors: int
+    verified_service_providers: int
     awarded_projects: int
     total_awarded_value: Decimal
 

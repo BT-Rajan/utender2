@@ -23,7 +23,7 @@ def _send(to: str, subject: str, html: str) -> None:
 
 
 def notify_owner_new_offer(
-    owner_email: str, project_title: str, project_id: str, contractor_name: str, amount: float, sealed: bool = False
+    owner_email: str, project_title: str, project_id: str, service_provider_name: str, amount: float, sealed: bool = False
 ) -> None:
     # Sealed-and-open (spec §19-21, D-001): the API already redacts bidder
     # identity and amount from the owner until close (see owner.py's
@@ -33,7 +33,7 @@ def notify_owner_new_offer(
         f"<p>You received a new sealed offer on <strong>{project_title}</strong>. "
         f"Bidder identity and amount stay hidden until you close bidding.</p>"
         if sealed
-        else f"<p><strong>{contractor_name}</strong> submitted an offer of ${amount:,.2f} on <strong>{project_title}</strong>.</p>"
+        else f"<p><strong>{service_provider_name}</strong> submitted an offer of ${amount:,.2f} on <strong>{project_title}</strong>.</p>"
     )
     _send(
         owner_email,
@@ -42,7 +42,7 @@ def notify_owner_new_offer(
     )
 
 
-def notify_contractor_offer_decision(contractor_email: str, project_title: str, approved: bool) -> None:
+def notify_service_provider_offer_decision(service_provider_email: str, project_title: str, approved: bool) -> None:
     if approved:
         subject = f"Your offer was approved — {project_title}"
         body = f"<p>Good news — your offer on <strong>{project_title}</strong> was approved.</p>"
@@ -50,7 +50,7 @@ def notify_contractor_offer_decision(contractor_email: str, project_title: str, 
         subject = f"Update on your offer for {project_title}"
         body = f"<p>The owner of <strong>{project_title}</strong> went with another offer this time.</p>"
 
-    _send(contractor_email, subject, f'{body}<p><a href="{settings.app_url}/contractor/feed">View open projects</a></p>')
+    _send(service_provider_email, subject, f'{body}<p><a href="{settings.app_url}/service-provider/feed">View open projects</a></p>')
 
 
 def notify_verify_email(to_email: str, token: str) -> None:
@@ -84,21 +84,21 @@ def notify_owner_new_clarification(owner_email: str, project_title: str, project
     )
 
 
-def notify_clarification_answered(contractor_email: str, project_title: str, project_id: str) -> None:
+def notify_clarification_answered(service_provider_email: str, project_title: str, project_id: str) -> None:
     _send(
-        contractor_email,
+        service_provider_email,
         f"Your question was answered — {project_title}",
         f"<p>The owner of <strong>{project_title}</strong> answered your question.</p>"
-        f'<p><a href="{settings.app_url}/contractor/projects/{project_id}/offer">View the answer</a></p>',
+        f'<p><a href="{settings.app_url}/service-provider/projects/{project_id}/offer">View the answer</a></p>',
     )
 
 
-def notify_contractor_tender_amended(contractor_email: str, project_title: str, project_id: str, summary: str) -> None:
+def notify_service_provider_tender_amended(service_provider_email: str, project_title: str, project_id: str, summary: str) -> None:
     _send(
-        contractor_email,
+        service_provider_email,
         f"Update to {project_title}",
         f"<p><strong>{project_title}</strong> was updated: {summary}</p>"
-        f'<p><a href="{settings.app_url}/contractor/projects/{project_id}/offer">Review the changes</a></p>',
+        f'<p><a href="{settings.app_url}/service-provider/projects/{project_id}/offer">Review the changes</a></p>',
     )
 
 

@@ -2,7 +2,7 @@
 
 Two full multi-actor lifecycles run continuously through the real FastAPI
 app (not isolated per-endpoint checks): one owner-visible tender, one
-sealed tender, each with 3 competing contractors (one of whom withdraws).
+sealed tender, each with 3 competing service providers (one of whom withdraws).
 Chains together clarifications, amendments, bid revisions/withdrawal,
 deadline auto-expiry, evaluation, award, audit logging, notifications,
 and ratings recompute -- verifying they all correctly compose in one
@@ -27,7 +27,7 @@ def test_pass21_e2e_scenarios():
     from app.auth.security import hash_password
     from app.models.audit_log import AuditLog
     from app.models.award_record import AwardRecord
-    from app.models.document import ContractorDocument
+    from app.models.document import ServiceProviderDocument
     from app.models.enums import DocumentStatus, UserRole, OfferStatus
     from app.models.offer import Offer
     from app.models.project import Project as ProjectModel
@@ -50,18 +50,18 @@ def test_pass21_e2e_scenarios():
     _owner_approve_db.commit()
 
 
-    def make_active_contractor(email, company):
+    def make_active_service_provider(email, company):
         client = TestClient(app)
         r = client.post(
             "/auth/signup",
-            json={"email": email, "password": "password123", "full_name": "C", "role": "contractor", "company_name": company},
+            json={"email": email, "password": "password123", "full_name": "C", "role": "service_provider", "company_name": company},
         )
         cid = r.json()["id"]
-        for doc in db.query(ContractorDocument).filter_by(contractor_id=cid).all():
+        for doc in db.query(ServiceProviderDocument).filter_by(service_provider_id=cid).all():
             doc.status = DocumentStatus.approved
         db.commit()
-        admin_client.post(f"/admin/review/contractors/{cid}/approve")
-        admin_client.post(f"/admin/contractors/{cid}/payment-override", json={"reason": "test activation"})
+        admin_client.post(f"/admin/review/service-providers/{cid}/approve")
+        admin_client.post(f"/admin/service-providers/{cid}/payment-override", json={"reason": "test activation"})
         return client, cid
 
 
@@ -71,9 +71,9 @@ def test_pass21_e2e_scenarios():
         return {n["type"] for n in r.json()}
 
 
-    c1, c1_id = make_active_contractor("c1@example.com", "Acme Roofing")
-    c2, c2_id = make_active_contractor("c2@example.com", "BuildCo")
-    c3, c3_id = make_active_contractor("c3@example.com", "ThirdCo")
+    c1, c1_id = make_active_service_provider("c1@example.com", "Acme Roofing")
+    c2, c2_id = make_active_service_provider("c2@example.com", "BuildCo")
+    c3, c3_id = make_active_service_provider("c3@example.com", "ThirdCo")
 
     future = (datetime.utcnow() + timedelta(days=7)).isoformat()
 
@@ -99,12 +99,12 @@ def test_pass21_e2e_scenarios():
 
     # --- clarifications, before any bids ---
     r = c1.post(f"/projects/{projA}/clarifications", json={"question": "What's the cabinet finish?", "shared_with_all": True})
-    check("A: contractor asks a question", r.status_code == 201)
+    check("A: service provider asks a question", r.status_code == 201)
     qA_id = r.json()["id"]
     r = owner_client.post(f"/projects/{projA}/clarifications/{qA_id}/answer", json={"answer": "Shaker, white oak"})
     check("A: owner answers", r.status_code == 200)
     r = c2.get(f"/projects/{projA}/clarifications")
-    check("A: shared Q&A visible to a different contractor", any(c["answer"] == "Shaker, white oak" for c in r.json()))
+    check("A: shared Q&A visible to a different service_provider", any(c["answer"] == "Shaker, white oak" for c in r.json()))
 
     # --- amendment before bids exist ---
     extended = (datetime.utcnow() + timedelta(days=9)).isoformat()
@@ -126,7 +126,7 @@ def test_pass21_e2e_scenarios():
     offerA3_id = r.json()["id"]
     c3.post(f"/projects/{projA}/offers/withdraw")
 
-    # --- owner-visible: owner CAN see contractor identities/amounts while still open ---
+    # --- owner-visible: owner CAN see service provider identities/amounts while still open ---
     r = owner_client.get(f"/owner/projects/{projA}/offers")
     check("A: owner sees offers while tender still open (owner-visible)", r.status_code == 200)
     offers_open = r.json()
@@ -144,19 +144,19 @@ def test_pass21_e2e_scenarios():
     # --- evaluate & award the lowest live bid (c2, 17500) ---
     owner_client.post(f"/owner/projects/{projA}/start-evaluation")
     r = owner_client.get(f"/owner/projects/{projA}/offers")
-    offerA2_id = next(o["id"] for o in r.json() if o["contractor_company_name"] == "BuildCo")
+    offerA2_id = next(o["id"] for o in r.json() if o["service_provider_company_name"] == "BuildCo")
 
     r = owner_client.post(f"/owner/projects/{projA}/offers/{offerA2_id}/approve")
     check("A: award to lowest live bidder succeeds", r.status_code == 200 and r.json()["status"] == "awarded")
 
     record = db.query(AwardRecord).filter_by(project_id=projA).first()
-    check("A: AwardRecord created for the right contractor", record is not None and record.contractor_id == c2_id)
+    check("A: AwardRecord created for the right service_provider", record is not None and record.service_provider_id == c2_id)
     audit_row = db.query(AuditLog).filter_by(action="project.award", target_id=projA).first()
     check("A: award is audited", audit_row is not None)
 
-    c1_offer = db.query(Offer).filter_by(project_id=projA, contractor_id=c1_id).first()
+    c1_offer = db.query(Offer).filter_by(project_id=projA, service_provider_id=c1_id).first()
     check("A: losing live bidder (c1) rejected", c1_offer.status == OfferStatus.rejected)
-    c3_offer = db.query(Offer).filter_by(project_id=projA, contractor_id=c3_id).first()
+    c3_offer = db.query(Offer).filter_by(project_id=projA, service_provider_id=c3_id).first()
     check("A: withdrawn bidder (c3) stays withdrawn, not overwritten", c3_offer.status == OfferStatus.withdrawn)
 
     # --- notifications: winner gets award_won, live loser gets award_lost, withdrawn bidder gets neither ---
@@ -168,14 +168,14 @@ def test_pass21_e2e_scenarios():
     check("A: withdrawn bidder (c3) gets NEITHER award notification", "award_won" not in c3_notifs and "award_lost" not in c3_notifs)
 
     # --- review + rating recompute ---
-    r = owner_client.post("/owner/reviews", json={"project_id": projA, "contractor_id": c2_id, "rating": 5, "comment": "Great work"})
+    r = owner_client.post("/owner/reviews", json={"project_id": projA, "service_provider_id": c2_id, "rating": 5, "comment": "Great work"})
     check("A: review submitted for the actual winner", r.status_code == 200)
 
-    r = c2.get("/contractor/profile")
-    check("A: winning contractor's avg_rating recomputed to 5.0", float(r.json()["avg_rating"]) == 5.0)
-    check("A: winning contractor's review_count is 1", r.json()["review_count"] == 1)
+    r = c2.get("/service-provider/profile")
+    check("A: winning service provider's avg_rating recomputed to 5.0", float(r.json()["avg_rating"]) == 5.0)
+    check("A: winning service provider's review_count is 1", r.json()["review_count"] == 1)
 
-    r = owner_client.post("/owner/reviews", json={"project_id": projA, "contractor_id": c2_id, "rating": 1})
+    r = owner_client.post("/owner/reviews", json={"project_id": projA, "service_provider_id": c2_id, "rating": 1})
     check("A: duplicate review on the same project rejected", r.status_code == 400)
 
     # ======================================================================
@@ -202,7 +202,7 @@ def test_pass21_e2e_scenarios():
     owner_client.post(f"/projects/{projB}/clarifications/{qB_id}/answer", json={"answer": "Architectural shingle"})
 
     r = owner_client.get(f"/projects/{projB}/clarifications")
-    check("B: owner's clarification view redacts bidder identity while sealed+open", r.json()[0]["contractor_id"] is None)
+    check("B: owner's clarification view redacts bidder identity while sealed+open", r.json()[0]["service_provider_id"] is None)
 
     r = c1.post(f"/projects/{projB}/offers", json={"amount": "9800.00"})
     offerB1_id = r.json()["id"]
@@ -215,7 +215,7 @@ def test_pass21_e2e_scenarios():
     r = owner_client.get(f"/owner/projects/{projB}/offers")
     check("B: offers list reachable while sealed+open", r.status_code == 200)
     sealed_offers = r.json()
-    check("B: contractor identity redacted while sealed+open", all(o["contractor_id"] is None for o in sealed_offers))
+    check("B: service provider identity redacted while sealed+open", all(o["service_provider_id"] is None for o in sealed_offers))
     check("B: amount redacted while sealed+open", all(o["amount"] is None for o in sealed_offers))
     check("B: marked sealed=True in the API response", all(o["sealed"] is True for o in sealed_offers))
 
@@ -233,7 +233,7 @@ def test_pass21_e2e_scenarios():
     # --- seal lifts once closed ---
     r = owner_client.get(f"/owner/projects/{projB}/offers")
     unsealed_offers = r.json()
-    check("B: seal lifts once closed -- identities now visible", any(o["contractor_id"] == c2_id for o in unsealed_offers))
+    check("B: seal lifts once closed -- identities now visible", any(o["service_provider_id"] == c2_id for o in unsealed_offers))
     check("B: seal lifts once closed -- real amounts now visible", any(o["amount"] == "9200.00" for o in unsealed_offers))
     check("B: response no longer marked sealed", all(o["sealed"] is False for o in unsealed_offers))
 
@@ -242,10 +242,10 @@ def test_pass21_e2e_scenarios():
     check("B: award to lowest live bidder (c2) succeeds", r.status_code == 200 and r.json()["status"] == "awarded")
 
     recordB = db.query(AwardRecord).filter_by(project_id=projB).first()
-    check("B: AwardRecord contractor is c2", recordB is not None and recordB.contractor_id == c2_id)
+    check("B: AwardRecord service provider is c2", recordB is not None and recordB.service_provider_id == c2_id)
     check("B: AwardRecord amount matches the winning bid", float(recordB.amount) == 9200.00)
 
-    c1_offerB = db.query(Offer).filter_by(project_id=projB, contractor_id=c1_id).first()
+    c1_offerB = db.query(Offer).filter_by(project_id=projB, service_provider_id=c1_id).first()
     check("B: live loser (c1) rejected", c1_offerB.status == OfferStatus.rejected)
 
     c1_notifsB = notification_types_for(c1)
@@ -253,9 +253,9 @@ def test_pass21_e2e_scenarios():
     check("B: live loser (c1) notified award_lost for scenario B too", "award_lost" in c1_notifsB)
     check("B: withdrawn bidder (c3) still has no award notification from scenario B", "award_won" not in c3_notifsB and "award_lost" not in c3_notifsB)
 
-    # a losing, non-withdrawn contractor can still see the award record post-close
+    # a losing, non-withdrawn service provider can still see the award record post-close
     r = c1.get(f"/projects/{projB}/award")
-    check("B: losing eligible contractor can view award record after close", r.status_code == 200)
+    check("B: losing eligible service provider can view award record after close", r.status_code == 200)
 
 
     failed = [n for n, ok in results if not ok]

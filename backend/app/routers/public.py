@@ -11,7 +11,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.models.award_record import AwardRecord
 from app.models.cms_content import CmsContent
-from app.models.contractor import ContractorProfile
+from app.models.service_provider import ServiceProviderProfile
 from app.models.document import DocumentRequirement
 from app.models.enums import Language, ProjectStatus, SubscriptionStatus, UserRole, VerificationStatus
 from app.models.project import Project
@@ -64,7 +64,7 @@ DEFAULT_CMS: dict[str, dict[str, str]] = {
     "home_owner_cta": {"en": "Sign up as an Owner", "ar": "سجّل كمالك"},
     "home_provider_title": {"en": "Service provider", "ar": "مزوّد خدمة"},
     "home_provider_who": {
-        "en": "You are a contractor, company or other service provider looking for projects to price and win.",
+        "en": "You are a service provider, company or other service provider looking for projects to price and win.",
         "ar": "أنت مقاول أو شركة أو أي مزوّد خدمة يبحث عن مشاريع لتسعيرها والفوز بها.",
     },
     "home_provider_step_1": {"en": "Discover open requirements", "ar": "اكتشف المتطلبات المفتوحة"},
@@ -104,18 +104,18 @@ def public_cms(language: Language = Language.en, db: Session = Depends(get_db)) 
 def public_stats(db: Session = Depends(get_db)) -> PublicStatsOut:
     open_tenders = db.query(Project).filter(Project.status == ProjectStatus.open).count()
 
-    # Mirrors ContractorProfile.is_verified_active exactly — the single
+    # Mirrors ServiceProviderProfile.is_verified_active exactly — the single
     # source of truth for marketplace activation (spec P0 rule) — so this
     # count can never drift from what "verified_active" actually means
     # elsewhere in the app.
-    verified_contractors = (
-        db.query(ContractorProfile)
+    verified_service_providers = (
+        db.query(ServiceProviderProfile)
         .filter(
-            ContractorProfile.is_suspended.is_(False),
-            ContractorProfile.verification_status == VerificationStatus.approved,
+            ServiceProviderProfile.is_suspended.is_(False),
+            ServiceProviderProfile.verification_status == VerificationStatus.approved,
             or_(
-                ContractorProfile.subscription_status.in_([SubscriptionStatus.active, SubscriptionStatus.trialing]),
-                ContractorProfile.payment_override_active.is_(True),
+                ServiceProviderProfile.subscription_status.in_([SubscriptionStatus.active, SubscriptionStatus.trialing]),
+                ServiceProviderProfile.payment_override_active.is_(True),
             ),
         )
         .count()
@@ -126,7 +126,7 @@ def public_stats(db: Session = Depends(get_db)) -> PublicStatsOut:
 
     return PublicStatsOut(
         open_tenders=open_tenders,
-        verified_contractors=verified_contractors,
+        verified_service_providers=verified_service_providers,
         awarded_projects=awarded_projects,
         total_awarded_value=total_awarded_value,
     )
@@ -135,7 +135,7 @@ def public_stats(db: Session = Depends(get_db)) -> PublicStatsOut:
 @router.get("/requirements", response_model=list[PublicRequirementOut])
 def public_requirements(role: UserRole, db: Session = Depends(get_db)) -> list[DocumentRequirement]:
     """The live verification checklist for a self-registering role — the same
-    active rows /owner/requirements and /contractor/requirements hand an
+    active rows /owner/requirements and /service-provider/requirements hand an
     account after signup, so the homepage can tell a visitor exactly what
     they'll be asked for before they register."""
     if role == UserRole.admin:

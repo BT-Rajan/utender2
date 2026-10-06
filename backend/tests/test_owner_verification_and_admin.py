@@ -2,7 +2,7 @@
 approval gate), admin owner management (list, approve, reject, suspend,
 delete), and the admin all-offers view -- added in response to a user
 request after the original 24-pass effort, following the same
-document-review pattern PASS 5/6 built for contractors.
+document-review pattern PASS 5/6 built for service providers.
 """
 from datetime import datetime, timedelta
 
@@ -57,30 +57,30 @@ def test_owner_signup_gets_seeded_document_checklist():
     assert all(d["status"] == "not_submitted" for d in r.json())
 
 
-def test_owner_requirements_and_contractor_requirements_are_scoped_separately():
+def test_owner_requirements_and_service_provider_requirements_are_scoped_separately():
     from app.models.document import DocumentRequirement
     from app.models.enums import UserRole
 
     db = db_module.SessionLocal()
     _seed_owner_requirements(db)
-    db.add(DocumentRequirement(name="Trade License", is_required=True, applies_to=UserRole.contractor))
+    db.add(DocumentRequirement(name="Trade License", is_required=True, applies_to=UserRole.service_provider))
     db.commit()
 
     owner_client = TestClient(app)
     owner_client.post(
         "/auth/signup", json={"email": "owner1@example.com", "password": "password123", "full_name": "Owner", "role": "owner"}
     )
-    contractor_client = TestClient(app)
-    contractor_client.post(
+    service_provider_client = TestClient(app)
+    service_provider_client.post(
         "/auth/signup",
-        json={"email": "c1@example.com", "password": "password123", "full_name": "C", "role": "contractor", "company_name": "Acme"},
+        json={"email": "c1@example.com", "password": "password123", "full_name": "C", "role": "service_provider", "company_name": "Acme"},
     )
 
     owner_reqs = {r["name"] for r in owner_client.get("/owner/requirements").json()}
-    contractor_reqs = {r["name"] for r in contractor_client.get("/contractor/requirements").json()}
+    service_provider_reqs = {r["name"] for r in service_provider_client.get("/service-provider/requirements").json()}
     assert owner_reqs == {"Civil ID", "Land Ownership Proof"}
-    assert contractor_reqs == {"Trade License"}
-    assert owner_reqs.isdisjoint(contractor_reqs)
+    assert service_provider_reqs == {"Trade License"}
+    assert owner_reqs.isdisjoint(service_provider_reqs)
 
 
 def _signup_admin(db):
@@ -147,7 +147,7 @@ def test_owner_blocked_from_posting_until_approved_then_unblocked():
     assert all(d["status"] == "pending" for d in docs)
 
     # Approving the OWNER before all documents are individually approved
-    # is rejected, same guard as the contractor flow.
+    # is rejected, same guard as the service provider flow.
     r = admin_client.post(f"/admin/review/owners/{owner_id}/approve")
     assert r.status_code == 400
 
@@ -279,7 +279,7 @@ def test_non_admin_cannot_reach_owner_admin_endpoints():
 
 def test_admin_created_by_promoting_an_owner_does_not_appear_in_owners_list():
     """Regression test: the README documents the ONLY way to create an
-    admin as "sign up as owner (or contractor), then flip that row's role
+    admin as "sign up as owner (or service provider), then flip that row's role
     column directly in the database." That leaves a real owner_profiles
     row behind for an account that is no longer an owner. A live UI smoke
     test caught this: /admin/owners listed the admin itself (with a
@@ -325,11 +325,11 @@ def test_admin_created_by_promoting_an_owner_does_not_appear_in_owners_list():
     assert r.status_code == 404
 
 
-def test_admin_created_by_promoting_a_contractor_does_not_appear_in_contractors_list():
+def test_admin_created_by_promoting_a_service_provider_does_not_appear_in_service_providers_list():
     """Same bug, same fix, one level over: this class of bug (a promoted
     admin's leftover profile row showing up in an admin management list)
     predates this session's owner work entirely -- it was already true
-    for contractors (PASS 6) and only surfaced now because fixing it for
+    for service providers (PASS 6) and only surfaced now because fixing it for
     owners meant re-reading every admin list/detail/mutation endpoint
     side by side. Fixed symmetrically in the same commit rather than left
     sitting next to the owner fix as a known twin.
@@ -343,7 +343,7 @@ def test_admin_created_by_promoting_a_contractor_does_not_appear_in_contractors_
             "email": "promoted-admin-2@example.com",
             "password": "password123",
             "full_name": "Promoted Admin Two",
-            "role": "contractor",
+            "role": "service_provider",
             "company_name": "Soon To Be Admin LLC",
         },
     )
@@ -358,20 +358,20 @@ def test_admin_created_by_promoting_a_contractor_does_not_appear_in_contractors_
     admin_client = TestClient(app)
     admin_client.post("/auth/login", json={"email": "promoted-admin-2@example.com", "password": "password123"})
 
-    r = admin_client.get("/admin/contractors")
+    r = admin_client.get("/admin/service-providers")
     assert r.status_code == 200
     assert all(c["user_id"] != promoted_id for c in r.json())
 
-    r = admin_client.get(f"/admin/contractors/{promoted_id}")
+    r = admin_client.get(f"/admin/service-providers/{promoted_id}")
     assert r.status_code == 404
 
-    r = admin_client.post(f"/admin/contractors/{promoted_id}/suspend", json={"suspended": True})
+    r = admin_client.post(f"/admin/service-providers/{promoted_id}/suspend", json={"suspended": True})
     assert r.status_code == 404
 
-    r = admin_client.post(f"/admin/contractors/{promoted_id}/payment-override", json={"reason": "test"})
+    r = admin_client.post(f"/admin/service-providers/{promoted_id}/payment-override", json={"reason": "test"})
     assert r.status_code == 404
 
-    r = admin_client.delete(f"/admin/contractors/{promoted_id}")
+    r = admin_client.delete(f"/admin/service-providers/{promoted_id}")
     assert r.status_code == 404
 
 
@@ -379,21 +379,21 @@ def test_admin_sees_all_offers_across_every_project_unredacted():
     db = db_module.SessionLocal()
     admin_client = _signup_admin(db)
 
-    from app.models.document import ContractorDocument
+    from app.models.document import ServiceProviderDocument
     from app.models.enums import DocumentStatus
 
-    def make_active_contractor(email, company):
+    def make_active_service_provider(email, company):
         client = TestClient(app)
         r = client.post(
             "/auth/signup",
-            json={"email": email, "password": "password123", "full_name": "C", "role": "contractor", "company_name": company},
+            json={"email": email, "password": "password123", "full_name": "C", "role": "service_provider", "company_name": company},
         )
         cid = r.json()["id"]
-        for doc in db.query(ContractorDocument).filter_by(contractor_id=cid).all():
+        for doc in db.query(ServiceProviderDocument).filter_by(service_provider_id=cid).all():
             doc.status = DocumentStatus.approved
         db.commit()
-        admin_client.post(f"/admin/review/contractors/{cid}/approve")
-        admin_client.post(f"/admin/contractors/{cid}/payment-override", json={"reason": "test"})
+        admin_client.post(f"/admin/review/service-providers/{cid}/approve")
+        admin_client.post(f"/admin/service-providers/{cid}/payment-override", json={"reason": "test"})
         return client, cid
 
     owner_client = TestClient(app)
@@ -406,8 +406,8 @@ def test_admin_sees_all_offers_across_every_project_unredacted():
     db.get(OwnerProfile, owner_id).verification_status = VerificationStatus.approved
     db.commit()
 
-    c1, c1_id = make_active_contractor("c1@example.com", "Acme")
-    c2, c2_id = make_active_contractor("c2@example.com", "BuildCo")
+    c1, c1_id = make_active_service_provider("c1@example.com", "Acme")
+    c2, c2_id = make_active_service_provider("c2@example.com", "BuildCo")
 
     future = (datetime.utcnow() + timedelta(days=7)).isoformat()
     r = owner_client.post(
@@ -420,7 +420,7 @@ def test_admin_sees_all_offers_across_every_project_unredacted():
 
     # Sealed and still open: the OWNER-facing endpoint redacts these.
     r = owner_client.get(f"/owner/projects/{project_id}/offers")
-    assert all(o["contractor_id"] is None for o in r.json())
+    assert all(o["service_provider_id"] is None for o in r.json())
 
     # The ADMIN-facing all-offers endpoint does not redact -- admin is the
     # platform operator, not the party the sealed-bid rule protects
@@ -430,7 +430,7 @@ def test_admin_sees_all_offers_across_every_project_unredacted():
     assert r.status_code == 200
     all_offers = r.json()
     assert len(all_offers) == 2
-    companies = {o["contractor_company_name"] for o in all_offers}
+    companies = {o["service_provider_company_name"] for o in all_offers}
     assert companies == {"Acme", "BuildCo"}
     amounts = {o["amount"] for o in all_offers}
     assert amounts == {"5000.00", "4800.00"}

@@ -1,7 +1,7 @@
 # U-Tender
 
 Drawings in. Offers out. A sealed-bid tender marketplace connecting building
-owners with contractors, gated by an admin-reviewed document verification
+owners with service providers, gated by an admin-reviewed document verification
 step.
 
 **Stack:** FastAPI (Python) backend · React (Vite) frontend · MySQL ·
@@ -59,20 +59,20 @@ on the first run; set `APP_PORT`/`API_PORT` to choose them. After a
    npm run dev
    ```
 4. **Create your first admin:** sign up normally through the app (as an
-   owner or contractor), then update that row's `role` column to `admin`
+   owner or service provider), then update that row's `role` column to `admin`
    directly in MySQL. There's no self-serve admin signup by design. (The
-   `owner_profiles`/`contractor_profiles` row created at signup stays
+   `owner_profiles`/`service_provider_profiles` row created at signup stays
    behind on that account — harmless, and every admin list/detail
    endpoint filters by the user's *current* role, so a promoted admin
-   never shows up as a manageable owner or contractor.)
+   never shows up as a manageable owner or service provider.)
 
 ## Demo data
 
 `backend/scripts/seed_kuwait_demo.py` populates a running instance with a
-realistic Kuwait-flavored dataset — owners, contractors, and projects
+realistic Kuwait-flavored dataset — owners, service providers, and projects
 across every lifecycle state (draft, open, sealed, under evaluation,
 awarded with a review, no-award) plus the admin-moderation states
-(a pending owner, a pending contractor, a suspended contractor, an
+(a pending owner, a pending service provider, a suspended service provider, an
 admin-suspended project, and an admin-suspended offer) — everything
 needed to click through the app right after a deploy. It drives the real
 API (not direct DB writes), so it needs an admin account to already
@@ -212,7 +212,7 @@ signed-URL expiry tied to the bid deadline. Two things changed on purpose:
 - Document/drawing uploads should never be served from a public bucket or
   directory — both storage backends serve files through signed, expiring
   URLs only.
-- `contractor_documents.status` transitions and `document_requirements`
+- `service_provider_documents.status` transitions and `document_requirements`
   soft-delete (`is_active = false` instead of a hard delete) both carry
   over unchanged, so existing audit history stays intact.
 - Backend has a real pytest suite (see "Running tests" above); there's no

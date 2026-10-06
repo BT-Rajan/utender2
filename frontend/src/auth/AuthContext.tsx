@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { apiFetch } from "@/api/client";
 
-export type UserRole = "owner" | "contractor" | "admin";
+export type UserRole = "owner" | "service_provider" | "admin";
 
 export interface CurrentUser {
   id: string;
@@ -18,7 +18,7 @@ interface SignupPayload {
   email: string;
   password: string;
   full_name: string;
-  role: "owner" | "contractor";
+  role: "owner" | "service_provider";
   company_name?: string;
 }
 

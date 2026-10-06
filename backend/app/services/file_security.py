@@ -36,7 +36,7 @@ def assert_allowed_extension(filename: str, allowed: set[str]) -> None:
 # name dangerous: parent-directory and "." segments, absolute/drive-letter
 # prefixes, backslash separators and control characters. A zip entry named
 # "../../x.pdf" or "/etc/x.pdf" would otherwise be written verbatim into the
-# archive handed to contractors, where a naive extractor honours the path.
+# archive handed to service providers, where a naive extractor honours the path.
 def safe_relative_name(name: str) -> str:
     cleaned = re.sub(r"[\x00-\x1f]", "", name)
     parts = [p for p in re.split(r"[\\/]+", cleaned) if p not in ("", ".", "..")]

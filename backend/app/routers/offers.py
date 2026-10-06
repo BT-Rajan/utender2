@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import get_contractor_profile, require_approved_contractor, require_marketplace_active_contractor
+from app.deps import get_service_provider_profile, require_approved_service_provider, require_marketplace_active_service_provider
 from app.models.enums import NotificationType, OfferStatus, ProjectStatus, TenderType
 from app.models.offer import Offer, OfferRevision
 from app.models.project import Project
@@ -23,13 +23,13 @@ _AMOUNT_LIMIT = Decimal("9999999999.995")
 
 
 @router.get("/mine", response_model=OfferOut | None)
-def my_offer(project_id: str, user: User = Depends(require_approved_contractor), db: Session = Depends(get_db)):
-    return db.query(Offer).filter(Offer.project_id == project_id, Offer.contractor_id == user.id).first()
+def my_offer(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    return db.query(Offer).filter(Offer.project_id == project_id, Offer.service_provider_id == user.id).first()
 
 
 @router.get("/mine/history", response_model=list[OfferRevisionOut])
-def my_offer_history(project_id: str, user: User = Depends(require_approved_contractor), db: Session = Depends(get_db)):
-    offer = db.query(Offer).filter(Offer.project_id == project_id, Offer.contractor_id == user.id).first()
+def my_offer_history(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    offer = db.query(Offer).filter(Offer.project_id == project_id, Offer.service_provider_id == user.id).first()
     if not offer:
         return []
     return (
@@ -63,14 +63,14 @@ def _snapshot_revision(db: Session, offer: Offer) -> None:
 def submit_offer(
     project_id: str,
     payload: OfferCreate,
-    user: User = Depends(require_marketplace_active_contractor),
+    user: User = Depends(require_marketplace_active_service_provider),
     db: Session = Depends(get_db),
 ):
-    profile = get_contractor_profile(user, db)
+    profile = get_service_provider_profile(user, db)
 
     # Lock the tender row, THEN check it. Checking an unlocked copy let a bid
     # slip in after the owner's close had committed, and two near-simultaneous
-    # first bids from one contractor (double-click, retry) both inserted and
+    # first bids from one service provider (double-click, retry) both inserted and
     # deadlocked. Under the lock every bid, withdrawal and lifecycle change on
     # this tender is serialized, so the state read below is the state the bid
     # is written against.
@@ -84,14 +84,14 @@ def submit_offer(
         raise HTTPException(status_code=400, detail="Enter a valid bid amount.")
 
     # The tender lock above already serializes every writer of this
-    # contractor's offer (a plain read is enough). Deliberately NOT
+    # service provider's offer (a plain read is enough). Deliberately NOT
     # SELECT ... FOR UPDATE on the offer: when no row exists yet that takes a
     # next-key/gap lock, and two such locks held at once deadlock on the
     # inserts that follow.
-    offer = db.query(Offer).filter(Offer.project_id == project_id, Offer.contractor_id == user.id).first()
+    offer = db.query(Offer).filter(Offer.project_id == project_id, Offer.service_provider_id == user.id).first()
     if offer:
-        # upsert on the (project_id, contractor_id) unique constraint — a
-        # contractor revising their bid before the deadline updates the
+        # upsert on the (project_id, service_provider_id) unique constraint — a
+        # service provider revising their bid before the deadline updates the
         # same row rather than creating a duplicate, but the prior values
         # are snapshotted first so nothing is silently lost.
         _snapshot_revision(db, offer)
@@ -103,7 +103,7 @@ def submit_offer(
     else:
         offer = Offer(
             project_id=project_id,
-            contractor_id=user.id,
+            service_provider_id=user.id,
             amount=payload.amount,
             timeline_estimate=payload.timeline_estimate,
             message=payload.message,
@@ -129,21 +129,21 @@ def submit_offer(
             NotificationType.bid_submitted,
             link=f"/owner/projects/{project_id}",
             project_title=project.title,
-            contractor_name="A service provider" if sealed else profile.company_name,
+            service_provider_name="A service provider" if sealed else profile.company_name,
         )
 
     return offer
 
 
 @router.post("/withdraw", response_model=OfferOut)
-def withdraw_offer(project_id: str, user: User = Depends(require_approved_contractor), db: Session = Depends(get_db)):
+def withdraw_offer(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
     # Same lock-then-check as submit_offer. Withdrawal is a change to a bid, and
     # bids can't change once bidding has stopped (an awarded bid flipped to
     # "withdrawn" would contradict the permanent AwardRecord; a bid pulled
     # after the deadline would let a bidder walk away from a price the owner is
     # already evaluating).
     project = lock_project(db, project_id)
-    offer = db.query(Offer).filter(Offer.project_id == project_id, Offer.contractor_id == user.id).first()
+    offer = db.query(Offer).filter(Offer.project_id == project_id, Offer.service_provider_id == user.id).first()
     if not project or not offer:
         raise HTTPException(status_code=404, detail="No offer to withdraw.")
     if offer.status == OfferStatus.withdrawn:

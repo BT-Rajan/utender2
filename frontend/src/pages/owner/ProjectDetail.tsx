@@ -147,7 +147,7 @@ export function OwnerProjectDetailPage() {
     mutationFn: () =>
       apiFetch(`/owner/reviews`, {
         method: "POST",
-        body: { project_id: id, contractor_id: approvedOffer?.contractor_id, rating, comment: comment || null },
+        body: { project_id: id, service_provider_id: approvedOffer?.service_provider_id, rating, comment: comment || null },
       }),
     onSuccess: () => {
       setError(null);
@@ -339,7 +339,7 @@ export function OwnerProjectDetailPage() {
               <table className="w-full border-collapse">
               <thead>
                 <tr>
-                  <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("owner.projectDetail.contractorCol")}</th>
+                  <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("owner.projectDetail.serviceProviderCol")}</th>
                   <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("owner.projectDetail.ratingCol")}</th>
                   <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("owner.projectDetail.bidCol")}</th>
                   <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("owner.projectDetail.timelineCol")}</th>
@@ -351,7 +351,7 @@ export function OwnerProjectDetailPage() {
                   <tr key={o.id} className="border-b border-border">
                     <td className="py-3 px-2.5">
                       <div className="font-display font-semibold text-[13.5px]">
-                        {o.contractor_company_name ?? t("owner.projectDetail.contractorCol")}
+                        {o.service_provider_company_name ?? t("owner.projectDetail.serviceProviderCol")}
                         {o.revision > 1 && (
                           <span className="text-steel-light font-normal">
                             {" "}
@@ -363,8 +363,8 @@ export function OwnerProjectDetailPage() {
                       {o.message && <div className="text-xs text-steel-light mt-0.5 max-w-xs">{o.message}</div>}
                     </td>
                     <td className="py-3 px-2.5">
-                      <span className="text-amber text-[11px] tracking-tight">{stars(Number(o.contractor_avg_rating ?? 0))}</span>{" "}
-                      <span className="font-mono text-[11px] text-steel">({o.contractor_review_count ?? 0})</span>
+                      <span className="text-amber text-[11px] tracking-tight">{stars(Number(o.service_provider_avg_rating ?? 0))}</span>{" "}
+                      <span className="font-mono text-[11px] text-steel">({o.service_provider_review_count ?? 0})</span>
                     </td>
                     <td className="py-3 px-2.5 font-mono font-semibold text-navy text-sm">
                       {o.amount !== null ? `$${Number(o.amount).toLocaleString()}` : "—"}
@@ -405,7 +405,7 @@ export function OwnerProjectDetailPage() {
       {approvedOffer && (
         <div className="mt-8 max-w-xl">
           <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-2">
-            {t("owner.projectDetail.rateContractor")} {approvedOffer.contractor_company_name ?? t("owner.projectDetail.theContractor")}
+            {t("owner.projectDetail.rateServiceProvider")} {approvedOffer.service_provider_company_name ?? t("owner.projectDetail.theServiceProvider")}
           </h3>
           {existingReview ? (
             <div className="bg-white border border-border rounded px-4.5 py-4">

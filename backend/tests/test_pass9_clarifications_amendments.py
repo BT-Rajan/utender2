@@ -14,7 +14,7 @@ def test_pass9_clarifications_amendments():
 
 
     from app.auth.security import hash_password
-    from app.models.document import ContractorDocument
+    from app.models.document import ServiceProviderDocument
     from app.models.enums import DocumentStatus, UserRole
     from app.models.user import User
 
@@ -36,23 +36,23 @@ def test_pass9_clarifications_amendments():
     _owner_approve_db.commit()
 
 
-    def make_active_contractor(email, company):
+    def make_active_service_provider(email, company):
         client = TestClient(app)
         r = client.post(
             "/auth/signup",
-            json={"email": email, "password": "password123", "full_name": "C", "role": "contractor", "company_name": company},
+            json={"email": email, "password": "password123", "full_name": "C", "role": "service_provider", "company_name": company},
         )
         cid = r.json()["id"]
-        for doc in db.query(ContractorDocument).filter_by(contractor_id=cid).all():
+        for doc in db.query(ServiceProviderDocument).filter_by(service_provider_id=cid).all():
             doc.status = DocumentStatus.approved
         db.commit()
-        admin_client.post(f"/admin/review/contractors/{cid}/approve")
-        admin_client.post(f"/admin/contractors/{cid}/payment-override", json={"reason": "test activation"})
+        admin_client.post(f"/admin/review/service-providers/{cid}/approve")
+        admin_client.post(f"/admin/service-providers/{cid}/payment-override", json={"reason": "test activation"})
         return client, cid
 
 
-    c1, c1_id = make_active_contractor("c1@example.com", "Acme")
-    c2, c2_id = make_active_contractor("c2@example.com", "BuildCo")
+    c1, c1_id = make_active_service_provider("c1@example.com", "Acme")
+    c2, c2_id = make_active_service_provider("c2@example.com", "BuildCo")
 
     future = (datetime.utcnow() + timedelta(days=7)).isoformat()
 
@@ -62,22 +62,22 @@ def test_pass9_clarifications_amendments():
 
     # ---------- clarifications ----------
     r = owner_client.post(f"/projects/{project_id}/clarifications", json={"question": "not allowed"})
-    check("owner cannot ask a question (only contractors)", r.status_code == 403)
+    check("owner cannot ask a question (only service providers)", r.status_code == 403)
 
     r = c1.post(f"/projects/{project_id}/clarifications", json={"question": "What's the roof pitch?", "shared_with_all": True})
-    check("contractor 1 asks a shared question", r.status_code == 201)
+    check("service_provider 1 asks a shared question", r.status_code == 201)
     q1_id = r.json()["id"]
 
     r = c1.post(f"/projects/{project_id}/clarifications", json={"question": "Can I email you directly?", "shared_with_all": False})
-    check("contractor 1 asks a private question", r.status_code == 201)
+    check("service_provider 1 asks a private question", r.status_code == 201)
     q1_private_id = r.json()["id"]
 
-    # unanswered question: visible to asker, invisible to other contractors
+    # unanswered question: visible to asker, invisible to other service providers
     r = c1.get(f"/projects/{project_id}/clarifications")
     check("asker sees both of their own questions", len(r.json()) == 2)
 
     r = c2.get(f"/projects/{project_id}/clarifications")
-    check("other contractor sees nothing before any answer", len(r.json()) == 0)
+    check("other service provider sees nothing before any answer", len(r.json()) == 0)
 
     # owner answers the shared one
     r = owner_client.post(f"/projects/{project_id}/clarifications/{q1_id}/answer", json={"answer": "12/12 pitch"})
@@ -86,10 +86,10 @@ def test_pass9_clarifications_amendments():
     r = owner_client.post(f"/projects/{project_id}/clarifications/{q1_id}/answer", json={"answer": "duplicate"})
     check("re-answering an already-answered question is rejected", r.status_code == 400)
 
-    # other contractor now sees the ANSWERED shared question, but not the private one
+    # other service provider now sees the ANSWERED shared question, but not the private one
     r = c2.get(f"/projects/{project_id}/clarifications")
-    check("other contractor now sees the answered+shared question", len(r.json()) == 1)
-    check("other contractor still cannot see the private question", all(q["id"] != q1_private_id for q in r.json()))
+    check("other service provider now sees the answered+shared question", len(r.json()) == 1)
+    check("other service provider still cannot see the private question", all(q["id"] != q1_private_id for q in r.json()))
 
     # owner answers the private one too
     owner_client.post(f"/projects/{project_id}/clarifications/{q1_private_id}/answer", json={"answer": "sure, email me"})
@@ -102,7 +102,7 @@ def test_pass9_clarifications_amendments():
     r = admin_client.get(f"/projects/{project_id}/clarifications")
     check("admin sees all questions too", len(r.json()) == 2)
 
-    # a contractor answering someone else's question is rejected (owner-only)
+    # a service provider answering someone else's question is rejected (owner-only)
     r = c2.post(f"/projects/{project_id}/clarifications/{q1_id}/answer", json={"answer": "nope"})
     check("non-owner cannot answer (403, wrong role)", r.status_code == 403)
 
@@ -141,9 +141,9 @@ def test_pass9_clarifications_amendments():
     r = c1.patch(f"/projects/{project_id}", json={"title": "Hijacked title"})
     check("non-owner cannot amend project", r.status_code == 404)
 
-    # contractor bids, locking tender_type; then owner tries to move deadline earlier -> rejected
+    # service provider bids, locking tender_type; then owner tries to move deadline earlier -> rejected
     r = c1.post(f"/projects/{project_id}/offers", json={"amount": "5000.00"})
-    check("contractor bids", r.status_code == 200)
+    check("service_provider bids", r.status_code == 200)
 
     earlier_deadline = (datetime.utcnow() + timedelta(days=1)).isoformat()
     r = owner_client.patch(f"/projects/{project_id}", json={"bid_deadline": earlier_deadline})
@@ -163,9 +163,9 @@ def test_pass9_clarifications_amendments():
     r = owner_client.patch(f"/projects/{project2_id}", json={"title": "New title"})
     check("amending a canceled project is rejected", r.status_code == 400)
 
-    # amendments visible to an eligible contractor too, not just the owner
+    # amendments visible to an eligible service provider too, not just the owner
     r = c1.get(f"/projects/{project_id}/amendments")
-    check("eligible contractor can view amendment history", r.status_code == 200 and len(r.json()) == 2)
+    check("eligible service provider can view amendment history", r.status_code == 200 and len(r.json()) == 2)
 
 
     failed = [n for n, ok in results if not ok]

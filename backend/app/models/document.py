@@ -17,30 +17,30 @@ class DocumentRequirement(Base):
     is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     # Which self-registering role this requirement's checklist applies to
-    # (owner or contractor — reuses UserRole rather than a new two-value
+    # (owner or service provider — reuses UserRole rather than a new two-value
     # enum since the values already line up; 'admin' is never a valid
     # value here, enforced at the API layer, not the column type).
     applies_to: Mapped[UserRole] = mapped_column(
-        Enum(UserRole, native_enum=True), nullable=False, default=UserRole.contractor
+        Enum(UserRole, native_enum=True), nullable=False, default=UserRole.service_provider
     )
     # Versioning (spec §48): when this requirement took effect. Combined
     # with is_active (retire without deleting — see removeRequirement),
     # this is enough to answer "was this requirement in force on date X"
     # for audit purposes without a full historical-snapshot table. Adding
     # a requirement never retroactively blocks an already-approved
-    # contractor — nothing re-checks past approvals against new rows.
+    # service provider — nothing re-checks past approvals against new rows.
     effective_from: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
-class ContractorDocument(Base):
-    __tablename__ = "contractor_documents"
-    __table_args__ = (UniqueConstraint("contractor_id", "requirement_id", name="uq_contractor_requirement"),)
+class ServiceProviderDocument(Base):
+    __tablename__ = "service_provider_documents"
+    __table_args__ = (UniqueConstraint("service_provider_id", "requirement_id", name="uq_service_provider_requirement"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
-    contractor_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("contractor_profiles.user_id", ondelete="CASCADE"), nullable=False, index=True
+    service_provider_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("service_provider_profiles.user_id", ondelete="CASCADE"), nullable=False, index=True
     )
     requirement_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("document_requirements.id", ondelete="CASCADE"), nullable=False
@@ -59,9 +59,9 @@ class ContractorDocument(Base):
 
 
 class OwnerDocument(Base):
-    """Mirrors ContractorDocument exactly, for the owner-side verification
+    """Mirrors ServiceProviderDocument exactly, for the owner-side verification
     checklist (e.g. civil ID, land ownership proof) — kept as a separate
-    table rather than a shared one so an owner's and a contractor's
+    table rather than a shared one so an owner's and a service provider's
     documents never collide even if a name coincidentally matched, and so
     each side's row count/growth is independent."""
 

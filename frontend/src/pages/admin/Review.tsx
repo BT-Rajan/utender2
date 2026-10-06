@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
-import type { ContractorProfile, DocumentStatus } from "@/api/types";
+import type { ServiceProviderProfile, DocumentStatus } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { QueryError } from "@/components/QueryError";
 
@@ -32,7 +32,7 @@ function expiryLabel(d: QueueDocument): { text: string; tone: "expired" | "soon"
 }
 
 interface QueueEntry {
-  contractor: ContractorProfile;
+  service_provider: ServiceProviderProfile;
   documents: QueueDocument[];
 }
 
@@ -71,29 +71,29 @@ export function AdminReviewPage() {
     setError(err instanceof ApiError ? err.detail : fallback);
 
   const decisionMutation = useMutation({
-    mutationFn: (vars: { contractorId: string; requirementId: string; decision: "approved" | "rejected"; note?: string }) =>
+    mutationFn: (vars: { serviceProviderId: string; requirementId: string; decision: "approved" | "rejected"; note?: string }) =>
       apiFetch("/admin/review/documents", {
         method: "POST",
-        body: { contractor_id: vars.contractorId, requirement_id: vars.requirementId, decision: vars.decision, note: vars.note ?? null },
+        body: { service_provider_id: vars.serviceProviderId, requirement_id: vars.requirementId, decision: vars.decision, note: vars.note ?? null },
       }),
     onSuccess: invalidate,
     onError: (err) => onMutationError(err, "Could not record that decision."),
   });
 
   const approveMutation = useMutation({
-    mutationFn: (contractorId: string) => apiFetch(`/admin/review/contractors/${contractorId}/approve`, { method: "POST" }),
+    mutationFn: (serviceProviderId: string) => apiFetch(`/admin/review/service-providers/${serviceProviderId}/approve`, { method: "POST" }),
     onSuccess: invalidate,
     onError: (err) => onMutationError(err, "Could not approve this service provider."),
   });
 
   const rejectMutation = useMutation({
-    mutationFn: (contractorId: string) => apiFetch(`/admin/review/contractors/${contractorId}/reject`, { method: "POST" }),
+    mutationFn: (serviceProviderId: string) => apiFetch(`/admin/review/service-providers/${serviceProviderId}/reject`, { method: "POST" }),
     onSuccess: invalidate,
     onError: (err) => onMutationError(err, "Could not reject this application."),
   });
 
-  const active = selectedId ?? queue?.[0]?.contractor.user_id ?? null;
-  const selected = queue?.find((c) => c.contractor.user_id === active);
+  const active = selectedId ?? queue?.[0]?.service_provider.user_id ?? null;
+  const selected = queue?.find((c) => c.service_provider.user_id === active);
 
   const requiredDocs = selected?.documents.filter((d) => d.requirement_is_required) ?? [];
   const requiredApprovedCount = requiredDocs.filter((d) => d.status === "approved").length;
@@ -118,17 +118,17 @@ export function AdminReviewPage() {
           <div className="space-y-2.5">
             {queue.map((entry) => (
               <button
-                key={entry.contractor.user_id}
+                key={entry.service_provider.user_id}
                 type="button"
-                onClick={() => setSelectedId(entry.contractor.user_id)}
+                onClick={() => setSelectedId(entry.service_provider.user_id)}
                 className={`block w-full text-left px-4 py-3.5 border rounded ${
-                  entry.contractor.user_id === active ? "border-l-[3px] border-l-amber bg-blue-tint border-border" : "border-border bg-white"
+                  entry.service_provider.user_id === active ? "border-l-[3px] border-l-amber bg-blue-tint border-border" : "border-border bg-white"
                 }`}
               >
-                <div className="font-display font-semibold text-sm">{entry.contractor.company_name}</div>
+                <div className="font-display font-semibold text-sm">{entry.service_provider.company_name}</div>
                 <div className="font-mono text-[10.5px] text-steel mt-1">
-                  {entry.contractor.primary_trade || "Trade not set"} · Submitted{" "}
-                  {new Date(entry.contractor.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  {entry.service_provider.primary_trade || "Trade not set"} · Submitted{" "}
+                  {new Date(entry.service_provider.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                 </div>
               </button>
             ))}
@@ -138,15 +138,15 @@ export function AdminReviewPage() {
             <div className="tblock rounded px-5.5 pt-5 pb-0">
               <div className="flex justify-between items-start gap-2 mb-1">
                 <div>
-                  <h3 className="font-display font-semibold text-lg">{selected.contractor.company_name}</h3>
-                  <p className="text-[12.5px] text-steel">{selected.contractor.primary_trade || "Trade not set"}</p>
+                  <h3 className="font-display font-semibold text-lg">{selected.service_provider.company_name}</h3>
+                  <p className="text-[12.5px] text-steel">{selected.service_provider.primary_trade || "Trade not set"}</p>
                 </div>
                 <span
                   className={`font-mono text-[10px] uppercase px-2.5 py-1 rounded-full ${statusBadge(
-                    selected.contractor.verification_status === "pending_review" ? "pending" : selected.contractor.verification_status
+                    selected.service_provider.verification_status === "pending_review" ? "pending" : selected.service_provider.verification_status
                   )}`}
                 >
-                  {selected.contractor.verification_status.replace("_", " ")}
+                  {selected.service_provider.verification_status.replace("_", " ")}
                 </span>
               </div>
 
@@ -191,7 +191,7 @@ export function AdminReviewPage() {
                           <button
                             type="button"
                             onClick={() =>
-                              decisionMutation.mutate({ contractorId: selected.contractor.user_id, requirementId: d.requirement_id, decision: "approved" })
+                              decisionMutation.mutate({ serviceProviderId: selected.service_provider.user_id, requirementId: d.requirement_id, decision: "approved" })
                             }
                             className="border border-navy text-navy hover:bg-navy hover:text-white text-xs font-semibold rounded px-3 py-1.5"
                           >
@@ -200,7 +200,7 @@ export function AdminReviewPage() {
                           <button
                             type="button"
                             onClick={() =>
-                              decisionMutation.mutate({ contractorId: selected.contractor.user_id, requirementId: d.requirement_id, decision: "rejected" })
+                              decisionMutation.mutate({ serviceProviderId: selected.service_provider.user_id, requirementId: d.requirement_id, decision: "rejected" })
                             }
                             className="bg-red-tint text-red text-xs font-semibold rounded px-3 py-1.5"
                           >
@@ -219,15 +219,15 @@ export function AdminReviewPage() {
               <div className="flex gap-2.5 py-4.5 border-t border-border mt-1">
                 <button
                   type="button"
-                  onClick={() => approveMutation.mutate(selected.contractor.user_id)}
+                  onClick={() => approveMutation.mutate(selected.service_provider.user_id)}
                   disabled={!readyToApprove}
                   className="bg-navy hover:bg-navy-deep disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded px-4 py-2"
                 >
-                  Approve contractor
+                  Approve service provider
                 </button>
                 <button
                   type="button"
-                  onClick={() => rejectMutation.mutate(selected.contractor.user_id)}
+                  onClick={() => rejectMutation.mutate(selected.service_provider.user_id)}
                   className="bg-red-tint text-red text-sm font-semibold rounded px-4 py-2"
                 >
                   Reject application
