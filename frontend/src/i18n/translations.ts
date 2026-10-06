@@ -22,8 +22,12 @@ export interface Dictionary {
     categoryHint: string;
     location: string;
     locationHint: string;
-    description: string;
-    descriptionHint: string;
+    scopeHeading: string;
+    scopeIntro: string;
+    scopeTopics: string;
+    insertOutline: string;
+    outline: string;
+    charCount: string;
     save: string;
     saving: string;
     saved: string;
@@ -634,8 +638,12 @@ export const en: Dictionary = {
     categoryHint: "The trade or service needed, e.g. Construction, MEP, Interior fit-out, Landscaping.",
     location: "Location",
     locationHint: "Governorate, area and block, e.g. \"Hawalli — Salmiya, Block 4\".",
-    description: "What you're looking for",
-    descriptionHint: "A short overview of the project. Detailed scope and quantities come later.",
+    scopeHeading: "Scope of work",
+    scopeIntro: "Describe the work you're asking a service provider to do, clearly enough for them to judge whether they can do it and how to price it.",
+    scopeTopics: "Cover what applies to this job: the tasks, what must be delivered, specifications or standards, quantities, what is included and excluded, site conditions, and anything else they need to know. Skip what doesn't apply.",
+    insertOutline: "Insert outline",
+    outline: "Overview:\n\n\nWork / tasks required:\n- \n\nDeliverables:\n- \n\nSpecifications & standards:\n- \n\nQuantities / measurements:\n- \n\nIncluded:\n- \n\nExcluded (by owner or others):\n- \n\nSite & working conditions:\n- \n\nOther instructions:\n- ",
+    charCount: "{count} / {max} characters",
     save: "Save draft",
     saving: "Saving…",
     saved: "Saved",
@@ -1271,8 +1279,12 @@ export const ar: Dictionary = {
     categoryHint: "الحرفة أو الخدمة المطلوبة، مثل: إنشاءات، أعمال كهروميكانيكية، تشطيبات داخلية، تنسيق حدائق.",
     location: "الموقع",
     locationHint: "المحافظة والمنطقة والقطعة، مثال: «حولي — السالمية، قطعة 4».",
-    description: "ما الذي تبحث عنه",
-    descriptionHint: "نبذة مختصرة عن المشروع. نطاق العمل التفصيلي والكميات لاحقًا.",
+    scopeHeading: "نطاق العمل",
+    scopeIntro: "صف العمل الذي تطلبه من مزوّد الخدمة بوضوح يكفي ليقرر هل يستطيع تنفيذه وكيف يسعّره.",
+    scopeTopics: "غطِّ ما ينطبق على هذا العمل: المهام، وما يجب تسليمه، والمواصفات أو المعايير، والكميات، وما يشمله وما لا يشمله، وظروف الموقع، وأي شيء آخر يحتاج معرفته. تجاوز ما لا ينطبق.",
+    insertOutline: "إدراج مخطط",
+    outline: "نظرة عامة:\n\n\nالأعمال / المهام المطلوبة:\n- \n\nالمخرجات المطلوب تسليمها:\n- \n\nالمواصفات والمعايير:\n- \n\nالكميات / القياسات:\n- \n\nيشمل:\n- \n\nلا يشمل (على المالك أو غيره):\n- \n\nظروف الموقع والعمل:\n- \n\nتعليمات أخرى:\n- ",
+    charCount: "{count} / {max} حرف",
     save: "حفظ المسودة",
     saving: "جارٍ الحفظ…",
     saved: "تم الحفظ",

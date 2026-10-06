@@ -92,6 +92,9 @@ function statusBadgeClasses(status: string) {
   }
 }
 
+// Mirrors MAX_SCOPE_CHARS in backend/app/routers/projects.py.
+const MAX_SCOPE_CHARS = 20000;
+
 // Stage 3.2: the requirement's basic identity -- what the work is and where --
 // editable while it is still a private draft.
 function DraftDetailsForm({ project }: { project: ProjectDetail }) {
@@ -156,10 +159,36 @@ function DraftDetailsForm({ project }: { project: ProjectDetail }) {
           <input id="draft-address" value={address} onChange={(e) => setAddress(e.target.value)} required maxLength={500} className={field} />
           <p className={hint}>{t("draftDetails.locationHint")}</p>
         </div>
-        <div>
-          <label htmlFor="draft-description" className={label}>{t("draftDetails.description")}</label>
-          <textarea id="draft-description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className={`${field} resize-y`} />
-          <p className={hint}>{t("draftDetails.descriptionHint")}</p>
+        {/* Stage 3.3: the scope of work, stored in the existing description
+            field. Free text with optional guidance -- no rigid template. */}
+        <div className="border-t border-border pt-4">
+          <div className="flex items-end justify-between gap-3 mb-1">
+            <label htmlFor="draft-description" className="font-display text-base font-semibold text-navy">
+              {t("draftDetails.scopeHeading")}
+            </label>
+            <button
+              type="button"
+              onClick={() =>
+                setDescription((current) => (current.trim() ? `${current.trimEnd()}\n\n${t("draftDetails.outline")}` : t("draftDetails.outline")))
+              }
+              className="text-xs text-navy underline"
+            >
+              {t("draftDetails.insertOutline")}
+            </button>
+          </div>
+          <p className="text-[13px] text-steel mb-1">{t("draftDetails.scopeIntro")}</p>
+          <p className={`${hint} mb-2`}>{t("draftDetails.scopeTopics")}</p>
+          <textarea
+            id="draft-description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={14}
+            maxLength={MAX_SCOPE_CHARS}
+            className={`${field} resize-y font-[inherit] leading-relaxed`}
+          />
+          <p className={`${hint} text-end`}>
+            {t("draftDetails.charCount").replace("{count}", description.length.toLocaleString()).replace("{max}", MAX_SCOPE_CHARS.toLocaleString())}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -397,7 +426,7 @@ export function OwnerProjectDetailPage() {
           {project.description && (
             <div className="mt-4 text-sm text-steel">
               <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-1">{t("owner.projectDetail.scope")}</h3>
-              {project.description}
+              <div className="whitespace-pre-wrap break-words">{project.description}</div>
             </div>
           )}
           <div className="mt-4">

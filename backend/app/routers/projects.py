@@ -54,6 +54,20 @@ def _can_view_project(user: User, project: Project, db: Session) -> bool:
     return bool(profile and profile.is_verified_active)
 
 
+# The scope of work lives in Project.description (a TEXT column: 64 KB). A
+# clear limit, well inside that even for multi-byte Arabic text, so an
+# over-long scope is a 400 the owner can act on rather than a database error.
+MAX_SCOPE_CHARS = 20_000
+
+
+def _check_scope_length(text: str | None) -> None:
+    if text and len(text) > MAX_SCOPE_CHARS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"The scope of work is too long ({len(text):,} characters; the limit is {MAX_SCOPE_CHARS:,}).",
+        )
+
+
 def _parse_bid_deadline(raw: str) -> datetime:
     """Parses an ISO 8601 deadline into the naive-UTC datetime this app stores
     everywhere (see `datetime.utcnow()` throughout). A value carrying an
@@ -98,6 +112,7 @@ async def create_project(
         raise HTTPException(status_code=400, detail="A new project must start as draft or open.")
     status_value = ProjectStatus(status)
 
+    _check_scope_length(description)
     deadline = _parse_bid_deadline(bid_deadline)
     if status_value == ProjectStatus.open and deadline <= datetime.utcnow():
         raise HTTPException(status_code=400, detail="Bid deadline must be in the future.")
@@ -207,6 +222,7 @@ def amend_project(
             changed.append("address")
             project.address = address
 
+    _check_scope_length(payload.description)
     if payload.description is not None and payload.description != project.description:
         changed.append("description")
         project.description = payload.description or None

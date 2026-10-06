@@ -131,7 +131,8 @@ export function ServiceProviderOfferPage() {
       {project.description && (
         <div className="mb-6 text-sm text-steel">
           <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-1">{t("service_provider.offer.scope")}</h3>
-          {project.description}
+          {/* Keep the owner's line breaks: lists of tasks, quantities, inclusions. */}
+          <div className="whitespace-pre-wrap break-words">{project.description}</div>
         </div>
       )}
 
