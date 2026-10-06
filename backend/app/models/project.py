@@ -1,11 +1,13 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text, func
+from decimal import Decimal
+
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 from app.models.common import gen_uuid
-from app.models.enums import ProjectStatus, TenderType
+from app.models.enums import PricingBasis, ProjectStatus, TenderType
 
 
 class Project(Base):
@@ -32,6 +34,9 @@ class Project(Base):
         Enum(TenderType, native_enum=True), nullable=False, default=TenderType.owner_visible
     )
     tender_type_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    pricing_basis: Mapped[PricingBasis] = mapped_column(
+        Enum(PricingBasis, native_enum=True), nullable=False, default=PricingBasis.lump_sum
+    )
     # Admin moderation flag — independent of the owner-driven lifecycle
     # `status` above. Hides the project from the service provider feed and blocks
     # new bids while set, but leaves `status` untouched so un-suspending
@@ -44,6 +49,30 @@ class Project(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     drawings = relationship("ProjectDrawing", back_populates="project", cascade="all, delete-orphan")
+    items = relationship(
+        "ProjectItem", back_populates="project", cascade="all, delete-orphan", order_by="ProjectItem.position"
+    )
+
+
+# Stage 3.4: the measurable basis for pricing -- the work components a
+# provider prices against, each with an optional quantity and unit and the
+# specifications that affect its cost. Optional: a requirement that isn't
+# naturally itemized simply has none.
+class ProjectItem(Base):
+    __tablename__ = "project_items"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    description: Mapped[str] = mapped_column(String(500), nullable=False)
+    quantity: Mapped[Decimal | None] = mapped_column(Numeric(14, 3), nullable=True)
+    unit: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # Specifications, dimensions and any item-specific notes.
+    specification: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    project = relationship("Project", back_populates="items")
 
 
 class ProjectDrawing(Base):

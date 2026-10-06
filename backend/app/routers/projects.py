@@ -8,15 +8,15 @@ from app.db import get_db
 from app.deps import get_current_user, require_verified_owner
 from app.models.award_record import AwardRecord
 from app.models.service_provider import ServiceProviderProfile
-from app.models.enums import NotificationType, OfferStatus, ProjectStatus, TenderType, UserRole
+from app.models.enums import NotificationType, OfferStatus, PricingBasis, ProjectStatus, TenderType, UserRole
 from app.models.offer import Offer
 from app.models.owner import OwnerProfile
-from app.models.project import Project, ProjectDrawing
+from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.project_amendment import ProjectAmendment
 from app.models.user import User
 from app.schemas.amendment import ProjectAmendmentOut, ProjectAmendmentRequest
 from app.schemas.award import AwardRecordOut
-from app.schemas.project import DrawingOut, ProjectCreate, ProjectDetailOut
+from app.schemas.project import DrawingOut, ProjectCreate, ProjectDetailOut, ProjectItemOut, ProjectItemsUpdate
 from app.services.drawings import upload_drawings_for_project
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name
 from app.services.email import notify_service_provider_tender_amended
@@ -304,6 +304,45 @@ def amend_project(
     return _serialize_detail(project, db)
 
 
+@router.put("/{project_id}/items", response_model=ProjectDetailOut)
+def set_project_items(
+    project_id: str, payload: ProjectItemsUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Stage 3.4: the requirement's pricing basis and its measurable items,
+    saved together and replaced as a whole. Items are optional -- a
+    requirement priced as one total needs none -- but pricing per item needs
+    at least one item to price."""
+    project = db.get(Project, project_id)
+    if not project or project.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    _require_active_owner(user, db)
+    if project.status != ProjectStatus.draft:
+        raise HTTPException(status_code=409, detail="Items and the pricing basis can only be changed while the requirement is a draft.")
+
+    items = []
+    for n, item in enumerate(payload.items, start=1):
+        description = item.description.strip()
+        if not description:
+            raise HTTPException(status_code=400, detail=f"Item {n} needs a description.")
+        items.append(
+            ProjectItem(
+                position=n,
+                description=description,
+                quantity=item.quantity,
+                unit=(item.unit or "").strip() or None,
+                specification=(item.specification or "").strip() or None,
+            )
+        )
+    if payload.pricing_basis == PricingBasis.per_item and not items:
+        raise HTTPException(status_code=400, detail="Add at least one item to price per item, or ask for one total price.")
+
+    project.pricing_basis = payload.pricing_basis
+    project.items = items  # delete-orphan removes the previous list
+    db.commit()
+    db.refresh(project)
+    return _serialize_detail(project, db)
+
+
 @router.get("/{project_id}/amendments", response_model=list[ProjectAmendmentOut])
 def list_amendments(project_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     project = db.get(Project, project_id)
@@ -474,4 +513,6 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
         created_at=project.created_at,
         offer_count=offer_count,
         drawings=drawings,
+        pricing_basis=project.pricing_basis,
+        items=[ProjectItemOut.model_validate(i) for i in project.items],
     )

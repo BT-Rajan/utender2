@@ -13,6 +13,30 @@ export interface Dictionary {
     optional: string;
     noDocuments: string;
   };
+  requirementItems: {
+    heading: string;
+    intro: string;
+    basisLabel: string;
+    lump_sum: string;
+    lump_sum_hint: string;
+    per_item: string;
+    per_item_hint: string;
+    item: string;
+    quantity: string;
+    unit: string;
+    specification: string;
+    specificationPlaceholder: string;
+    addItem: string;
+    remove: string;
+    noItems: string;
+    save: string;
+    saved: string;
+    saveError: string;
+    providerHeading: string;
+    provider_lump_sum: string;
+    provider_per_item: string;
+    notSpecified: string;
+  };
   draftDetails: {
     heading: string;
     intro: string;
@@ -628,6 +652,30 @@ export const en: Dictionary = {
     costLabel: "Cost",
     optional: "optional",
     noDocuments: "No documents are currently required.",
+  },
+  requirementItems: {
+    heading: "Quantities & pricing basis",
+    intro: "What a service provider needs to calculate their price. List items only where the work is naturally measured; otherwise leave the list empty.",
+    basisLabel: "Providers should price",
+    lump_sum: "One total for the whole requirement",
+    lump_sum_hint: "Any items below are for reference: they help the provider estimate one overall price.",
+    per_item: "Each listed item separately",
+    per_item_hint: "Providers give a price for every item below. List at least one.",
+    item: "Item / work component",
+    quantity: "Quantity",
+    unit: "Unit",
+    specification: "Specification & notes",
+    specificationPlaceholder: "Specs, dimensions, standards, or anything that affects the price",
+    addItem: "+ Add item",
+    remove: "Remove",
+    noItems: "No items. Fine for work that isn't naturally measured; the scope of work describes it.",
+    save: "Save quantities & pricing",
+    saved: "Saved",
+    saveError: "Could not save the items.",
+    providerHeading: "What to price",
+    provider_lump_sum: "Give one total price for the complete requirement. Any items listed are there to help you estimate it.",
+    provider_per_item: "Give a price for each item listed below.",
+    notSpecified: "not specified",
   },
   draftDetails: {
     heading: "Requirement details",
@@ -1269,6 +1317,30 @@ export const ar: Dictionary = {
     costLabel: "التكلفة",
     optional: "اختياري",
     noDocuments: "لا توجد مستندات مطلوبة حاليًا.",
+  },
+  requirementItems: {
+    heading: "الكميات وأساس التسعير",
+    intro: "ما يحتاجه مزوّد الخدمة لحساب سعره. أضف بنودًا فقط إذا كان العمل يُقاس بطبيعته؛ وإلا فاترك القائمة فارغة.",
+    basisLabel: "يسعّر مزوّدو الخدمة",
+    lump_sum: "سعرًا إجماليًا واحدًا للمتطلب كاملًا",
+    lump_sum_hint: "أي بنود أدناه للاسترشاد: تساعد مزوّد الخدمة على تقدير سعر إجمالي واحد.",
+    per_item: "كل بند مذكور على حدة",
+    per_item_hint: "يقدّم مزوّدو الخدمة سعرًا لكل بند أدناه. أضف بندًا واحدًا على الأقل.",
+    item: "البند / مكوّن العمل",
+    quantity: "الكمية",
+    unit: "الوحدة",
+    specification: "المواصفات والملاحظات",
+    specificationPlaceholder: "المواصفات أو الأبعاد أو المعايير أو أي شيء يؤثر في السعر",
+    addItem: "+ إضافة بند",
+    remove: "حذف",
+    noItems: "لا توجد بنود. هذا مناسب للأعمال التي لا تُقاس بطبيعتها؛ نطاق العمل يصفها.",
+    save: "حفظ الكميات والتسعير",
+    saved: "تم الحفظ",
+    saveError: "تعذر حفظ البنود.",
+    providerHeading: "ما المطلوب تسعيره",
+    provider_lump_sum: "قدّم سعرًا إجماليًا واحدًا للمتطلب كاملًا. أي بنود مذكورة هي لمساعدتك على تقديره.",
+    provider_per_item: "قدّم سعرًا لكل بند مذكور أدناه.",
+    notSpecified: "غير محدد",
   },
   draftDetails: {
     heading: "تفاصيل المتطلب",

@@ -6,6 +6,7 @@ import type { Drawing, Offer, ProjectDetail } from "@/api/types";
 import { timeRemaining, stars } from "@/lib/format";
 import { RatingInput } from "@/components/RatingInput";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { RequirementItemsEditor, RequirementItemsView } from "@/components/RequirementItems";
 import { PageLoading } from "@/components/PageLoading";
 import { ClarificationsPanel } from "@/components/ClarificationsPanel";
 import { useI18n } from "@/i18n/I18nContext";
@@ -305,6 +306,7 @@ export function OwnerProjectDetailPage() {
       <ErrorBanner message={error} />
 
       {project.status === "draft" && <DraftDetailsForm project={project} />}
+      {project.status === "draft" && <RequirementItemsEditor project={project} />}
 
       {(project.status === "draft" ||
         project.status === "open" ||
@@ -427,6 +429,11 @@ export function OwnerProjectDetailPage() {
             <div className="mt-4 text-sm text-steel">
               <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-1">{t("owner.projectDetail.scope")}</h3>
               <div className="whitespace-pre-wrap break-words">{project.description}</div>
+            </div>
+          )}
+          {project.status !== "draft" && (
+            <div className="mt-4">
+              <RequirementItemsView project={project} />
             </div>
           )}
           <div className="mt-4">

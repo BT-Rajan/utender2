@@ -6,6 +6,7 @@ import type { Offer, ProjectDetail } from "@/api/types";
 import { formatDeadline, timeRemaining } from "@/lib/format";
 import { PageLoading } from "@/components/PageLoading";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { RequirementItemsView } from "@/components/RequirementItems";
 import { ClarificationsPanel } from "@/components/ClarificationsPanel";
 import { useI18n } from "@/i18n/I18nContext";
 
@@ -135,6 +136,8 @@ export function ServiceProviderOfferPage() {
           <div className="whitespace-pre-wrap break-words">{project.description}</div>
         </div>
       )}
+
+      <RequirementItemsView project={project} />
 
       <div className="mb-6">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-2">

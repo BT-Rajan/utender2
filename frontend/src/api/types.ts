@@ -40,6 +40,8 @@ export interface Drawing {
 }
 
 export interface ProjectDetail extends Project {
+  pricing_basis: PricingBasis;
+  items: RequirementItem[];
   drawings: Drawing[];
 }
 
@@ -255,4 +257,17 @@ export interface AuditLogEntry {
   new_value: string | null;
   reason: string | null;
   created_at: string;
+}
+
+// Stage 3.4: what a service provider is asked to price, and the measurable
+// items to price against (optional: a non-itemized requirement has none).
+export type PricingBasis = "lump_sum" | "per_item";
+
+export interface RequirementItem {
+  id: string;
+  position: number;
+  description: string;
+  quantity: string | null;
+  unit: string | null;
+  specification: string | null;
 }

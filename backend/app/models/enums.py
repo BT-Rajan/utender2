@@ -50,6 +50,15 @@ class TenderType(str, enum.Enum):
     owner_visible = "owner_visible"
 
 
+# Stage 3.4: what a service provider is asked to price. lump_sum = one total
+# for the complete requirement (the only basis offers capture today);
+# per_item = a price for each listed requirement item (offers gain per-item
+# prices in the response step).
+class PricingBasis(str, enum.Enum):
+    lump_sum = "lump_sum"
+    per_item = "per_item"
+
+
 class OfferStatus(str, enum.Enum):
     submitted = "submitted"
     approved = "approved"
