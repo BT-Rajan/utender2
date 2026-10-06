@@ -666,7 +666,7 @@ def test_amending_the_deadline_with_a_timezone_offset_is_stored_as_utc(db, submi
     r = owner.patch(f"/projects/{pid}", json={"bid_deadline": submitted})
 
     assert r.status_code == 200, r.text
-    assert r.json()["bid_deadline"] == stored
+    assert r.json()["bid_deadline"] == stored + "Z"  # returned as explicit UTC
 
 
 def test_amending_the_deadline_with_garbage_is_a_client_error(db):

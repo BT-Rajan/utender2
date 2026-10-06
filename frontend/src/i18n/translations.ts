@@ -13,6 +13,144 @@ export interface Dictionary {
     optional: string;
     noDocuments: string;
   };
+  response: {
+    heading: string;
+    hint: string;
+    completionPeriod: string;
+    approach: string;
+    required: string;
+    optional: string;
+    documentsHeading: string;
+    documentsHint: string;
+    documentName: string;
+    addDocument: string;
+    remove: string;
+    declarationsHeading: string;
+    declarationsHint: string;
+    declarationText: string;
+    addDeclaration: string;
+    save: string;
+    saved: string;
+    saveError: string;
+    whatToSubmit: string;
+    priceTotal: string;
+    pricePerItem: string;
+    rateCol: string;
+    lineTotalCol: string;
+    total: string;
+    amount: string;
+    assumptions: string;
+    assumptionsPlaceholder: string;
+    attachments: string;
+    upload: string;
+    replace: string;
+    uploadError: string;
+    declarations: string;
+    requiredMark: string;
+    noDocuments: string;
+    itemBreakdown: string;
+    declarationsConfirmed: string;
+    details: string;
+  };
+  dates: {
+    heading: string;
+    responseHeading: string;
+    responseHint: string;
+    workHeading: string;
+    workHint: string;
+    start: string;
+    finishBy: string;
+    completion: string;
+    duration: string;
+    durationOr: string;
+    save: string;
+    saved: string;
+    saveError: string;
+    pastDeadline: string;
+    work: string;
+    from: string;
+    until: string;
+    days: string;
+  };
+  documents: {
+    drawing: string;
+    boq: string;
+    specification: string;
+    photo: string;
+    site: string;
+    other: string;
+    typeLabel: string;
+    essential: string;
+    supplementary: string;
+    essentialToggle: string;
+    remove: string;
+    removeConfirm: string;
+    uploadHint: string;
+    heading: string;
+    saveError: string;
+  };
+  location: {
+    governorate: string;
+    chooseGovernorate: string;
+    allGovernorates: string;
+    capital: string;
+    hawalli: string;
+    farwaniya: string;
+    mubarak_al_kabeer: string;
+    ahmadi: string;
+    jahra: string;
+    area: string;
+    areaHint: string;
+    address: string;
+    addressHint: string;
+    siteNotesHint: string;
+    notSpecified: string;
+  };
+  requirementItems: {
+    heading: string;
+    intro: string;
+    basisLabel: string;
+    lump_sum: string;
+    lump_sum_hint: string;
+    per_item: string;
+    per_item_hint: string;
+    item: string;
+    quantity: string;
+    unit: string;
+    specification: string;
+    specificationPlaceholder: string;
+    addItem: string;
+    remove: string;
+    noItems: string;
+    save: string;
+    saved: string;
+    saveError: string;
+    providerHeading: string;
+    provider_lump_sum: string;
+    provider_per_item: string;
+    notSpecified: string;
+  };
+  draftDetails: {
+    heading: string;
+    intro: string;
+    title: string;
+    titleHint: string;
+    category: string;
+    categoryHint: string;
+    location: string;
+    locationHint: string;
+    scopeHeading: string;
+    scopeIntro: string;
+    scopeTopics: string;
+    insertOutline: string;
+    outline: string;
+    charCount: string;
+    save: string;
+    saving: string;
+    saved: string;
+    saveError: string;
+    notSet: string;
+  };
   verification: {
     scopeLabel: string;
     scopeAll: string;
@@ -608,6 +746,144 @@ export const en: Dictionary = {
     optional: "optional",
     noDocuments: "No documents are currently required.",
   },
+  response: {
+    heading: "What providers must submit",
+    hint: "Every offer includes a price in {currency}. Choose what else a complete offer must contain. Offers missing a required part are refused.",
+    completionPeriod: "Completion period",
+    approach: "Technical approach / method",
+    required: "Required",
+    optional: "Optional",
+    documentsHeading: "Documents to attach",
+    documentsHint: "e.g. Method statement, Programme, Trade licence copy.",
+    documentName: "Document name",
+    addDocument: "Add document",
+    remove: "Remove",
+    declarationsHeading: "Declarations providers must confirm",
+    declarationsHint: "Short statements each provider must tick, e.g. \"I have visited the site.\"",
+    declarationText: "Declaration",
+    addDeclaration: "Add declaration",
+    save: "Save response requirements",
+    saved: "Saved",
+    saveError: "Could not save the response requirements.",
+    whatToSubmit: "What your offer must include",
+    priceTotal: "Total price in {currency}",
+    pricePerItem: "A rate in {currency} for every item listed",
+    rateCol: "Rate ({currency})",
+    lineTotalCol: "Line total",
+    total: "Total",
+    amount: "Your total price ({currency})",
+    assumptions: "Assumptions, exclusions & clarifications",
+    assumptionsPlaceholder: "e.g. Excludes dewatering; client provides water and power on site.",
+    attachments: "Supporting documents",
+    upload: "Upload",
+    replace: "Replace",
+    uploadError: "Could not upload the document.",
+    declarations: "Declarations",
+    requiredMark: "required",
+    noDocuments: "No documents attached.",
+    itemBreakdown: "Price breakdown",
+    declarationsConfirmed: "All declarations confirmed",
+    details: "Response details",
+  },
+  dates: {
+    heading: "Dates",
+    responseHeading: "Offer deadline",
+    responseHint: "When service providers must have submitted their offers. Offers are refused after this moment. In your local time.",
+    workHeading: "Expected work timing",
+    workHint: "When you expect the work itself to happen, so providers can check their availability. Optional; leave blank if it doesn't apply.",
+    start: "Expected start",
+    finishBy: "Finish by",
+    completion: "Expected completion date",
+    duration: "Duration (days)",
+    durationOr: "or",
+    save: "Save dates",
+    saved: "Saved",
+    saveError: "Could not save the dates.",
+    pastDeadline: "This deadline has passed. Set a future one before publishing.",
+    work: "Work",
+    from: "from {date}",
+    until: "until {date}",
+    days: "{n} days",
+  },
+  documents: {
+    drawing: "Drawing",
+    boq: "BOQ",
+    specification: "Specification",
+    photo: "Photo",
+    site: "Site document",
+    other: "Other",
+    typeLabel: "Document type",
+    essential: "Essential for pricing",
+    supplementary: "Supplementary",
+    essentialToggle: "Providers need this to price the work",
+    remove: "Remove",
+    removeConfirm: "Remove this document and its earlier versions from the draft?",
+    uploadHint: "PDF, DWG, Excel (.xlsx), Word (.docx), JPG/PNG, or a .zip of them, up to 50 MB per upload. Uploading a file with the same name replaces it as a new version.",
+    heading: "Documents",
+    saveError: "Could not update the document.",
+  },
+  location: {
+    governorate: "Governorate",
+    chooseGovernorate: "Select governorate",
+    allGovernorates: "All governorates",
+    capital: "Capital (Al Asimah)",
+    hawalli: "Hawalli",
+    farwaniya: "Farwaniya",
+    mubarak_al_kabeer: "Mubarak Al-Kabeer",
+    ahmadi: "Ahmadi",
+    jahra: "Jahra",
+    area: "Area",
+    areaHint: "The neighbourhood, e.g. Salmiya, Mishref, Fahaheel. Shown in listings with the governorate.",
+    address: "Exact address or site description",
+    addressHint: "Block, street, house or plot, landmarks or directions. Shown only to service providers who can open the full requirement, not in listings.",
+    siteNotesHint: "Site access or conditions that affect the work (working hours, access for trucks, occupied building…) go in the scope of work, under \"Site & working conditions\".",
+    notSpecified: "Location not specified",
+  },
+  requirementItems: {
+    heading: "Quantities & pricing basis",
+    intro: "What a service provider needs to calculate their price. List items only where the work is naturally measured; otherwise leave the list empty.",
+    basisLabel: "Providers should price",
+    lump_sum: "One total for the whole requirement",
+    lump_sum_hint: "Any items below are for reference: they help the provider estimate one overall price.",
+    per_item: "Each listed item separately",
+    per_item_hint: "Providers give a price for every item below. List at least one.",
+    item: "Item / work component",
+    quantity: "Quantity",
+    unit: "Unit",
+    specification: "Specification & notes",
+    specificationPlaceholder: "Specs, dimensions, standards, or anything that affects the price",
+    addItem: "+ Add item",
+    remove: "Remove",
+    noItems: "No items. Fine for work that isn't naturally measured; the scope of work describes it.",
+    save: "Save quantities & pricing",
+    saved: "Saved",
+    saveError: "Could not save the items.",
+    providerHeading: "What to price",
+    provider_lump_sum: "Give one total price for the complete requirement. Any items listed are there to help you estimate it.",
+    provider_per_item: "Give a price for each item listed below.",
+    notSpecified: "not specified",
+  },
+  draftDetails: {
+    heading: "Requirement details",
+    intro: "The basics a service provider sees first: what the work is and where. This draft is private until you publish it.",
+    title: "Title",
+    titleHint: "Short and specific, e.g. \"Villa extension — ground floor majlis\".",
+    category: "Type of work",
+    categoryHint: "The trade or service needed, e.g. Construction, MEP, Interior fit-out, Landscaping.",
+    location: "Location",
+    locationHint: "Governorate, area and block, e.g. \"Hawalli — Salmiya, Block 4\".",
+    scopeHeading: "Scope of work",
+    scopeIntro: "Describe the work you're asking a service provider to do, clearly enough for them to judge whether they can do it and how to price it.",
+    scopeTopics: "Cover what applies to this job: the tasks, what must be delivered, specifications or standards, quantities, what is included and excluded, site conditions, and anything else they need to know. Skip what doesn't apply.",
+    insertOutline: "Insert outline",
+    outline: "Overview:\n\n\nWork / tasks required:\n- \n\nDeliverables:\n- \n\nSpecifications & standards:\n- \n\nQuantities / measurements:\n- \n\nIncluded:\n- \n\nExcluded (by owner or others):\n- \n\nSite & working conditions:\n- \n\nOther instructions:\n- ",
+    charCount: "{count} / {max} characters",
+    save: "Save draft",
+    saving: "Saving…",
+    saved: "Saved",
+    saveError: "Could not save the draft.",
+    notSet: "Not set",
+  },
   verification: {
     scopeLabel: "Applies to",
     scopeAll: "Individuals and organizations",
@@ -879,7 +1155,7 @@ export const en: Dictionary = {
       deadlineLabel: "Deadline",
       closed: "Closed",
       scope: "Scope",
-      drawings: "Drawings",
+      drawings: "Documents",
       downloadZip: "Download all as .zip",
       noDrawings: "No drawings were uploaded for this project.",
       biddingClosedNotice: "Bidding on this project has closed.",
@@ -887,7 +1163,7 @@ export const en: Dictionary = {
       awardedTo: "Awarded to",
       anotherServiceProvider: "another service provider",
       noAwardNotice: "The owner decided not to award this project.",
-      bidAmount: "Your bid amount (USD)",
+      bidAmount: "Your bid amount",
       timeline: "Estimated timeline",
       timelinePlaceholder: "e.g. 3 weeks from start",
       messageToOwner: "Message to owner",
@@ -957,7 +1233,7 @@ export const en: Dictionary = {
       tradePlaceholder: "e.g. Roofing, Framing, Fencing",
       scope: "Scope of work",
       scopePlaceholder: "Describe the work you need done. Service providers will use this alongside your drawings to price their offer.",
-      drawings: "Drawings",
+      drawings: "Drawings & documents",
       drawingsHint: "PDF, DWG, JPG, PNG, or a .zip folder of drawings — up to 50MB total",
       drawingsAccessNote: "Only approved, subscribed service providers can view these files.",
       deadline: "Bid deadline",
@@ -989,7 +1265,7 @@ export const en: Dictionary = {
       noHistory: "No revision history yet.",
       current: "(current)",
       view: "view",
-      addDrawings: "Add drawings",
+      addDrawings: "Add documents",
       zipHint: "You can also upload a .zip folder of drawings.",
       scope: "Scope",
       lowestBid: "Lowest bid",
@@ -1227,6 +1503,144 @@ export const ar: Dictionary = {
     costLabel: "التكلفة",
     optional: "اختياري",
     noDocuments: "لا توجد مستندات مطلوبة حاليًا.",
+  },
+  response: {
+    heading: "ما يجب على مقدمي الخدمة تقديمه",
+    hint: "يتضمن كل عرض سعرًا بعملة {currency}. اختر ما يجب أن يحتويه العرض الكامل أيضًا. تُرفض العروض التي ينقصها جزء مطلوب.",
+    completionPeriod: "مدة الإنجاز",
+    approach: "المنهجية / طريقة التنفيذ",
+    required: "مطلوب",
+    optional: "اختياري",
+    documentsHeading: "المستندات المطلوب إرفاقها",
+    documentsHint: "مثل: بيان طريقة التنفيذ، الجدول الزمني، نسخة الرخصة التجارية.",
+    documentName: "اسم المستند",
+    addDocument: "إضافة مستند",
+    remove: "إزالة",
+    declarationsHeading: "إقرارات يجب على مقدمي الخدمة تأكيدها",
+    declarationsHint: "عبارات قصيرة يؤكدها كل مقدم خدمة، مثل: \"قمت بزيارة الموقع.\"",
+    declarationText: "الإقرار",
+    addDeclaration: "إضافة إقرار",
+    save: "حفظ متطلبات العرض",
+    saved: "تم الحفظ",
+    saveError: "تعذر حفظ متطلبات العرض.",
+    whatToSubmit: "ما يجب أن يتضمنه عرضك",
+    priceTotal: "السعر الإجمالي بعملة {currency}",
+    pricePerItem: "سعر وحدة بعملة {currency} لكل بند مدرج",
+    rateCol: "سعر الوحدة ({currency})",
+    lineTotalCol: "إجمالي البند",
+    total: "الإجمالي",
+    amount: "السعر الإجمالي ({currency})",
+    assumptions: "الافتراضات والاستثناءات والتوضيحات",
+    assumptionsPlaceholder: "مثال: لا يشمل نزح المياه الجوفية؛ يوفر المالك الماء والكهرباء في الموقع.",
+    attachments: "المستندات الداعمة",
+    upload: "رفع",
+    replace: "استبدال",
+    uploadError: "تعذر رفع المستند.",
+    declarations: "الإقرارات",
+    requiredMark: "مطلوب",
+    noDocuments: "لا توجد مستندات مرفقة.",
+    itemBreakdown: "تفصيل السعر",
+    declarationsConfirmed: "تم تأكيد جميع الإقرارات",
+    details: "تفاصيل العرض",
+  },
+  dates: {
+    heading: "التواريخ",
+    responseHeading: "الموعد النهائي لتقديم العروض",
+    responseHint: "الوقت الذي يجب أن يقدّم فيه مزوّدو الخدمات عروضهم. تُرفض العروض بعد هذه اللحظة. بتوقيتك المحلي.",
+    workHeading: "التوقيت المتوقع للعمل",
+    workHint: "متى تتوقع تنفيذ العمل نفسه، ليتمكن مزوّدو الخدمات من التحقق من توفرهم. اختياري؛ اتركه فارغًا إن لم ينطبق.",
+    start: "البدء المتوقع",
+    finishBy: "الانتهاء بحلول",
+    completion: "تاريخ الإنجاز المتوقع",
+    duration: "المدة (أيام)",
+    durationOr: "أو",
+    save: "حفظ التواريخ",
+    saved: "تم الحفظ",
+    saveError: "تعذر حفظ التواريخ.",
+    pastDeadline: "انقضى هذا الموعد. حدّد موعدًا مستقبليًا قبل النشر.",
+    work: "العمل",
+    from: "من {date}",
+    until: "حتى {date}",
+    days: "{n} يوم",
+  },
+  documents: {
+    drawing: "مخطط",
+    boq: "جدول كميات",
+    specification: "مواصفات",
+    photo: "صورة",
+    site: "مستند الموقع",
+    other: "أخرى",
+    typeLabel: "نوع المستند",
+    essential: "أساسي للتسعير",
+    supplementary: "تكميلي",
+    essentialToggle: "يحتاجه مزوّدو الخدمات لتسعير العمل",
+    remove: "حذف",
+    removeConfirm: "حذف هذا المستند ونسخه السابقة من المسودة؟",
+    uploadHint: "PDF أو DWG أو Excel (.xlsx) أو Word (.docx) أو JPG/PNG أو ملف .zip يضمها، حتى 50 ميجابايت لكل رفع. رفع ملف بالاسم نفسه يستبدله كنسخة جديدة.",
+    heading: "المستندات",
+    saveError: "تعذر تحديث المستند.",
+  },
+  location: {
+    governorate: "المحافظة",
+    chooseGovernorate: "اختر المحافظة",
+    allGovernorates: "كل المحافظات",
+    capital: "العاصمة",
+    hawalli: "حولي",
+    farwaniya: "الفروانية",
+    mubarak_al_kabeer: "مبارك الكبير",
+    ahmadi: "الأحمدي",
+    jahra: "الجهراء",
+    area: "المنطقة",
+    areaHint: "الحي، مثل: السالمية، مشرف، الفحيحيل. يظهر في القوائم مع المحافظة.",
+    address: "العنوان الدقيق أو وصف الموقع",
+    addressHint: "القطعة والشارع والمنزل أو القسيمة والمعالم أو الاتجاهات. يظهر فقط لمزوّدي الخدمات الذين يمكنهم فتح المتطلب كاملًا، وليس في القوائم.",
+    siteNotesHint: "ظروف الوصول إلى الموقع أو الظروف المؤثرة في العمل (ساعات العمل، دخول الشاحنات، مبنى مأهول…) تُكتب في نطاق العمل تحت «ظروف الموقع والعمل».",
+    notSpecified: "الموقع غير محدد",
+  },
+  requirementItems: {
+    heading: "الكميات وأساس التسعير",
+    intro: "ما يحتاجه مزوّد الخدمة لحساب سعره. أضف بنودًا فقط إذا كان العمل يُقاس بطبيعته؛ وإلا فاترك القائمة فارغة.",
+    basisLabel: "يسعّر مزوّدو الخدمة",
+    lump_sum: "سعرًا إجماليًا واحدًا للمتطلب كاملًا",
+    lump_sum_hint: "أي بنود أدناه للاسترشاد: تساعد مزوّد الخدمة على تقدير سعر إجمالي واحد.",
+    per_item: "كل بند مذكور على حدة",
+    per_item_hint: "يقدّم مزوّدو الخدمة سعرًا لكل بند أدناه. أضف بندًا واحدًا على الأقل.",
+    item: "البند / مكوّن العمل",
+    quantity: "الكمية",
+    unit: "الوحدة",
+    specification: "المواصفات والملاحظات",
+    specificationPlaceholder: "المواصفات أو الأبعاد أو المعايير أو أي شيء يؤثر في السعر",
+    addItem: "+ إضافة بند",
+    remove: "حذف",
+    noItems: "لا توجد بنود. هذا مناسب للأعمال التي لا تُقاس بطبيعتها؛ نطاق العمل يصفها.",
+    save: "حفظ الكميات والتسعير",
+    saved: "تم الحفظ",
+    saveError: "تعذر حفظ البنود.",
+    providerHeading: "ما المطلوب تسعيره",
+    provider_lump_sum: "قدّم سعرًا إجماليًا واحدًا للمتطلب كاملًا. أي بنود مذكورة هي لمساعدتك على تقديره.",
+    provider_per_item: "قدّم سعرًا لكل بند مذكور أدناه.",
+    notSpecified: "غير محدد",
+  },
+  draftDetails: {
+    heading: "تفاصيل المتطلب",
+    intro: "الأساسيات التي يراها مزوّد الخدمة أولًا: ما هو العمل وأين. هذه المسودة خاصة بك حتى تنشرها.",
+    title: "العنوان",
+    titleHint: "قصير ومحدد، مثال: «توسعة فيلا — مجلس الدور الأرضي».",
+    category: "نوع العمل",
+    categoryHint: "الحرفة أو الخدمة المطلوبة، مثل: إنشاءات، أعمال كهروميكانيكية، تشطيبات داخلية، تنسيق حدائق.",
+    location: "الموقع",
+    locationHint: "المحافظة والمنطقة والقطعة، مثال: «حولي — السالمية، قطعة 4».",
+    scopeHeading: "نطاق العمل",
+    scopeIntro: "صف العمل الذي تطلبه من مزوّد الخدمة بوضوح يكفي ليقرر هل يستطيع تنفيذه وكيف يسعّره.",
+    scopeTopics: "غطِّ ما ينطبق على هذا العمل: المهام، وما يجب تسليمه، والمواصفات أو المعايير، والكميات، وما يشمله وما لا يشمله، وظروف الموقع، وأي شيء آخر يحتاج معرفته. تجاوز ما لا ينطبق.",
+    insertOutline: "إدراج مخطط",
+    outline: "نظرة عامة:\n\n\nالأعمال / المهام المطلوبة:\n- \n\nالمخرجات المطلوب تسليمها:\n- \n\nالمواصفات والمعايير:\n- \n\nالكميات / القياسات:\n- \n\nيشمل:\n- \n\nلا يشمل (على المالك أو غيره):\n- \n\nظروف الموقع والعمل:\n- \n\nتعليمات أخرى:\n- ",
+    charCount: "{count} / {max} حرف",
+    save: "حفظ المسودة",
+    saving: "جارٍ الحفظ…",
+    saved: "تم الحفظ",
+    saveError: "تعذر حفظ المسودة.",
+    notSet: "غير محدد",
   },
   verification: {
     scopeLabel: "ينطبق على",
@@ -1499,7 +1913,7 @@ export const ar: Dictionary = {
       deadlineLabel: "الموعد النهائي",
       closed: "مغلق",
       scope: "نطاق العمل",
-      drawings: "المخططات",
+      drawings: "المستندات",
       downloadZip: "تنزيل الكل كملف .zip",
       noDrawings: "لم يتم رفع أي مخططات لهذا المشروع.",
       biddingClosedNotice: "أُغلق تقديم العروض على هذا المشروع.",
@@ -1507,7 +1921,7 @@ export const ar: Dictionary = {
       awardedTo: "تم الترسية على",
       anotherServiceProvider: "مزوّد خدمة آخر",
       noAwardNotice: "قرر المالك عدم ترسية هذا المشروع.",
-      bidAmount: "قيمة عرضك (دولار أمريكي)",
+      bidAmount: "قيمة عرضك",
       timeline: "الجدول الزمني المتوقع",
       timelinePlaceholder: "مثال: 3 أسابيع من بدء العمل",
       messageToOwner: "رسالة إلى المالك",
@@ -1577,7 +1991,7 @@ export const ar: Dictionary = {
       tradePlaceholder: "مثال: أسقف، هياكل، أسوار",
       scope: "نطاق العمل",
       scopePlaceholder: "صف العمل المطلوب. سيستخدم مزوّدو الخدمات هذا الوصف مع مخططاتك لتسعير عروضهم.",
-      drawings: "المخططات",
+      drawings: "المخططات والمستندات",
       drawingsHint: "PDF أو DWG أو JPG أو PNG أو ملف .zip للمخططات — حتى 50 ميغابايت إجمالاً",
       drawingsAccessNote: "فقط مزوّدو الخدمات المعتمدون والمشتركون يمكنهم عرض هذه الملفات.",
       deadline: "الموعد النهائي لتقديم العروض",
@@ -1609,7 +2023,7 @@ export const ar: Dictionary = {
       noHistory: "لا يوجد سجل مراجعات بعد.",
       current: "(الحالي)",
       view: "عرض",
-      addDrawings: "إضافة مخططات",
+      addDrawings: "إضافة مستندات",
       zipHint: "يمكنك أيضًا رفع ملف .zip يحتوي على المخططات.",
       scope: "نطاق العمل",
       lowestBid: "أقل عرض",

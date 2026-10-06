@@ -6,12 +6,15 @@ import type { ServiceProviderProfile, Project } from "@/api/types";
 import { formatDeadline, timeRemaining } from "@/lib/format";
 import { QueryError } from "@/components/QueryError";
 import { useI18n } from "@/i18n/I18nContext";
+import { formatWorkTiming } from "@/lib/dates";
+import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
 
 export function ServiceProviderFeedPage() {
   const { t } = useI18n();
   const location = useLocation() as { state?: { notice?: string } };
   const [search, setSearch] = useState("");
   const [trade, setTrade] = useState("");
+  const [governorate, setGovernorate] = useState("");
   const [sort, setSort] = useState<"deadline" | "newest">("deadline");
 
   const { data: profile } = useQuery({
@@ -29,11 +32,12 @@ export function ServiceProviderFeedPage() {
     isError,
     refetch,
   } = useQuery({
-    queryKey: ["service-provider-feed", search, trade, sort],
+    queryKey: ["service-provider-feed", search, trade, governorate, sort],
     queryFn: () => {
       const params = new URLSearchParams();
       if (search.trim()) params.set("search", search.trim());
       if (trade) params.set("trade", trade);
+      if (governorate) params.set("governorate", governorate);
       params.set("sort", sort);
       return apiFetch<Project[]>(`/service-provider/feed?${params.toString()}`);
     },
@@ -45,7 +49,7 @@ export function ServiceProviderFeedPage() {
   // an admin-granted payment override has no Stripe subscription at all,
   // but is fully active.
   const isSubscribed = profile?.marketplace_status === "verified_active";
-  const filtersActive = !!search.trim() || !!trade;
+  const filtersActive = !!search.trim() || !!trade || !!governorate;
 
   return (
     <main className="max-w-5xl mx-auto px-5 py-8">
@@ -88,6 +92,19 @@ export function ServiceProviderFeedPage() {
           ))}
         </select>
         <select
+          value={governorate}
+          onChange={(e) => setGovernorate(e.target.value)}
+          aria-label={t("location.governorate")}
+          className="border border-border rounded px-3 py-2 text-sm font-mono"
+        >
+          <option value="">{t("location.allGovernorates")}</option>
+          {KUWAIT_GOVERNORATES.map((g) => (
+            <option key={g} value={g}>
+              {t(`location.${g}`)}
+            </option>
+          ))}
+        </select>
+        <select
           value={sort}
           onChange={(e) => setSort(e.target.value as "deadline" | "newest")}
           className="border border-border rounded px-3 py-2 text-sm font-mono"
@@ -112,7 +129,10 @@ export function ServiceProviderFeedPage() {
               <div className="flex justify-between items-start gap-2">
                 <div>
                   <h3 className="font-display font-semibold text-[16.5px] mb-0.5">{p.title}</h3>
-                  <p className="text-[12.5px] text-steel mb-3">{p.address}</p>
+                  <p className="text-[12.5px] text-steel mb-3">
+                    {formatArea(t, p.governorate, p.area)}
+                    {formatWorkTiming(t, p) && <span className="block text-[11.5px]">{formatWorkTiming(t, p)}</span>}
+                  </p>
                 </div>
                 {p.my_offer_status && (
                   <span className="font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-green-tint text-green whitespace-nowrap">

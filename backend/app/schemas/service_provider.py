@@ -4,6 +4,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict
 
 from app.models.enums import OfferStatus, ProjectStatus, SubscriptionStatus, VerificationStatus
+from app.schemas.common import UTCDateTime
 
 
 class ServiceProviderProfileOut(BaseModel):
@@ -52,7 +53,7 @@ class MyBidOut(BaseModel):
     project_title: str
     project_address: str
     project_status: ProjectStatus
-    bid_deadline: datetime
+    bid_deadline: UTCDateTime
     offer_id: str
     amount: Decimal
     offer_status: OfferStatus

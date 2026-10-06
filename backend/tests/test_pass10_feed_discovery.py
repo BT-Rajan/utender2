@@ -74,7 +74,7 @@ def test_pass10_feed_discovery():
     check("trade filter with no matches returns empty list", len(r.json()) == 0)
 
     r = service_provider_client.get("/service-provider/feed", params={"search": "Maple"})
-    check("search matches address", len(r.json()) == 1)
+    check("search matches title (never the exact address)", len(r.json()) == 1)
 
     r = service_provider_client.get("/service-provider/feed", params={"search": "cedar fence"})
     check("search matches description", len(r.json()) == 1 and r.json()[0]["title"] == "Fence repair")

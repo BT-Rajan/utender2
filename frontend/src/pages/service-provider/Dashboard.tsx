@@ -4,6 +4,7 @@ import { apiFetch } from "@/api/client";
 import type { ServiceProviderProfile, OfferStatus, ProjectStatus } from "@/api/types";
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
+import { money } from "@/lib/money";
 
 interface MyBid {
   project_id: string;
@@ -177,7 +178,7 @@ export function ServiceProviderDashboardPage() {
                     </span>
                   </div>
                   <div className="flex items-center justify-between font-mono text-xs">
-                    <span className="text-navy font-semibold">${Number(b.amount).toLocaleString()}</span>
+                    <span className="text-navy font-semibold">{money(b.amount)}</span>
                     <span className="text-steel-light">{b.project_status.replace(/_/g, " ")}</span>
                   </div>
                 </Link>

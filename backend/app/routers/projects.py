@@ -1,5 +1,6 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 from starlette.responses import StreamingResponse
@@ -8,17 +9,19 @@ from app.db import get_db
 from app.deps import get_current_user, require_verified_owner
 from app.models.award_record import AwardRecord
 from app.models.service_provider import ServiceProviderProfile
-from app.models.enums import NotificationType, OfferStatus, ProjectStatus, TenderType, UserRole
+from app.models.enums import NotificationType, OfferStatus, PricingBasis, ProjectStatus, TenderType, UserRole
 from app.models.offer import Offer
 from app.models.owner import OwnerProfile
-from app.models.project import Project, ProjectDrawing
+from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.project_amendment import ProjectAmendment
 from app.models.user import User
 from app.schemas.amendment import ProjectAmendmentOut, ProjectAmendmentRequest
 from app.schemas.award import AwardRecordOut
-from app.schemas.project import DrawingOut, ProjectCreate, ProjectDetailOut
-from app.services.drawings import upload_drawings_for_project
-from app.services.file_security import safe_relative_name
+from app.config import get_settings
+from app.schemas.project import DrawingOut, ProjectCreate, ProjectDetailOut, ProjectItemOut, ProjectItemsUpdate, ResponseRequirements
+from app.services.drawings import DOCUMENT_CATEGORIES, upload_drawings_for_project
+from app.services.locations import clean_area, clean_governorate
+from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name
 from app.services.email import notify_service_provider_tender_amended
 from app.services.notify import notify
 from app.services.storage import drawing_url_expiry_seconds, get_storage
@@ -54,6 +57,40 @@ def _can_view_project(user: User, project: Project, db: Session) -> bool:
     return bool(profile and profile.is_verified_active)
 
 
+# The scope of work lives in Project.description (a TEXT column: 64 KB). A
+# clear limit, well inside that even for multi-byte Arabic text, so an
+# over-long scope is a 400 the owner can act on rather than a database error.
+MAX_SCOPE_CHARS = 20_000
+
+
+def _check_scope_length(text: str | None) -> None:
+    if text and len(text) > MAX_SCOPE_CHARS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"The scope of work is too long ({len(text):,} characters; the limit is {MAX_SCOPE_CHARS:,}).",
+        )
+
+
+MAX_DURATION_DAYS = 3650
+
+
+def _check_execution_timing(deadline: datetime, start: date | None, completion: date | None, duration: int | None) -> None:
+    """Stage 3.7: reject expected work timing that contradicts itself or the
+    response deadline. Work can't be expected to start (or finish) before
+    providers have even finished responding."""
+    if completion and duration:
+        raise HTTPException(status_code=400, detail="Give either an expected completion date or a duration, not both.")
+    if duration is not None and not 1 <= duration <= MAX_DURATION_DAYS:
+        raise HTTPException(status_code=400, detail=f"Duration must be between 1 and {MAX_DURATION_DAYS} days.")
+    if start and completion and completion < start:
+        raise HTTPException(status_code=400, detail="The expected completion date can't be before the expected start date.")
+    response_closes = deadline.date()
+    if start and start < response_closes:
+        raise HTTPException(status_code=400, detail="Work can't be expected to start before the response deadline.")
+    if completion and completion < response_closes:
+        raise HTTPException(status_code=400, detail="Work can't be expected to finish before the response deadline.")
+
+
 def _parse_bid_deadline(raw: str) -> datetime:
     """Parses an ISO 8601 deadline into the naive-UTC datetime this app stores
     everywhere (see `datetime.utcnow()` throughout). A value carrying an
@@ -76,11 +113,18 @@ def _parse_bid_deadline(raw: str) -> datetime:
 async def create_project(
     title: str = Form(...),
     address: str = Form(...),
+    governorate: str | None = Form(None),
+    area: str | None = Form(None),
     description: str | None = Form(None),
     trade: str | None = Form(None),
     bid_deadline: str = Form(...),
+    expected_start_date: date | None = Form(None),
+    expected_completion_date: date | None = Form(None),
+    expected_duration_days: int | None = Form(None),
     tender_type: str = Form("owner_visible"),
-    status: str = Form("open"),
+    # Starting a requirement creates a draft unless the owner explicitly asks
+    # to publish; a client that omits status must never publish by accident.
+    status: str = Form(ProjectStatus.draft.value),
     drawings: list[UploadFile] = File(default=[]),
     user: User = Depends(require_verified_owner),
     db: Session = Depends(get_db),
@@ -96,17 +140,30 @@ async def create_project(
         raise HTTPException(status_code=400, detail="A new project must start as draft or open.")
     status_value = ProjectStatus(status)
 
+    _check_scope_length(description)
+    governorate_value, area_value = clean_governorate(governorate), clean_area(area)
     deadline = _parse_bid_deadline(bid_deadline)
     if status_value == ProjectStatus.open and deadline <= datetime.utcnow():
         raise HTTPException(status_code=400, detail="Bid deadline must be in the future.")
+    _check_execution_timing(deadline, expected_start_date, expected_completion_date, expected_duration_days)
+
+    # Reject disallowed drawing types before anything is created.
+    for f in drawings:
+        if f.filename:
+            assert_allowed_extension(f.filename, ALLOWED_DRAWING_EXTENSIONS)
 
     project = Project(
         owner_id=user.id,
         title=title,
         address=address,
+        governorate=governorate_value,
+        area=area_value,
         description=description or None,
         trade=trade or None,
         bid_deadline=deadline,
+        expected_start_date=expected_start_date,
+        expected_completion_date=expected_completion_date,
+        expected_duration_days=expected_duration_days,
         tender_type=tender_type_value,
         status=status_value,
     )
@@ -116,10 +173,33 @@ async def create_project(
 
     real_files = [f for f in drawings if f.filename]
     if real_files:
-        await upload_drawings_for_project(db, get_storage(), project.id, real_files)
+        try:
+            await upload_drawings_for_project(db, get_storage(), project.id, real_files)
+        except Exception:
+            # A rejected file (wrong type, unsafe archive) fails the whole start:
+            # remove the project and anything already stored for it, so the
+            # owner is never left with a half-created requirement -- possibly
+            # already published -- that a retry would then duplicate.
+            _discard_project(db, project.id)
+            raise
         db.refresh(project)
 
     return _serialize_detail(project, db)
+
+
+def _discard_project(db: Session, project_id: str) -> None:
+    db.rollback()
+    project = db.get(Project, project_id)
+    if not project:
+        return
+    paths = [d.file_path for d in project.drawings]
+    db.delete(project)
+    db.commit()
+    if paths:
+        try:
+            get_storage().delete("project-drawings", paths)
+        except Exception:
+            pass  # unreferenced files are harmless; the record is what matters
 
 
 @router.get("/{project_id}", response_model=ProjectDetailOut)
@@ -169,6 +249,27 @@ def amend_project(
             changed.append("title")
             project.title = title
 
+    if payload.address is not None:
+        address = payload.address.strip()
+        if not address:
+            raise HTTPException(status_code=400, detail="Location cannot be empty.")
+        if address != project.address:
+            changed.append("address")
+            project.address = address
+
+    if "governorate" in payload.model_fields_set:
+        governorate = clean_governorate(payload.governorate)
+        if governorate != project.governorate:
+            changed.append("governorate")
+            project.governorate = governorate
+
+    if "area" in payload.model_fields_set:
+        area = clean_area(payload.area)
+        if area != project.area:
+            changed.append("area")
+            project.area = area
+
+    _check_scope_length(payload.description)
     if payload.description is not None and payload.description != project.description:
         changed.append("description")
         project.description = payload.description or None
@@ -197,8 +298,24 @@ def amend_project(
         changed.append("bid_deadline")
         project.bid_deadline = new_deadline
 
+    for field in ("expected_start_date", "expected_completion_date", "expected_duration_days"):
+        if field in payload.model_fields_set and getattr(payload, field) != getattr(project, field):
+            changed.append(field)
+            setattr(project, field, getattr(payload, field))
+    if changed:
+        _check_execution_timing(
+            project.bid_deadline, project.expected_start_date, project.expected_completion_date, project.expected_duration_days
+        )
+
     if not changed:
         raise HTTPException(status_code=400, detail="No changes were provided.")
+
+    # A draft is still being written: nobody has seen it, so saving it is not
+    # an amendment -- no numbered record, no revision bump, no notifications.
+    if project.status == ProjectStatus.draft:
+        db.commit()
+        db.refresh(project)
+        return _serialize_detail(project, db)
 
     amendment_number = (
         db.query(ProjectAmendment).filter(ProjectAmendment.project_id == project_id).count() + 1
@@ -240,6 +357,63 @@ def amend_project(
                 summary=summary,
             )
 
+    return _serialize_detail(project, db)
+
+
+@router.put("/{project_id}/items", response_model=ProjectDetailOut)
+def set_project_items(
+    project_id: str, payload: ProjectItemsUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Stage 3.4: the requirement's pricing basis and its measurable items,
+    saved together and replaced as a whole. Items are optional -- a
+    requirement priced as one total needs none -- but pricing per item needs
+    at least one item to price."""
+    project = db.get(Project, project_id)
+    if not project or project.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    _require_active_owner(user, db)
+    if project.status != ProjectStatus.draft:
+        raise HTTPException(status_code=409, detail="Items and the pricing basis can only be changed while the requirement is a draft.")
+
+    items = []
+    for n, item in enumerate(payload.items, start=1):
+        description = item.description.strip()
+        if not description:
+            raise HTTPException(status_code=400, detail=f"Item {n} needs a description.")
+        items.append(
+            ProjectItem(
+                position=n,
+                description=description,
+                quantity=item.quantity,
+                unit=(item.unit or "").strip() or None,
+                specification=(item.specification or "").strip() or None,
+            )
+        )
+    if payload.pricing_basis == PricingBasis.per_item and not items:
+        raise HTTPException(status_code=400, detail="Add at least one item to price per item, or ask for one total price.")
+
+    project.pricing_basis = payload.pricing_basis
+    project.items = items  # delete-orphan removes the previous list
+    db.commit()
+    db.refresh(project)
+    return _serialize_detail(project, db)
+
+
+@router.put("/{project_id}/response-requirements", response_model=ProjectDetailOut)
+def set_response_requirements(
+    project_id: str, payload: ResponseRequirements, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Stage 3.8: what providers must submit with their price. Owner only,
+    while a draft -- once published, providers rely on these terms."""
+    project = db.get(Project, project_id)
+    if not project or project.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    _require_active_owner(user, db)
+    if project.status != ProjectStatus.draft:
+        raise HTTPException(status_code=409, detail="Response requirements can only be changed while the requirement is a draft.")
+    project.response_requirements = payload.model_dump()
+    db.commit()
+    db.refresh(project)
     return _serialize_detail(project, db)
 
 
@@ -285,6 +459,10 @@ def get_award(project_id: str, user: User = Depends(get_current_user), db: Sessi
 async def add_drawings(
     project_id: str,
     drawings: list[UploadFile] = File(...),
+    # Stage 3.6: what these files are, and whether providers need them to
+    # price the work (applies to every file in this upload).
+    category: str = Form("drawing"),
+    is_required: bool = Form(True),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -292,9 +470,67 @@ async def add_drawings(
     if not project or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
+    if category not in DOCUMENT_CATEGORIES:
+        raise HTTPException(status_code=400, detail="Unknown document type.")
 
     real_files = [f for f in drawings if f.filename]
-    await upload_drawings_for_project(db, get_storage(), project_id, real_files)
+    await upload_drawings_for_project(db, get_storage(), project_id, real_files, category, is_required)
+    db.refresh(project)
+    return _serialize_detail(project, db)
+
+
+def _owned_draft_document(project_id: str, drawing_id: str, user: User, db: Session) -> tuple[Project, ProjectDrawing]:
+    project = db.get(Project, project_id)
+    drawing = db.get(ProjectDrawing, drawing_id)
+    if not project or project.owner_id != user.id or not drawing or drawing.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    _require_active_owner(user, db)
+    if project.status != ProjectStatus.draft:
+        # Once published, providers may already be pricing against a file;
+        # replace it by uploading a new revision instead.
+        raise HTTPException(status_code=409, detail="Documents can only be removed or re-labelled while the requirement is a draft.")
+    return project, drawing
+
+
+class DocumentPatch(BaseModel):
+    category: str | None = None
+    is_required: bool | None = None
+
+
+@router.patch("/{project_id}/drawings/{drawing_id}", response_model=ProjectDetailOut)
+def update_document(
+    project_id: str, drawing_id: str, payload: DocumentPatch, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    project, drawing = _owned_draft_document(project_id, drawing_id, user, db)
+    if payload.category is not None:
+        if payload.category not in DOCUMENT_CATEGORIES:
+            raise HTTPException(status_code=400, detail="Unknown document type.")
+        drawing.category = payload.category
+    if payload.is_required is not None:
+        drawing.is_required = payload.is_required
+    db.commit()
+    db.refresh(project)
+    return _serialize_detail(project, db)
+
+
+@router.delete("/{project_id}/drawings/{drawing_id}", response_model=ProjectDetailOut)
+def remove_document(project_id: str, drawing_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Removes a document from a draft, with all its earlier revisions (rows
+    sharing its file name) and their stored files."""
+    project, drawing = _owned_draft_document(project_id, drawing_id, user, db)
+    versions = (
+        db.query(ProjectDrawing)
+        .filter(ProjectDrawing.project_id == project_id, ProjectDrawing.file_name.ilike(drawing.file_name))
+        .all()
+    )
+    paths = [v.file_path for v in versions]
+    for v in versions:
+        db.delete(v)
+    db.commit()
+    try:
+        get_storage().delete("project-drawings", paths)
+    except Exception:
+        pass  # the records are gone; an unreferenced stored file is unreachable
     db.refresh(project)
     return _serialize_detail(project, db)
 
@@ -370,6 +606,8 @@ def drawing_history(project_id: str, user: User = Depends(get_current_user), db:
             uploaded_at=d.uploaded_at,
             revision=d.revision,
             is_current=d.is_current,
+            category=d.category,
+            is_required=d.is_required,
             url=storage.signed_url("project-drawings", d.file_path, expiry),
         )
         for d in rows
@@ -394,6 +632,8 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
             uploaded_at=d.uploaded_at,
             revision=d.revision,
             is_current=d.is_current,
+            category=d.category,
+            is_required=d.is_required,
             url=storage.signed_url("project-drawings", d.file_path, expiry),
         )
         for d in drawing_rows
@@ -403,9 +643,14 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
         owner_id=project.owner_id,
         title=project.title,
         address=project.address,
+        governorate=project.governorate,
+        area=project.area,
         description=project.description,
         trade=project.trade,
         bid_deadline=project.bid_deadline,
+        expected_start_date=project.expected_start_date,
+        expected_completion_date=project.expected_completion_date,
+        expected_duration_days=project.expected_duration_days,
         status=project.status,
         tender_type=project.tender_type,
         tender_type_locked=project.tender_type_locked,
@@ -413,4 +658,8 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
         created_at=project.created_at,
         offer_count=offer_count,
         drawings=drawings,
+        pricing_basis=project.pricing_basis,
+        items=[ProjectItemOut.model_validate(i) for i in project.items],
+        response_requirements=ResponseRequirements(**(project.response_requirements or {})),
+        currency=get_settings().marketplace_currency,
     )

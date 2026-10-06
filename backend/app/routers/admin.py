@@ -33,6 +33,7 @@ from app.schemas.document import (
     ReviewOwnerDocumentDecision,
 )
 from app.schemas.owner import OwnerProfileOut
+from app.schemas.common import utc_iso
 from app.services.audit import log_action
 from app.services.stakeholder import describe as describe_stakeholder
 from app.services.verification import assert_ready_to_approve, checklist, document_out_fields, profile_state_fields
@@ -961,7 +962,7 @@ def _project_admin_fields(p: Project, owner: User | None) -> dict:
         "address": p.address,
         "description": p.description,
         "trade": p.trade,
-        "bid_deadline": p.bid_deadline,
+        "bid_deadline": utc_iso(p.bid_deadline),
         "status": p.status,
         "tender_type": p.tender_type,
         "tender_type_locked": p.tender_type_locked,

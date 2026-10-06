@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     # deadline if post-close access is intentionally permitted" note).
     signed_url_default_expiry_seconds: int = 60 * 60 * 24  # 24h
 
+    # Stage 3.8: the currency every requirement is priced in. One market,
+    # one currency -- no conversion.
+    marketplace_currency: str = "KWD"
+
     stripe_secret_key: str | None = None
     stripe_webhook_secret: str | None = None
     stripe_price_id_monthly: str | None = None

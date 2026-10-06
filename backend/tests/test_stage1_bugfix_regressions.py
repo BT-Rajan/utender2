@@ -107,7 +107,7 @@ def test_create_project_accepts_iso_deadlines_and_stores_utc(db, submitted, stor
     r = _post_project(owner, submitted)
 
     assert r.status_code == 201, r.text
-    assert r.json()["bid_deadline"] == stored
+    assert r.json()["bid_deadline"] == stored + "Z"  # returned as explicit UTC
 
 
 def test_create_project_draft_with_offset_is_stored_at_the_correct_instant(db):
@@ -118,7 +118,7 @@ def test_create_project_draft_with_offset_is_stored_at_the_correct_instant(db):
     r = _post_project(owner, "2020-01-01T00:00:00+03:00", status="draft")
 
     assert r.status_code == 201, r.text
-    assert r.json()["bid_deadline"] == "2019-12-31T21:00:00"
+    assert r.json()["bid_deadline"] == "2019-12-31T21:00:00Z"
 
 
 def test_offset_is_applied_not_just_stripped_when_checking_the_future(db):
@@ -136,7 +136,7 @@ def test_offset_is_applied_not_just_stripped_when_checking_the_future(db):
     future_instant = (now - timedelta(hours=3)).isoformat() + "-05:00"
     r = _post_project(owner, future_instant)
     assert r.status_code == 201, r.text
-    assert r.json()["bid_deadline"] == (now + timedelta(hours=2)).isoformat()
+    assert r.json()["bid_deadline"] == (now + timedelta(hours=2)).isoformat() + "Z"
 
 
 @pytest.mark.parametrize(

@@ -283,12 +283,26 @@ def main() -> None:
     c_desertrose = service_provider_clients["service_provider.desertrose@example.com"]
     c_manara = service_provider_clients["service_provider.manara@example.com"]
 
+    # Demo areas -> (governorate, area), so listings show where each job is.
+    demo_areas = {
+        "Salmiya": ("hawalli", "Salmiya"),
+        "Jabriya": ("hawalli", "Jabriya"),
+        "Fintas": ("ahmadi", "Fintas"),
+        "Sharq": ("capital", "Sharq"),
+        "Mishref": ("mubarak_al_kabeer", "Mishref"),
+        "Shuwaikh": ("capital", "Shuwaikh Industrial"),
+        "Andalous": ("farwaniya", "Andalous"),
+    }
+
     def create_project(owner: Client, title: str, address: str, description: str, trade: str, days: int, tender_type: str = "owner_visible", status: str = "open") -> str:
+        governorate, area = next((v for k, v in demo_areas.items() if k in address), (None, None))
         r = owner.post(
             "/projects",
             data={
                 "title": title,
                 "address": address,
+                "governorate": governorate or "",
+                "area": area or "",
                 "description": description,
                 "trade": trade,
                 "bid_deadline": future(days),

@@ -1,30 +1,112 @@
 from datetime import datetime
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.deps import get_service_provider_profile, require_approved_service_provider, require_marketplace_active_service_provider
 from app.models.enums import NotificationType, OfferStatus, ProjectStatus, TenderType
-from app.models.offer import Offer, OfferRevision
+from app.models.offer import Offer, OfferDocument, OfferRevision
 from app.models.project import Project
 from app.models.user import User
-from app.schemas.offer import OfferCreate, OfferOut, OfferRevisionOut
+from app.schemas.offer import OfferCreate, OfferDocumentOut, OfferOut, OfferRevisionOut
 from app.services.email import notify_owner_new_offer
+from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name, sanitize_path_segment
 from app.services.notify import notify
+from app.services.offer_response import OFFER_DOCUMENTS_BUCKET, check_complete, documents_out, priced_total, requirements_for
+from app.services.storage import get_storage
 from app.services.tender_lifecycle import bidding_is_open, lock_project
 
 router = APIRouter(prefix="/projects/{project_id}/offers", tags=["offers"])
 
-# offers.amount is NUMERIC(12,2). The DB rounds to 2 places, so anything at or
-# above 9999999999.995 would round past the column's range and fail the insert.
-_AMOUNT_LIMIT = Decimal("9999999999.995")
+# offers.amount is NUMERIC(15,3) (KWD has 3 decimals). Totals are capped well
+# inside the column's range; more than 3 decimals is refused by the schema.
+_AMOUNT_LIMIT = Decimal("10000000000")
 
 
 @router.get("/mine", response_model=OfferOut | None)
 def my_offer(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
-    return db.query(Offer).filter(Offer.project_id == project_id, Offer.service_provider_id == user.id).first()
+    offer = db.query(Offer).filter(Offer.project_id == project_id, Offer.service_provider_id == user.id).first()
+    return _with_documents(db, offer) if offer else None
+
+
+def _with_documents(db: Session, offer: Offer) -> OfferOut:
+    out = OfferOut.model_validate(offer)
+    out.documents = documents_out(db, offer.project_id, offer.service_provider_id)
+    return out
+
+
+# ---------- Stage 3.8: documents a provider submits with their response ----------
+
+
+@router.get("/documents", response_model=list[OfferDocumentOut])
+def my_offer_documents(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """The provider's own response attachments (there may be some before the
+    offer itself is first submitted)."""
+    return documents_out(db, project_id, user.id)
+
+
+@router.post("/documents", response_model=list[OfferDocumentOut])
+async def upload_offer_document(
+    project_id: str,
+    label: str = Form(...),
+    file: UploadFile = File(...),
+    user: User = Depends(require_marketplace_active_service_provider),
+    db: Session = Depends(get_db),
+):
+    project = lock_project(db, project_id)
+    if not project or not bidding_is_open(project) or project.is_suspended:
+        raise HTTPException(status_code=400, detail="Bidding on this project is closed.")
+    requested = {d.name for d in requirements_for(project).documents}
+    if label not in requested:
+        raise HTTPException(status_code=400, detail="This requirement doesn't ask for that document.")
+    assert_allowed_extension(file.filename, ALLOWED_DRAWING_EXTENSIONS - {"zip"})
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="No file provided.")
+
+    storage = get_storage()
+    path = f"{project_id}/{user.id}/{int(datetime.utcnow().timestamp() * 1000)}-{sanitize_path_segment(file.filename)}"
+    storage.save(OFFER_DOCUMENTS_BUCKET, path, content, file.content_type or "application/octet-stream")
+    existing = (
+        db.query(OfferDocument)
+        .filter(OfferDocument.project_id == project_id, OfferDocument.service_provider_id == user.id, OfferDocument.label == label)
+        .first()
+    )
+    replaced = existing.file_path if existing else None
+    if existing:
+        existing.file_path, existing.file_name = path, safe_relative_name(file.filename)
+        existing.uploaded_at = datetime.utcnow()
+    else:
+        db.add(OfferDocument(project_id=project_id, service_provider_id=user.id, label=label, file_path=path, file_name=safe_relative_name(file.filename)))
+    db.commit()
+    if replaced:
+        try:
+            storage.delete(OFFER_DOCUMENTS_BUCKET, [replaced])
+        except Exception:
+            pass
+    return documents_out(db, project_id, user.id)
+
+
+@router.delete("/documents/{document_id}", response_model=list[OfferDocumentOut])
+def remove_offer_document(
+    project_id: str, document_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)
+):
+    project = lock_project(db, project_id)
+    doc = db.get(OfferDocument, document_id)
+    if not project or not doc or doc.project_id != project_id or doc.service_provider_id != user.id:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    if not bidding_is_open(project):
+        raise HTTPException(status_code=400, detail="Bidding on this project has closed.")
+    path = doc.file_path
+    db.delete(doc)
+    db.commit()
+    try:
+        get_storage().delete(OFFER_DOCUMENTS_BUCKET, [path])
+    except Exception:
+        pass
+    return documents_out(db, project_id, user.id)
 
 
 @router.get("/mine/history", response_model=list[OfferRevisionOut])
@@ -53,6 +135,8 @@ def _snapshot_revision(db: Session, offer: Offer) -> None:
             amount=offer.amount,
             timeline_estimate=offer.timeline_estimate,
             message=offer.message,
+            item_prices=offer.item_prices,
+            assumptions=offer.assumptions,
             status=offer.status,
         )
     )
@@ -80,8 +164,12 @@ def submit_offer(
     if project.is_suspended:
         raise HTTPException(status_code=400, detail="This project has been suspended and is not accepting offers.")
 
-    if payload.amount <= 0 or payload.amount >= _AMOUNT_LIMIT:
+    # Stage 3.8: the response must match what the requirement asks for --
+    # its pricing basis and its response rules.
+    amount, item_prices = priced_total(project, payload)
+    if amount is None or amount <= 0 or amount >= _AMOUNT_LIMIT:
         raise HTTPException(status_code=400, detail="Enter a valid bid amount.")
+    declarations = check_complete(db, project, user.id, payload)
 
     # The tender lock above already serializes every writer of this
     # service provider's offer (a plain read is enough). Deliberately NOT
@@ -95,18 +183,24 @@ def submit_offer(
         # same row rather than creating a duplicate, but the prior values
         # are snapshotted first so nothing is silently lost.
         _snapshot_revision(db, offer)
-        offer.amount = payload.amount
+        offer.amount = amount
         offer.timeline_estimate = payload.timeline_estimate
         offer.message = payload.message
+        offer.item_prices = item_prices
+        offer.assumptions = payload.assumptions
+        offer.declarations_accepted = declarations
         offer.status = OfferStatus.submitted
         offer.updated_at = datetime.utcnow()
     else:
         offer = Offer(
             project_id=project_id,
             service_provider_id=user.id,
-            amount=payload.amount,
+            amount=amount,
             timeline_estimate=payload.timeline_estimate,
             message=payload.message,
+            item_prices=item_prices,
+            assumptions=payload.assumptions,
+            declarations_accepted=declarations,
             status=OfferStatus.submitted,
         )
         db.add(offer)
@@ -122,7 +216,7 @@ def submit_offer(
     sealed = project.tender_type == TenderType.sealed and project.status == ProjectStatus.open
     owner = db.get(User, project.owner_id)
     if owner:
-        notify_owner_new_offer(owner.email, project.title, project_id, profile.company_name, float(payload.amount), sealed=sealed)
+        notify_owner_new_offer(owner.email, project.title, project_id, profile.company_name, float(amount), sealed=sealed)
         notify(
             db,
             owner,
@@ -132,7 +226,7 @@ def submit_offer(
             service_provider_name="A service provider" if sealed else profile.company_name,
         )
 
-    return offer
+    return _with_documents(db, offer)
 
 
 @router.post("/withdraw", response_model=OfferOut)

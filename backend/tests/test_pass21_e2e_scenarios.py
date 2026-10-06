@@ -130,7 +130,7 @@ def test_pass21_e2e_scenarios():
     r = owner_client.get(f"/owner/projects/{projA}/offers")
     check("A: owner sees offers while tender still open (owner-visible)", r.status_code == 200)
     offers_open = r.json()
-    check("A: real amounts visible pre-close on an owner-visible tender", any(o["amount"] == "18000.00" for o in offers_open))
+    check("A: real amounts visible pre-close on an owner-visible tender", any(o["amount"] == "18000.000" for o in offers_open))
     check("A: not marked sealed", all(o["sealed"] is False for o in offers_open))
 
     # --- force deadline into the past, sync via a normal read path ---
@@ -234,7 +234,7 @@ def test_pass21_e2e_scenarios():
     r = owner_client.get(f"/owner/projects/{projB}/offers")
     unsealed_offers = r.json()
     check("B: seal lifts once closed -- identities now visible", any(o["service_provider_id"] == c2_id for o in unsealed_offers))
-    check("B: seal lifts once closed -- real amounts now visible", any(o["amount"] == "9200.00" for o in unsealed_offers))
+    check("B: seal lifts once closed -- real amounts now visible", any(o["amount"] == "9200.000" for o in unsealed_offers))
     check("B: response no longer marked sealed", all(o["sealed"] is False for o in unsealed_offers))
 
     owner_client.post(f"/owner/projects/{projB}/start-evaluation")

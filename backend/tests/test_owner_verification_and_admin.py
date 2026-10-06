@@ -437,7 +437,7 @@ def test_admin_sees_all_offers_across_every_project_unredacted():
     companies = {o["service_provider_company_name"] for o in all_offers}
     assert companies == {"Acme", "BuildCo"}
     amounts = {o["amount"] for o in all_offers}
-    assert amounts == {"5000.00", "4800.00"}
+    assert amounts == {"5000.000", "4800.000"}
     assert all(o["project_title"] == "Sealed job" for o in all_offers)
 
     r = owner_client.get("/admin/offers")

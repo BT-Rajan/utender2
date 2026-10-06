@@ -79,7 +79,7 @@ export function OwnerDashboardPage() {
     return (projects ?? []).filter((p) => {
       if (statusFilter !== "all" && p.status !== statusFilter) return false;
       if (tenderTypeFilter !== "all" && p.tender_type !== tenderTypeFilter) return false;
-      if (term && !p.title.toLowerCase().includes(term) && !p.address.toLowerCase().includes(term)) return false;
+      if (term && !p.title.toLowerCase().includes(term) && !(p.address ?? "").toLowerCase().includes(term) && !(p.area ?? "").toLowerCase().includes(term)) return false;
       return true;
     });
   }, [projects, statusFilter, tenderTypeFilter, search]);

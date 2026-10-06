@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -7,7 +7,14 @@ class ProjectAmendmentRequest(BaseModel):
     title: str | None = None
     description: str | None = None
     trade: str | None = None
+    address: str | None = None
+    governorate: str | None = None
+    area: str | None = None
     bid_deadline: datetime | None = None
+    # Stage 3.7 execution timing (send null to clear).
+    expected_start_date: date | None = None
+    expected_completion_date: date | None = None
+    expected_duration_days: int | None = None
     reason: str | None = None
 
 

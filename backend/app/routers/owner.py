@@ -23,6 +23,7 @@ from app.services.audit import log_action
 from app.services.email import notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify
+from app.services.offer_response import documents_out
 from app.services.stakeholder import require_established
 from app.services.verification import (
     applicable_requirements,
@@ -121,6 +122,10 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
             amount=o.amount,
             timeline_estimate=o.timeline_estimate,
             message=o.message,
+            item_prices=o.item_prices,
+            assumptions=o.assumptions,
+            declarations_accepted=o.declarations_accepted,
+            documents=documents_out(db, project_id, o.service_provider_id),
             status=o.status,
             revision=o.revision,
             created_at=o.created_at,
@@ -480,9 +485,14 @@ def _project_fields(p: Project) -> dict:
         owner_id=p.owner_id,
         title=p.title,
         address=p.address,
+        governorate=p.governorate,
+        area=p.area,
         description=p.description,
         trade=p.trade,
         bid_deadline=p.bid_deadline,
+        expected_start_date=p.expected_start_date,
+        expected_completion_date=p.expected_completion_date,
+        expected_duration_days=p.expected_duration_days,
         status=p.status,
         tender_type=p.tender_type,
         tender_type_locked=p.tender_type_locked,

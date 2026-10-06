@@ -17,8 +17,17 @@ export interface Project {
   id: string;
   owner_id: string;
   title: string;
-  address: string;
+  // Exact address: null in the service provider feed (listings show
+  // governorate/area); present on the full requirement.
+  address: string | null;
+  governorate: string | null;
+  area: string | null;
   description: string | null;
+  // Stage 3.7: expected work timing (calendar dates, "YYYY-MM-DD"), separate
+  // from bid_deadline -- the response deadline, sent as UTC ("...Z").
+  expected_start_date: string | null;
+  expected_completion_date: string | null;
+  expected_duration_days: number | null;
   trade: string | null;
   bid_deadline: string;
   status: ProjectStatus;
@@ -36,11 +45,41 @@ export interface Drawing {
   uploaded_at: string;
   revision: number;
   is_current: boolean;
+  // Stage 3.6: what the file is, and whether providers need it to price.
+  category: DocumentCategory;
+  is_required: boolean;
   url: string | null;
 }
 
+export type DocumentCategory = "drawing" | "boq" | "specification" | "photo" | "site" | "other";
+
 export interface ProjectDetail extends Project {
+  pricing_basis: PricingBasis;
+  items: RequirementItem[];
   drawings: Drawing[];
+  currency: string;
+  response_requirements: ResponseRequirements;
+}
+
+export interface ResponseRequirements {
+  completion_period: "required" | "optional";
+  approach: "required" | "optional";
+  documents: { name: string; required: boolean }[];
+  declarations: string[];
+}
+
+export interface OfferItemPrice {
+  item_id: string;
+  rate: string;
+  line_total: string;
+}
+
+export interface OfferDocument {
+  id: string;
+  label: string;
+  file_name: string;
+  uploaded_at: string;
+  url: string;
 }
 
 export interface Offer {
@@ -59,6 +98,10 @@ export interface Offer {
   service_provider_avg_rating?: string | null;
   service_provider_review_count?: number | null;
   sealed: boolean;
+  item_prices: OfferItemPrice[] | null;
+  assumptions: string | null;
+  declarations_accepted: string[] | null;
+  documents: OfferDocument[];
 }
 
 export interface OfferRevision {
@@ -68,6 +111,8 @@ export interface OfferRevision {
   amount: string;
   timeline_estimate: string | null;
   message: string | null;
+  item_prices: OfferItemPrice[] | null;
+  assumptions: string | null;
   status: OfferStatus;
   recorded_at: string;
 }
@@ -255,4 +300,17 @@ export interface AuditLogEntry {
   new_value: string | null;
   reason: string | null;
   created_at: string;
+}
+
+// Stage 3.4: what a service provider is asked to price, and the measurable
+// items to price against (optional: a non-itemized requirement has none).
+export type PricingBasis = "lump_sum" | "per_item";
+
+export interface RequirementItem {
+  id: string;
+  position: number;
+  description: string;
+  quantity: string | null;
+  unit: string | null;
+  specification: string | null;
 }
