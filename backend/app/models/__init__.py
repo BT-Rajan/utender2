@@ -1,6 +1,7 @@
 from app.models.audit_log import AuditLog
 from app.models.auth_token import AuthToken
 from app.models.award_record import AwardRecord
+from app.models.category import ServiceCategory
 from app.models.clarification import Clarification
 from app.models.cms_content import CmsContent
 from app.models.service_provider import ServiceProviderProfile
@@ -35,6 +36,7 @@ __all__ = [
     "OfferRevision",
     "OfferDocument",
     "AwardRecord",
+    "ServiceCategory",
     "Review",
     "RevokedToken",
     "PaymentOverride",

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { IneligibleNotice } from "@/components/ProviderEligibility";
 import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/api/client";
@@ -156,6 +157,12 @@ export function ServiceProviderFeedPage() {
                 </div>
               </div>
 
+              {p.eligible === false && (
+                <div className="mt-3 mb-4">
+                  <IneligibleNotice reasons={p.ineligible_reasons ?? []} />
+                </div>
+              )}
+
               {!isSubscribed && (
                 <div className="absolute inset-0 bg-navy/90 flex flex-col items-center justify-center text-center gap-2.5 px-4">
                   <div className="text-xl">🔒</div>
@@ -166,7 +173,8 @@ export function ServiceProviderFeedPage() {
             </div>
           );
 
-          return isSubscribed ? (
+          // Stage 3.9: an ineligible provider sees why, not a link the server would refuse.
+          return isSubscribed && (p.eligible !== false || p.my_offer_status) ? (
             <Link key={p.id} to={`/service-provider/projects/${p.id}/offer`}>
               {card}
             </Link>

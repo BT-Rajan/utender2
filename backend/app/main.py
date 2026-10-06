@@ -8,6 +8,7 @@ from app.middleware import MaxBodySizeMiddleware
 from app.routers.admin import router as admin_router
 from app.routers.account import router as account_router
 from app.routers.billing import router as billing_router
+from app.routers.categories import router as categories_router
 from app.routers.clarifications import router as clarifications_router
 from app.routers.service_provider import router as service_provider_router
 from app.routers.cron import router as cron_router
@@ -38,6 +39,7 @@ app.include_router(auth_router)
 app.include_router(account_router)
 app.include_router(public_router)
 app.include_router(projects_router)
+app.include_router(categories_router)
 app.include_router(clarifications_router)
 app.include_router(offers_router)
 app.include_router(owner_router)

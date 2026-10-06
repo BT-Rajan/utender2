@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Text, Integer, Numeric, String, func
+from sqlalchemy import JSON, Boolean, DateTime, Enum, ForeignKey, Text, Integer, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -16,6 +16,14 @@ class ServiceProviderProfile(Base):
     license_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
     primary_trade: Mapped[str | None] = mapped_column(String(100), nullable=True)
     service_area: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Stage 3.9: what the provider says they offer and where, in the
+    # platform's structured terms (declared by the provider, editable at any
+    # time; not part of verification). service_categories: ServiceCategory
+    # ids. service_governorates: KUWAIT_GOVERNORATES keys; empty = all of
+    # Kuwait. primary_trade / service_area above are the admin's free-text
+    # notes from onboarding.
+    service_categories: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    service_governorates: Mapped[list | None] = mapped_column(JSON, nullable=True)
     verification_status: Mapped[VerificationStatus] = mapped_column(
         Enum(VerificationStatus, native_enum=True), nullable=False, default=VerificationStatus.incomplete
     )

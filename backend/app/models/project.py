@@ -27,7 +27,13 @@ class Project(Base):
     governorate: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
     area: Mapped[str | None] = mapped_column(String(100), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The type of work, as shown. When filed under one of the platform's
+    # service categories, category_id links it and trade holds that
+    # category's name (kept in step by services.categories).
     trade: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    category_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("service_categories.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     # The response deadline: the one authoritative closing time for offers.
     bid_deadline: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     # Stage 3.7: when the owner expects the work itself to happen (calendar
@@ -54,6 +60,9 @@ class Project(Base):
     # schemas.project.ResponseRequirements). NULL = the defaults: price only,
     # everything else optional.
     response_requirements: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Stage 3.9: who may respond (see schemas.project.ProviderEligibilityIn).
+    # NULL = every verified provider with active access.
+    provider_eligibility: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     # Admin moderation flag — independent of the owner-driven lifecycle
     # `status` above. Hides the project from the service provider feed and blocks
     # new bids while set, but leaves `status` untouched so un-suspending

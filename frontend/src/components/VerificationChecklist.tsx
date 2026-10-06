@@ -50,11 +50,14 @@ export function VerificationStateBanner({ state, note }: { state: VerificationSt
 export function VerificationChecklist({
   documents,
   editable,
+  canUpload,
   onUpload,
   labels,
 }: {
   documents: ChecklistDocument[];
   editable: boolean;
+  // Per-row override: e.g. optional qualifications a verified account may add later.
+  canUpload?: (d: ChecklistDocument) => boolean;
   onUpload: (requirementId: string, file: File) => void;
   labels: { document: string; status: string; required: string; optional: string };
 }) {
@@ -87,7 +90,7 @@ export function VerificationChecklist({
                 {d.status === "rejected" ? t("verification.state_correction_required") : d.status.replace("_", " ")}
               </td>
               <td className="py-3">
-                {editable && (
+                {(editable || canUpload?.(d)) && (
                   <label className="flex items-center gap-2 text-xs">
                     {d.status !== "not_submitted" && <span className="text-steel">{t("verification.replace")}:</span>}
                     <input

@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.models.enums import OfferStatus, ProjectStatus, SubscriptionStatus, VerificationStatus
 from app.schemas.common import UTCDateTime
@@ -15,6 +15,15 @@ class ServiceProviderProfileOut(BaseModel):
     license_number: str | None
     primary_trade: str | None
     service_area: str | None
+    # Stage 3.9: declared services (category ids) and governorates served
+    # (empty = all of Kuwait).
+    service_categories: list[str] = []
+    service_governorates: list[str] = []
+
+    @field_validator("service_categories", "service_governorates", mode="before")
+    @classmethod
+    def _none_is_empty(cls, value):
+        return value or []
     verification_status: VerificationStatus
     is_suspended: bool
     avg_rating: Decimal

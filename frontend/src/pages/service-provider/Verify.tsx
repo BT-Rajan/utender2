@@ -75,6 +75,7 @@ export function ServiceProviderVerifyPage() {
       {profile && <VerificationStateBanner state={profile.verification_state} note={profile.verification_note} />}
 
       <ErrorBanner message={error} />
+      {profile?.verification_status === "approved" && <p className="text-sm text-green mb-4 max-w-2xl">{t("verification.addLaterHint")}</p>}
 
       <form onSubmit={handleSubmit} className="mb-10 grid gap-4 max-w-2xl">
         <div>
@@ -98,6 +99,9 @@ export function ServiceProviderVerifyPage() {
         <VerificationChecklist
           documents={docs ?? []}
           editable={editable}
+          // Stage 3.9: once verified, optional qualifications can still be
+          // added; each is reviewed on its own and access continues.
+          canUpload={(d) => profile?.verification_status === "approved" && !profile.is_suspended && !d.requirement_is_required}
           onUpload={(requirementId, file) => uploadMutation.mutate({ requirementId, file })}
           labels={{
             document: t("service_provider.verify.document"),

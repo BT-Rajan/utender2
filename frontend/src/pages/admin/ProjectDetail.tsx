@@ -22,12 +22,18 @@ const OFFER_STATUS_BADGE: Record<string, string> = {
   withdrawn: "bg-border text-steel-light",
 };
 
-function OfferRow({ offer, projectId, t }: { offer: AdminOffer; projectId: string; t: (k: string) => string }) {
+type AdminItems = NonNullable<AdminProjectDetail["items"]>;
+
+function OfferRow({ offer, projectId, items, t }: { offer: AdminOffer; projectId: string; items: AdminItems | null; t: (k: string) => string }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [amount, setAmount] = useState(offer.amount ?? "");
   const [timeline, setTimeline] = useState(offer.timeline_estimate ?? "");
   const [message, setMessage] = useState(offer.message ?? "");
+  // Priced per item (Stage 3.4/3.8): corrections are to the rates; the server recomputes the total.
+  const [rates, setRates] = useState<Record<string, string>>(
+    Object.fromEntries((offer.item_prices ?? []).map((l) => [l.item_id, String(Number(l.rate))])),
+  );
   const [error, setError] = useState<string | null>(null);
 
   const invalidate = () => {
@@ -40,7 +46,9 @@ function OfferRow({ offer, projectId, t }: { offer: AdminOffer; projectId: strin
     mutationFn: () =>
       apiFetch(`/admin/offers/${offer.id}`, {
         method: "PATCH",
-        body: { amount, timeline_estimate: timeline || null, message: message || null },
+        body: items
+          ? { item_prices: items.map((i) => ({ item_id: i.id, rate: rates[i.id] ?? "" })), timeline_estimate: timeline || null, message: message || null }
+          : { amount, timeline_estimate: timeline || null, message: message || null },
       }),
     onSuccess: () => {
       setEditing(false);
@@ -71,10 +79,32 @@ function OfferRow({ offer, projectId, t }: { offer: AdminOffer; projectId: strin
           </div>
           {error && <div className="text-[11.5px] text-red mb-2">{error}</div>}
           <div className="grid sm:grid-cols-3 gap-2 mb-2">
-            <div>
-              <label className="block font-mono text-[10px] uppercase tracking-wide text-steel mb-1">{t("admin.projectDetail.amountFieldLabel")}</label>
-              <input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" step="0.01" min="0.01" className="w-full border border-border rounded px-2.5 py-1.5 text-sm" />
-            </div>
+            {items ? (
+              <div className="sm:col-span-3 grid gap-1">
+                {items.map((i) => (
+                  <label key={i.id} className="flex items-center gap-2 text-xs">
+                    <span className="flex-1">
+                      {i.position}. {i.description}
+                      {i.quantity !== null && ` (${Number(i.quantity)} ${i.unit ?? ""})`}
+                    </span>
+                    <input
+                      aria-label={`Rate ${i.position}`}
+                      value={rates[i.id] ?? ""}
+                      onChange={(e) => setRates((r) => ({ ...r, [i.id]: e.target.value }))}
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      className="w-28 border border-border rounded px-2 py-1 text-sm"
+                    />
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <div>
+                <label className="block font-mono text-[10px] uppercase tracking-wide text-steel mb-1">{t("admin.projectDetail.amountFieldLabel")}</label>
+                <input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" step="0.001" min="0.001" className="w-full border border-border rounded px-2.5 py-1.5 text-sm" />
+              </div>
+            )}
             <div>
               <label className="block font-mono text-[10px] uppercase tracking-wide text-steel mb-1">{t("admin.projectDetail.timelineFieldLabel")}</label>
               <input value={timeline} onChange={(e) => setTimeline(e.target.value)} className="w-full border border-border rounded px-2.5 py-1.5 text-sm" />
@@ -308,7 +338,7 @@ export function AdminProjectDetailPage() {
                 </thead>
                 <tbody>
                   {offers.map((o) => (
-                    <OfferRow key={o.id} offer={o} projectId={id!} t={t} />
+                    <OfferRow key={o.id} offer={o} projectId={id!} items={detail.pricing_basis === "per_item" ? detail.items ?? [] : null} t={t} />
                   ))}
                 </tbody>
               </table>

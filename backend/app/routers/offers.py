@@ -11,6 +11,7 @@ from app.models.offer import Offer, OfferDocument, OfferRevision
 from app.models.project import Project
 from app.models.user import User
 from app.schemas.offer import OfferCreate, OfferDocumentOut, OfferOut, OfferRevisionOut
+from app.services.eligibility import assert_eligible
 from app.services.email import notify_owner_new_offer
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name, sanitize_path_segment
 from app.services.notify import notify
@@ -58,6 +59,7 @@ async def upload_offer_document(
     project = lock_project(db, project_id)
     if not project or not bidding_is_open(project) or project.is_suspended:
         raise HTTPException(status_code=400, detail="Bidding on this project is closed.")
+    assert_eligible(db, project, get_service_provider_profile(user, db))
     requested = {d.name for d in requirements_for(project).documents}
     if label not in requested:
         raise HTTPException(status_code=400, detail="This requirement doesn't ask for that document.")
@@ -163,6 +165,9 @@ def submit_offer(
         raise HTTPException(status_code=400, detail="Bidding on this project is closed.")
     if project.is_suspended:
         raise HTTPException(status_code=400, detail="This project has been suspended and is not accepting offers.")
+    # Stage 3.9: the requirement's own eligibility rules, checked at the
+    # moment of every submission and revision.
+    assert_eligible(db, project, profile)
 
     # Stage 3.8: the response must match what the requirement asks for --
     # its pricing basis and its response rules.

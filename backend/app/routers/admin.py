@@ -14,7 +14,7 @@ from app.models.award_record import AwardRecord
 from app.models.cms_content import CmsContent
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import ServiceProviderDocument, DocumentRequirement, OwnerDocument
-from app.models.enums import DocumentStatus, Language, NotificationType, ProjectStatus, StakeholderType, UserRole, VerificationStatus
+from app.models.enums import DocumentStatus, Language, NotificationType, PricingBasis, ProjectStatus, StakeholderType, UserRole, VerificationStatus
 from app.models.offer import Offer, OfferRevision
 from app.models.owner import OwnerProfile
 from app.models.payment_override import PaymentOverride
@@ -36,10 +36,17 @@ from app.schemas.owner import OwnerProfileOut
 from app.schemas.common import utc_iso
 from app.services.audit import log_action
 from app.services.stakeholder import describe as describe_stakeholder
-from app.services.verification import assert_ready_to_approve, checklist, document_out_fields, profile_state_fields
+from app.services.verification import assert_ready_to_approve, checklist, document_out_fields, is_added_qualification, profile_state_fields
 from app.services.notify import notify
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import is_sealed_and_open, lock_project
+from app.models.category import ServiceCategory
+from app.schemas.category import CategoryCreate, CategoryOut, CategoryPatch
+from app.services.categories import rename_category, resolve_trade
+from app.services.eligibility import ineligibility_reasons, rules_for
+from app.routers.offers import _snapshot_revision
+from app.schemas.offer import OfferCreate, OfferItemPrice
+from app.services.offer_response import check_complete, priced_total
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
@@ -49,6 +56,59 @@ router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(requir
 @router.get("/requirements", response_model=list[DocumentRequirementOut])
 def list_requirements(db: Session = Depends(get_db)):
     return db.query(DocumentRequirement).order_by(DocumentRequirement.created_at.desc()).all()
+
+
+# ---------- Service categories (types of work) ----------
+
+
+@router.get("/categories", response_model=list[CategoryOut])
+def list_all_categories(db: Session = Depends(get_db)):
+    return db.query(ServiceCategory).order_by(ServiceCategory.name.asc()).all()
+
+
+def _name_taken(db: Session, name: str, exclude_id: str | None = None) -> bool:
+    query = db.query(ServiceCategory).filter(func.lower(ServiceCategory.name) == name.lower())
+    if exclude_id:
+        query = query.filter(ServiceCategory.id != exclude_id)
+    return query.first() is not None
+
+
+@router.post("/categories", response_model=CategoryOut, status_code=201)
+def add_category(payload: CategoryCreate, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    if _name_taken(db, payload.name):
+        raise HTTPException(status_code=409, detail="A category with that name already exists.")
+    category = ServiceCategory(name=payload.name, is_active=True)
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+    log_action(db, actor_id=admin.id, action="category.created", target_type="service_category", target_id=category.id, new_value=category.name)
+    return category
+
+
+@router.patch("/categories/{category_id}", response_model=CategoryOut)
+def edit_category(category_id: str, payload: CategoryPatch, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Rename (requirements filed under it follow) or deactivate (no longer
+    offered for new requirements or profiles; existing ones keep it)."""
+    category = db.get(ServiceCategory, category_id)
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found.")
+    previous = f"{category.name} ({'active' if category.is_active else 'inactive'})"
+    if payload.name is not None:
+        name = payload.name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Enter a name.")
+        if _name_taken(db, name, exclude_id=category.id):
+            raise HTTPException(status_code=409, detail="A category with that name already exists.")
+        rename_category(db, category, name)
+    if payload.is_active is not None:
+        category.is_active = payload.is_active
+    db.commit()
+    db.refresh(category)
+    log_action(
+        db, actor_id=admin.id, action="category.updated", target_type="service_category", target_id=category.id,
+        previous_value=previous, new_value=f"{category.name} ({'active' if category.is_active else 'inactive'})",
+    )
+    return category
 
 
 @router.post("/requirements", response_model=DocumentRequirementOut, status_code=201)
@@ -186,8 +246,10 @@ def _decide_document(db: Session, admin: User, profile, requirement_id: str, dec
     doc.reviewed_by = admin.id
     doc.reviewed_at = datetime.utcnow()
     doc.expires_on = expires_on if decision == DocumentStatus.approved else None
-    if decision == DocumentStatus.rejected:
-        # A correction sends the whole application back to the account holder.
+    if decision == DocumentStatus.rejected and not is_added_qualification(profile, req):
+        # A correction sends the whole application back to the account holder
+        # -- except for an optional qualification a verified account added
+        # later, which is decided on its own (their access is untouched).
         profile.verification_status = VerificationStatus.changes_requested
     db.commit()
 
@@ -256,6 +318,13 @@ def review_queue(db: Session = Depends(get_db)):
         .filter(
             ServiceProviderProfile.verification_status.in_(
                 [VerificationStatus.pending_review, VerificationStatus.changes_requested]
+            )
+            # Stage 3.9: verified providers who added a qualification for review.
+            | (
+                (ServiceProviderProfile.verification_status == VerificationStatus.approved)
+                & ServiceProviderProfile.user_id.in_(
+                    db.query(ServiceProviderDocument.service_provider_id).filter(ServiceProviderDocument.status == DocumentStatus.pending)
+                )
             )
         )
         .order_by(ServiceProviderProfile.created_at.asc())
@@ -981,6 +1050,7 @@ def _offer_admin_fields(o: Offer, p: Project | None, cp: ServiceProviderProfile 
         "service_provider_id": o.service_provider_id,
         "service_provider_company_name": cp.company_name if cp else None,
         "amount": str(o.amount) if o.amount is not None else None,
+        "item_prices": o.item_prices,
         "timeline_estimate": o.timeline_estimate,
         "message": o.message,
         "status": o.status,
@@ -1026,6 +1096,10 @@ def admin_project_detail(project_id: str, db: Session = Depends(get_db)):
     return {
         "project": _project_admin_fields(project, owner),
         "offers": [_offer_admin_fields(o, project, cp) for o, cp in offer_rows],
+        # What an offer's price is measured against (Stage 3.4), so an admin
+        # correction can follow it.
+        "pricing_basis": project.pricing_basis,
+        "items": [{"id": i.id, "position": i.position, "description": i.description, "quantity": str(i.quantity) if i.quantity is not None else None, "unit": i.unit} for i in project.items],
     }
 
 
@@ -1072,8 +1146,13 @@ def admin_edit_project(
         changed.append("description")
         project.description = payload.description or None
     if payload.trade is not None and payload.trade != project.trade:
+        # Same resolution as the owner's: a name on the platform's list links
+        # that category; other text stays free text.
+        category_value, trade = resolve_trade(db, None, payload.trade)
+        if project.status != ProjectStatus.draft and rules_for(project).match_category and category_value != project.category_id:
+            raise HTTPException(status_code=409, detail="Who can respond depends on this requirement's type of work, so it can't be changed after publishing.")
         changed.append("trade")
-        project.trade = payload.trade or None
+        project.category_id, project.trade = category_value, trade
     if payload.bid_deadline is not None and payload.bid_deadline != project.bid_deadline:
         changed.append("bid_deadline")
         project.bid_deadline = payload.bid_deadline
@@ -1177,23 +1256,8 @@ class AdminOfferEdit(BaseModel):
     amount: Decimal | None = None
     timeline_estimate: str | None = None
     message: str | None = None
-
-
-def _snapshot_offer_revision(db: Session, offer: Offer) -> None:
-    """Same append-only trail as the service provider's own edits in
-    routers/offers.py — an admin correcting a bid still leaves the pre-edit
-    values recoverable in offer_revisions, never silently overwritten."""
-    db.add(
-        OfferRevision(
-            offer_id=offer.id,
-            revision_number=offer.revision,
-            amount=offer.amount,
-            timeline_estimate=offer.timeline_estimate,
-            message=offer.message,
-            status=offer.status,
-        )
-    )
-    offer.revision += 1
+    # For a requirement priced per item: corrected rates (the total follows).
+    item_prices: list[OfferItemPrice] | None = None
 
 
 @router.patch("/offers/{offer_id}")
@@ -1219,11 +1283,41 @@ def admin_edit_offer(
             detail="This tender has been decided, so its bids are part of the permanent record and can't be edited.",
         )
 
+    # The same rules as the provider's own submission (routers/offers.py):
+    # an edited bid must still come from an eligible provider (Stage 3.9) and
+    # still meet the requirement's pricing basis and response rules (3.8).
+    reasons = ineligibility_reasons(db, project, db.get(ServiceProviderProfile, offer.service_provider_id)) if project else []
+    if reasons:
+        raise HTTPException(
+            status_code=409,
+            detail="This provider isn't eligible for this requirement, so the bid can't be changed. " + " ".join(r.message for r in reasons),
+        )
+    per_item = project is not None and project.pricing_basis == PricingBasis.per_item
+    if per_item and payload.amount is not None and payload.item_prices is None:
+        raise HTTPException(status_code=400, detail="This requirement is priced per item: correct the item rates and the total follows.")
+    if not per_item and payload.item_prices is not None:
+        raise HTTPException(status_code=400, detail="This requirement is priced as one total: correct the amount.")
+    merged = OfferCreate(
+        amount=payload.amount if payload.amount is not None else offer.amount,
+        item_prices=payload.item_prices if payload.item_prices is not None else (
+            [OfferItemPrice(item_id=line["item_id"], rate=line["rate"]) for line in offer.item_prices] if offer.item_prices else None
+        ),
+        timeline_estimate=payload.timeline_estimate if payload.timeline_estimate is not None else offer.timeline_estimate,
+        message=payload.message if payload.message is not None else offer.message,
+        assumptions=offer.assumptions,
+        accepted_declarations=offer.declarations_accepted or [],
+    )
+    amount, item_prices = priced_total(project, merged) if project else (merged.amount, None)
+    if amount is None or amount <= 0:
+        raise HTTPException(status_code=400, detail="Enter a valid bid amount.")
+    if project:
+        check_complete(db, project, offer.service_provider_id, merged)
+
     changed: list[str] = []
-    if payload.amount is not None and payload.amount != offer.amount:
-        if payload.amount <= 0:
-            raise HTTPException(status_code=400, detail="Enter a valid bid amount.")
+    if amount != offer.amount:
         changed.append("amount")
+    if item_prices is not None and item_prices != offer.item_prices:
+        changed.append("item_prices")
     if payload.timeline_estimate is not None and payload.timeline_estimate != offer.timeline_estimate:
         changed.append("timeline_estimate")
     if payload.message is not None and payload.message != offer.message:
@@ -1233,9 +1327,10 @@ def admin_edit_offer(
         raise HTTPException(status_code=400, detail="No changes were provided.")
 
     previous_values = {field: getattr(offer, field) for field in changed}
-    _snapshot_offer_revision(db, offer)
-    if payload.amount is not None:
-        offer.amount = payload.amount
+    _snapshot_revision(db, offer)
+    offer.amount = amount
+    if item_prices is not None:
+        offer.item_prices = item_prices
     if payload.timeline_estimate is not None:
         offer.timeline_estimate = payload.timeline_estimate or None
     if payload.message is not None:
@@ -1340,6 +1435,8 @@ def _profile_fields(cp: ServiceProviderProfile) -> dict:
         license_number=cp.license_number,
         primary_trade=cp.primary_trade,
         service_area=cp.service_area,
+        service_categories=cp.service_categories or [],
+        service_governorates=cp.service_governorates or [],
         verification_status=cp.verification_status,
         is_suspended=cp.is_suspended,
         avg_rating=cp.avg_rating,

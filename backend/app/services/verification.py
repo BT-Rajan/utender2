@@ -78,6 +78,23 @@ def assert_editable(profile) -> None:
         )
 
 
+def is_added_qualification(profile, requirement: DocumentRequirement) -> bool:
+    """An optional document an already-verified account adds (or renews)
+    later -- e.g. a licence obtained after onboarding. It is reviewed on its
+    own; the account's verification, and so its marketplace access, are
+    untouched."""
+    return (
+        not requirement.is_required
+        and not profile.is_suspended
+        and profile.verification_status == VerificationStatus.approved
+    )
+
+
+def assert_can_upload(profile, requirement: DocumentRequirement) -> None:
+    if not is_added_qualification(profile, requirement):
+        assert_editable(profile)
+
+
 def assert_ready_to_submit(db: Session, profile) -> None:
     missing = [req.name for req, doc in checklist(db, profile) if req.is_required and doc.status in (DocumentStatus.not_submitted, DocumentStatus.rejected)]
     if missing:
