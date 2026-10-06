@@ -10,6 +10,7 @@ import { RequirementItemsEditor, RequirementItemsView } from "@/components/Requi
 import { PageLoading } from "@/components/PageLoading";
 import { ClarificationsPanel } from "@/components/ClarificationsPanel";
 import { useI18n } from "@/i18n/I18nContext";
+import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
 import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
 
 function errorMessage(err: unknown, fallback: string): string {
@@ -289,6 +290,19 @@ export function OwnerProjectDetailPage() {
     onError: (err) => setError(errorMessage(err, t("owner.projectDetail.drawingsError"))),
   });
 
+  // Stage 3.6: re-label or remove a document while the requirement is a draft.
+  const documentMutation = useMutation({
+    mutationFn: ({ drawingId, change }: { drawingId: string; change: { category?: string; is_required?: boolean } | "remove" }) =>
+      change === "remove"
+        ? apiFetch(`/projects/${id}/drawings/${drawingId}`, { method: "DELETE" })
+        : apiFetch(`/projects/${id}/drawings/${drawingId}`, { method: "PATCH", body: change }),
+    onSuccess: () => {
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ["project", id] });
+    },
+    onError: (err) => setError(errorMessage(err, t("documents.saveError"))),
+  });
+
   const reviewMutation = useMutation({
     mutationFn: () =>
       apiFetch(`/owner/reviews`, {
@@ -403,7 +417,7 @@ export function OwnerProjectDetailPage() {
           <div className="aspect-[4/3] bg-navy rounded flex flex-col items-center justify-center gap-2 text-white/60 font-mono text-xs text-center px-4">
             {project.drawings.length ? (
               <ul className="space-y-2">
-                {project.drawings.map((d) => (
+                {sortDocuments(project.drawings).map((d) => (
                   <li key={d.id}>
                     {d.url ? (
                       <a href={d.url} target="_blank" rel="noreferrer" className="text-white underline">
@@ -413,6 +427,43 @@ export function OwnerProjectDetailPage() {
                       <span>{d.file_name}</span>
                     )}
                     {d.revision > 1 && <span className="text-white/50"> · v{d.revision}</span>}
+                    <span className="text-white/60">
+                      {" "}
+                      · {t(`documents.${d.category}`)} · {d.is_required ? t("documents.essential") : t("documents.supplementary")}
+                    </span>
+                    {project.status === "draft" && (
+                      <div className="flex flex-wrap items-center gap-2 mt-1 normal-case">
+                        <select
+                          aria-label={`${t("documents.typeLabel")}: ${d.file_name}`}
+                          value={d.category}
+                          onChange={(e) => documentMutation.mutate({ drawingId: d.id, change: { category: e.target.value } })}
+                          className="bg-white text-navy rounded px-1.5 py-0.5 text-[11px]"
+                        >
+                          {DOCUMENT_CATEGORIES.map((c) => (
+                            <option key={c} value={c}>
+                              {t(`documents.${c}`)}
+                            </option>
+                          ))}
+                        </select>
+                        <label className="flex items-center gap-1 text-[11px] text-white/80">
+                          <input
+                            type="checkbox"
+                            checked={d.is_required}
+                            onChange={(e) => documentMutation.mutate({ drawingId: d.id, change: { is_required: e.target.checked } })}
+                          />
+                          {t("documents.essentialToggle")}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm(t("documents.removeConfirm"))) documentMutation.mutate({ drawingId: d.id, change: "remove" });
+                          }}
+                          className="text-[11px] text-red-tint underline"
+                        >
+                          {t("documents.remove")}
+                        </button>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -439,11 +490,25 @@ export function OwnerProjectDetailPage() {
             ref={drawingsFormRef}
             onSubmit={(e) => {
               e.preventDefault();
-              addDrawingsMutation.mutate(new FormData(e.currentTarget));
+              const form = new FormData(e.currentTarget);
+              // An unchecked checkbox is simply absent from FormData; send it explicitly.
+              form.set("is_required", form.get("is_required") ? "true" : "false");
+              addDrawingsMutation.mutate(form);
             }}
-            className="mt-3.5 flex items-center gap-2"
+            className="mt-3.5 flex flex-wrap items-center gap-2"
           >
-            <input type="file" name="drawings" multiple accept=".pdf,.dwg,.jpg,.jpeg,.png,.zip" className="text-[11px] flex-1" />
+            <input type="file" name="drawings" multiple accept={DOCUMENT_ACCEPT} className="text-[11px] flex-1" />
+            <select name="category" defaultValue="drawing" aria-label={t("documents.typeLabel")} className="border border-border rounded px-1.5 py-1 text-[11px]">
+              {DOCUMENT_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {t(`documents.${c}`)}
+                </option>
+              ))}
+            </select>
+            <label className="flex items-center gap-1 text-[11px] text-navy">
+              <input type="checkbox" name="is_required" defaultChecked />
+              {t("documents.essential")}
+            </label>
             <button
               type="submit"
               className="border border-navy text-navy hover:bg-navy hover:text-white text-xs font-semibold rounded px-3 py-1.5 whitespace-nowrap"
@@ -451,6 +516,7 @@ export function OwnerProjectDetailPage() {
               {t("owner.projectDetail.addDrawings")}
             </button>
           </form>
+          <p className="text-[11px] text-steel-light mt-1.5">{t("documents.uploadHint")}</p>
           <p className="text-[10.5px] text-steel-light mt-1">{t("owner.projectDetail.zipHint")}</p>
           <div
             className={`mt-3.5 px-3.5 py-3 rounded font-mono text-xs border-l-[3px] ${

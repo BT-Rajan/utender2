@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 from starlette.responses import StreamingResponse
@@ -17,7 +18,7 @@ from app.models.user import User
 from app.schemas.amendment import ProjectAmendmentOut, ProjectAmendmentRequest
 from app.schemas.award import AwardRecordOut
 from app.schemas.project import DrawingOut, ProjectCreate, ProjectDetailOut, ProjectItemOut, ProjectItemsUpdate
-from app.services.drawings import upload_drawings_for_project
+from app.services.drawings import DOCUMENT_CATEGORIES, upload_drawings_for_project
 from app.services.locations import clean_area, clean_governorate
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name
 from app.services.email import notify_service_provider_tender_amended
@@ -403,6 +404,10 @@ def get_award(project_id: str, user: User = Depends(get_current_user), db: Sessi
 async def add_drawings(
     project_id: str,
     drawings: list[UploadFile] = File(...),
+    # Stage 3.6: what these files are, and whether providers need them to
+    # price the work (applies to every file in this upload).
+    category: str = Form("drawing"),
+    is_required: bool = Form(True),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -410,9 +415,67 @@ async def add_drawings(
     if not project or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
+    if category not in DOCUMENT_CATEGORIES:
+        raise HTTPException(status_code=400, detail="Unknown document type.")
 
     real_files = [f for f in drawings if f.filename]
-    await upload_drawings_for_project(db, get_storage(), project_id, real_files)
+    await upload_drawings_for_project(db, get_storage(), project_id, real_files, category, is_required)
+    db.refresh(project)
+    return _serialize_detail(project, db)
+
+
+def _owned_draft_document(project_id: str, drawing_id: str, user: User, db: Session) -> tuple[Project, ProjectDrawing]:
+    project = db.get(Project, project_id)
+    drawing = db.get(ProjectDrawing, drawing_id)
+    if not project or project.owner_id != user.id or not drawing or drawing.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    _require_active_owner(user, db)
+    if project.status != ProjectStatus.draft:
+        # Once published, providers may already be pricing against a file;
+        # replace it by uploading a new revision instead.
+        raise HTTPException(status_code=409, detail="Documents can only be removed or re-labelled while the requirement is a draft.")
+    return project, drawing
+
+
+class DocumentPatch(BaseModel):
+    category: str | None = None
+    is_required: bool | None = None
+
+
+@router.patch("/{project_id}/drawings/{drawing_id}", response_model=ProjectDetailOut)
+def update_document(
+    project_id: str, drawing_id: str, payload: DocumentPatch, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    project, drawing = _owned_draft_document(project_id, drawing_id, user, db)
+    if payload.category is not None:
+        if payload.category not in DOCUMENT_CATEGORIES:
+            raise HTTPException(status_code=400, detail="Unknown document type.")
+        drawing.category = payload.category
+    if payload.is_required is not None:
+        drawing.is_required = payload.is_required
+    db.commit()
+    db.refresh(project)
+    return _serialize_detail(project, db)
+
+
+@router.delete("/{project_id}/drawings/{drawing_id}", response_model=ProjectDetailOut)
+def remove_document(project_id: str, drawing_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Removes a document from a draft, with all its earlier revisions (rows
+    sharing its file name) and their stored files."""
+    project, drawing = _owned_draft_document(project_id, drawing_id, user, db)
+    versions = (
+        db.query(ProjectDrawing)
+        .filter(ProjectDrawing.project_id == project_id, ProjectDrawing.file_name.ilike(drawing.file_name))
+        .all()
+    )
+    paths = [v.file_path for v in versions]
+    for v in versions:
+        db.delete(v)
+    db.commit()
+    try:
+        get_storage().delete("project-drawings", paths)
+    except Exception:
+        pass  # the records are gone; an unreferenced stored file is unreachable
     db.refresh(project)
     return _serialize_detail(project, db)
 
@@ -488,6 +551,8 @@ def drawing_history(project_id: str, user: User = Depends(get_current_user), db:
             uploaded_at=d.uploaded_at,
             revision=d.revision,
             is_current=d.is_current,
+            category=d.category,
+            is_required=d.is_required,
             url=storage.signed_url("project-drawings", d.file_path, expiry),
         )
         for d in rows
@@ -512,6 +577,8 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
             uploaded_at=d.uploaded_at,
             revision=d.revision,
             is_current=d.is_current,
+            category=d.category,
+            is_required=d.is_required,
             url=storage.signed_url("project-drawings", d.file_path, expiry),
         )
         for d in drawing_rows

@@ -5,7 +5,9 @@ from fastapi import HTTPException
 
 _UNSAFE_CHARS = re.compile(r"[^a-zA-Z0-9._-]")
 
-ALLOWED_DRAWING_EXTENSIONS = {"pdf", "dwg", "jpg", "jpeg", "png", "zip"}
+# Requirement documents: drawings, BOQs (Excel), specifications (Word/PDF),
+# photos. Macro-enabled Office formats (.xlsm, .docm) are not accepted.
+ALLOWED_DRAWING_EXTENSIONS = {"pdf", "dwg", "jpg", "jpeg", "png", "zip", "xlsx", "docx"}
 ALLOWED_DOCUMENT_EXTENSIONS = {"pdf", "jpg", "jpeg", "png"}
 
 

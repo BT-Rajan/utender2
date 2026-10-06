@@ -9,6 +9,7 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { RequirementItemsView } from "@/components/RequirementItems";
 import { ClarificationsPanel } from "@/components/ClarificationsPanel";
 import { useI18n } from "@/i18n/I18nContext";
+import { sortDocuments } from "@/lib/documents";
 import { formatArea } from "@/lib/location";
 
 interface AwardRecord {
@@ -152,8 +153,11 @@ export function ServiceProviderOfferPage() {
         </div>
         {project.drawings.length ? (
           <ul className="flex flex-wrap gap-2">
-            {project.drawings.map((d) => (
-              <li key={d.id}>
+            {sortDocuments(project.drawings).map((d) => (
+              <li key={d.id} className="flex flex-col">
+                <span className="font-mono text-[10px] uppercase text-steel mb-0.5">
+                  {t(`documents.${d.category}`)} · {d.is_required ? t("documents.essential") : t("documents.supplementary")}
+                </span>
                 {d.url ? (
                   <a href={d.url} target="_blank" rel="noreferrer" className="font-mono text-xs text-blue underline bg-blue-tint px-3 py-1.5 rounded">
                     {d.file_name}

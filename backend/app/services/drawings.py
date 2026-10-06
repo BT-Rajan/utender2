@@ -21,7 +21,13 @@ from app.services.zip_utils import ZipSecurityError, extract_zip, is_zip_filenam
 # at revision+1. Matching by file_name (case-insensitive) is what lets an
 # owner "replace" a drawing through the same plain upload control used for
 # adding brand new ones, with no separate "replace" UI required.
-def _record_drawing(db: Session, project_id: str, file_path: str, file_name: str) -> None:
+# Stage 3.6: what a requirement document is. Stored on ProjectDrawing.category.
+DOCUMENT_CATEGORIES = ("drawing", "boq", "specification", "photo", "site", "other")
+
+
+def _record_drawing(
+    db: Session, project_id: str, file_path: str, file_name: str, category: str = "drawing", is_required: bool = True
+) -> None:
     current = (
         db.query(ProjectDrawing)
         .filter(
@@ -37,7 +43,13 @@ def _record_drawing(db: Session, project_id: str, file_path: str, file_name: str
         next_revision = current.revision + 1
     db.add(
         ProjectDrawing(
-            project_id=project_id, file_path=file_path, file_name=file_name, revision=next_revision, is_current=True
+            project_id=project_id,
+            file_path=file_path,
+            file_name=file_name,
+            revision=next_revision,
+            is_current=True,
+            category=category,
+            is_required=is_required,
         )
     )
     # Autoflush is off on this session (see db.py) — flush explicitly so a
@@ -52,7 +64,12 @@ def _record_drawing(db: Session, project_id: str, file_path: str, file_name: str
 # per file inside it; anything else is uploaded as-is. One bad file/zip
 # entry doesn't block the rest — each is best-effort.
 async def upload_drawings_for_project(
-    db: Session, storage: Storage, project_id: str, files: list[UploadFile]
+    db: Session,
+    storage: Storage,
+    project_id: str,
+    files: list[UploadFile],
+    category: str = "drawing",
+    is_required: bool = True,
 ) -> dict[str, int]:
     uploaded = 0
     failed = 0
@@ -90,7 +107,7 @@ async def upload_drawings_for_project(
                 except Exception:
                     failed += 1
                     continue
-                _record_drawing(db, project_id, path, name)
+                _record_drawing(db, project_id, path, name, category, is_required)
                 uploaded += 1
             continue
 
@@ -100,7 +117,7 @@ async def upload_drawings_for_project(
         except Exception:
             failed += 1
             continue
-        _record_drawing(db, project_id, path, safe_relative_name(file.filename))
+        _record_drawing(db, project_id, path, safe_relative_name(file.filename), category, is_required)
         uploaded += 1
 
     db.commit()

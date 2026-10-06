@@ -131,7 +131,7 @@ export function OwnerProjectNewPage() {
           <div>
             <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("owner.projectNew.drawings")}</label>
             <div className="border border-dashed border-blue bg-blue-tint rounded px-4 py-6 text-center">
-              <input type="file" name="drawings" multiple accept=".pdf,.dwg,.jpg,.jpeg,.png,.zip" className="text-xs mx-auto" />
+              <input type="file" name="drawings" multiple accept=".pdf,.dwg,.xlsx,.docx,.jpg,.jpeg,.png,.zip" className="text-xs mx-auto" />
               <p className="text-[11px] text-blue mt-2">{t("owner.projectNew.drawingsHint")}</p>
             </div>
             <p className="text-xs text-steel-light mt-1.5">{t("owner.projectNew.drawingsAccessNote")}</p>

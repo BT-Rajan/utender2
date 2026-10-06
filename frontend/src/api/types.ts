@@ -40,8 +40,13 @@ export interface Drawing {
   uploaded_at: string;
   revision: number;
   is_current: boolean;
+  // Stage 3.6: what the file is, and whether providers need it to price.
+  category: DocumentCategory;
+  is_required: boolean;
   url: string | null;
 }
+
+export type DocumentCategory = "drawing" | "boq" | "specification" | "photo" | "site" | "other";
 
 export interface ProjectDetail extends Project {
   pricing_basis: PricingBasis;

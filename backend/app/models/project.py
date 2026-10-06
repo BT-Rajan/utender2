@@ -101,5 +101,9 @@ class ProjectDrawing(Base):
         String(36), ForeignKey("project_amendments.id", ondelete="SET NULL"), nullable=True
     )
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # Stage 3.6: what the file is (one of DOCUMENT_CATEGORIES) and whether
+    # providers need it to price the work (True) or it's supplementary.
+    category: Mapped[str] = mapped_column(String(20), nullable=False, default="drawing")
+    is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     project = relationship("Project", back_populates="drawings")

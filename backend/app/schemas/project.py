@@ -26,6 +26,8 @@ class DrawingOut(BaseModel):
     uploaded_at: datetime
     revision: int
     is_current: bool
+    category: str = "drawing"
+    is_required: bool = True
     url: str | None = None
 
 

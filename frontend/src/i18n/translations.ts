@@ -13,6 +13,23 @@ export interface Dictionary {
     optional: string;
     noDocuments: string;
   };
+  documents: {
+    drawing: string;
+    boq: string;
+    specification: string;
+    photo: string;
+    site: string;
+    other: string;
+    typeLabel: string;
+    essential: string;
+    supplementary: string;
+    essentialToggle: string;
+    remove: string;
+    removeConfirm: string;
+    uploadHint: string;
+    heading: string;
+    saveError: string;
+  };
   location: {
     governorate: string;
     chooseGovernorate: string;
@@ -670,6 +687,23 @@ export const en: Dictionary = {
     optional: "optional",
     noDocuments: "No documents are currently required.",
   },
+  documents: {
+    drawing: "Drawing",
+    boq: "BOQ",
+    specification: "Specification",
+    photo: "Photo",
+    site: "Site document",
+    other: "Other",
+    typeLabel: "Document type",
+    essential: "Essential for pricing",
+    supplementary: "Supplementary",
+    essentialToggle: "Providers need this to price the work",
+    remove: "Remove",
+    removeConfirm: "Remove this document and its earlier versions from the draft?",
+    uploadHint: "PDF, DWG, Excel (.xlsx), Word (.docx), JPG/PNG, or a .zip of them, up to 50 MB per upload. Uploading a file with the same name replaces it as a new version.",
+    heading: "Documents",
+    saveError: "Could not update the document.",
+  },
   location: {
     governorate: "Governorate",
     chooseGovernorate: "Select governorate",
@@ -1003,7 +1037,7 @@ export const en: Dictionary = {
       deadlineLabel: "Deadline",
       closed: "Closed",
       scope: "Scope",
-      drawings: "Drawings",
+      drawings: "Documents",
       downloadZip: "Download all as .zip",
       noDrawings: "No drawings were uploaded for this project.",
       biddingClosedNotice: "Bidding on this project has closed.",
@@ -1081,7 +1115,7 @@ export const en: Dictionary = {
       tradePlaceholder: "e.g. Roofing, Framing, Fencing",
       scope: "Scope of work",
       scopePlaceholder: "Describe the work you need done. Service providers will use this alongside your drawings to price their offer.",
-      drawings: "Drawings",
+      drawings: "Drawings & documents",
       drawingsHint: "PDF, DWG, JPG, PNG, or a .zip folder of drawings — up to 50MB total",
       drawingsAccessNote: "Only approved, subscribed service providers can view these files.",
       deadline: "Bid deadline",
@@ -1113,7 +1147,7 @@ export const en: Dictionary = {
       noHistory: "No revision history yet.",
       current: "(current)",
       view: "view",
-      addDrawings: "Add drawings",
+      addDrawings: "Add documents",
       zipHint: "You can also upload a .zip folder of drawings.",
       scope: "Scope",
       lowestBid: "Lowest bid",
@@ -1351,6 +1385,23 @@ export const ar: Dictionary = {
     costLabel: "التكلفة",
     optional: "اختياري",
     noDocuments: "لا توجد مستندات مطلوبة حاليًا.",
+  },
+  documents: {
+    drawing: "مخطط",
+    boq: "جدول كميات",
+    specification: "مواصفات",
+    photo: "صورة",
+    site: "مستند الموقع",
+    other: "أخرى",
+    typeLabel: "نوع المستند",
+    essential: "أساسي للتسعير",
+    supplementary: "تكميلي",
+    essentialToggle: "يحتاجه مزوّدو الخدمات لتسعير العمل",
+    remove: "حذف",
+    removeConfirm: "حذف هذا المستند ونسخه السابقة من المسودة؟",
+    uploadHint: "PDF أو DWG أو Excel (.xlsx) أو Word (.docx) أو JPG/PNG أو ملف .zip يضمها، حتى 50 ميجابايت لكل رفع. رفع ملف بالاسم نفسه يستبدله كنسخة جديدة.",
+    heading: "المستندات",
+    saveError: "تعذر تحديث المستند.",
   },
   location: {
     governorate: "المحافظة",
@@ -1685,7 +1736,7 @@ export const ar: Dictionary = {
       deadlineLabel: "الموعد النهائي",
       closed: "مغلق",
       scope: "نطاق العمل",
-      drawings: "المخططات",
+      drawings: "المستندات",
       downloadZip: "تنزيل الكل كملف .zip",
       noDrawings: "لم يتم رفع أي مخططات لهذا المشروع.",
       biddingClosedNotice: "أُغلق تقديم العروض على هذا المشروع.",
@@ -1763,7 +1814,7 @@ export const ar: Dictionary = {
       tradePlaceholder: "مثال: أسقف، هياكل، أسوار",
       scope: "نطاق العمل",
       scopePlaceholder: "صف العمل المطلوب. سيستخدم مزوّدو الخدمات هذا الوصف مع مخططاتك لتسعير عروضهم.",
-      drawings: "المخططات",
+      drawings: "المخططات والمستندات",
       drawingsHint: "PDF أو DWG أو JPG أو PNG أو ملف .zip للمخططات — حتى 50 ميغابايت إجمالاً",
       drawingsAccessNote: "فقط مزوّدو الخدمات المعتمدون والمشتركون يمكنهم عرض هذه الملفات.",
       deadline: "الموعد النهائي لتقديم العروض",
@@ -1795,7 +1846,7 @@ export const ar: Dictionary = {
       noHistory: "لا يوجد سجل مراجعات بعد.",
       current: "(الحالي)",
       view: "عرض",
-      addDrawings: "إضافة مخططات",
+      addDrawings: "إضافة مستندات",
       zipHint: "يمكنك أيضًا رفع ملف .zip يحتوي على المخططات.",
       scope: "نطاق العمل",
       lowestBid: "أقل عرض",
