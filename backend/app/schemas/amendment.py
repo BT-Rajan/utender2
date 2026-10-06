@@ -8,6 +8,8 @@ class ProjectAmendmentRequest(BaseModel):
     description: str | None = None
     trade: str | None = None
     address: str | None = None
+    governorate: str | None = None
+    area: str | None = None
     bid_deadline: datetime | None = None
     reason: str | None = None
 

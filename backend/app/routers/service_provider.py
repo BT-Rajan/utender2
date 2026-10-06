@@ -16,6 +16,7 @@ from app.schemas.service_provider import ServiceProviderProfileOut, MyBidOut, Su
 from app.schemas.document import ServiceProviderDocumentOut, DocumentRequirementOut
 from app.schemas.project import ProjectOut
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
+from app.services.locations import clean_governorate
 from app.services.stakeholder import require_established
 from app.services.verification import (
     applicable_requirements,
@@ -46,6 +47,7 @@ def active_requirements(user: User = Depends(require_service_provider), db: Sess
 @router.get("/feed", response_model=list[ProjectOut])
 def feed(
     trade: str | None = None,
+    governorate: str | None = None,
     search: str | None = None,
     sort: str = "deadline",  # "deadline" (closing soonest, default) | "newest"
     user: User = Depends(require_approved_service_provider),
@@ -59,9 +61,13 @@ def feed(
 
     if trade and trade.strip():
         query = query.filter(Project.trade.ilike(f"%{trade.strip()}%"))
+    if governorate and governorate.strip():
+        query = query.filter(Project.governorate == clean_governorate(governorate))
     if search and search.strip():
+        # Never matched against the exact address: a search must not let a
+        # listing-level viewer probe for a specific property.
         term = f"%{search.strip()}%"
-        query = query.filter(or_(Project.title.ilike(term), Project.address.ilike(term), Project.description.ilike(term)))
+        query = query.filter(or_(Project.title.ilike(term), Project.area.ilike(term), Project.description.ilike(term)))
 
     query = query.order_by(Project.created_at.desc()) if sort == "newest" else query.order_by(Project.bid_deadline.asc())
     projects = query.all()
@@ -75,8 +81,14 @@ def feed(
                 id=p.id,
                 owner_id=p.owner_id,
                 title=p.title,
-                address=p.address,
-                description=p.description,
+                # Listing level: where (governorate/area) and what (title,
+                # trade) only. The exact address and the scope -- which holds
+                # site and access notes -- are on the full requirement,
+                # available to providers with active access.
+                address=None,
+                governorate=p.governorate,
+                area=p.area,
+                description=None,
                 trade=p.trade,
                 bid_deadline=p.bid_deadline,
                 status=p.status,

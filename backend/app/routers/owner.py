@@ -480,6 +480,8 @@ def _project_fields(p: Project) -> dict:
         owner_id=p.owner_id,
         title=p.title,
         address=p.address,
+        governorate=p.governorate,
+        area=p.area,
         description=p.description,
         trade=p.trade,
         bid_deadline=p.bid_deadline,

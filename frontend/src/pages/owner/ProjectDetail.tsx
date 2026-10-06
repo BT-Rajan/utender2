@@ -10,6 +10,7 @@ import { RequirementItemsEditor, RequirementItemsView } from "@/components/Requi
 import { PageLoading } from "@/components/PageLoading";
 import { ClarificationsPanel } from "@/components/ClarificationsPanel";
 import { useI18n } from "@/i18n/I18nContext";
+import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.detail : fallback;
@@ -103,7 +104,9 @@ function DraftDetailsForm({ project }: { project: ProjectDetail }) {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState(project.title);
   const [trade, setTrade] = useState(project.trade ?? "");
-  const [address, setAddress] = useState(project.address);
+  const [governorate, setGovernorate] = useState(project.governorate ?? "");
+  const [area, setArea] = useState(project.area ?? "");
+  const [address, setAddress] = useState(project.address ?? "");
   const [description, setDescription] = useState(project.description ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -111,15 +114,22 @@ function DraftDetailsForm({ project }: { project: ProjectDetail }) {
   useEffect(() => {
     setTitle(project.title);
     setTrade(project.trade ?? "");
-    setAddress(project.address);
+    setGovernorate(project.governorate ?? "");
+    setArea(project.area ?? "");
+    setAddress(project.address ?? "");
     setDescription(project.description ?? "");
-  }, [project.title, project.trade, project.address, project.description]);
+  }, [project.title, project.trade, project.governorate, project.area, project.address, project.description]);
 
   const dirty =
-    title !== project.title || trade !== (project.trade ?? "") || address !== project.address || description !== (project.description ?? "");
+    title !== project.title ||
+    trade !== (project.trade ?? "") ||
+    governorate !== (project.governorate ?? "") ||
+    area !== (project.area ?? "") ||
+    address !== (project.address ?? "") ||
+    description !== (project.description ?? "");
 
   const save = useMutation({
-    mutationFn: () => apiFetch<ProjectDetail>(`/projects/${project.id}`, { method: "PATCH", body: { title, trade, address, description } }),
+    mutationFn: () => apiFetch<ProjectDetail>(`/projects/${project.id}`, { method: "PATCH", body: { title, trade, governorate, area, address, description } }),
     onSuccess: (data) => {
       setError(null);
       setSaved(true);
@@ -156,9 +166,31 @@ function DraftDetailsForm({ project }: { project: ProjectDetail }) {
           <p className={hint}>{t("draftDetails.categoryHint")}</p>
         </div>
         <div>
-          <label htmlFor="draft-address" className={label}>{t("draftDetails.location")}</label>
+          {/* Stage 3.5: where the work is. Governorate and area are shown in
+              listings; the exact address only on the full requirement. */}
+          <span className={label}>{t("draftDetails.location")}</span>
+          <div className="grid sm:grid-cols-2 gap-3 mb-3">
+            <div>
+              <label htmlFor="draft-governorate" className="block text-xs text-steel mb-1">{t("location.governorate")}</label>
+              <select id="draft-governorate" value={governorate} onChange={(e) => setGovernorate(e.target.value)} className={field}>
+                <option value="">{t("location.chooseGovernorate")}</option>
+                {KUWAIT_GOVERNORATES.map((g) => (
+                  <option key={g} value={g}>
+                    {t(`location.${g}`)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="draft-area" className="block text-xs text-steel mb-1">{t("location.area")}</label>
+              <input id="draft-area" value={area} onChange={(e) => setArea(e.target.value)} maxLength={100} className={field} />
+            </div>
+          </div>
+          <p className={`${hint} -mt-2 mb-3`}>{t("location.areaHint")}</p>
+          <label htmlFor="draft-address" className="block text-xs text-steel mb-1">{t("location.address")}</label>
           <input id="draft-address" value={address} onChange={(e) => setAddress(e.target.value)} required maxLength={500} className={field} />
-          <p className={hint}>{t("draftDetails.locationHint")}</p>
+          <p className={hint}>{t("location.addressHint")}</p>
+          <p className={hint}>{t("location.siteNotesHint")}</p>
         </div>
         {/* Stage 3.3: the scope of work, stored in the existing description
             field. Free text with optional guidance -- no rigid template. */}
@@ -291,7 +323,9 @@ export function OwnerProjectDetailPage() {
         <div>
           <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">{project.title}</span>
           <h1 className="font-display text-2xl font-semibold text-navy mb-1">{t("owner.projectDetail.reviewOffers")}</h1>
-          <p className="text-[13.5px] text-steel">{project.address}</p>
+          <p className="text-[13.5px] text-steel">
+            {formatArea(t, project.governorate, project.area)} — {project.address}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <span className="font-mono text-[10px] uppercase tracking-wide px-2.5 py-1 rounded-full bg-blue-tint text-steel">

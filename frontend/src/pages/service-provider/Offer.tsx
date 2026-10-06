@@ -9,6 +9,7 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { RequirementItemsView } from "@/components/RequirementItems";
 import { ClarificationsPanel } from "@/components/ClarificationsPanel";
 import { useI18n } from "@/i18n/I18nContext";
+import { formatArea } from "@/lib/location";
 
 interface AwardRecord {
   amount: string;
@@ -121,7 +122,8 @@ export function ServiceProviderOfferPage() {
         <div>
           <div className="font-display font-semibold text-base">{project.title}</div>
           <div className="font-mono text-[11.5px] text-white/70 mt-0.5">
-            {project.address} · {t("service_provider.offer.deadlineLabel")} {formatDeadline(project.bid_deadline)}
+            {formatArea(t, project.governorate, project.area)}
+            {project.address && ` — ${project.address}`} · {t("service_provider.offer.deadlineLabel")} {formatDeadline(project.bid_deadline)}
           </div>
         </div>
         <span className="font-mono text-[10px] uppercase tracking-wide px-2.5 py-1 rounded-full bg-white/15">

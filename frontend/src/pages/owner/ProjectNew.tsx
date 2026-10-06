@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiFetch, ApiError } from "@/api/client";
 import type { ProjectDetail, TenderType } from "@/api/types";
 import { useI18n } from "@/i18n/I18nContext";
+import { KUWAIT_GOVERNORATES } from "@/lib/location";
 
 export function OwnerProjectNewPage() {
   const { t } = useI18n();
@@ -93,8 +94,26 @@ export function OwnerProjectNewPage() {
             />
           </div>
           <div>
-            <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("owner.projectNew.address")}</label>
+            <div className="grid sm:grid-cols-2 gap-3 mb-3">
+              <div>
+                <label htmlFor="new-governorate" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("location.governorate")}</label>
+                <select id="new-governorate" name="governorate" defaultValue="" className="w-full border border-border rounded px-3 py-2.5 text-sm">
+                  <option value="">{t("location.chooseGovernorate")}</option>
+                  {KUWAIT_GOVERNORATES.map((g) => (
+                    <option key={g} value={g}>
+                      {t(`location.${g}`)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="new-area" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("location.area")}</label>
+                <input id="new-area" name="area" maxLength={100} className="w-full border border-border rounded px-3 py-2.5 text-sm" />
+              </div>
+            </div>
+            <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("location.address")}</label>
             <input name="address" required placeholder={t("owner.projectNew.addressPlaceholder")} className="w-full border border-border rounded px-3 py-2.5 text-sm" />
+            <p className="text-xs text-steel-light mt-1.5">{t("location.addressHint")}</p>
           </div>
           <div>
             <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("owner.projectNew.trade")}</label>

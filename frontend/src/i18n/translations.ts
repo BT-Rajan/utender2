@@ -13,6 +13,23 @@ export interface Dictionary {
     optional: string;
     noDocuments: string;
   };
+  location: {
+    governorate: string;
+    chooseGovernorate: string;
+    allGovernorates: string;
+    capital: string;
+    hawalli: string;
+    farwaniya: string;
+    mubarak_al_kabeer: string;
+    ahmadi: string;
+    jahra: string;
+    area: string;
+    areaHint: string;
+    address: string;
+    addressHint: string;
+    siteNotesHint: string;
+    notSpecified: string;
+  };
   requirementItems: {
     heading: string;
     intro: string;
@@ -652,6 +669,23 @@ export const en: Dictionary = {
     costLabel: "Cost",
     optional: "optional",
     noDocuments: "No documents are currently required.",
+  },
+  location: {
+    governorate: "Governorate",
+    chooseGovernorate: "Select governorate",
+    allGovernorates: "All governorates",
+    capital: "Capital (Al Asimah)",
+    hawalli: "Hawalli",
+    farwaniya: "Farwaniya",
+    mubarak_al_kabeer: "Mubarak Al-Kabeer",
+    ahmadi: "Ahmadi",
+    jahra: "Jahra",
+    area: "Area",
+    areaHint: "The neighbourhood, e.g. Salmiya, Mishref, Fahaheel. Shown in listings with the governorate.",
+    address: "Exact address or site description",
+    addressHint: "Block, street, house or plot, landmarks or directions. Shown only to service providers who can open the full requirement, not in listings.",
+    siteNotesHint: "Site access or conditions that affect the work (working hours, access for trucks, occupied building…) go in the scope of work, under \"Site & working conditions\".",
+    notSpecified: "Location not specified",
   },
   requirementItems: {
     heading: "Quantities & pricing basis",
@@ -1317,6 +1351,23 @@ export const ar: Dictionary = {
     costLabel: "التكلفة",
     optional: "اختياري",
     noDocuments: "لا توجد مستندات مطلوبة حاليًا.",
+  },
+  location: {
+    governorate: "المحافظة",
+    chooseGovernorate: "اختر المحافظة",
+    allGovernorates: "كل المحافظات",
+    capital: "العاصمة",
+    hawalli: "حولي",
+    farwaniya: "الفروانية",
+    mubarak_al_kabeer: "مبارك الكبير",
+    ahmadi: "الأحمدي",
+    jahra: "الجهراء",
+    area: "المنطقة",
+    areaHint: "الحي، مثل: السالمية، مشرف، الفحيحيل. يظهر في القوائم مع المحافظة.",
+    address: "العنوان الدقيق أو وصف الموقع",
+    addressHint: "القطعة والشارع والمنزل أو القسيمة والمعالم أو الاتجاهات. يظهر فقط لمزوّدي الخدمات الذين يمكنهم فتح المتطلب كاملًا، وليس في القوائم.",
+    siteNotesHint: "ظروف الوصول إلى الموقع أو الظروف المؤثرة في العمل (ساعات العمل، دخول الشاحنات، مبنى مأهول…) تُكتب في نطاق العمل تحت «ظروف الموقع والعمل».",
+    notSpecified: "الموقع غير محدد",
   },
   requirementItems: {
     heading: "الكميات وأساس التسعير",

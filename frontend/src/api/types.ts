@@ -17,7 +17,11 @@ export interface Project {
   id: string;
   owner_id: string;
   title: string;
-  address: string;
+  // Exact address: null in the service provider feed (listings show
+  // governorate/area); present on the full requirement.
+  address: string | null;
+  governorate: string | null;
+  area: string | null;
   description: string | null;
   trade: string | null;
   bid_deadline: string;

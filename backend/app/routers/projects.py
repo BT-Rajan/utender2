@@ -18,6 +18,7 @@ from app.schemas.amendment import ProjectAmendmentOut, ProjectAmendmentRequest
 from app.schemas.award import AwardRecordOut
 from app.schemas.project import DrawingOut, ProjectCreate, ProjectDetailOut, ProjectItemOut, ProjectItemsUpdate
 from app.services.drawings import upload_drawings_for_project
+from app.services.locations import clean_area, clean_governorate
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name
 from app.services.email import notify_service_provider_tender_amended
 from app.services.notify import notify
@@ -90,6 +91,8 @@ def _parse_bid_deadline(raw: str) -> datetime:
 async def create_project(
     title: str = Form(...),
     address: str = Form(...),
+    governorate: str | None = Form(None),
+    area: str | None = Form(None),
     description: str | None = Form(None),
     trade: str | None = Form(None),
     bid_deadline: str = Form(...),
@@ -113,6 +116,7 @@ async def create_project(
     status_value = ProjectStatus(status)
 
     _check_scope_length(description)
+    governorate_value, area_value = clean_governorate(governorate), clean_area(area)
     deadline = _parse_bid_deadline(bid_deadline)
     if status_value == ProjectStatus.open and deadline <= datetime.utcnow():
         raise HTTPException(status_code=400, detail="Bid deadline must be in the future.")
@@ -126,6 +130,8 @@ async def create_project(
         owner_id=user.id,
         title=title,
         address=address,
+        governorate=governorate_value,
+        area=area_value,
         description=description or None,
         trade=trade or None,
         bid_deadline=deadline,
@@ -221,6 +227,18 @@ def amend_project(
         if address != project.address:
             changed.append("address")
             project.address = address
+
+    if "governorate" in payload.model_fields_set:
+        governorate = clean_governorate(payload.governorate)
+        if governorate != project.governorate:
+            changed.append("governorate")
+            project.governorate = governorate
+
+    if "area" in payload.model_fields_set:
+        area = clean_area(payload.area)
+        if area != project.area:
+            changed.append("area")
+            project.area = area
 
     _check_scope_length(payload.description)
     if payload.description is not None and payload.description != project.description:
@@ -503,6 +521,8 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
         owner_id=project.owner_id,
         title=project.title,
         address=project.address,
+        governorate=project.governorate,
+        area=project.area,
         description=project.description,
         trade=project.trade,
         bid_deadline=project.bid_deadline,

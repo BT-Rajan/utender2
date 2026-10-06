@@ -18,7 +18,14 @@ class Project(Base):
         String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Exact address or site description. Shown only where a provider can open
+    # the full requirement (verified with active access); listings show the
+    # governorate and area instead.
     address: Mapped[str] = mapped_column(String(500), nullable=False)
+    # Stage 3.5: where the work is, at the level providers use to judge
+    # relevance and travel. governorate is one of KUWAIT_GOVERNORATES.
+    governorate: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    area: Mapped[str | None] = mapped_column(String(100), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     trade: Mapped[str | None] = mapped_column(String(100), nullable=True)
     bid_deadline: Mapped[datetime] = mapped_column(DateTime, nullable=False)

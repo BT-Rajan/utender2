@@ -35,7 +35,11 @@ class ProjectOut(BaseModel):
     id: str
     owner_id: str
     title: str
-    address: str
+    # None in the service provider feed: the exact address is shown only on
+    # the full requirement (see _can_view_project). Listings use governorate/area.
+    address: str | None
+    governorate: str | None = None
+    area: str | None = None
     description: str | None
     trade: str | None
     bid_deadline: datetime
