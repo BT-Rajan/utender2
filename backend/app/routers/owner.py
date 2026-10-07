@@ -142,17 +142,14 @@ def list_offers(
         .join(ServiceProviderProfile, Offer.service_provider_id == ServiceProviderProfile.user_id)
         .filter(Offer.project_id == project_id, Offer.is_suspended.is_(False), tendered())
     )
-    # Sorting by amount would itself leak relative ranking on a sealed
-    # tender (the owner could infer who's cheapest from list order alone
-    # even with the amounts blanked out) — order by submission time instead
-    # while sealed, by amount once the seal is lifted for real evaluation.
-    # Stage 6.1: live offers ahead of withdrawn ones, and the offer id last so
-    # ties keep one order across refreshes and pages.
-    query = (
-        query.order_by(Offer.submitted_at.asc(), Offer.id)
-        if sealed
-        else query.order_by(case((Offer.status == OfferStatus.withdrawn, 1), else_=0), Offer.amount.asc(), Offer.submitted_at.asc(), Offer.id)
-    )
+    # In the order offers came in -- never by amount: on a sealed tender list
+    # order alone would leak who is cheapest, and once open, a list ranked by
+    # price would be the platform ranking offers (Stage 6.7: the owner
+    # weighs them; nothing here orders them by merit). Stage 6.1: live offers
+    # ahead of withdrawn ones, the offer id last so ties keep one order
+    # across refreshes and pages.
+    live_first = case((Offer.status == OfferStatus.withdrawn, 1), else_=0)
+    query = query.order_by(Offer.submitted_at.asc(), Offer.id) if sealed else query.order_by(live_first, Offer.submitted_at.asc(), Offer.id)
     offers = query.offset(offset).limit(limit).all()
 
     if sealed:

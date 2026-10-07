@@ -81,7 +81,7 @@ function EvaluationSummary({ offers, t }: { offers: Offer[]; t: (key: string) =>
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-4">
       <div className="border border-border bg-white rounded px-3 py-2.5">
-        <div className="font-display text-lg font-semibold text-green leading-none">{money(low)}</div>
+        <div className="font-display text-lg font-semibold text-navy leading-none">{money(low)}</div>
         <div className="font-mono text-[9.5px] uppercase tracking-wide text-steel mt-1">{t("owner.projectDetail.lowestBid")}</div>
       </div>
       <div className="border border-border bg-white rounded px-3 py-2.5">

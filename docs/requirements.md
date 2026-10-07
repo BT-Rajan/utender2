@@ -401,7 +401,7 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - Each offer shows its provider, its status as the server holds it (received, withdrawn, awarded, not selected), when it was submitted and its revision. A withdrawn offer is listed after the live ones, dimmed, and can't be awarded.
   - Sealed and before the deadline (including one ended early): only that offers are in, as a count of live offers plus how many were withdrawn. No provider, price, response, documents or history.
   - Stays readable after the requirement closes, ends, expires or is awarded. Reading it never changes the requirement.
-  - Bounded: 200 per page (up to 500), with an offset, in a fixed order (live first, then by price, submission time and id; by submission time while sealed).
+  - Bounded: 200 per page (up to 500), with an offset, in a fixed order: live first, then by submission time and id (Stage 6.7: never by price).
   - The page shows "couldn't load the offers" on an error, never "no offers", and "no offers were received" once offers have closed.
 
 - **6.2 Offer access & confidentiality:** all offer read paths were traced: the owner workflow, the provider's own-offer routes, admin oversight, the offer-document file route, the award record and notifications.
@@ -461,5 +461,20 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - **Differences:** rows where the offers differ are marked ≠, without saying which is better.
   - **No scoring:** nothing is recalculated, normalised, scored, ranked or recommended.
   - **Freshness:** read-only; refreshes every minute and on returning to the page, so a withdrawal or revision appears as it happens.
+
+- **6.7 Commercial evaluation:**
+  - **Already working:** the commercial terms each offer actually holds are shown exactly as stored:
+    - the total, in the marketplace currency;
+    - on itemised requirements, each item's rate, quantity, unit and line total;
+    - assumptions and exclusions.
+  - **Pricing basis:** one total for a single-price requirement; per-item pricing only where the requirement is itemised.
+  - **Server-side pricing:** totals are computed by the server (line = rate × quantity to 3 decimals, total = the sum). Any total or line total sent by the browser is ignored. Malformed prices are refused (negative, more than 3 decimals, not a number), never stored or rounded.
+  - **Same figures everywhere:** the inbox, the offer page and the comparison all build from the same stored record.
+  - **Over time:** a revision's price is current and earlier prices stay in the history. A withdrawn offer's price isn't shown. An amendment never changes a price; the offer keeps the version it answered.
+  - **Competitors:** never get another provider's price on any endpoint (Stage 5.12 / 6.2).
+  - **No price ranking (fixed):**
+    - The owner's offer list was ordered cheapest first, which ranked offers by price. It now lists them in the order they came in: live first, then by submission time and id. Offers submitted within the same second are ordered by id.
+    - The summary's lowest / average / highest figures stay as plain facts; the lowest is no longer highlighted green.
+  - **Not captured:** payment terms and offer validity aren't fields of the offer or the requirement, so they aren't shown. Adding them would be new fields, not evaluation. Providers can state such conditions in assumptions and exclusions.
 
 _Later Stage 6 steps are added as they are implemented._
