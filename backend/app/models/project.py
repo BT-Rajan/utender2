@@ -95,10 +95,13 @@ class Project(Base):
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     deadline_reminder_sent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    # Stage 3.11 (drafts): when the requirement was last saved -- shown as
-    # "last saved", and the version a save must match so a stale page can't
-    # silently overwrite newer work (whole seconds: what MySQL keeps).
+    # Stage 3.11 (drafts): when the requirement was last saved (shown as
+    # "last saved"), and its version: +1 on every save, checked under the
+    # row lock against the version the saving page last saw (If-Match), so a
+    # stale page can never overwrite newer work -- however close together
+    # the two saves are.
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=_now_s, onupdate=_now_s)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     # A draft the owner deliberately discarded. It stays a draft (so it is as
     # private as ever) but is no longer active: not listed, not editable,
     # not publishable. Soft, so the audit trail keeps pointing at a record.

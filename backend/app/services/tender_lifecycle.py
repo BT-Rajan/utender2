@@ -51,10 +51,10 @@ def lock_project(db: Session, project_id: str) -> Project | None:
 # Bidding isn't cron-driven — a project's deadline passing is detected
 # lazily, the first time anything reads it, and written through so the
 # stored status is never stale for more than one request. Only 'open'
-# projects past their deadline ever move here; every other status
-# (draft, under_evaluation, awarded, no_award, canceled, expired itself)
-# is either not yet started or already terminal/owner-driven, so this
-# never fights a manual lifecycle action.
+# projects, and unpublished (non-discarded) drafts, past their deadline ever
+# move here; every other status (under_evaluation, awarded, no_award,
+# canceled, expired itself) is already terminal/owner-driven, so this never
+# fights a manual lifecycle action.
 def sync_expired_projects(db: Session) -> None:
     now = datetime.utcnow()
     # skip_locked: a row another request is transitioning right now (owner
@@ -62,13 +62,24 @@ def sync_expired_projects(db: Session) -> None:
     # closed/expired — the next read picks it up if it's still open.
     stale = (
         db.query(Project)
-        .filter(Project.status == ProjectStatus.open, Project.bid_deadline <= now)
+        .filter(
+            Project.status.in_([ProjectStatus.open, ProjectStatus.draft]),
+            Project.bid_deadline <= now,
+            Project.discarded_at.is_(None),
+        )
         .with_for_update(skip_locked=True)
         .all()
     )
     if not stale:
         return
     for project in stale:
+        if project.status == ProjectStatus.draft:
+            # Stage 3.11: a draft whose offer deadline passed before it was
+            # published has expired. It was never published, so it stays
+            # private (providers can't open an expired tender they didn't
+            # bid on) and is now read-only.
+            project.status = ProjectStatus.expired
+            continue
         has_live_offer = (
             db.query(Offer.id)
             .filter(Offer.project_id == project.id, Offer.status == OfferStatus.submitted)

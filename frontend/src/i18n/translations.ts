@@ -252,6 +252,7 @@ export interface Dictionary {
     resumeHint: string;
     untitled: string;
     lastSavedShort: string;
+    expired: string;
   };
   verification: {
     scopeLabel: string;
@@ -1091,6 +1092,7 @@ export const en: Dictionary = {
     resumeHint: "Continue one instead of starting again:",
     untitled: "Untitled",
     lastSavedShort: "last saved {date}",
+    expired: "This requirement expired at its offer deadline ({date}) without any offers. It is now read-only.",
   },
   verification: {
     scopeLabel: "Applies to",
@@ -1955,6 +1957,7 @@ export const ar: Dictionary = {
     resumeHint: "تابع إحداها بدلًا من البدء من جديد:",
     untitled: "بدون عنوان",
     lastSavedShort: "آخر حفظ {date}",
+    expired: "انتهت صلاحية هذا الطلب عند موعد إغلاق العروض ({date}) دون أي عروض. أصبح الآن للقراءة فقط.",
   },
   verification: {
     scopeLabel: "ينطبق على",

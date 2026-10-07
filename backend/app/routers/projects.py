@@ -19,7 +19,6 @@ from app.models.user import User
 from app.schemas.amendment import ProjectAmendmentOut, ProjectAmendmentRequest
 from app.schemas.award import AwardRecordOut
 from app.config import get_settings
-from app.schemas.common import utc_iso
 from app.schemas.project import (
     DrawingOut,
     EligibilityCheckOut,
@@ -61,24 +60,26 @@ def _can_view_project(user: User, project: Project, db: Session) -> bool:
         return True
     if user.role != UserRole.service_provider:
         return False
-    # Draft is the only status a service provider never sees — every other state,
-    # including the newer under_evaluation/no_award/canceled/expired, stays
-    # visible so a service provider who bid can still see what happened to their
-    # bid after bidding itself has ended. An admin-suspended project is
-    # blocked the same way, even for a service provider who already bid on it —
-    # suspension is a moderation action meant to pull the whole project out
-    # of sight until an admin reactivates it.
+    # A draft is never seen by providers; nor is an admin-suspended project,
+    # even by a provider who already bid on it -- suspension is a moderation
+    # action meant to pull the whole project out of sight until an admin
+    # reactivates it.
     if project.status == ProjectStatus.draft or project.is_suspended:
         return False
     profile = db.get(ServiceProviderProfile, user.id)
     if not (profile and profile.is_verified_active):
         return False
-    # Stage 3.9: and eligible for this particular requirement -- or already
-    # bidding on it (so a lapsed qualification never hides a provider's own
-    # bid; it only stops new or revised offers, see routers/offers.py).
-    if not ineligibility_reasons(db, project, profile):
-        return True
-    return db.query(Offer.id).filter(Offer.project_id == project.id, Offer.service_provider_id == user.id).first() is not None
+    has_bid = db.query(Offer.id).filter(Offer.project_id == project.id, Offer.service_provider_id == user.id).first() is not None
+    # Once offers have closed (closed, under evaluation, awarded, no award,
+    # canceled, expired -- including a draft that expired unpublished), only
+    # providers who took part can still open it, to see what happened to
+    # their bid. Nobody else needs the exact address and scope any more.
+    if project.status != ProjectStatus.open:
+        return has_bid
+    # Stage 3.9: open, and eligible for this particular requirement -- or
+    # already bidding on it (so a lapsed qualification never hides a
+    # provider's own bid; it only stops new or revised offers).
+    return has_bid or not ineligibility_reasons(db, project, profile)
 
 
 # The scope of work lives in Project.description (a TEXT column: 64 KB). A
@@ -176,7 +177,9 @@ async def create_project(
     category_value, trade = resolve_trade(db, category_id, trade)
     governorate_value, area_value = clean_governorate(governorate), clean_area(area)
     deadline = _parse_bid_deadline(bid_deadline)
-    if status_value == ProjectStatus.open and deadline <= datetime.utcnow():
+    # A draft is prepared for a future deadline too: a draft whose deadline
+    # passes expires (Stage 3.11).
+    if deadline <= datetime.utcnow():
         raise HTTPException(status_code=400, detail="Bid deadline must be in the future.")
     _check_execution_timing(deadline, expected_start_date, expected_completion_date, expected_duration_days)
 
@@ -269,20 +272,25 @@ def _require_active_owner(user: User, db: Session) -> None:
 
 
 def _guard_draft_write(project: Project, if_match: str | None) -> None:
-    """Stage 3.11: a discarded draft is closed to changes; and a save sent
-    from a page showing an older version (another tab, another device) is
-    refused rather than silently overwriting newer work. If-Match carries the
-    updated_at the page last saw."""
+    """Stage 3.11: a discarded or expired draft is closed to changes; and a
+    save sent from a page showing an older version (another tab, another
+    device, another member of the organization) is refused rather than
+    silently overwriting newer work. Callers hold the row lock
+    (lock_project), so the check and the version bump are one step: two
+    saves can never both pass against the same version. If-Match carries
+    the version the page last saw."""
     if project.discarded_at is not None:
         raise HTTPException(status_code=409, detail="This draft was discarded and can no longer be changed.")
-    if if_match and if_match != (utc_iso(project.updated_at) or ""):
+    if if_match and if_match.strip('"') != str(project.version):
         raise HTTPException(
             status_code=409,
-            detail="This requirement was changed somewhere else (another tab or device) since you opened it. Reload to see the latest version, then make your change again.",
+            detail="This requirement was changed somewhere else (another tab, device or team member) since you opened it. Reload to see the latest version, then make your change again.",
         )
+    _touch(project)
 
 
 def _touch(project: Project) -> None:
+    project.version = (project.version or 0) + 1
     project.updated_at = datetime.utcnow().replace(microsecond=0)
 
 
@@ -371,6 +379,8 @@ def amend_project(
         # bidders who priced against the original window.
         if new_deadline < project.bid_deadline and project.tender_type_locked:
             raise HTTPException(status_code=400, detail="Cannot move the deadline earlier once bids have been submitted.")
+        if project.status == ProjectStatus.draft and new_deadline <= datetime.utcnow():
+            raise HTTPException(status_code=400, detail="The offer deadline must be in the future.")
         # Stage 3.10: questions close before offers do.
         if project.questions_deadline and new_deadline <= project.questions_deadline:
             raise HTTPException(status_code=400, detail="The offer deadline must be after the question deadline.")
@@ -449,7 +459,7 @@ def set_project_items(
     saved together and replaced as a whole. Items are optional -- a
     requirement priced as one total needs none -- but pricing per item needs
     at least one item to price."""
-    project = db.get(Project, project_id)
+    project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
     if not project or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
@@ -488,7 +498,7 @@ def set_response_requirements(
 ):
     """Stage 3.8: what providers must submit with their price. Owner only,
     while a draft -- once published, providers rely on these terms."""
-    project = db.get(Project, project_id)
+    project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
     if not project or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
@@ -558,7 +568,7 @@ def set_provider_eligibility(
 ):
     """Stage 3.9: who may respond. Owner only, while a draft -- once
     published, providers have decided whether to respond on these terms."""
-    project = db.get(Project, project_id)
+    project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
     if not project or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
@@ -632,7 +642,7 @@ async def add_drawings(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    project = db.get(Project, project_id)
+    project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
     if not project or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
@@ -642,14 +652,13 @@ async def add_drawings(
 
     real_files = [f for f in drawings if f.filename]
     await upload_drawings_for_project(db, get_storage(), project_id, real_files, category, is_required)
-    _touch(project)
     db.commit()
     db.refresh(project)
     return _serialize_detail(project, db)
 
 
 def _owned_draft_document(project_id: str, drawing_id: str, user: User, db: Session) -> tuple[Project, ProjectDrawing]:
-    project = db.get(Project, project_id)
+    project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
     drawing = db.get(ProjectDrawing, drawing_id)
     if not project or project.owner_id != user.id or not drawing or drawing.project_id != project_id:
         raise HTTPException(status_code=404, detail="Document not found.")
@@ -678,7 +687,6 @@ def update_document(
         drawing.category = payload.category
     if payload.is_required is not None:
         drawing.is_required = payload.is_required
-    _touch(project)
     db.commit()
     db.refresh(project)
     return _serialize_detail(project, db)
@@ -697,7 +705,6 @@ def remove_document(project_id: str, drawing_id: str, user: User = Depends(get_c
     paths = [v.file_path for v in versions]
     for v in versions:
         db.delete(v)
-    _touch(project)
     db.commit()
     try:
         get_storage().delete("project-drawings", paths)
@@ -831,6 +838,7 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
         created_at=project.created_at,
         updated_at=project.updated_at,
         discarded_at=project.discarded_at,
+        version=project.version,
         offer_count=offer_count,
         drawings=drawings,
         pricing_basis=project.pricing_basis,

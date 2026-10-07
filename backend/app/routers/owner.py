@@ -535,4 +535,5 @@ def _project_fields(p: Project) -> dict:
         created_at=p.created_at,
         updated_at=p.updated_at,
         discarded_at=p.discarded_at,
+        version=p.version,
     )

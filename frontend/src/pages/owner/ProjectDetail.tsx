@@ -370,6 +370,11 @@ export function OwnerProjectDetailPage() {
       {editableDraft && project.updated_at && (
         <p className="text-[12.5px] text-steel mb-4">{t("draftDetails.lastSaved").replace("{date}", formatDeadline(project.updated_at))}</p>
       )}
+      {project.status === "expired" && project.offer_count === 0 && (
+        <div className="border border-border bg-border/30 rounded px-4 py-3 mb-6 text-sm text-steel max-w-2xl">
+          {t("draftDetails.expired").replace("{date}", formatDeadline(project.bid_deadline))}
+        </div>
+      )}
       {project.discarded_at && (
         <div className="border border-border bg-border/30 rounded px-4 py-3 mb-6 text-sm text-steel max-w-2xl">
           {t("draftDetails.discarded").replace("{date}", formatDeadline(project.discarded_at))}

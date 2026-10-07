@@ -39,9 +39,9 @@ def test_start_save_leave_resume_edit_without_publishing(db):
     owner = _verified(db, "owner", "owner@example.com")
     draft = owner.post("/projects", data={"title": "Diwaniya renovation", "address": "Qortuba, block 2", "bid_deadline": DEADLINE}).json()
     pid = draft["id"]
-    assert draft["status"] == "draft" and draft["updated_at"]
+    assert draft["status"] == "draft" and draft["updated_at"] and draft["version"] == 1
     # Only part of the information: a scope line, nothing else. Saved as is.
-    r = owner.patch(f"/projects/{pid}", json={"description": "Replace ceiling and lighting."}, headers={"If-Match": draft["updated_at"]})
+    r = owner.patch(f"/projects/{pid}", json={"description": "Replace ceiling and lighting."}, headers={"If-Match": str(draft["version"])})
     assert r.status_code == 200
     owner.post(f"/projects/{pid}/drawings", files=[("drawings", ("ceiling.pdf", b"%PDF-1", "application/pdf"))])
 
@@ -53,7 +53,7 @@ def test_start_save_leave_resume_edit_without_publishing(db):
     assert resumed["description"] == "Replace ceiling and lighting." and resumed["drawings"][0]["file_name"] == "ceiling.pdf"
 
     # Continue editing (text and attachments), save again.
-    r = later.patch(f"/projects/{pid}", json={"title": "Diwaniya renovation — ceiling & lighting"}, headers={"If-Match": resumed["updated_at"]})
+    r = later.patch(f"/projects/{pid}", json={"title": "Diwaniya renovation — ceiling & lighting"}, headers={"If-Match": str(resumed["version"])})
     assert r.status_code == 200
     later.delete(f"/projects/{pid}/drawings/{resumed['drawings'][0]['id']}")
     final = later.get(f"/projects/{pid}").json()
@@ -78,18 +78,37 @@ def test_a_repeated_start_does_not_create_a_second_draft(db):
 def test_a_stale_page_cannot_overwrite_newer_work(db):
     owner = _verified(db, "owner", "owner@example.com")
     draft = owner.post("/projects", data={"title": "Kitchen", "address": "Mishref", "bid_deadline": DEADLINE}).json()
-    pid, seen = draft["id"], draft["updated_at"]
-    row = db.get(Project, pid)
-    row.updated_at = row.updated_at - timedelta(seconds=5)  # first tab's version is older than what's stored next
-    db.commit()
-    stale = owner.get(f"/projects/{pid}").json()["updated_at"]
-    fresh = owner.patch(f"/projects/{pid}", json={"description": "Tab B: full scope"}, headers={"If-Match": stale})
-    assert fresh.status_code == 200
-    # Tab A still shows the old version: its save is refused, nothing is lost.
-    r = owner.patch(f"/projects/{pid}", json={"description": "Tab A: old scope"}, headers={"If-Match": stale})
-    assert r.status_code == 409 and "Reload" in r.json()["detail"]
+    pid, seen = draft["id"], str(draft["version"])
+    # Two tabs opened on the same version; both save within the same second.
+    tab_b = owner.patch(f"/projects/{pid}", json={"description": "Tab B: full scope"}, headers={"If-Match": seen})
+    assert tab_b.status_code == 200 and tab_b.json()["version"] == draft["version"] + 1
+    tab_a = owner.patch(f"/projects/{pid}", json={"description": "Tab A: old scope"}, headers={"If-Match": seen})
+    assert tab_a.status_code == 409 and "Reload" in tab_a.json()["detail"]
     assert owner.get(f"/projects/{pid}").json()["description"] == "Tab B: full scope"
-    assert seen  # (the version is always sent with the requirement)
+    # Every kind of draft save moves the version on, documents included.
+    v = tab_b.json()["version"]
+    r = owner.post(f"/projects/{pid}/drawings", files=[("drawings", ("plan.pdf", b"%PDF", "application/pdf"))])
+    assert r.json()["version"] == v + 1
+    assert owner.put(f"/projects/{pid}/tender-rules", json={}, headers={"If-Match": str(v)}).status_code == 409
+
+
+def test_a_draft_expires_at_its_offer_deadline(db):
+    owner = _verified(db, "owner", "owner@example.com")
+    sp = _verified(db, "service_provider", "sp@example.com")
+    # A draft can't be started, or moved, onto a deadline that has passed.
+    past = (datetime.utcnow() - timedelta(hours=1)).isoformat() + "Z"
+    assert owner.post("/projects", data={"title": "T", "address": "A", "bid_deadline": past}).status_code == 400
+    pid = owner.post("/projects", data={"title": "Shade structure", "address": "Fintas", "bid_deadline": DEADLINE}).json()["id"]
+    assert owner.patch(f"/projects/{pid}", json={"bid_deadline": past}).status_code == 400
+
+    db.get(Project, pid).bid_deadline = datetime.utcnow() - timedelta(seconds=1)
+    db.commit()
+    seen = owner.get(f"/projects/{pid}").json()
+    assert seen["status"] == "expired"
+    assert owner.patch(f"/projects/{pid}", json={"title": "x"}).status_code == 400  # read-only
+    assert owner.post(f"/owner/projects/{pid}/publish").status_code == 400
+    assert sp.get(f"/projects/{pid}").status_code == 404  # never published: still private
+    assert [p["status"] for p in owner.get("/owner/projects").json()] == ["expired"]
 
 
 def test_owner_discards_a_draft(db):

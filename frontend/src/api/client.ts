@@ -83,6 +83,6 @@ export async function apiFetch<T>(
 // Stage 3.11: a draft save carries the version the page last saw, so a stale
 // page (another tab or device) gets a clear refusal instead of overwriting
 // newer work.
-export function draftVersion(project: { updated_at?: string | null }): Record<string, string> {
-  return project.updated_at ? { "If-Match": project.updated_at } : {};
+export function draftVersion(project: { version?: number | null }): Record<string, string> {
+  return project.version != null ? { "If-Match": String(project.version) } : {};
 }
