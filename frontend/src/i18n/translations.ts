@@ -77,6 +77,20 @@ export interface Dictionary {
     pWarranty: string;
     pOther: string;
   };
+  organization: {
+    heading: string;
+    hint: string;
+    representative: string;
+    member: string;
+    remove: string;
+    removeConfirm: string;
+    email: string;
+    emailPlaceholder: string;
+    position: string;
+    add: string;
+    addHint: string;
+    error: string;
+  };
   eligibility: {
     heading: string;
     hint: string;
@@ -916,6 +930,20 @@ export const en: Dictionary = {
     pRetention: "Retention: {percent}% held for {months} months.",
     pWarranty: "Warranty: {months} months from handover.",
     pOther: "Other conditions",
+  },
+  organization: {
+    heading: "Organization members",
+    hint: "Everyone here acts for the organization and shares everything done for it: its verification, requirements, offers and questions.",
+    representative: "Authorized representative",
+    member: "Member",
+    remove: "Remove",
+    removeConfirm: "Remove this member? They will no longer act for the organization. Everything they worked on stays with the organization.",
+    email: "Colleague's email",
+    emailPlaceholder: "colleague@company.com",
+    position: "Position (optional)",
+    add: "Add member",
+    addHint: "Your colleague signs up for their own account first. They then act for the organization; they don't need to verify separately.",
+    error: "Could not update the members.",
   },
   eligibility: {
     heading: "Who can respond",
@@ -1781,6 +1809,20 @@ export const ar: Dictionary = {
     pRetention: "المحتجزات: {percent}% لمدة {months} شهرًا.",
     pWarranty: "الضمان: {months} شهرًا من التسليم.",
     pOther: "شروط أخرى",
+  },
+  organization: {
+    heading: "أعضاء الجهة",
+    hint: "كل من هنا يعمل باسم الجهة ويشارك كل ما يتم باسمها: توثيقها وطلباتها وعروضها وأسئلتها.",
+    representative: "الممثل المفوض",
+    member: "عضو",
+    remove: "إزالة",
+    removeConfirm: "هل تريد إزالة هذا العضو؟ لن يعمل باسم الجهة بعد ذلك، وكل ما عمل عليه يبقى للجهة.",
+    email: "بريد الزميل",
+    emailPlaceholder: "colleague@company.com",
+    position: "المنصب (اختياري)",
+    add: "إضافة عضو",
+    addHint: "ينشئ زميلك حسابه الخاص أولًا، ثم يعمل باسم الجهة دون حاجة إلى توثيق منفصل.",
+    error: "تعذر تحديث الأعضاء.",
   },
   eligibility: {
     heading: "من يمكنه تقديم عرض",

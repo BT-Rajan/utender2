@@ -37,7 +37,7 @@ from app.schemas.common import utc_iso
 from app.services.audit import log_action
 from app.services.stakeholder import describe as describe_stakeholder
 from app.services.verification import assert_ready_to_approve, checklist, document_out_fields, is_added_qualification, profile_state_fields
-from app.services.notify import notify
+from app.services.notify import notify, notify_team
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import is_sealed_and_open, lock_project
 from app.models.category import ServiceCategory
@@ -1200,10 +1200,11 @@ def suspend_project(
     )
     owner = db.get(User, project.owner_id)
     if owner:
-        notify(
+        notify_team(
             db,
             owner,
             NotificationType.project_suspended if payload.suspended else NotificationType.project_reactivated,
+            organization_id=project.organization_id,
             link=f"/owner/projects/{project_id}",
             project_title=project.title,
         )
@@ -1311,7 +1312,7 @@ def admin_edit_offer(
     if amount is None or amount <= 0:
         raise HTTPException(status_code=400, detail="Enter a valid bid amount.")
     if project:
-        check_complete(db, project, offer.service_provider_id, merged)
+        check_complete(db, project, offer.organization_id, offer.service_provider_id, merged)
 
     changed: list[str] = []
     if amount != offer.amount:
@@ -1379,10 +1380,11 @@ def suspend_offer(
     project = db.get(Project, offer.project_id)
     service_provider_user = db.get(User, offer.service_provider_id)
     if service_provider_user and project:
-        notify(
+        notify_team(
             db,
             service_provider_user,
             NotificationType.offer_suspended if payload.suspended else NotificationType.offer_reactivated,
+            organization_id=offer.organization_id,
             link=f"/service-provider/projects/{project.id}/offer",
             project_title=project.title,
         )

@@ -21,6 +21,10 @@ class Project(Base):
     owner_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    # The organization this was done for (services.team); NULL = an individual's.
+    organization_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     # Exact address or site description. Shown only where a provider can open
     # the full requirement (verified with active access); listings show the

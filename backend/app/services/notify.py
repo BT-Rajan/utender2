@@ -156,3 +156,15 @@ def notify(db: Session, user: User, notification_type: NotificationType, link: s
     db.commit()
     db.refresh(row)
     return row
+
+
+
+def notify_team(
+    db: Session, user: User | None, notification_type: NotificationType, link: str | None = None, organization_id: str | None = None, **kwargs
+) -> None:
+    """A tender notification for work done for an organization goes to every
+    current member (services.team); for an individual's, to them."""
+    from app.services.team import side_users
+
+    for member in side_users(db, organization_id, user.id if user else None):
+        notify(db, member, notification_type, link=link, **kwargs)

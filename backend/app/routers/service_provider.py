@@ -18,6 +18,7 @@ from app.schemas.project import ProjectOut
 from app.schemas.category import ProviderServices
 from app.services.categories import clean_services
 from app.services.eligibility import ineligibility_reasons
+from app.services.team import acting_profile, mine
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.locations import clean_governorate
 from app.services.stakeholder import require_established
@@ -82,8 +83,8 @@ def feed(
 
     query = query.order_by(Project.created_at.desc()) if sort == "newest" else query.order_by(Project.bid_deadline.asc())
     projects = query.all()
-    my_offers = {o.project_id: o.status.value for o in db.query(Offer).filter(Offer.service_provider_id == user.id).all()}
-    profile = db.get(ServiceProviderProfile, user.id)
+    my_offers = {o.project_id: o.status.value for o in db.query(Offer).filter(mine(db, user, Offer, Offer.service_provider_id)).all()}
+    profile = acting_profile(db, user)
 
     out = []
     for p in projects:
@@ -145,7 +146,7 @@ def my_bids(user: User = Depends(require_service_provider), db: Session = Depend
     rows = (
         db.query(Offer, Project)
         .join(Project, Offer.project_id == Project.id)
-        .filter(Offer.service_provider_id == user.id)
+        .filter(mine(db, user, Offer, Offer.service_provider_id))
         .order_by(Offer.updated_at.desc())
         .all()
     )

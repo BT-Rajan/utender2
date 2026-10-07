@@ -39,7 +39,8 @@ from app.services.drawings import DOCUMENT_CATEGORIES, upload_drawings_for_proje
 from app.services.locations import clean_area, clean_governorate
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name
 from app.services.email import notify_service_provider_tender_amended
-from app.services.notify import notify
+from app.services.notify import notify, notify_team
+from app.services.team import acting_id, acting_profile, mine, org_of, owns
 from app.services.storage import drawing_url_expiry_seconds, get_storage
 from app.services.tender_lifecycle import lock_project, sync_expired_projects
 
@@ -56,7 +57,7 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 # drawings) stays available on verification alone; that split is what lets
 # an unpaid service provider browse before paying instead of a hard app lockout.
 def _can_view_project(user: User, project: Project, db: Session) -> bool:
-    if user.role == UserRole.admin or project.owner_id == user.id:
+    if user.role == UserRole.admin or owns(db, user, project):
         return True
     if user.role != UserRole.service_provider:
         return False
@@ -66,10 +67,12 @@ def _can_view_project(user: User, project: Project, db: Session) -> bool:
     # reactivates it.
     if project.status == ProjectStatus.draft or project.is_suspended:
         return False
-    profile = db.get(ServiceProviderProfile, user.id)
+    profile = acting_profile(db, user)
     if not (profile and profile.is_verified_active):
         return False
-    has_bid = db.query(Offer.id).filter(Offer.project_id == project.id, Offer.service_provider_id == user.id).first() is not None
+    has_bid = (
+        db.query(Offer.id).filter(Offer.project_id == project.id, mine(db, user, Offer, Offer.service_provider_id)).first() is not None
+    )
     # Once offers have closed (closed, under evaluation, awarded, no award,
     # canceled, expired -- including a draft that expired unpublished), only
     # providers who took part can still open it, to see what happened to
@@ -159,7 +162,7 @@ async def create_project(
     # Stage 3.11: the same start sent again (double click, retry after a lost
     # response) returns the draft it already created.
     if creation_token:
-        existing = db.query(Project).filter(Project.owner_id == user.id, Project.creation_token == creation_token).first()
+        existing = db.query(Project).filter(Project.owner_id == acting_id(db, user), Project.creation_token == creation_token).first()
         if existing:
             return _serialize_detail(existing, db)
     try:
@@ -189,7 +192,9 @@ async def create_project(
             assert_allowed_extension(f.filename, ALLOWED_DRAWING_EXTENSIONS)
 
     project = Project(
-        owner_id=user.id,
+        # Recorded under the stakeholder this person acts as (their
+        # organization's profile, for a member: services.team).
+        owner_id=acting_id(db, user),
         title=title,
         address=address,
         governorate=governorate_value,
@@ -204,6 +209,7 @@ async def create_project(
         tender_type=tender_type_value,
         status=status_value,
         creation_token=creation_token or None,
+        organization_id=org_of(db, user.id),  # an organization's requirement is shared by its members
     )
     db.add(project)
     try:
@@ -211,7 +217,7 @@ async def create_project(
     except IntegrityError:
         # Two copies of the same start arrived at once: the other one won.
         db.rollback()
-        existing = db.query(Project).filter(Project.owner_id == user.id, Project.creation_token == creation_token).first()
+        existing = db.query(Project).filter(Project.owner_id == acting_id(db, user), Project.creation_token == creation_token).first()
         if not existing:
             raise
         return _serialize_detail(existing, db)
@@ -266,7 +272,7 @@ def _require_active_owner(user: User, db: Session) -> None:
     change it. Same rule and same "not_approved" code as
     deps.require_verified_owner, applied *after* the ownership lookup so
     everyone else keeps getting the 404 they always did."""
-    profile = db.get(OwnerProfile, user.id)
+    profile = acting_profile(db, user)
     if not profile or not profile.is_verified_active:
         raise HTTPException(status_code=403, detail="not_approved")
 
@@ -306,7 +312,7 @@ def amend_project(
     # Locked: "can't move the deadline earlier once bids exist" reads
     # tender_type_locked, which the first bid sets under this same lock.
     project = lock_project(db, project_id)
-    if not project or project.owner_id != user.id:
+    if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
     _guard_draft_write(project, if_match)
@@ -429,20 +435,21 @@ def amend_project(
     # Best-effort — every service provider with a live (non-withdrawn) bid gets
     # notified; a failed send never rolls back the amendment itself.
     bidder_ids = (
-        db.query(Offer.service_provider_id)
+        db.query(Offer.service_provider_id, Offer.organization_id)
         .filter(Offer.project_id == project_id, Offer.status != OfferStatus.withdrawn)
         .distinct()
         .all()
     )
-    for (service_provider_id,) in bidder_ids:
+    for service_provider_id, organization_id in bidder_ids:
         service_provider_user = db.get(User, service_provider_id)
         if service_provider_user:
             notify_service_provider_tender_amended(service_provider_user.email, project.title, project_id, summary)
-            notify(
+            notify_team(
                 db,
                 service_provider_user,
                 NotificationType.tender_amendment,
                 link=f"/service-provider/projects/{project_id}/offer",
+                organization_id=organization_id,
                 project_title=project.title,
                 summary=summary,
             )
@@ -460,7 +467,7 @@ def set_project_items(
     requirement priced as one total needs none -- but pricing per item needs
     at least one item to price."""
     project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
-    if not project or project.owner_id != user.id:
+    if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
     _guard_draft_write(project, if_match)
@@ -499,7 +506,7 @@ def set_response_requirements(
     """Stage 3.8: what providers must submit with their price. Owner only,
     while a draft -- once published, providers rely on these terms."""
     project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
-    if not project or project.owner_id != user.id:
+    if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
     _guard_draft_write(project, if_match)
@@ -532,7 +539,7 @@ def set_tender_rules(
     whether and until when questions are taken, and the owner's commercial
     conditions and instructions. Owner only, while a draft."""
     project = lock_project(db, project_id)
-    if not project or project.owner_id != user.id:
+    if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
     _guard_draft_write(project, if_match)
@@ -569,7 +576,7 @@ def set_provider_eligibility(
     """Stage 3.9: who may respond. Owner only, while a draft -- once
     published, providers have decided whether to respond on these terms."""
     project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
-    if not project or project.owner_id != user.id:
+    if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
     _guard_draft_write(project, if_match)
@@ -589,7 +596,7 @@ def my_eligibility(project_id: str, user: User = Depends(require_approved_servic
     project = db.get(Project, project_id)
     if not project or project.status == ProjectStatus.draft or project.is_suspended:
         raise HTTPException(status_code=404, detail="Project not found.")
-    reasons = ineligibility_reasons(db, project, db.get(ServiceProviderProfile, user.id))
+    reasons = ineligibility_reasons(db, project, acting_profile(db, user))
     return EligibilityCheckOut(eligible=not reasons, reasons=reasons, rules=rules_out(db, project))
 
 
@@ -643,7 +650,7 @@ async def add_drawings(
     db: Session = Depends(get_db),
 ):
     project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
-    if not project or project.owner_id != user.id:
+    if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
     _guard_draft_write(project, None)
@@ -660,7 +667,7 @@ async def add_drawings(
 def _owned_draft_document(project_id: str, drawing_id: str, user: User, db: Session) -> tuple[Project, ProjectDrawing]:
     project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
     drawing = db.get(ProjectDrawing, drawing_id)
-    if not project or project.owner_id != user.id or not drawing or drawing.project_id != project_id:
+    if not project or not owns(db, user, project) or not drawing or drawing.project_id != project_id:
         raise HTTPException(status_code=404, detail="Document not found.")
     _require_active_owner(user, db)
     _guard_draft_write(project, None)

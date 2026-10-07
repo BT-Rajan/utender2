@@ -4,6 +4,7 @@ import { apiFetch, ApiError } from "@/api/client";
 import { useI18n } from "@/i18n/I18nContext";
 import { StakeholderSummary, useIdentity } from "@/components/Stakeholder";
 import { AppHeader } from "@/components/AppHeader";
+import { OrganizationMembers } from "@/components/OrganizationMembers";
 
 const ROLE_HOME: Record<string, { label: string; href: string }> = {
   owner: { label: "Owner", href: "/owner/dashboard" },
@@ -132,6 +133,11 @@ function IdentityCard() {
   );
 }
 
+function MembersIfOrganization() {
+  const { data: identity } = useIdentity();
+  return identity?.acting_as?.kind === "organization" ? <OrganizationMembers /> : null;
+}
+
 export function AccountPage() {
   const { user } = useAuth();
   const roleInfo = ROLE_HOME[user?.role ?? "owner"];
@@ -142,6 +148,7 @@ export function AccountPage() {
       <main className="max-w-5xl mx-auto px-5 py-8">
         <EmailVerifyBanner />
         <IdentityCard />
+        <MembersIfOrganization />
         <ChangePasswordForm />
       </main>
     </div>

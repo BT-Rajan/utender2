@@ -16,6 +16,7 @@ The four states are kept distinct:
                              not suspended; service providers: also paid)
 """
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.enums import MembershipRole, StakeholderType, UserRole, VerificationStatus
@@ -108,11 +109,14 @@ def describe(profile, user: User, db: Session, viewer_id: str | None = None) -> 
 
 
 def identity(user: User, db: Session) -> dict:
-    profile = stakeholder_profile(user, db)
+    from app.services.team import acting_profile
+
+    # A member of an organization acts as the organization's profile.
+    profile = acting_profile(db, user)
     person = {"user_id": user.id, "full_name": user.full_name, "email": user.email}
     if profile is None:  # admins act only as themselves
         return {"person": person, "role": user.role.value, "stakeholder": None, "acting_as": None}
-    stakeholder = describe(profile, user, db, viewer_id=user.id)
+    stakeholder = describe(profile, profile.user if profile.user_id != user.id else user, db, viewer_id=user.id)
     if stakeholder["type"] == StakeholderType.organization.value:
         acting_as = {"kind": "organization", "organization_id": stakeholder["organization"]["id"]}
     elif stakeholder["type"] == StakeholderType.individual.value:
@@ -135,6 +139,10 @@ def establish(
     profile = stakeholder_profile(user, db)
     if profile is None:
         raise HTTPException(status_code=403, detail="Only owner or service provider accounts represent a stakeholder.")
+    joined = db.query(OrganizationMembership).filter(OrganizationMembership.user_id == user.id).first()
+    if joined and profile.organization_id != joined.organization_id:
+        # A member acts for the organization they were added to.
+        raise HTTPException(status_code=409, detail="You act for an organization. Ask its representative to remove you first.")
     if profile.verification_status not in EDITABLE_STATUSES or profile.is_suspended:
         raise HTTPException(
             status_code=409,
@@ -201,3 +209,88 @@ def require_established(profile) -> None:
             status_code=400,
             detail="Tell us whether this account represents you personally or an organization before submitting for review.",
         )
+
+
+# ---------- organization members ----------
+# An organization is one stakeholder: one profile, verified once (Step 3).
+# Its authorized representative (membership admin) brings colleagues in;
+# each colleague keeps their own login and acts as the organization's
+# profile (services.team.acting_profile), so its verification, payment,
+# trading name and everything recorded under it are shared. Their own
+# (personal) profile is left untouched and unused while they are a member.
+
+
+def _my_membership(user: User, db: Session) -> OrganizationMembership:
+    membership = db.query(OrganizationMembership).filter(OrganizationMembership.user_id == user.id).first()
+    if not membership:
+        raise HTTPException(status_code=400, detail="This account doesn't act for an organization.")
+    return membership
+
+
+def _require_representative(user: User, db: Session) -> OrganizationMembership:
+    membership = _my_membership(user, db)
+    if membership.role != MembershipRole.admin:
+        raise HTTPException(status_code=403, detail="Only the organization's authorized representative can manage its members.")
+    return membership
+
+
+def list_members(user: User, db: Session) -> list[dict]:
+    membership = _my_membership(user, db)
+    rows = (
+        db.query(OrganizationMembership, User)
+        .join(User, OrganizationMembership.user_id == User.id)
+        .filter(OrganizationMembership.organization_id == membership.organization_id)
+        .order_by(OrganizationMembership.created_at.asc())
+        .all()
+    )
+    return [
+        {"user_id": u.id, "full_name": u.full_name, "email": u.email, "role": m.role.value, "position": m.position}
+        for m, u in rows
+    ]
+
+
+def add_member(user: User, db: Session, email: str, position: str | None) -> None:
+    membership = _require_representative(user, db)
+    target = db.query(User).filter(func.lower(User.email) == email.strip().lower()).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="No account with that email. Ask your colleague to sign up first.")
+    if target.role != user.role:
+        raise HTTPException(status_code=400, detail="That account is on the other side of the marketplace.")
+    if db.query(OrganizationMembership).filter(OrganizationMembership.user_id == target.id).first():
+        raise HTTPException(status_code=409, detail="That account already belongs to an organization.")
+    own = stakeholder_profile(target, db)
+    if own is None:
+        raise HTTPException(status_code=400, detail="That account can't join an organization.")
+    if own.verification_status not in EDITABLE_STATUSES or own.is_suspended or own.stakeholder_type is not None:
+        # An account already established, under review or verified in its own
+        # right stays as it is (the same rule as changing who it represents).
+        raise HTTPException(status_code=409, detail="That account already represents someone in its own right, so it can't join.")
+    db.add(
+        OrganizationMembership(
+            organization_id=membership.organization_id, user_id=target.id, role=MembershipRole.member, position=(position or "").strip() or None
+        )
+    )
+    db.flush()
+    log_action(
+        db, actor_id=user.id, action="organization.member_added", target_type="organization", target_id=membership.organization_id, new_value=target.id
+    )
+
+
+def remove_member(user: User, db: Session, member_id: str) -> None:
+    membership = _require_representative(user, db)
+    if member_id == user.id:
+        raise HTTPException(status_code=400, detail="You can't remove yourself as the organization's representative.")
+    target = (
+        db.query(OrganizationMembership)
+        .filter(OrganizationMembership.organization_id == membership.organization_id, OrganizationMembership.user_id == member_id)
+        .first()
+    )
+    if not target:
+        raise HTTPException(status_code=404, detail="Not a member of this organization.")
+    # They stop acting for the organization; it keeps everything recorded
+    # under it. Their own account is as it was before they joined.
+    db.delete(target)
+    db.flush()
+    log_action(
+        db, actor_id=user.id, action="organization.member_removed", target_type="organization", target_id=membership.organization_id, previous_value=member_id
+    )

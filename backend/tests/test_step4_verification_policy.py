@@ -201,7 +201,9 @@ def test_document_access_stays_private(admin, db):
     assert anon.get("/" + path.replace("sig=", "sig=x")).status_code == 403  # tampered link doesn't
     assert anon.get("/" + path.split("?")[0]).status_code == 422  # unsigned link doesn't
 
-    # Another member of the same organization gets no access to its documents.
+    # Another member of the same organization shares the organization's
+    # verification (everything is shared among members: services.team) -- its
+    # checklist, but still never a file link -- and no admin access.
     org_id = c.get("/account/identity").json()["stakeholder"]["organization"]["id"]
     colleague = User(email="colleague@example.com", password_hash=hash_password("password123"), role=UserRole.service_provider, full_name="C")
     db.add(colleague)
@@ -210,5 +212,6 @@ def test_document_access_stays_private(admin, db):
     db.commit()
     cc = TestClient(app)
     cc.post("/auth/login", json={"email": "colleague@example.com", "password": "password123"})
-    assert cc.get("/service-provider/documents").status_code == 404
+    shared = cc.get("/service-provider/documents")
+    assert shared.status_code == 200 and all("url" not in d for d in shared.json())
     assert cc.get(f"/admin/service-providers/{user_id}").status_code == 403

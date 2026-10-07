@@ -41,7 +41,18 @@ def priced_total(project: Project, payload: OfferCreate) -> tuple[Decimal | None
     return sum(Decimal(line["line_total"]) for line in lines), lines
 
 
-def check_complete(db: Session, project: Project, provider_id: str, payload: OfferCreate) -> list[str]:
+def _side_documents(db: Session, project_id: str, organization_id: str | None, provider_id: str):
+    """The attachments of one side's response: its organization's (whichever
+    member uploaded them), or an individual's own."""
+    query = db.query(OfferDocument).filter(OfferDocument.project_id == project_id)
+    if organization_id:
+        return query.filter(OfferDocument.organization_id == organization_id)
+    return query.filter(OfferDocument.organization_id.is_(None), OfferDocument.service_provider_id == provider_id)
+
+
+def check_complete(
+    db: Session, project: Project, organization_id: str | None, provider_id: str, payload: OfferCreate
+) -> list[str]:
     """Raises 400 naming what's missing; returns the declarations accepted."""
     reqs = requirements_for(project)
     missing = []
@@ -51,12 +62,7 @@ def check_complete(db: Session, project: Project, provider_id: str, payload: Off
         missing.append("your technical approach")
     required_docs = {d.name for d in reqs.documents if d.required}
     if required_docs:
-        attached = {
-            label
-            for (label,) in db.query(OfferDocument.label).filter(
-                OfferDocument.project_id == project.id, OfferDocument.service_provider_id == provider_id
-            )
-        }
+        attached = {d.label for d in _side_documents(db, project.id, organization_id, provider_id)}
         missing += [f'the "{name}" document' for name in sorted(required_docs - attached)]
     if reqs.declarations and set(payload.accepted_declarations) != set(reqs.declarations):
         missing.append("acceptance of every declaration")
@@ -65,14 +71,9 @@ def check_complete(db: Session, project: Project, provider_id: str, payload: Off
     return list(reqs.declarations)
 
 
-def documents_out(db: Session, project_id: str, provider_id: str) -> list[OfferDocumentOut]:
+def documents_out(db: Session, project_id: str, organization_id: str | None, provider_id: str) -> list[OfferDocumentOut]:
     storage = get_storage()
-    rows = (
-        db.query(OfferDocument)
-        .filter(OfferDocument.project_id == project_id, OfferDocument.service_provider_id == provider_id)
-        .order_by(OfferDocument.label.asc())
-        .all()
-    )
+    rows = _side_documents(db, project_id, organization_id, provider_id).order_by(OfferDocument.label.asc()).all()
     return [
         OfferDocumentOut(
             id=d.id,

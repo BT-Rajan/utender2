@@ -32,6 +32,7 @@ from app.models.document import DocumentRequirement, ServiceProviderDocument
 from app.models.enums import DocumentStatus, StakeholderType, UserRole
 from app.models.project import Project
 from app.models.service_provider import ServiceProviderProfile
+from app.services.team import team_ids
 from app.schemas.project import EligibilityQualification, EligibilityReason, ProviderEligibilityIn, ProviderEligibilityOut
 
 
@@ -90,18 +91,23 @@ def ineligibility_reasons(db: Session, project: Project, profile: ServiceProvide
         ))
     if rules.qualifications:
         names = {r.id: r.name for r in db.query(DocumentRequirement).filter(DocumentRequirement.id.in_(rules.qualifications))}
-        held = {
-            d.requirement_id: d
-            for d in db.query(ServiceProviderDocument).filter(
-                ServiceProviderDocument.service_provider_id == profile.user_id,
-                ServiceProviderDocument.requirement_id.in_(rules.qualifications),
-            )
-        }
+        # An organization's qualification counts for every member, whoever
+        # in it holds the approved document.
+        team = team_ids(db, profile.user_id)
+        held: dict[str, ServiceProviderDocument] = {}
+        for d in db.query(ServiceProviderDocument).filter(
+            ServiceProviderDocument.service_provider_id.in_(team),
+            ServiceProviderDocument.requirement_id.in_(rules.qualifications),
+            ServiceProviderDocument.status == DocumentStatus.approved,
+        ):
+            best = held.get(d.requirement_id)
+            if best is None or (best.expires_on is not None and (d.expires_on is None or d.expires_on > best.expires_on)):
+                held[d.requirement_id] = d
         today = date.today()
         for q in rules.qualifications:
             name = names.get(q, "a required qualification")
             doc = held.get(q)
-            if not doc or doc.status != DocumentStatus.approved:
+            if not doc:
                 reasons.append(EligibilityReason(
                     code="qualification_missing",
                     name=name,
@@ -115,13 +121,20 @@ def ineligibility_reasons(db: Session, project: Project, profile: ServiceProvide
                     message=f'This requirement needs a valid "{name}"; yours expired on {doc.expires_on.isoformat()}.',
                 ))
     # A rule whose subject was later cleared from the requirement restricts nothing.
-    if rules.match_category and project.category_id and project.category_id not in (profile.service_categories or []):
+    team_profiles = (
+        db.query(ServiceProviderProfile).filter(ServiceProviderProfile.user_id.in_(team_ids(db, profile.user_id))).all()
+        if (rules.match_category or rules.match_governorate)
+        else [profile]
+    )
+    offered = {c for p in team_profiles for c in (p.service_categories or [])}
+    if rules.match_category and project.category_id and project.category_id not in offered:
         reasons.append(EligibilityReason(
             code="category_not_offered",
             name=project.trade,
             message=f'This requirement is for "{project.trade}"; your profile doesn\'t list it among your services.',
         ))
-    served = profile.service_governorates or []  # empty = all of Kuwait
+    # The governorates the organization's members serve; none declared = all of Kuwait.
+    served = {g for p in team_profiles for g in (p.service_governorates or [])}
     if rules.match_governorate and project.governorate and served and project.governorate not in served:
         reasons.append(EligibilityReason(
             code="governorate_not_served",

@@ -22,7 +22,8 @@ from app.schemas.review import ReviewCreate, ReviewOut
 from app.services.audit import log_action
 from app.services.email import notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
-from app.services.notify import notify
+from app.services.notify import notify, notify_team
+from app.services.team import acting_profile, mine, owns
 from app.services.eligibility import qualification_options
 from app.services.offer_response import documents_out
 from app.services.stakeholder import require_established
@@ -55,14 +56,14 @@ def _get_owned_project(project_id: str, user: User, db: Session, *, lock: bool =
     # transitions at once -- close vs cancel, award vs award, award vs a bid
     # -- are serialized instead of both passing a stale check.
     project = lock_project(db, project_id) if lock else db.get(Project, project_id)
-    if not project or project.owner_id != user.id:
+    if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     if lock:
         # A suspended (or unapproved) owner keeps read access to their tender
         # but can't change its state or award it -- the same rule and code as
         # require_verified_owner, checked after ownership so everyone else
         # still gets the 404 they always did.
-        profile = db.get(OwnerProfile, user.id)
+        profile = acting_profile(db, user)
         if not profile or not profile.is_verified_active:
             raise HTTPException(status_code=403, detail="not_approved")
     return project
@@ -74,7 +75,8 @@ def dashboard(user: User = Depends(require_owner), db: Session = Depends(get_db)
     projects = (
         db.query(Project)
         # A discarded draft is no longer one of the owner's active requirements.
-        .filter(Project.owner_id == user.id, Project.discarded_at.is_(None))
+        # The organization's requirements, whoever in it started them.
+        .filter(mine(db, user, Project, Project.owner_id), Project.discarded_at.is_(None))
         .order_by(Project.created_at.desc())
         .all()
     )
@@ -138,7 +140,7 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
             item_prices=o.item_prices,
             assumptions=o.assumptions,
             declarations_accepted=o.declarations_accepted,
-            documents=documents_out(db, project_id, o.service_provider_id),
+            documents=documents_out(db, project_id, o.organization_id, o.service_provider_id),
             status=o.status,
             revision=o.revision,
             created_at=o.created_at,
@@ -243,12 +245,12 @@ def approve_offer(project_id: str, offer_id: str, user: User = Depends(require_o
     winner_user = db.get(User, winning_offer.service_provider_id)
     if winner_user:
         notify_service_provider_offer_decision(winner_user.email, project.title, approved=True)
-        notify(db, winner_user, NotificationType.award_won, link=f"/service-provider/projects/{project_id}/offer", project_title=project.title)
+        notify_team(db, winner_user, NotificationType.award_won, link=f"/service-provider/projects/{project_id}/offer", organization_id=winning_offer.organization_id, project_title=project.title)
     for o in other_offers:
         loser_user = db.get(User, o.service_provider_id)
         if loser_user:
             notify_service_provider_offer_decision(loser_user.email, project.title, approved=False)
-            notify(db, loser_user, NotificationType.award_lost, link=f"/service-provider/projects/{project_id}/offer", project_title=project.title)
+            notify_team(db, loser_user, NotificationType.award_lost, link=f"/service-provider/projects/{project_id}/offer", organization_id=o.organization_id, project_title=project.title)
 
     db.refresh(project)
     offer_count = db.query(Offer).filter(Offer.project_id == project_id).count()
@@ -312,16 +314,18 @@ def start_evaluation(project_id: str, user: User = Depends(require_owner), db: S
 
 
 def _notify_bidders(db: Session, project: Project, notification_type: NotificationType) -> None:
-    bidder_ids = (
-        db.query(Offer.service_provider_id)
+    bidders = (
+        db.query(Offer.service_provider_id, Offer.organization_id)
         .filter(Offer.project_id == project.id, Offer.status != OfferStatus.withdrawn)
         .distinct()
         .all()
     )
-    for (service_provider_id,) in bidder_ids:
+    for service_provider_id, organization_id in bidders:
         bidder = db.get(User, service_provider_id)
         if bidder:
-            notify(db, bidder, notification_type, link=f"/service-provider/projects/{project.id}/offer", project_title=project.title)
+            notify_team(
+                db, bidder, notification_type, link=f"/service-provider/projects/{project.id}/offer", organization_id=organization_id, project_title=project.title
+            )
 
 
 @router.post("/projects/{project_id}/no-award", response_model=ProjectOut)
@@ -377,7 +381,7 @@ def cancel_project(project_id: str, user: User = Depends(require_owner), db: Ses
 @router.get("/projects/{project_id}/review", response_model=ReviewOut | None)
 def get_review(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     project = db.get(Project, project_id)
-    if not project or project.owner_id != user.id:
+    if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     return db.query(Review).filter(Review.project_id == project_id).first()
 
@@ -385,7 +389,7 @@ def get_review(project_id: str, user: User = Depends(require_owner), db: Session
 @router.post("/reviews", response_model=ReviewOut)
 def submit_review(payload: ReviewCreate, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     project = db.get(Project, payload.project_id)
-    if not project or project.owner_id != user.id:
+    if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     if project.status != ProjectStatus.awarded:
         raise HTTPException(status_code=400, detail="You can only review a project after it's awarded.")
