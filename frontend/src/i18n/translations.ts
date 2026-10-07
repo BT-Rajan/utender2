@@ -985,6 +985,12 @@ export interface Dictionary {
       sealedBidsReceived: string;
       sealedExplanation: string;
       noOffersYet: string;
+      noOffersReceived: string;
+      offersLoadError: string;
+      offersTruncated: string;
+      withdrawnCount: string;
+      offerReceived: string;
+      statusCol: string;
       serviceProviderCol: string;
       ratingCol: string;
       bidCol: string;
@@ -2201,6 +2207,12 @@ export const en: Dictionary = {
       sealedExplanation:
         "This is a sealed tender — bidder identities and amounts stay hidden from you until bidding closes. Close bidding to reveal and evaluate them.",
       noOffersYet: "No offers yet. Service providers can bid until the deadline above.",
+      noOffersReceived: "No offers were received for this requirement.",
+      offersLoadError: "Could not load the offers. Refresh the page to try again.",
+      offersTruncated: "Showing the first {n} offers.",
+      withdrawnCount: "{n} withdrawn",
+      offerReceived: "Received",
+      statusCol: "Status",
       serviceProviderCol: "Service provider",
       ratingCol: "Rating",
       bidCol: "Bid",
@@ -3422,6 +3434,12 @@ export const ar: Dictionary = {
       sealedExplanation:
         "هذا عطاء مغلق (سري) — تبقى هويات مزوّدي الخدمات وقيم عروضهم مخفية عنك حتى يُغلق تقديم العروض. أغلق تقديم العروض لكشفها وتقييمها.",
       noOffersYet: "لا توجد عروض بعد. يمكن لمزوّدي الخدمات تقديم عروض حتى الموعد النهائي أعلاه.",
+      noOffersReceived: "لم تُستلم أي عروض لهذا المتطلب.",
+      offersLoadError: "تعذر تحميل العروض. حدّث الصفحة للمحاولة مجددًا.",
+      offersTruncated: "يُعرض أول {n} عرض.",
+      withdrawnCount: "{n} مسحوب",
+      offerReceived: "مستلم",
+      statusCol: "الحالة",
       serviceProviderCol: "مزوّد الخدمة",
       ratingCol: "التقييم",
       bidCol: "العرض",

@@ -393,4 +393,15 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - **Safe rollback:** a downgrade below 0039 is refused before anything changes while any draft holds a provider's work, unless `ALLOW_DRAFT_LOSS=1` is set.
   - **By design:** platform admins see all offers for oversight.
 
-_Stage 6 onwards is added as it is implemented._
+## Stage 6 — Offer evaluation & award
+
+- **6.1 Owner offer inbox:** `GET /owner/projects/{id}/offers`, shown on the owner's requirement page.
+  - The offers put forward on that requirement only: drafts and admin-suspended offers are left out. An offer id from another requirement, or a suspended offer, isn't found by its history either.
+  - Only the requirement's owner side (its organisation's members, or the individual owner) can open it. Anyone else gets "not found". Admins use their own offer oversight.
+  - Each offer shows its provider, its status as the server holds it (received, withdrawn, awarded, not selected), when it was submitted and its revision. A withdrawn offer is listed after the live ones, dimmed, and can't be awarded.
+  - Sealed and before the deadline (including one ended early): only that offers are in, as a count of live offers plus how many were withdrawn. No provider, price, response, documents or history.
+  - Stays readable after the requirement closes, ends, expires or is awarded. Reading it never changes the requirement.
+  - Bounded: 200 per page (up to 500), with an offset, in a fixed order (live first, then by price, submission time and id; by submission time while sealed).
+  - The page shows "couldn't load the offers" on an error, never "no offers", and "no offers were received" once offers have closed.
+
+_Later Stage 6 steps are added as they are implemented._

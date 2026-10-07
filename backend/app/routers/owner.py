@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
 
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from sqlalchemy import case
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -90,7 +91,14 @@ def dashboard(user: User = Depends(require_owner), db: Session = Depends(get_db)
 
 
 @router.get("/projects/{project_id}/offers", response_model=list[OfferOut])
-def list_offers(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+def list_offers(
+    project_id: str,
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+    # Stage 6.1: bounded, as "my bids" is -- each row signs its documents' links.
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
     project = _get_owned_project(project_id, user, db)
     sealed = is_sealed_and_open(project)
 
@@ -107,8 +115,14 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
     # tender (the owner could infer who's cheapest from list order alone
     # even with the amounts blanked out) — order by submission time instead
     # while sealed, by amount once the seal is lifted for real evaluation.
-    query = query.order_by(Offer.submitted_at.asc()) if sealed else query.order_by(Offer.amount.asc())
-    offers = query.all()
+    # Stage 6.1: live offers ahead of withdrawn ones, and the offer id last so
+    # ties keep one order across refreshes and pages.
+    query = (
+        query.order_by(Offer.submitted_at.asc(), Offer.id)
+        if sealed
+        else query.order_by(case((Offer.status == OfferStatus.withdrawn, 1), else_=0), Offer.amount.asc(), Offer.submitted_at.asc(), Offer.id)
+    )
+    offers = query.offset(offset).limit(limit).all()
 
     if sealed:
         # Bidder identity, amount, message, and rating are all withheld —
@@ -174,7 +188,9 @@ def offer_history(project_id: str, offer_id: str, user: User = Depends(require_o
         raise HTTPException(status_code=404, detail="Not available while this tender is sealed and still open.")
 
     offer = db.get(Offer, offer_id)
-    if not offer or offer.project_id != project_id or offer.status == OfferStatus.draft:
+    # Stage 6.1: an admin-suspended offer is withheld from the owner (see
+    # list_offers) -- its id doesn't open its history either.
+    if not offer or offer.project_id != project_id or offer.status == OfferStatus.draft or offer.is_suspended:
         raise HTTPException(status_code=404, detail="Offer not found.")
 
     return history_out(db, db.query(OfferRevision).filter(OfferRevision.offer_id == offer_id).order_by(OfferRevision.revision_number.asc()))

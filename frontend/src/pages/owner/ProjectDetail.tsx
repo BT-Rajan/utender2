@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError, API_URL, draftVersion } from "@/api/client";
 import type { Drawing, Offer, ProjectDetail } from "@/api/types";
-import { formatDeadline, formatSize, timeRemaining, stars } from "@/lib/format";
+import { formatDeadline, formatSize, fullDate, timeRemaining, stars } from "@/lib/format";
 import { RatingInput } from "@/components/RatingInput";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { RequirementItemsEditor, RequirementItemsView } from "@/components/RequirementItems";
@@ -35,6 +35,9 @@ interface Review {
   comment: string | null;
   created_at: string;
 }
+
+// Stage 6.1: the server's default page of the owner's offer list.
+const OFFERS_PAGE = 200;
 
 function EvaluationSummary({ offers, t }: { offers: Offer[]; t: (key: string) => string }) {
   const active = offers.filter((o) => o.status !== "withdrawn" && o.amount !== null);
@@ -290,7 +293,7 @@ function DraftDetailsForm({ project }: { project: ProjectDetail }) {
 }
 
 export function OwnerProjectDetailPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const [rating, setRating] = useState(0);
@@ -308,7 +311,7 @@ export function OwnerProjectDetailPage() {
     refetchInterval: (q) => (q.state.data && q.state.data.status !== "draft" ? 20 * 60 * 1000 : false),
   });
 
-  const { data: offers } = useQuery({
+  const { data: offers, isPending: offersLoading, isError: offersError } = useQuery({
     queryKey: ["owner-offers", id],
     queryFn: () => apiFetch<Offer[]>(`/owner/projects/${id}/offers`),
     enabled: !!id,
@@ -687,15 +690,27 @@ export function OwnerProjectDetailPage() {
         </div>
 
         <div>
-          {!offers?.length ? (
+          {/* Stage 6.1: a failed or pending load is never shown as "no offers". */}
+          {offersError && !offers ? (
+            <div role="alert" className="border border-dashed border-red rounded p-8 text-center text-sm text-red">
+              {t("owner.projectDetail.offersLoadError")}
+            </div>
+          ) : offersLoading ? null : !offers?.length ? (
             <div className="border border-dashed border-border rounded p-8 text-center text-sm text-steel">
-              {t("owner.projectDetail.noOffersYet")}
+              {project.status === "open" ? t("owner.projectDetail.noOffersYet") : t("owner.projectDetail.noOffersReceived")}
             </div>
           ) : offers[0]?.sealed ? (
             <div className="border border-dashed border-blue bg-blue-tint rounded p-8 text-center">
               <div className="text-xl mb-2">🔒</div>
               <p className="text-sm text-navy font-semibold mb-1">
-                {offers.length} {t("owner.projectDetail.sealedBidsReceived")}
+                {/* A withdrawn offer isn't one received for consideration. */}
+                {offers.filter((o) => o.status !== "withdrawn").length} {t("owner.projectDetail.sealedBidsReceived")}
+                {offers.some((o) => o.status === "withdrawn") && (
+                  <span className="font-normal text-steel">
+                    {" · "}
+                    {t("owner.projectDetail.withdrawnCount").replace("{n}", String(offers.filter((o) => o.status === "withdrawn").length))}
+                  </span>
+                )}
               </p>
               <p className="text-[12.5px] text-steel max-w-sm mx-auto">{t("owner.projectDetail.sealedExplanation")}</p>
             </div>
@@ -710,12 +725,13 @@ export function OwnerProjectDetailPage() {
                   <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("owner.projectDetail.ratingCol")}</th>
                   <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("owner.projectDetail.bidCol")}</th>
                   <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("owner.projectDetail.timelineCol")}</th>
+                  <th className="font-mono text-[10px] uppercase tracking-wide text-steel text-left border-b-2 border-navy py-2 px-2.5">{t("owner.projectDetail.statusCol")}</th>
                   <th className="border-b-2 border-navy py-2 px-2.5"></th>
                 </tr>
               </thead>
               <tbody>
                 {offers.map((o) => (
-                  <tr key={o.id} className="border-b border-border">
+                  <tr key={o.id} className={`border-b border-border ${o.status === "withdrawn" ? "opacity-60" : ""}`} data-testid="owner-offer-row">
                     <td className="py-3 px-2.5">
                       <div className="font-display font-semibold text-[13.5px]">
                         {o.service_provider_company_name ?? t("owner.projectDetail.serviceProviderCol")}
@@ -736,6 +752,11 @@ export function OwnerProjectDetailPage() {
                           </span>
                         )}
                       </div>
+                      {o.submitted_at && (
+                        <div className="font-mono text-[10px] text-steel mt-0.5">
+                          {t("owner.projectDetail.submittedOn")} {fullDate(o.submitted_at, language)}
+                        </div>
+                      )}
                       {o.message && <div className="text-xs text-steel-light mt-0.5 max-w-xs">{o.message}</div>}
                       <OfferResponseDetails offer={o} project={project} />
                     </td>
@@ -748,15 +769,18 @@ export function OwnerProjectDetailPage() {
                     </td>
                     <td className="py-3 px-2.5 font-mono text-xs">{o.timeline_estimate || "—"}</td>
                     <td className="py-3 px-2.5">
-                      {project.status === "awarded" || project.status === "no_award" ? (
-                        <span
-                          className={`font-mono text-[10px] uppercase px-2 py-1 rounded-full ${
-                            o.status === "approved" ? "bg-green-tint text-green" : "bg-border text-steel"
-                          }`}
-                        >
-                          {o.status}
-                        </span>
-                      ) : project.status === "closed" || project.status === "under_evaluation" ? (
+                      {/* Stage 6.1: the offer's own status, as the server holds it. */}
+                      <span
+                        className={`font-mono text-[10px] uppercase px-2 py-1 rounded-full whitespace-nowrap ${
+                          o.status === "approved" ? "bg-green-tint text-green" : o.status === "submitted" ? "bg-blue-tint text-blue" : "bg-border text-steel"
+                        }`}
+                        data-testid="owner-offer-status"
+                      >
+                        {o.status === "submitted" ? t("owner.projectDetail.offerReceived") : t(`feed.offer_${o.status}`)}
+                      </span>
+                    </td>
+                    <td className="py-3 px-2.5">
+                      {o.status !== "submitted" ? null : project.status === "closed" || project.status === "under_evaluation" ? (
                         <button
                           type="button"
                           onClick={() => approveMutation.mutate(o.id)}
@@ -765,15 +789,18 @@ export function OwnerProjectDetailPage() {
                         >
                           {t("owner.projectDetail.approve")}
                         </button>
-                      ) : (
+                      ) : project.status === "open" ? (
                         <span className="font-mono text-[10px] text-steel-light">{t("owner.projectDetail.closeToAwardHint")}</span>
-                      )}
+                      ) : null}
                     </td>
                   </tr>
                 ))}
               </tbody>
               </table>
               </div>
+              {offers.length >= OFFERS_PAGE && (
+                <p className="font-mono text-[10px] text-steel mt-2">{t("owner.projectDetail.offersTruncated").replace("{n}", String(offers.length))}</p>
+              )}
             </>
           )}
         </div>
