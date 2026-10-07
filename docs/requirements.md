@@ -267,4 +267,11 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - After an owner document change (material amendment): the provider sees the current document, the earlier version stays on record, the provider's earlier documents keep their version, and new ones wait until the change has been reviewed.
   - Suspended, closed, expired or cancelled requirements: documents are kept and still viewable, but can't be changed.
 
-_Further steps (5.7 onwards) are added as they are implemented._
+- **5.7 Assumptions, exclusions & clarifications:**
+  - The provider states what their offer depends on, what it excludes, qualifications, departures from the specification needing owner acceptance, and other commercial or technical clarifications. This uses the offer's existing "Assumptions, exclusions & clarifications" field (Stage 3.8): free text up to 10,000 characters, line breaks kept, optional unless the requirement says otherwise.
+  - It is saved on the same offer draft ("Save draft" saves every part together). The provider can leave, return and edit, and nothing is submitted. Price, technical response, timing and documents stay intact.
+  - Kept exactly as written; never interpreted or accepted by the platform. The owner receives it with the submitted offer (not while sealed), and earlier wording stays in the offer's revision history.
+  - Separate from requirement questions (Stage 4.7 Q&A): nothing entered here becomes a question or a message, and the form says where to ask about the requirement.
+  - Saving has the same checks as 5.3–5.6 (own side's draft only, up-to-date page, open requirement, amendment reviewed first). No requirement field can be changed through it.
+
+_Further steps (5.8 onwards) are added as they are implemented._

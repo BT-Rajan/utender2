@@ -410,6 +410,7 @@ export interface Dictionary {
     rateCol: string;
     saveDraft: string;
     approachGuide: string;
+    assumptionsGuide: string;
     draftSaved: string;
     saveDraftError: string;
     lineTotalCol: string;
@@ -1545,6 +1546,7 @@ export const en: Dictionary = {
     rateCol: "Rate ({currency})",
     saveDraft: "Save draft",
     approachGuide: "Explain how your offer meets the item specifications and the instructions to bidders shown above.",
+    assumptionsGuide: "State what your price or programme depends on (access, items the owner provides), what is excluded, and any departure from the specification that needs the owner’s acceptance. The owner receives these with your offer. To ask about the requirement itself, use Questions & answers.",
     draftSaved: "Draft saved — not submitted.",
     saveDraftError: "Couldn’t save your draft.",
     lineTotalCol: "Line total",
@@ -2705,6 +2707,7 @@ export const ar: Dictionary = {
     rateCol: "سعر الوحدة ({currency})",
     saveDraft: "حفظ المسودة",
     approachGuide: "اشرح كيف يلبّي عرضك مواصفات البنود والتعليمات الموجّهة لمقدمي العروض الموضّحة أعلاه.",
+    assumptionsGuide: "اذكر ما يعتمد عليه سعرك أو برنامجك (إتاحة الموقع، ما يوفّره المالك)، وما هو مستثنى، وأي اختلاف عن المواصفات يحتاج إلى قبول المالك. يتسلّم المالك ذلك مع عرضك. للاستفسار عن الطلب نفسه، استخدم الأسئلة والأجوبة.",
     draftSaved: "حُفظت المسودة — لم تُقدَّم.",
     saveDraftError: "تعذّر حفظ المسودة.",
     lineTotalCol: "إجمالي البند",

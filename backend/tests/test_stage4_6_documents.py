@@ -78,7 +78,9 @@ def test_no_link_or_endpoint_reaches_a_file_it_shouldnt(db):
     assert _get(sp, url.split("&name=")[0]).status_code == 403  # dropping the signed name
     q = parse_qs(urlparse(url).query)
     assert _get(sp, url.replace(f"exp={q['exp'][0]}", f"exp={int(q['exp'][0]) + 86400}")).status_code == 403
-    assert _get(sp, url.replace(q["sig"][0], q["sig"][0][:-1] + "0")).status_code == 403
+    sig = q["sig"][0]
+    forged = sig[:-1] + ("1" if sig[-1] == "0" else "0")  # always a different signature
+    assert _get(sp, url.replace(sig, forged)).status_code == 403
     assert _get(sp, other_url).status_code == 200  # (its own link works)
     # 3/6. A draft's documents: the owner side only.
     draft = _files(owner, status="draft")

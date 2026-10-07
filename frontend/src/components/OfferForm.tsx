@@ -46,6 +46,7 @@ export function OfferForm({
       setRates(Object.fromEntries((draft.item_prices ?? []).map((l) => [l.item_id, String(Number(l.rate))])));
       setMessage(draft.message ?? "");
       setTimeline(draft.timeline_estimate ?? "");
+      setAssumptions(draft.assumptions ?? "");
       setStartDate(draft.proposed_start_date ?? "");
       setCompletionDate(draft.proposed_completion_date ?? "");
       setDurationDays(draft.proposed_duration_days == null ? "" : String(draft.proposed_duration_days));
@@ -145,9 +146,14 @@ export function OfferForm({
         headers: { "If-Match": String(commercial.draft_version ?? 0) },
         body: { message: message || null },
       });
-      return apiFetch<Offer>(`/projects/${project.id}/offers/draft/timing`, {
+      const conditions = await apiFetch<Offer>(`/projects/${project.id}/offers/draft/assumptions`, {
         method: "PUT",
         headers: { "If-Match": String(technical.draft_version ?? 0) },
+        body: { assumptions: assumptions || null },
+      });
+      return apiFetch<Offer>(`/projects/${project.id}/offers/draft/timing`, {
+        method: "PUT",
+        headers: { "If-Match": String(conditions.draft_version ?? 0) },
         body: {
           proposed_start_date: startDate || null,
           proposed_completion_date: completionDate || null,
@@ -328,6 +334,8 @@ export function OfferForm({
                 placeholder={t("response.assumptionsPlaceholder")}
                 className="w-full border border-border rounded px-3 py-2.5 text-sm resize-y"
               />
+              {/* Stage 5.7: conditions on this offer -- not questions about the requirement (Q&A above). */}
+              <p className="text-xs text-steel mt-1" data-testid="assumptions-guide">{t("response.assumptionsGuide")}</p>
             </div>
             {rules.documents.length > 0 && (
               <fieldset>

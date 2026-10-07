@@ -9,7 +9,7 @@ from app.models.enums import NotificationType, OfferStatus, ProjectStatus, Tende
 from app.models.offer import Offer, OfferDocument, OfferRevision
 from app.models.project import Project
 from app.models.user import User
-from app.schemas.offer import OfferCommercialDraft, OfferCreate, OfferTechnicalDraft, OfferTimingDraft, OfferDocumentOut, OfferOut, OfferRevisionOut
+from app.schemas.offer import OfferAssumptionsDraft, OfferCommercialDraft, OfferCreate, OfferTechnicalDraft, OfferTimingDraft, OfferDocumentOut, OfferOut, OfferRevisionOut
 from app.services.audit import log_action
 from app.services.eligibility import assert_eligible
 from app.services.email import notify_owner_new_offer
@@ -113,6 +113,24 @@ def save_technical_draft(
     requirement makes it mandatory is checked when the offer is submitted."""
     _, offer = _draft_for_edit(db, user, project_id, if_match)
     offer.message = (payload.message or "").strip() or None
+    return _saved(db, user, offer)
+
+
+@router.put("/draft/assumptions", response_model=OfferOut)
+def save_assumptions_draft(
+    project_id: str,
+    payload: OfferAssumptionsDraft,
+    if_match: str | None = Header(None, alias="If-Match"),
+    user: User = Depends(require_marketplace_active_service_provider),
+    db: Session = Depends(get_db),
+):
+    """Stage 5.7: save the provider's assumptions, exclusions,
+    qualifications and offer clarifications on their offer draft, without
+    submitting it -- kept exactly as written (never interpreted or
+    accepted here) for the owner to weigh once the offer is submitted.
+    Only that text changes."""
+    _, offer = _draft_for_edit(db, user, project_id, if_match)
+    offer.assumptions = (payload.assumptions or "").strip() or None
     return _saved(db, user, offer)
 
 

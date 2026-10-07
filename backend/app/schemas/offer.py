@@ -45,6 +45,16 @@ class OfferTechnicalDraft(BaseModel):
     message: str | None = Field(default=None, max_length=10_000)
 
 
+class OfferAssumptionsDraft(BaseModel):
+    """Stage 5.7: the provider's assumptions, exclusions, qualifications and
+    offer-specific clarifications (offers.assumptions, Stage 3.8) -- the
+    conditions attached to their own offer, kept as written for the owner
+    to weigh. Not a question about the requirement (those are Stage 4.7
+    clarifications). May be empty while a draft."""
+
+    assumptions: str | None = Field(default=None, max_length=10_000)
+
+
 class OfferTimingDraft(BaseModel):
     """Stage 5.5: when the provider commits to start and finish, in the terms
     the requirement uses (Stage 3.7): a start date, and a completion date or a
