@@ -235,4 +235,11 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - Saves are refused when the page is out of date (another tab or team member saved since it was opened), and while the requirement is paused, suspended, closed, past its deadline or changed since the provider last reviewed it. Saves are also refused once the offer is submitted. A draft started before a material change also can't be submitted directly until the provider has reviewed the current requirement.
   - Pricing basis, items and quantities can't change after publication (Stage 3.4), so a saved price always refers to the current items.
 
-_Further steps (5.4 onwards) are added as they are implemented._
+- **5.4 Technical response:**
+  - The technical response is the requirement's own "Technical approach / method" (Stage 3.8): how the provider will do the work and how it meets the scope, item specifications, deliverables and instructions to bidders. It's free text up to 10,000 characters with line breaks kept, not a fixed template.
+  - It is saved on the same offer draft as the price ("Save draft" saves both). The provider can leave, return and edit; nothing is submitted, and a price save leaves the technical response untouched (and the reverse).
+  - The owner's required/optional setting (Stage 3.8) is enforced when the offer is submitted, not while drafting.
+  - Saving has the same checks as 5.3: the provider's own side's draft only, found on the server; refused from an out-of-date page; refused while the requirement is paused, suspended, closed, past its deadline or materially amended and not yet reviewed. No requirement field can be changed through it.
+  - The form points the provider to the item specifications and instructions to bidders when the requirement has them.
+
+_Further steps (5.5 onwards) are added as they are implemented._

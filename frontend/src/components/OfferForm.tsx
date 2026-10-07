@@ -34,11 +34,12 @@ export function OfferForm({
   const [accepted, setAccepted] = useState<string[]>([]);
   const [savedNotice, setSavedNotice] = useState(false);
 
-  // Stage 5.3: the price saved on the draft, when returning to it.
+  // Stage 5.3/5.4: the price and technical response saved on the draft, when returning to it.
   useEffect(() => {
     if (draft && !existingOffer) {
       setAmount(draft.amount === null ? "" : String(Number(draft.amount)));
       setRates(Object.fromEntries((draft.item_prices ?? []).map((l) => [l.item_id, String(Number(l.rate))])));
+      setMessage(draft.message ?? "");
     }
     // Only when a different draft (or a newer save of it) arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -109,12 +110,13 @@ export function OfferForm({
     },
   });
 
-  // Stage 5.3: save the price on the draft -- nothing is submitted. The
-  // server prices it on the requirement's basis and computes every total;
-  // If-Match makes a save from a stale tab fail instead of overwriting.
+  // Stage 5.3/5.4: save the price, then the technical response, on the
+  // draft -- nothing is submitted. The server prices it on the requirement's
+  // basis and computes every total; If-Match makes a save from a stale tab
+  // fail instead of overwriting (each save moves the draft's version on).
   const saveDraftMutation = useMutation({
-    mutationFn: () =>
-      apiFetch<Offer>(`/projects/${project.id}/offers/draft/commercial`, {
+    mutationFn: async () => {
+      const commercial = await apiFetch<Offer>(`/projects/${project.id}/offers/draft/commercial`, {
         method: "PUT",
         headers: draft ? { "If-Match": String(draft.draft_version ?? 0) } : undefined,
         body: {
@@ -123,7 +125,13 @@ export function OfferForm({
             ? project.items.filter((item) => clean(rates[item.id] ?? "")).map((item) => ({ item_id: item.id, rate: clean(rates[item.id] ?? "") }))
             : null,
         },
-      }),
+      });
+      return apiFetch<Offer>(`/projects/${project.id}/offers/draft/technical`, {
+        method: "PUT",
+        headers: { "If-Match": String(commercial.draft_version ?? 0) },
+        body: { message: message || null },
+      });
+    },
     onSuccess: (saved) => {
       setError(null);
       setSavedNotice(true);
@@ -248,7 +256,12 @@ export function OfferForm({
                 rows={4}
                 placeholder={t("service_provider.offer.messagePlaceholder")}
                 className="w-full border border-border rounded px-3 py-2.5 text-sm resize-y"
+                maxLength={10000}
               />
+              {/* Stage 5.4: answer this requirement's own specifications and instructions, shown above. */}
+              {(project.items.some((item) => item.specification) || project.tender_rules.bidder_instructions) && (
+                <p className="text-xs text-steel mt-1" data-testid="approach-guide">{t("response.approachGuide")}</p>
+              )}
             </div>
             <div>
               <label htmlFor="offer-assumptions" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("response.assumptions")}</label>

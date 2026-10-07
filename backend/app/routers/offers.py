@@ -9,7 +9,7 @@ from app.models.enums import NotificationType, OfferStatus, ProjectStatus, Tende
 from app.models.offer import Offer, OfferDocument, OfferRevision
 from app.models.project import Project
 from app.models.user import User
-from app.schemas.offer import OfferCommercialDraft, OfferCreate, OfferDocumentOut, OfferOut, OfferRevisionOut
+from app.schemas.offer import OfferCommercialDraft, OfferCreate, OfferTechnicalDraft, OfferDocumentOut, OfferOut, OfferRevisionOut
 from app.services.audit import log_action
 from app.services.eligibility import assert_eligible
 from app.services.email import notify_owner_new_offer
@@ -38,25 +38,16 @@ def _with_documents(db: Session, offer: Offer) -> OfferOut:
     return out
 
 
-# ---------- Stage 5.3: the commercial part of the draft ----------
+# ---------- Stage 5.3/5.4: saving the offer draft (price, technical response) ----------
 
 
-@router.put("/draft/commercial", response_model=OfferOut)
-def save_commercial_draft(
-    project_id: str,
-    payload: OfferCommercialDraft,
-    if_match: str | None = Header(None, alias="If-Match"),
-    user: User = Depends(require_marketplace_active_service_provider),
-    db: Session = Depends(get_db),
-):
-    """Save the price -- one total, or a rate per item -- on this provider's
-    offer draft (Stage 5.2), without submitting it. Judged under the
-    requirement's lock, like every offer change: only while bidding is open,
-    for an eligible provider, on their own side's draft (found by who is
-    asking, never an id from the request), against the requirement version
-    they have seen, and from a page showing the latest draft (If-Match:
-    draft_version). The requirement's pricing basis, items, quantities and
-    currency are read from the requirement, never from the request."""
+def _draft_for_edit(db: Session, user: User, project_id: str, if_match: str | None) -> tuple[Project, Offer]:
+    """Stage 5.3/5.4: the provider's own side's offer draft, locked for one
+    save. Judged under the requirement's lock, like every offer change: only
+    while bidding is open, for an eligible provider, on their side's draft
+    (found by who is asking, never an id from the request), against the
+    requirement version they have seen, and from a page showing the latest
+    draft (If-Match: draft_version)."""
     project = lock_project(db, project_id)
     if project and project.is_suspended:
         raise HTTPException(status_code=400, detail="This project has been suspended and is not accepting offers.")
@@ -75,12 +66,51 @@ def save_commercial_draft(
             status_code=409,
             detail="Your offer draft was changed somewhere else (another tab, device or team member) since you opened it. Reload to see the latest, then make your change again.",
         )
-    offer.amount, offer.item_prices = draft_pricing(project, payload.amount, payload.item_prices)
+    return project, offer
+
+
+def _saved(db: Session, user: User, offer: Offer) -> OfferOut:
     offer.draft_version += 1
     offer.updated_at, offer.updated_by = datetime.utcnow(), user.id
     db.commit()
     db.refresh(offer)
     return _with_documents(db, offer)
+
+
+@router.put("/draft/commercial", response_model=OfferOut)
+def save_commercial_draft(
+    project_id: str,
+    payload: OfferCommercialDraft,
+    if_match: str | None = Header(None, alias="If-Match"),
+    user: User = Depends(require_marketplace_active_service_provider),
+    db: Session = Depends(get_db),
+):
+    """Save the price -- one total, or a rate per item -- on this provider's
+    offer draft (Stage 5.2), without submitting it. The requirement's
+    pricing basis, items, quantities and currency are read from the
+    requirement, never from the request. Nothing else on the draft changes."""
+    project, offer = _draft_for_edit(db, user, project_id, if_match)
+    offer.amount, offer.item_prices = draft_pricing(project, payload.amount, payload.item_prices)
+    return _saved(db, user, offer)
+
+
+@router.put("/draft/technical", response_model=OfferOut)
+def save_technical_draft(
+    project_id: str,
+    payload: OfferTechnicalDraft,
+    if_match: str | None = Header(None, alias="If-Match"),
+    user: User = Depends(require_marketplace_active_service_provider),
+    db: Session = Depends(get_db),
+):
+    """Stage 5.4: save the technical response -- the requirement's "technical
+    approach / method" (Stage 3.8) -- on this provider's offer draft,
+    without submitting it. Only that text changes: the price, the
+    requirement and everything else stay as they are. Whether the
+    requirement makes it mandatory is checked when the offer is submitted."""
+    _, offer = _draft_for_edit(db, user, project_id, if_match)
+    offer.message = (payload.message or "").strip() or None
+    return _saved(db, user, offer)
+
 
 
 # ---------- Stage 3.8: documents a provider submits with their response ----------

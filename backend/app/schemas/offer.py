@@ -35,6 +35,16 @@ class OfferCommercialDraft(BaseModel):
     item_prices: list[OfferItemPrice] | None = Field(default=None, max_length=300)
 
 
+class OfferTechnicalDraft(BaseModel):
+    """Stage 5.4: the technical part of an offer draft -- how the provider
+    will do the work and how it meets the requirement's scope,
+    specifications and instructions (the requirement's "technical approach /
+    method", Stage 3.8) -- saved without submitting. May be empty while a
+    draft; whether it is required is checked on submission."""
+
+    message: str | None = Field(default=None, max_length=10_000)
+
+
 class OfferDocumentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

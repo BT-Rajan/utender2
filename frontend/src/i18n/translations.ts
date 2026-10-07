@@ -396,6 +396,7 @@ export interface Dictionary {
     pricePerItem: string;
     rateCol: string;
     saveDraft: string;
+    approachGuide: string;
     draftSaved: string;
     saveDraftError: string;
     lineTotalCol: string;
@@ -1517,6 +1518,7 @@ export const en: Dictionary = {
     pricePerItem: "A rate in {currency} for every item listed",
     rateCol: "Rate ({currency})",
     saveDraft: "Save draft",
+    approachGuide: "Explain how your offer meets the item specifications and the instructions to bidders shown above.",
     draftSaved: "Draft saved — not submitted.",
     saveDraftError: "Couldn’t save your draft.",
     lineTotalCol: "Line total",
@@ -2663,6 +2665,7 @@ export const ar: Dictionary = {
     pricePerItem: "سعر وحدة بعملة {currency} لكل بند مدرج",
     rateCol: "سعر الوحدة ({currency})",
     saveDraft: "حفظ المسودة",
+    approachGuide: "اشرح كيف يلبّي عرضك مواصفات البنود والتعليمات الموجّهة لمقدمي العروض الموضّحة أعلاه.",
     draftSaved: "حُفظت المسودة — لم تُقدَّم.",
     saveDraftError: "تعذّر حفظ المسودة.",
     lineTotalCol: "إجمالي البند",
