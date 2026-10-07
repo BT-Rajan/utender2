@@ -30,6 +30,9 @@ _AMOUNT_LIMIT = Decimal("10000000000")
 
 @router.get("/mine", response_model=OfferOut | None)
 def my_offer(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """This provider's side's one offer on the requirement, in whatever state --
+    including the draft Participate started (Stage 5.2). Found by who is
+    asking (their stakeholder), never by an id from the request."""
     offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
     return _with_documents(db, offer) if offer else None
 
@@ -189,8 +192,12 @@ def submit_offer(
         # upsert on the (project_id, service_provider_id) unique constraint — a
         # service provider revising their bid before the deadline updates the
         # same row rather than creating a duplicate, but the prior values
-        # are snapshotted first so nothing is silently lost.
-        _snapshot_revision(db, offer)
+        # are snapshotted first so nothing is silently lost. Stage 5.2: a
+        # draft (started by Participate) becomes the offer itself -- it was
+        # never put forward, so there is no earlier submission to keep.
+        if offer.status != OfferStatus.draft:
+            _snapshot_revision(db, offer)
+        offer.updated_by = user.id
         offer.amount = amount
         offer.timeline_estimate = payload.timeline_estimate
         offer.message = payload.message
@@ -213,6 +220,8 @@ def submit_offer(
             declarations_accepted=declarations,
             based_on_material_revision=project.material_revision,
             status=OfferStatus.submitted,
+            created_by=user.id,
+            updated_by=user.id,
         )
         db.add(offer)
     # The tender type is a material term of the tender — once at least one
@@ -266,7 +275,7 @@ def confirm_offer(project_id: str, user: User = Depends(require_marketplace_acti
     # Stage 3.17: the trail keeps that it was first made against the earlier version.
     _snapshot_revision(db, offer)
     offer.based_on_material_revision = project.material_revision
-    offer.updated_at = datetime.utcnow()
+    offer.updated_at, offer.updated_by = datetime.utcnow(), user.id
     db.commit()
     log_action(
         db, actor_id=user.id, action="offer.confirmed", target_type="offer", target_id=offer.id,
@@ -285,7 +294,7 @@ def withdraw_offer(project_id: str, user: User = Depends(require_approved_servic
     # already evaluating).
     project = lock_project(db, project_id)
     offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
-    if not project or not offer:
+    if not project or not offer or offer.status == OfferStatus.draft:  # Stage 5.2: nothing was put forward
         raise HTTPException(status_code=404, detail="No offer to withdraw.")
     if offer.status == OfferStatus.withdrawn:
         raise HTTPException(status_code=400, detail="This offer has already been withdrawn.")
@@ -295,7 +304,7 @@ def withdraw_offer(project_id: str, user: User = Depends(require_approved_servic
         )
     _snapshot_revision(db, offer)
     offer.status = OfferStatus.withdrawn
-    offer.updated_at = datetime.utcnow()
+    offer.updated_at, offer.updated_by = datetime.utcnow(), user.id
     db.commit()
     db.refresh(offer)
     return offer

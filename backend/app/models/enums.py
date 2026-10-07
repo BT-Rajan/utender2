@@ -60,6 +60,11 @@ class PricingBasis(str, enum.Enum):
 
 
 class OfferStatus(str, enum.Enum):
+    # Stage 5.2: the provider's offer while it is being prepared -- started by
+    # Participate, private to the provider's side, never seen by the owner,
+    # competitors or counts (see models.offer.tendered), and only ever made
+    # an offer by submitting it while bidding is open.
+    draft = "draft"
     submitted = "submitted"
     approved = "approved"
     rejected = "rejected"

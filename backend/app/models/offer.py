@@ -29,7 +29,9 @@ class Offer(Base):
     organization_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    amount: Mapped[Decimal] = mapped_column(Numeric(15, 3), nullable=False)  # KWD: 3 decimals (fils)
+    # KWD: 3 decimals (fils). NULL only while a draft (Stage 5.2): every
+    # submitted, approved, rejected or withdrawn offer carries its amount.
+    amount: Mapped[Decimal | None] = mapped_column(Numeric(15, 3), nullable=True)
     # Stage 3.15: the requirement's material_revision this offer was made or
     # last confirmed against. Lower than the requirement's = made before a
     # material change: the provider is asked to review and confirm or revise.
@@ -56,10 +58,21 @@ class Offer(Base):
     # OfferRevision snapshot of the pre-edit values and bumps this counter
     # (spec §29, D-009) — old values are never lost, just superseded.
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # Stage 5.2: the people who started it and last changed it (an
+    # organization's members share one offer).
+    created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
     service_provider_profile = relationship("ServiceProviderProfile")
+
+
+def tendered():
+    """SQL condition: offers actually put forward -- every state but an
+    unsubmitted draft (Stage 5.2). Owners, competitors, counts, admins and
+    lifecycle decisions only ever see these."""
+    return Offer.status != OfferStatus.draft
 
 
 # Immutable log of every prior state of an Offer, written just before the

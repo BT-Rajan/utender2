@@ -11,7 +11,7 @@ from app.deps import get_current_user, require_approved_service_provider, requir
 from app.models.award_record import AwardRecord
 from app.models.service_provider import ServiceProviderProfile
 from app.models.enums import NotificationType, OfferStatus, PricingBasis, ProjectStatus, TenderType, UserRole
-from app.models.offer import Offer
+from app.models.offer import Offer, tendered
 from app.models.owner import OwnerProfile
 from app.models.clarification import Clarification
 from app.models.participation import Participation as ParticipationRecord
@@ -78,7 +78,7 @@ def _can_view_project(user: User, project: Project, db: Session) -> bool:
     if not (profile and profile.is_verified_active):
         return False
     has_bid = (
-        db.query(Offer.id).filter(Offer.project_id == project.id, mine(db, user, Offer, Offer.service_provider_id)).first() is not None
+        db.query(Offer.id).filter(Offer.project_id == project.id, mine(db, user, Offer, Offer.service_provider_id), tendered()).first() is not None
     )
     # Once offers have closed (closed, under evaluation, awarded, no award,
     # canceled, expired -- including a draft that expired unpublished), only
@@ -414,7 +414,7 @@ def _record_amendment(
         summary += " Review your offer: confirm it still stands, or revise it."
     bidder_ids = (
         db.query(Offer.service_provider_id, Offer.organization_id)
-        .filter(Offer.project_id == project.id, Offer.status != OfferStatus.withdrawn)
+        .filter(Offer.project_id == project.id, Offer.status != OfferStatus.withdrawn, tendered())
         .distinct()
         .all()
     )
@@ -837,10 +837,17 @@ def _decision(db: Session, user: User, project: Project) -> ParticipationRecord 
     ).first()
 
 
+def _my_offer(db: Session, user: User, project: Project) -> Offer | None:
+    return db.query(Offer).filter(Offer.project_id == project.id, mine(db, user, Offer, Offer.service_provider_id)).first()
+
+
 def _with_decision(db: Session, user: User, project: Project, verdict) -> None:
     record = _decision(db, user, project)
     if record:
         verdict.started, verdict.started_at, verdict.seen_material_revision = True, record.started_at, record.seen_material_revision
+        offer = _my_offer(db, user, project)
+        if offer:  # Stage 5.2: the offer this provider is preparing or has made
+            verdict.offer_id, verdict.offer_status = offer.id, offer.status.value
 
 
 def record_decision(db: Session, user: User, project: Project) -> None:
@@ -855,6 +862,25 @@ def record_decision(db: Session, user: User, project: Project) -> None:
         ))
     else:
         record.seen_material_revision = project.material_revision
+
+
+def ensure_draft(db: Session, user: User, project: Project) -> None:
+    """Stage 5.2: the provider's one offer on this requirement, as a draft --
+    created on Participate if their side has none, otherwise left as it is
+    (a submitted or withdrawn offer is never turned back into a draft). A
+    draft is moved to the requirement's current version, which the provider
+    has just been shown. Called under the requirement's lock; the
+    (requirement, provider) and (requirement, organization) unique
+    constraints refuse a second one. The caller commits."""
+    offer = _my_offer(db, user, project)
+    if offer is None:
+        db.add(Offer(
+            project_id=project.id, service_provider_id=acting_id(db, user), organization_id=org_of(db, user.id),
+            amount=None, status=OfferStatus.draft, based_on_material_revision=project.material_revision,
+            created_by=user.id, updated_by=user.id,
+        ))
+    elif offer.status == OfferStatus.draft and offer.based_on_material_revision != project.material_revision:
+        offer.based_on_material_revision, offer.updated_by = project.material_revision, user.id
 
 
 _NOT_NOW = {
@@ -906,6 +932,7 @@ def participate(project_id: str, user: User = Depends(require_service_provider),
     if verdict.status == "not_eligible":
         raise HTTPException(status_code=403, detail="You aren't eligible to respond to this requirement. " + " ".join(r.message for r in reasons))
     record_decision(db, user, project)
+    ensure_draft(db, user, project)  # Stage 5.2
     try:
         db.commit()
     except IntegrityError:  # the same decision from another request at the same moment
@@ -1129,7 +1156,7 @@ def drawing_history(project_id: str, user: User = Depends(get_current_user), db:
 
 
 def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
-    offer_count = db.query(Offer).filter(Offer.project_id == project.id).count()
+    offer_count = db.query(Offer).filter(Offer.project_id == project.id, tendered()).count()
     storage = get_storage()
     expiry = drawing_url_expiry_seconds(project.bid_deadline)
     # Current revisions only — superseded ones are never lost, just not

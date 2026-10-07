@@ -161,21 +161,24 @@ def _announce(db: Session, project: Project) -> None:
 
 def interested_providers(db: Session, project: Project) -> list:
     """Providers who were told about this requirement (a new-opportunity
-    notification) or asked about it, but have no offer on it -- everyone who
-    may be preparing one. Bidders are told through their offer instead."""
+    notification), asked about it, or are preparing an offer draft on it
+    (Stage 5.2), but have no submitted offer -- everyone who may be preparing
+    one. Bidders are told through their offer instead."""
     from app.models.clarification import Clarification
     from app.models.enums import NotificationType, UserRole
     from app.models.notification import Notification
-    from app.models.offer import Offer
+    from app.models.offer import Offer, tendered
     from app.models.user import User
     from app.services.team import side_users
 
     link = f"/service-provider/projects/{project.id}/offer"
     bidders: set[str] = set()
-    for provider_id, organization_id in db.query(Offer.service_provider_id, Offer.organization_id).filter(Offer.project_id == project.id).distinct():
+    for provider_id, organization_id in db.query(Offer.service_provider_id, Offer.organization_id).filter(Offer.project_id == project.id, tendered()).distinct():
         bidders.update(u.id for u in side_users(db, organization_id, provider_id))
     told = {n.user_id for n in db.query(Notification.user_id).filter(Notification.type == NotificationType.new_requirement, Notification.link == link)}
     for provider_id, organization_id in db.query(Clarification.service_provider_id, Clarification.organization_id).filter(Clarification.project_id == project.id).distinct():
+        told.update(u.id for u in side_users(db, organization_id, provider_id))
+    for provider_id, organization_id in db.query(Offer.service_provider_id, Offer.organization_id).filter(Offer.project_id == project.id, Offer.status == OfferStatus.draft).distinct():
         told.update(u.id for u in side_users(db, organization_id, provider_id))
     ids = told - bidders
     if not ids:

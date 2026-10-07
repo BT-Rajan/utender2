@@ -10,7 +10,7 @@ from app.deps import get_current_user, require_owner
 from app.models.clarification import Clarification, ClarificationAttachment
 from app.models.service_provider import ServiceProviderProfile
 from app.models.enums import NotificationType, OfferStatus, UserRole
-from app.models.offer import Offer
+from app.models.offer import Offer, tendered
 from app.models.project_amendment import ProjectAmendment
 from app.models.project import Project
 from app.models.user import User
@@ -230,7 +230,7 @@ def _tell_the_field(db: Session, project: Project, clarification: Clarification)
     link = f"/service-provider/projects/{project.id}/offer"
     asker_side = {u.id for u in side_users(db, clarification.organization_id, clarification.service_provider_id)}
     people = {}
-    for provider_id, organization_id in db.query(Offer.service_provider_id, Offer.organization_id).filter(Offer.project_id == project.id, Offer.status != OfferStatus.withdrawn).distinct():
+    for provider_id, organization_id in db.query(Offer.service_provider_id, Offer.organization_id).filter(Offer.project_id == project.id, Offer.status != OfferStatus.withdrawn, tendered()).distinct():
         for u in side_users(db, organization_id, provider_id):
             people[u.id] = u
     for u in interested_providers(db, project):

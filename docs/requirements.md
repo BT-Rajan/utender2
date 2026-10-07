@@ -217,4 +217,12 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - Refusals say why: no longer accepting offers (and when the deadline passed, that), paused, temporarily unavailable, not eligible, verification or access needed.
   - The offer page states "You are preparing an offer for [requirement]".
 
-_Further steps (5.2 onwards) are added as they are implemented._
+- **5.2 Offer identity & draft:**
+  - Participate creates the provider's one offer as a **draft**, using the existing offers record and status model with a `draft` state added. The same row is completed on submission, so an offer keeps one ID from start to finish.
+  - The draft belongs to the requirement, the version it was started on, the provider stakeholder (the organisation for members), the user who started it and the user who last changed it. It is found by who is asking, never by an ID sent from the browser.
+  - Persistent: refresh, leaving, logging out and in, or returning later all find the same draft; leaving never submits it.
+  - Private: owners, competitors, admin lists and moderation, offer counts, "my bids" and lifecycle decisions (closed vs expired) never see a draft. It can't be withdrawn, confirmed, edited by an admin or awarded.
+  - One per stakeholder and requirement, enforced by the database for both provider and organisation, and decided under the requirement's lock. Organisation members share it.
+  - Lifecycle: extending keeps the same draft; after an amendment the draft moves to the current version only once the provider has seen it, and draft holders are notified as people preparing an offer; suspension preserves it; closed, expired or cancelled leave it a draft, never an offer.
+
+_Further steps (5.3 onwards) are added as they are implemented._

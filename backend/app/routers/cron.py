@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.models.enums import NotificationType, ProjectStatus
-from app.models.offer import Offer
+from app.models.offer import Offer, tendered
 from app.models.project import Project
 from app.models.user import User
 from app.services.email import notify_owner_deadline_approaching
@@ -42,7 +42,7 @@ def deadline_reminders(authorization: str | None = Header(default=None), db: Ses
 
     sent = 0
     for p in projects:
-        offer_count = db.query(Offer).filter(Offer.project_id == p.id).count()
+        offer_count = db.query(Offer).filter(Offer.project_id == p.id, tendered()).count()
         owner = db.get(User, p.owner_id)
         if owner:
             notify_owner_deadline_approaching(owner.email, p.title, p.id, offer_count)

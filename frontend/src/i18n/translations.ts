@@ -182,6 +182,8 @@ export interface Dictionary {
     changedShort: string;
     preparingFor: string;
     reviewFirst: string;
+    draftStatus: string;
+    draftStarted: string;
   };
   saved: {
     save: string;
@@ -1298,6 +1300,8 @@ export const en: Dictionary = {
     changedShort: "changed since you started",
     preparingFor: "You are preparing an offer for",
     reviewFirst: "Confirm you’ve reviewed the current requirement to continue preparing your offer.",
+    draftStatus: "Draft — not submitted. Nothing is sent to the owner until you submit it.",
+    draftStarted: "started",
   },
   saved: {
     save: "Save",
@@ -2439,6 +2443,8 @@ export const ar: Dictionary = {
     changedShort: "تغيّر منذ أن بدأت",
     preparingFor: "أنت تُعِدّ عرضًا للطلب",
     reviewFirst: "أكّد أنك راجعت الطلب الحالي لمتابعة إعداد عرضك.",
+    draftStatus: "مسودة — لم تُقدَّم. لا يُرسل شيء إلى المالك حتى تقدّمها.",
+    draftStarted: "بدأت في",
   },
   saved: {
     save: "حفظ",

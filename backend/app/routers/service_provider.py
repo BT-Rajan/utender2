@@ -12,7 +12,7 @@ from app.deps import get_service_provider_profile, get_current_user, require_app
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import DocumentRequirement
 from app.models.enums import DocumentStatus, OfferStatus, ProjectStatus, UserRole
-from app.models.offer import Offer
+from app.models.offer import Offer, tendered
 from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.saved_opportunity import SavedOpportunity
 from app.models.user import User
@@ -184,7 +184,7 @@ def feed(
         query = query.order_by(Project.bid_deadline.asc(), Project.id)
     narrowed = bool(trade or category_id or governorate or my_services or my_areas or min_days or accepting or words)
 
-    my_offers = {o.project_id: o.status.value for o in db.query(Offer).filter(mine(db, user, Offer, Offer.service_provider_id)).all()}
+    my_offers = {o.project_id: o.status.value for o in db.query(Offer).filter(mine(db, user, Offer, Offer.service_provider_id), tendered()).all()}
     # Stage 3.9 eligibility, in the query (services.eligibility.feed_condition):
     # what this provider may respond to, or already bid on.
     available = or_(feed_condition(db, profile), Project.id.in_(list(my_offers)))
@@ -210,7 +210,7 @@ def _cards(db: Session, page: list[Project], profile, my_offers: dict, full_acce
     """The opportunity summary (Stage 4.3) for a list of requirements -- the
     feed's and the saved list's one representation."""
     ids = [p.id for p in page]
-    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(Offer.project_id.in_(ids)).group_by(Offer.project_id).all()) if ids else {}
+    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(Offer.project_id.in_(ids), tendered()).group_by(Offer.project_id).all()) if ids else {}
     item_counts = dict(db.query(ProjectItem.project_id, func.count(ProjectItem.id)).filter(ProjectItem.project_id.in_(ids)).group_by(ProjectItem.project_id).all()) if ids else {}
     document_counts = dict(
         db.query(ProjectDrawing.project_id, func.count(ProjectDrawing.id))
@@ -298,7 +298,7 @@ def save_opportunity(project_id: str, user: User = Depends(require_approved_serv
     sync_expired_projects(db)
     project = db.get(Project, project_id)
     profile = acting_profile(db, user)
-    has_bid = project is not None and db.query(Offer.id).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first() is not None
+    has_bid = project is not None and db.query(Offer.id).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id), tendered()).first() is not None
     if (
         not project or project.status != ProjectStatus.open or project.is_suspended or project.bid_deadline <= datetime.utcnow()
         or not (has_bid or not ineligibility_reasons(db, project, profile))
@@ -341,7 +341,7 @@ def saved_opportunities(user: User = Depends(require_approved_service_provider),
         .all()
     )
     profile = acting_profile(db, user)
-    my_offers = {o.project_id: o.status.value for o in db.query(Offer).filter(mine(db, user, Offer, Offer.service_provider_id)).all()}
+    my_offers = {o.project_id: o.status.value for o in db.query(Offer).filter(mine(db, user, Offer, Offer.service_provider_id), tendered()).all()}
     full_access = bool(profile and profile.is_verified_active)
     state = {p.id: availability(p) for p in rows}
     rank = {"open": 0, "paused": 0, "ended": 1, "unavailable": 2}
@@ -405,7 +405,7 @@ def my_bids(user: User = Depends(require_service_provider), db: Session = Depend
     rows = (
         db.query(Offer, Project)
         .join(Project, Offer.project_id == Project.id)
-        .filter(mine(db, user, Offer, Offer.service_provider_id))
+        .filter(mine(db, user, Offer, Offer.service_provider_id), tendered())
         .order_by(Offer.updated_at.desc())
         .all()
     )

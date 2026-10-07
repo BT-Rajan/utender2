@@ -8,7 +8,7 @@ export type ProjectStatus =
   | "canceled"
   | "expired";
 export type TenderType = "sealed" | "owner_visible";
-export type OfferStatus = "submitted" | "approved" | "rejected" | "withdrawn";
+export type OfferStatus = "draft" | "submitted" | "approved" | "rejected" | "withdrawn";
 export type VerificationStatus = "incomplete" | "pending_review" | "changes_requested" | "approved" | "rejected";
 export type DocumentStatus = "not_submitted" | "pending" | "approved" | "rejected";
 export type SubscriptionStatus = "trialing" | "active" | "past_due" | "canceled";
@@ -147,6 +147,9 @@ export interface Participation {
   started?: boolean;
   started_at?: string | null;
   seen_material_revision?: number | null;
+  // Stage 5.2: the offer this provider's side is preparing (draft) or has made.
+  offer_id?: string | null;
+  offer_status?: OfferStatus | null;
 }
 
 export interface EligibilityCheck {

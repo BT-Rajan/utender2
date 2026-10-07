@@ -39,7 +39,7 @@ function AwardOutcome({ projectId }: { projectId: string }) {
 }
 
 export function ServiceProviderOfferPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -84,11 +84,15 @@ export function ServiceProviderOfferPage() {
     }
   }, [projectError, eligibility, eligibilityError, verdict, navigate, t]);
 
-  const { data: existingOffer } = useQuery({
+  const { data: myOffer } = useQuery({
     queryKey: ["my-offer", id],
     queryFn: () => apiFetch<Offer | null>(`/projects/${id}/offers/mine`),
     enabled: !!id,
   });
+  // Stage 5.2: the provider's one offer -- a draft until it is submitted. A
+  // draft has never been put forward, so the form treats it as a new offer.
+  const draft = myOffer?.status === "draft" ? myOffer : null;
+  const existingOffer = draft ? null : myOffer;
 
   if (unavailable && eligibility) {
     return (
@@ -183,6 +187,12 @@ export function ServiceProviderOfferPage() {
           {/* Stage 5.1: which requirement this offer is for. */}
           <p className="mb-4 text-sm text-navy" data-testid="preparing-for">
             {t("participate.preparingFor")} <strong dir="auto" className="font-display">{project.title}</strong>
+            {draft && (
+              <span className="block font-mono text-xs text-steel mt-1" data-testid="draft-status">
+                {t("participate.draftStatus")}
+                {project.participation?.started_at && ` · ${t("participate.draftStarted")} ${fullDate(project.participation.started_at, language)}`}
+              </span>
+            )}
           </p>
           {/* Stage 4.9 / 5.1: changed materially since they decided -- the offer
               is prepared against the current requirement only, once they've seen it. */}

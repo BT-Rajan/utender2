@@ -215,6 +215,9 @@ class Participation(BaseModel):
     started: bool = False
     started_at: UTCDateTime | None = None
     seen_material_revision: int | None = None
+    # Stage 5.2: the offer this provider's side is preparing (draft) or has made.
+    offer_id: str | None = None
+    offer_status: str | None = None
 
 
 class OpportunityListing(BaseModel):

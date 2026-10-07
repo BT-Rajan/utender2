@@ -14,8 +14,8 @@ from app.models.award_record import AwardRecord
 from app.models.cms_content import CmsContent
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import ServiceProviderDocument, DocumentRequirement, OwnerDocument
-from app.models.enums import DocumentStatus, Language, NotificationType, PricingBasis, ProjectStatus, StakeholderType, UserRole, VerificationStatus
-from app.models.offer import Offer, OfferRevision
+from app.models.enums import DocumentStatus, Language, NotificationType, OfferStatus, PricingBasis, ProjectStatus, StakeholderType, UserRole, VerificationStatus
+from app.models.offer import Offer, OfferRevision, tendered
 from app.models.owner import OwnerProfile
 from app.models.payment_override import PaymentOverride
 from app.models.project import Project, ProjectDrawing
@@ -995,6 +995,7 @@ def list_all_offers(db: Session = Depends(get_db)):
         db.query(Offer, Project, ServiceProviderProfile)
         .join(Project, Offer.project_id == Project.id)
         .outerjoin(ServiceProviderProfile, Offer.service_provider_id == ServiceProviderProfile.user_id)
+        .filter(tendered())
         .order_by(Offer.created_at.desc())
         .all()
     )
@@ -1070,7 +1071,7 @@ def _offer_admin_fields(o: Offer, p: Project | None, cp: ServiceProviderProfile 
 @router.get("/projects")
 def list_all_projects(db: Session = Depends(get_db)):
     rows = db.query(Project, User).join(User, Project.owner_id == User.id).order_by(Project.created_at.desc()).all()
-    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).group_by(Offer.project_id).all())
+    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(tendered()).group_by(Offer.project_id).all())
     return [{**_project_admin_fields(p, u), "offer_count": offer_counts.get(p.id, 0)} for p, u in rows]
 
 
@@ -1082,7 +1083,7 @@ def list_owner_projects(owner_id: str, db: Session = Depends(get_db)):
     _get_active_owner_profile(db, owner_id)  # 404s outright for a since-promoted admin account
     owner_user = db.get(User, owner_id)
     rows = db.query(Project).filter(Project.owner_id == owner_id).order_by(Project.created_at.desc()).all()
-    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).group_by(Offer.project_id).all())
+    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(tendered()).group_by(Offer.project_id).all())
     return [{**_project_admin_fields(p, owner_user), "offer_count": offer_counts.get(p.id, 0)} for p in rows]
 
 
@@ -1095,7 +1096,7 @@ def admin_project_detail(project_id: str, db: Session = Depends(get_db)):
     offer_rows = (
         db.query(Offer, ServiceProviderProfile)
         .outerjoin(ServiceProviderProfile, Offer.service_provider_id == ServiceProviderProfile.user_id)
-        .filter(Offer.project_id == project_id)
+        .filter(Offer.project_id == project_id, tendered())
         .order_by(Offer.created_at.desc())
         .all()
     )
@@ -1246,7 +1247,7 @@ def delete_project(project_id: str, admin: User = Depends(require_admin), db: Se
     if not project:
         raise HTTPException(status_code=404, detail="Project not found.")
 
-    offer_count = db.query(Offer).filter(Offer.project_id == project_id).count()
+    offer_count = db.query(Offer).filter(Offer.project_id == project_id, tendered()).count()
     if offer_count > 0:
         raise HTTPException(
             status_code=400,
@@ -1295,7 +1296,7 @@ def admin_edit_offer(
     offer_id: str, payload: AdminOfferEdit, admin: User = Depends(require_admin), db: Session = Depends(get_db)
 ):
     offer = db.get(Offer, offer_id)
-    if not offer:
+    if not offer or offer.status == OfferStatus.draft:  # Stage 5.2: a draft isn't an offer yet
         raise HTTPException(status_code=404, detail="Offer not found.")
 
     # Bid integrity: a bid on a sealed tender is untouchable until the tender
@@ -1365,7 +1366,7 @@ def admin_edit_offer(
         offer.timeline_estimate = payload.timeline_estimate or None
     if payload.message is not None:
         offer.message = payload.message or None
-    offer.updated_at = datetime.utcnow()
+    offer.updated_at, offer.updated_by = datetime.utcnow(), admin.id
     db.commit()
     db.refresh(offer)
 
@@ -1391,7 +1392,7 @@ def suspend_offer(
     offer_id: str, payload: OfferSuspendPatch, admin: User = Depends(require_admin), db: Session = Depends(get_db)
 ):
     offer = db.get(Offer, offer_id)
-    if not offer:
+    if not offer or offer.status == OfferStatus.draft:  # Stage 5.2: a draft isn't an offer yet
         raise HTTPException(status_code=404, detail="Offer not found.")
     previous = offer.is_suspended
     offer.is_suspended = payload.suspended

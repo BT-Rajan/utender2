@@ -11,7 +11,7 @@ from app.models.notification import Notification
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import DocumentRequirement
 from app.models.enums import DocumentStatus, NotificationType, OfferStatus, ProjectStatus, UserRole
-from app.models.offer import Offer, OfferRevision
+from app.models.offer import Offer, OfferRevision, tendered
 from app.models.owner import OwnerProfile
 from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.review import Review
@@ -84,7 +84,7 @@ def dashboard(user: User = Depends(require_owner), db: Session = Depends(get_db)
     )
     out = []
     for p in projects:
-        offer_count = db.query(Offer).filter(Offer.project_id == p.id).count()
+        offer_count = db.query(Offer).filter(Offer.project_id == p.id, tendered()).count()
         out.append(ProjectOut(**_project_fields(p), offer_count=offer_count))
     return out
 
@@ -101,7 +101,7 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
     query = (
         db.query(Offer, ServiceProviderProfile)
         .join(ServiceProviderProfile, Offer.service_provider_id == ServiceProviderProfile.user_id)
-        .filter(Offer.project_id == project_id, Offer.is_suspended.is_(False))
+        .filter(Offer.project_id == project_id, Offer.is_suspended.is_(False), tendered())
     )
     # Sorting by amount would itself leak relative ranking on a sealed
     # tender (the owner could infer who's cheapest from list order alone
@@ -167,7 +167,7 @@ def offer_history(project_id: str, offer_id: str, user: User = Depends(require_o
         raise HTTPException(status_code=404, detail="Not available while this tender is sealed and still open.")
 
     offer = db.get(Offer, offer_id)
-    if not offer or offer.project_id != project_id:
+    if not offer or offer.project_id != project_id or offer.status == OfferStatus.draft:
         raise HTTPException(status_code=404, detail="Offer not found.")
 
     return (
@@ -257,7 +257,7 @@ def approve_offer(project_id: str, offer_id: str, user: User = Depends(require_o
             notify_team(db, loser_user, NotificationType.award_lost, link=f"/service-provider/projects/{project_id}/offer", organization_id=o.organization_id, project_title=project.title)
 
     db.refresh(project)
-    offer_count = db.query(Offer).filter(Offer.project_id == project_id).count()
+    offer_count = db.query(Offer).filter(Offer.project_id == project_id, tendered()).count()
     return ProjectOut(**_project_fields(project), offer_count=offer_count)
 
 
@@ -266,7 +266,7 @@ def approve_offer(project_id: str, offer_id: str, user: User = Depends(require_o
 # one is open -> closed/expired, handled lazily by sync_expired_projects.
 
 def _project_response(project: Project, db: Session) -> ProjectOut:
-    offer_count = db.query(Offer).filter(Offer.project_id == project.id).count()
+    offer_count = db.query(Offer).filter(Offer.project_id == project.id, tendered()).count()
     return ProjectOut(**_project_fields(project), offer_count=offer_count)
 
 
@@ -366,7 +366,7 @@ def start_evaluation(project_id: str, user: User = Depends(require_owner), db: S
 def _notify_bidders(db: Session, project: Project, notification_type: NotificationType, **details) -> None:
     bidders = (
         db.query(Offer.service_provider_id, Offer.organization_id)
-        .filter(Offer.project_id == project.id, Offer.status != OfferStatus.withdrawn)
+        .filter(Offer.project_id == project.id, Offer.status != OfferStatus.withdrawn, tendered())
         .distinct()
         .all()
     )
