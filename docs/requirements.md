@@ -335,4 +335,13 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - competitors can't reach it.
   - Notifications: the owner gets "New offer" on the first submission only. Later revisions send "Offer revised" (an existing notification type that had no template yet). Nothing is sent for a failed submission.
 
-_Further steps (5.12 onwards) are added as they are implemented._
+- **5.12 Sealed offer / confidentiality integrity:**
+  - Audited every read route of the API. Once a provider has submitted, nothing of that offer reaches another provider, an unrelated owner or an unverified account: no price, item prices, technical approach, timing, assumptions, documents, or even the provider's identity. This holds whatever IDs are put in the path (their own, the offer's, the document's, the provider's, the organisation's, guessed version numbers), in every requirement state: open, suspended, extended, amended, closed at its deadline, cancelled, and ended outside U-Tender.
+  - The owner gets offers only through the owner workflow, for their own requirements. A sealed tender reveals content and identity only once its deadline has passed; ending it early never opens it.
+  - The provider always has their own offer. Offer documents are reachable only through short-lived signed links issued to someone authorised; a forged or re-pointed link is refused.
+  - Platform admins see all offers for oversight, by existing design.
+  - The award outcome is shown to the requirement's bidders after award, also by existing design.
+  - A permanent regression test sweeps every read route with every known ID as a competitor, an unrelated owner and an unverified account, so a future route can't leak an offer unnoticed. It checks itself against the routes that should show the data.
+  - The opportunity card's "offers so far" count (including for sealed tenders) is an existing design choice and was left as is.
+
+_Further steps (5.13 onwards) are added as they are implemented._
