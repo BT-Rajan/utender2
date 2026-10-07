@@ -8,6 +8,7 @@ import { localInputToUtcIso } from "@/lib/dates";
 import { KUWAIT_GOVERNORATES } from "@/lib/location";
 import { CategoryField } from "@/components/CategoryField";
 import { formatDeadline } from "@/lib/format";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 export function OwnerProjectNewPage() {
   const { t } = useI18n();
@@ -15,6 +16,7 @@ export function OwnerProjectNewPage() {
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const confirm = useConfirm();
   const creationToken = useRef(
     typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
   );
@@ -189,7 +191,12 @@ export function OwnerProjectNewPage() {
               onClick={() => {
                 const deadline = (formRef.current?.elements.namedItem("bid_deadline") as HTMLInputElement | null)?.value;
                 const text = t("draftDetails.publishNowConfirm").replace("{deadline}", deadline ? formatDeadline(new Date(deadline).toISOString()) : "—");
-                if (window.confirm(text)) submitProject("open");
+                const [title, ...body] = text.split("\n\n");
+                void confirm({ title, body: body.join("\n\n"), confirmLabel: t("owner.projectNew.postProject") }).then(
+                  (ok) => {
+                    if (ok) void submitProject("open");
+                  },
+                );
               }}
               className="bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 w-fit"
             >

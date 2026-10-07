@@ -115,3 +115,35 @@ def publish(db: Session, project: Project, actor_id: str) -> None:
     project.published_at = now.replace(microsecond=0)
     # log_action commits: the status, the timestamp and the audit entry land together.
     log_action(db, actor_id=actor_id, action="project.publish", target_type="project", target_id=project.id, previous_value="draft", new_value="open")
+    _announce(db, project)
+
+
+def _announce(db: Session, project: Project) -> None:
+    """After the publication is committed -- never before, so no one is told
+    about a requirement that didn't go live -- tell the providers it is for.
+    Best-effort: a failed notification never undoes a publication."""
+    import logging
+
+    from app.models.enums import NotificationType
+    from app.models.user import User
+    from app.services.eligibility import matching_providers
+    from app.services.notify import notify_team
+
+    try:
+        area = ", ".join(x for x in (project.area, (project.governorate or "").replace("_", " ").title()) if x) or project.address
+        deadline = project.bid_deadline.strftime("%d %b %Y %H:%M UTC")
+        for profile in matching_providers(db, project):
+            notify_team(
+                db,
+                db.get(User, profile.user_id),
+                NotificationType.new_requirement,
+                link=f"/service-provider/projects/{project.id}/offer",
+                organization_id=profile.organization_id,
+                project_title=project.title,
+                trade=project.trade or "",
+                area=area,
+                deadline=deadline,
+            )
+    except Exception:
+        db.rollback()
+        logging.getLogger("notify").exception("new-requirement notifications failed for %s", project.id)

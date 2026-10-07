@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { useAuth } from "@/auth/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatDeadline } from "@/lib/format";
@@ -29,6 +30,7 @@ export function OrganizationMembers() {
   const { t } = useI18n();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [email, setEmail] = useState("");
   const [position, setPosition] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +91,9 @@ export function OrganizationMembers() {
               <button
                 type="button"
                 onClick={() => {
-                  if (window.confirm(t("organization.removeConfirm"))) remove.mutate(m.user_id);
+                  void confirm({ title: t("organization.removeConfirm"), confirmLabel: t("organization.remove"), tone: "danger" }).then(
+                    (ok) => ok && remove.mutate(m.user_id),
+                  );
                 }}
                 className="text-xs text-red underline"
               >

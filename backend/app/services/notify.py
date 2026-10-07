@@ -32,6 +32,10 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.en: ("Your question was answered", "The owner of {project_title} answered your question."),
         Language.ar: ("تمت الإجابة على سؤالك", "أجاب مالك {project_title} على سؤالك."),
     },
+    NotificationType.new_requirement: {
+        Language.en: ("New opportunity: {project_title}", "A new {trade} requirement in {area} is open for offers until {deadline}. You meet its conditions."),
+        Language.ar: ("فرصة جديدة: {project_title}", "طلب جديد لأعمال {trade} في {area} مفتوح للعروض حتى {deadline}. أنت تستوفي شروطه."),
+    },
     NotificationType.tender_amendment: {
         Language.en: ("{project_title} was updated", "{summary}"),
         Language.ar: ("تم تحديث {project_title}", "{summary}"),

@@ -142,3 +142,4 @@ class NotificationType(str, enum.Enum):
     offer_reactivated = "offer_reactivated"
     verification_changes_requested = "verification_changes_requested"
     verification_rejected = "verification_rejected"
+    new_requirement = "new_requirement"

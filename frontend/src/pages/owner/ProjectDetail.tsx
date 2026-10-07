@@ -18,6 +18,7 @@ import { ProviderEligibilityEditor } from "@/components/ProviderEligibility";
 import { CategoryField } from "@/components/CategoryField";
 import { TenderRulesEditor } from "@/components/TenderRules";
 import { QualityCheck, type QualityReport } from "@/components/QualityCheck";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
 import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
 
@@ -363,6 +364,7 @@ export function OwnerProjectDetailPage() {
     onError: (err) => setError(errorMessage(err, t("owner.projectDetail.reviewError"))),
   });
 
+  const confirm = useConfirm();
   const lifecycleMutation = useMutation({
     mutationFn: (action: "publish" | "close" | "start-evaluation" | "no-award" | "cancel" | "discard") =>
       apiFetch(`/owner/projects/${id}/${action}`, { method: "POST" }),
@@ -457,7 +459,10 @@ export function OwnerProjectDetailPage() {
               onClick={() => {
                 // Stage 3.14: publishing is a deliberate step, never a stray click.
                 const text = t("draftDetails.publishConfirm").replace("{title}", project.title).replace("{deadline}", formatDeadline(project.bid_deadline));
-                if (window.confirm(text)) lifecycleMutation.mutate("publish");
+                const [title, ...body] = text.split("\n\n");
+                void confirm({ title, body: body.join("\n\n"), confirmLabel: t("owner.projectDetail.publish") }).then(
+                  (ok) => ok && lifecycleMutation.mutate("publish"),
+                );
               }}
               // The server refuses anyway; this just says so up front.
               disabled={lifecycleMutation.isPending || !quality?.ready}
@@ -501,7 +506,9 @@ export function OwnerProjectDetailPage() {
             <button
               type="button"
               onClick={() => {
-                if (window.confirm(t("draftDetails.discardConfirm"))) lifecycleMutation.mutate("discard");
+                void confirm({ title: t("draftDetails.discardConfirm"), confirmLabel: t("draftDetails.discard"), tone: "danger" }).then(
+                  (ok) => ok && lifecycleMutation.mutate("discard"),
+                );
               }}
               disabled={lifecycleMutation.isPending}
               className="text-xs text-red underline disabled:opacity-60"
@@ -565,7 +572,9 @@ export function OwnerProjectDetailPage() {
                         <button
                           type="button"
                           onClick={() => {
-                            if (window.confirm(t("documents.removeConfirm"))) documentMutation.mutate({ drawingId: d.id, change: "remove" });
+                            void confirm({ title: t("documents.removeConfirm"), confirmLabel: t("confirm.remove"), tone: "danger" }).then(
+                              (ok) => ok && documentMutation.mutate({ drawingId: d.id, change: "remove" }),
+                            );
                           }}
                           className="text-[11px] text-red-tint underline"
                         >

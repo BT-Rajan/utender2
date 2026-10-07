@@ -165,6 +165,10 @@ export interface Dictionary {
     audienceNone: string;
     audienceNote: string;
   };
+  confirm: {
+    cancel: string;
+    remove: string;
+  };
   eligibility: {
     heading: string;
     hint: string;
@@ -1097,6 +1101,10 @@ export const en: Dictionary = {
     excluded_governorate_not_served: "{count} don't serve this governorate",
     audienceNone: "No provider meets these rules right now. Consider relaxing them under Who can respond.",
     audienceNote: "Counts only; providers who qualify later will be able to respond too.",
+  },
+  confirm: {
+    cancel: "Cancel",
+    remove: "Remove",
   },
   eligibility: {
     heading: "Who can respond",
@@ -2055,6 +2063,10 @@ export const ar: Dictionary = {
     excluded_governorate_not_served: "{count} لا يخدمون هذه المحافظة",
     audienceNone: "لا يستوفي أي مقدم خدمة هذه الشروط حاليًا. فكر في تخفيفها في من يمكنه تقديم عرض.",
     audienceNote: "أعداد فقط؛ من يستوفي الشروط لاحقًا سيتمكن من تقديم عرض أيضًا.",
+  },
+  confirm: {
+    cancel: "إلغاء",
+    remove: "إزالة",
   },
   eligibility: {
     heading: "من يمكنه تقديم عرض",

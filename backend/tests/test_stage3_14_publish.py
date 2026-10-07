@@ -116,3 +116,48 @@ def test_publish_now_from_the_start_form_is_the_same_step(db):
     r = owner.post("/projects", data={**GOOD, "status": "open"}, files=[("drawings", ("plan.pdf", b"%PDF", "application/pdf"))])
     assert r.status_code == 201 and r.json()["status"] == "open" and r.json()["published_at"] and len(r.json()["drawings"]) == 1
     assert db.query(AuditLog).filter(AuditLog.action == "project.publish").count() == 1
+
+
+def test_publication_tells_the_providers_it_is_for(db):
+    from app.models.category import ServiceCategory
+    from app.models.notification import Notification
+
+    masonry, plumbing = ServiceCategory(name="Masonry", is_active=True), ServiceCategory(name="Plumbing", is_active=True)
+    db.add_all([masonry, plumbing])
+    db.commit()
+    owner = _verified(db, "owner", "owner@example.com")
+    match = _verified(db, "service_provider", "match@example.com")
+    match.put("/service-provider/services", json={"categories": [masonry.id], "governorates": ["ahmadi"]})
+    anywhere = _verified(db, "service_provider", "anywhere@example.com")
+    anywhere.put("/service-provider/services", json={"categories": [masonry.id]})  # no area limit
+    other_trade = _verified(db, "service_provider", "plumber@example.com")
+    other_trade.put("/service-provider/services", json={"categories": [plumbing.id]})
+    elsewhere = _verified(db, "service_provider", "jahra@example.com")
+    elsewhere.put("/service-provider/services", json={"categories": [masonry.id], "governorates": ["jahra"]})
+    undeclared = _verified(db, "service_provider", "quiet@example.com")  # declared no services
+    unpaid = _verified(db, "service_provider", "unpaid@example.com")
+    unpaid.put("/service-provider/services", json={"categories": [masonry.id]})
+    unpaid_id = unpaid.get("/auth/me").json()["id"]
+    db.get(ServiceProviderProfile, unpaid_id).payment_override_active = False
+    db.commit()
+
+    def told():
+        rows = db.query(Notification).filter(Notification.type == "new_requirement").all()
+        return {db.get(ServiceProviderProfile, n.user_id).company_name for n in rows}
+
+    # Refused publication: nobody is told anything.
+    thin = owner.post("/projects", data={"title": "Wall", "address": "x", "category_id": masonry.id, "bid_deadline": DEADLINE}).json()["id"]
+    assert owner.post(f"/owner/projects/{thin}/publish").status_code == 400 and told() == set()
+
+    pid = owner.post("/projects", data={**GOOD, "trade": None, "category_id": masonry.id}).json()["id"]
+    assert owner.post(f"/owner/projects/{pid}/publish").status_code == 200
+    assert told() == {"match", "anywhere"}
+    note = db.query(Notification).filter(Notification.type == "new_requirement").first()
+    assert note.link == f"/service-provider/projects/{pid}/offer" and "Boundary wall" in note.title and "Masonry" in note.body
+
+    # A requirement without a type of work from the platform's list tells nobody.
+    db.query(Notification).delete()
+    db.commit()
+    free = owner.post("/projects", data={**GOOD, "trade": "Some odd job"}).json()["id"]
+    owner.post(f"/owner/projects/{free}/publish")
+    assert told() == set()
