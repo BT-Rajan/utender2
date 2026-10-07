@@ -45,6 +45,7 @@ export interface Project {
   // Stage 3.16: why it ended without a U-Tender award (canceled / no_award only).
   closure_reason?: ClosureReason | null;
   closure_note?: string | null; // the owner side only
+  restarted_from_id?: string | null; // the owner side only
   material_revision?: number;
   documents_required?: boolean;
   offer_count: number;
@@ -361,8 +362,23 @@ export interface ProjectAmendment {
   reason: string | null;
   deadline_extended: boolean;
   material?: boolean;
+  // Stage 3.17: each field's before/after; documents: files added / replaced.
+  changes?: Record<string, { from: unknown; to: unknown } | { added: string[]; replaced: string[] }> | null;
+  material_revision?: number;
   created_by: string;
   created_at: string;
+}
+
+// Stage 3.17: the requirement as it stood at one material version.
+export interface RequirementVersion {
+  number: number;
+  current: boolean;
+  complete: boolean;
+  effective_from: string | null;
+  superseded_at: string | null;
+  amendment_number: number | null;
+  fields: Record<string, unknown>;
+  documents: Drawing[];
 }
 
 export interface PaymentOverrideRecord {

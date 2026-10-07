@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError, draftVersion } from "@/api/client";
-import type { Offer, ProjectAmendment, ProjectDetail } from "@/api/types";
+import type { Offer, ProjectAmendment, ProjectDetail, RequirementVersion } from "@/api/types";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
@@ -176,16 +176,114 @@ export function AmendmentsList({ projectId }: { projectId: string }) {
   return (
     <section className="mb-6 bg-white border border-border rounded px-4 py-3">
       <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-1.5">{t("postPub.changesHeading")}</h3>
-      <ul className="text-sm text-navy grid gap-1.5">
+      <ul className="text-sm text-navy grid gap-2.5" data-testid="amendments">
         {amendments.map((a) => (
           <li key={a.id}>
             <span className="font-mono text-xs text-steel">#{a.amendment_number} · {formatDeadline(a.created_at)}</span>{" "}
-            {a.material && <span className="font-mono text-[10px] uppercase text-amber-dark">{t("postPub.material")}</span>} {a.summary}
+            {a.material && (
+              <span className="font-mono text-[10px] uppercase text-amber-dark">
+                {t("postPub.material")} · {t("versions.version").replace("{n}", String(a.material_revision ?? ""))}
+              </span>
+            )}{" "}
+            {a.changes ? <ChangeList changes={a.changes} /> : a.summary}
             {a.reason && <span className="block text-xs text-steel">{a.reason}</span>}
+            {a.material && !!a.material_revision && (
+              <VersionView projectId={projectId} number={a.material_revision - 1} label={t("versions.before").replace("{n}", String(a.material_revision - 1))} />
+            )}
           </li>
         ))}
       </ul>
     </section>
+  );
+}
+
+// Stage 3.17: a recorded value, readably.
+function showValue(t: (key: string) => string, field: string, value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+  if (field === "bid_deadline") return formatDeadline(String(value));
+  if (field === "governorate") return t(`location.${value}`);
+  if (typeof value === "boolean") return value ? t("versions.yes") : t("versions.no");
+  return String(value);
+}
+
+const SHOWN_FIELDS = [
+  "title", "address", "governorate", "area", "trade", "description", "bid_deadline",
+  "expected_start_date", "expected_completion_date", "expected_duration_days", "documents_required",
+];
+
+function ChangeList({ changes }: { changes: NonNullable<ProjectAmendment["changes"]> }) {
+  const { t } = useI18n();
+  return (
+    <ul className="grid gap-1 mt-1 text-[13px]">
+      {Object.entries(changes).map(([field, change]) => {
+        if (field === "category_id") return null; // shown through the type of work
+        if ("added" in change) {
+          return (
+            <li key={field}>
+              {change.added.length > 0 && <span className="block">{t("versions.docsAdded")} {change.added.join(", ")}</span>}
+              {change.replaced.length > 0 && <span className="block">{t("versions.docsReplaced")} {change.replaced.join(", ")}</span>}
+            </li>
+          );
+        }
+        return (
+          <li key={field}>
+            <span className="text-steel">{t(`versions.field_${field}`)}:</span>{" "}
+            <del className="text-steel-light whitespace-pre-line">{showValue(t, field, change.from)}</del> →{" "}
+            <span className="whitespace-pre-line">{showValue(t, field, change.to)}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+// The requirement as it stood at one version, with the documents current then.
+export function VersionView({ projectId, number, label }: { projectId: string; number: number; label: string }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const { data: version } = useQuery({
+    queryKey: ["version", projectId, number],
+    queryFn: () => apiFetch<RequirementVersion>(`/projects/${projectId}/versions/${number}`),
+    enabled: open,
+  });
+  return (
+    <details className="mt-1 text-[13px]" onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)} data-testid={`version-${number}`}>
+      <summary className="cursor-pointer text-blue underline w-fit">{label}</summary>
+      {version && (
+        <div className="border border-border rounded px-3 py-2 mt-1 bg-paper grid gap-1">
+          <p className="font-mono text-[11px] text-steel">
+            {t("versions.version").replace("{n}", String(version.number))}
+            {version.effective_from && ` · ${t("versions.from").replace("{date}", formatDeadline(version.effective_from))}`}
+            {version.superseded_at && ` · ${t("versions.until").replace("{date}", formatDeadline(version.superseded_at))}`}
+            {version.current && ` · ${t("versions.current")}`}
+          </p>
+          {!version.complete && <p className="text-xs text-amber-dark">{t("versions.incomplete")}</p>}
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+            {SHOWN_FIELDS.map((f) => (
+              <div key={f} className="contents">
+                <dt className="text-steel">{t(`versions.field_${f}`)}</dt>
+                <dd className="whitespace-pre-line">{showValue(t, f, version.fields[f])}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="text-steel mt-1">{t("versions.documents")}</p>
+          <ul className="list-disc ps-5">
+            {version.documents.map((d) => (
+              <li key={d.id}>
+                {d.url ? (
+                  <a href={d.url} target="_blank" rel="noreferrer" className="text-blue underline">{d.file_name}</a>
+                ) : (
+                  d.file_name
+                )}
+                {d.revision > 1 && ` · v${d.revision}`}
+                {!d.is_current && <span className="text-steel-light"> · {t("versions.replacedSince")}</span>}
+              </li>
+            ))}
+            {version.documents.length === 0 && <li className="list-none text-steel-light">—</li>}
+          </ul>
+        </div>
+      )}
+    </details>
   );
 }
 
@@ -207,6 +305,11 @@ export function OutdatedOfferNotice({ project, offer }: { project: ProjectDetail
     <div className="border border-amber-dark/40 bg-amber/10 rounded px-4 py-3 mb-4 text-sm">
       <strong className="font-display text-navy block">{t("postPub.outdatedHeading")}</strong>
       <p className="text-steel">{t("postPub.outdatedBody")}</p>
+      <VersionView
+        projectId={project.id}
+        number={offer.based_on_material_revision ?? 0}
+        label={t("versions.yourOfferVersion").replace("{n}", String(offer.based_on_material_revision ?? 0))}
+      />
       <ErrorBanner message={error} />
       <button type="button" onClick={() => confirmOffer.mutate()} disabled={confirmOffer.isPending} className="mt-2 bg-navy hover:bg-navy-deep text-white text-xs font-semibold rounded px-4 py-2">
         {t("postPub.confirmOffer")}

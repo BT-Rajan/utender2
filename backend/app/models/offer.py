@@ -79,6 +79,8 @@ class OfferRevision(Base):
     item_prices: Mapped[list | None] = mapped_column(JSON, nullable=True)
     assumptions: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[OfferStatus] = mapped_column(Enum(OfferStatus, native_enum=True), nullable=False)
+    # Stage 3.17: the requirement version this earlier submission was made against.
+    based_on_material_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     recorded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 

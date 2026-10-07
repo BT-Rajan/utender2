@@ -147,3 +147,19 @@ def notify_provider_new_requirement(
             f'<p><a href="{link}">View the requirement and send your offer</a></p>'
         )
     _send(to_email, subject, html)
+
+
+def notify_provider_requirement_ended(to_email: str, language: str, project_title: str, project_id: str) -> None:
+    """Stage 3.16: a requirement the provider was told about (by the
+    new-opportunity email) ended before its deadline, in their language."""
+    from html import escape
+
+    title = escape(project_title)
+    link = f"{settings.app_url}/service-provider/projects/{project_id}/offer"
+    if language == "ar":
+        subject = f"انتهى الطلب على U-Tender: {project_title}"
+        html = f'<div dir="rtl"><p>أنهى المالك <strong>{title}</strong> قبل موعده النهائي، ولم يعد مفتوحًا لتلقي العروض.</p><p><a href="{link}">اطّلع على الطلب</a></p></div>'
+    else:
+        subject = f"Requirement ended on U-Tender: {project_title}"
+        html = f'<p>The owner ended <strong>{title}</strong> before its deadline. It is no longer open for offers.</p><p><a href="{link}">View the requirement</a></p>'
+    _send(to_email, subject, html)

@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import get_owner_profile, require_owner
 from app.models.award_record import AwardRecord
-from app.models.clarification import Clarification
 from app.models.notification import Notification
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import DocumentRequirement
@@ -23,10 +22,10 @@ from app.schemas.owner import OwnerProfileOut
 from app.schemas.project import EligibilityQualification, ProjectOut
 from app.schemas.review import ReviewCreate, ReviewOut
 from app.services.audit import log_action
-from app.services.email import notify_service_provider_offer_decision
+from app.services.email import notify_provider_requirement_ended, notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify, notify_team
-from app.services.team import acting_profile, mine, owns, side_users
+from app.services.team import acting_profile, mine, owns
 from app.services.eligibility import qualification_options
 from app.services.offer_response import documents_out
 from app.services.stakeholder import require_established
@@ -40,7 +39,7 @@ from app.services.verification import (
     profile_state_fields,
 )
 from app.services.storage import get_storage
-from app.services.tender_lifecycle import is_sealed_and_open, lock_project, publish, sync_expired_projects
+from app.services.tender_lifecycle import interested_providers, is_sealed_and_open, lock_project, publish, sync_expired_projects
 
 router = APIRouter(prefix="/owner", tags=["owner"])
 
@@ -389,20 +388,9 @@ def _notify_watchers(db: Session, project: Project) -> None:
     told about it (or asked about it) but hadn't offered hear it is over,
     rather than it just vanishing from their feed. Bidders are told separately."""
     link = f"/service-provider/projects/{project.id}/offer"
-    bidders = set()
-    for service_provider_id, organization_id in (
-        db.query(Offer.service_provider_id, Offer.organization_id).filter(Offer.project_id == project.id).distinct()
-    ):
-        bidders.update(u.id for u in side_users(db, organization_id, service_provider_id))
-    told = {n.user_id for n in db.query(Notification).filter(Notification.type == NotificationType.new_requirement, Notification.link == link)}
-    for service_provider_id, organization_id in (
-        db.query(Clarification.service_provider_id, Clarification.organization_id).filter(Clarification.project_id == project.id).distinct()
-    ):
-        told.update(u.id for u in side_users(db, organization_id, service_provider_id))
-    for user_id in told - bidders:
-        person = db.get(User, user_id)
-        if person and person.role == UserRole.service_provider:
-            notify(db, person, NotificationType.requirement_ended, link=link, project_title=project.title)
+    for person in interested_providers(db, project):
+        notify(db, person, NotificationType.requirement_ended, link=link, project_title=project.title)
+        notify_provider_requirement_ended(person.email, person.language.value, project_title=project.title, project_id=project.id)
     # A "new opportunity" still waiting to be read no longer is one.
     db.query(Notification).filter(
         Notification.type == NotificationType.new_requirement, Notification.link == link, Notification.is_read.is_(False)
@@ -526,6 +514,7 @@ def restart_project(project_id: str, payload: RestartRequest | None = None, user
         # The old dates have passed: a placeholder the owner sets before publishing.
         bid_deadline=(datetime.utcnow() + timedelta(days=7)).replace(second=0, microsecond=0),
         creation_token=token,
+        restarted_from_id=source.id,
     )
     db.add(copy)
     db.flush()
@@ -732,4 +721,5 @@ def _project_fields(p: Project) -> dict:
         material_revision=p.material_revision,
         closure_reason=p.closure_reason,
         closure_note=p.closure_note,  # owner side only (this router)
+        restarted_from_id=p.restarted_from_id,
     )

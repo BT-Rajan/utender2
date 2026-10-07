@@ -74,6 +74,7 @@ class ProjectOut(BaseModel):
     closure_reason: str | None = None
     # The owner's private note on ending it: filled in for the owner side only.
     closure_note: str | None = None
+    restarted_from_id: str | None = None  # owner side only: the ended requirement this was started again from
     version: int = 1  # send back as If-Match when saving a draft
     documents_required: bool = False
     offer_count: int = 0
@@ -255,3 +256,17 @@ class ProjectDetailOut(ProjectOut):
     response_requirements: ResponseRequirements = Field(default_factory=ResponseRequirements)
     tender_rules: TenderRulesOut = Field(default_factory=TenderRulesOut)
     currency: str = "KWD"
+
+
+class RequirementVersionOut(BaseModel):
+    """Stage 3.17: the requirement at one material version (see
+    routers.projects.get_version)."""
+
+    number: int
+    current: bool
+    complete: bool  # False: an older amendment didn't keep what it replaced
+    effective_from: UTCDateTime | None
+    superseded_at: UTCDateTime | None
+    amendment_number: int | None  # the amendment that started it; None = as published
+    fields: dict
+    documents: list[DrawingOut]

@@ -427,6 +427,14 @@ export function OwnerProjectDetailPage() {
           {t("draftDetails.published").replace("{date}", formatDeadline(project.published_at)).replace("{deadline}", formatDeadline(project.bid_deadline))}
         </p>
       )}
+      {project.restarted_from_id && (
+        <p className="text-[12.5px] text-steel mb-4" data-testid="restarted-from">
+          {t("closure.restartedFrom")}{" "}
+          <Link to={`/owner/projects/${project.restarted_from_id}`} className="text-blue underline">
+            {t("closure.restartedFromLink")}
+          </Link>
+        </p>
+      )}
       {project.discarded_at && (
         <div className="border border-border bg-border/30 rounded px-4 py-3 mb-6 text-sm text-steel max-w-2xl">
           {t("draftDetails.discarded").replace("{date}", formatDeadline(project.discarded_at))}
@@ -702,6 +710,12 @@ export function OwnerProjectDetailPage() {
                         {o.service_provider_company_name ?? t("owner.projectDetail.serviceProviderCol")}
                         {o.status === "submitted" && (o.based_on_material_revision ?? 0) < (project.material_revision ?? 0) && (
                           <span className="block font-mono text-[10px] uppercase text-amber-dark font-normal">{t("postPub.outdatedOwner")}</span>
+                        )}
+                        {/* Stage 3.17: which version of the requirement this offer priced. */}
+                        {(project.material_revision ?? 0) > 0 && (
+                          <span className="block font-mono text-[10px] text-steel font-normal" data-testid="offer-version">
+                            {t("versions.pricedOn").replace("{n}", String(o.based_on_material_revision ?? 0))}
+                          </span>
                         )}
                         {o.revision > 1 && (
                           <span className="text-steel-light font-normal">

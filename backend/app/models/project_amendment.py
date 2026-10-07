@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -28,5 +28,12 @@ class ProjectAmendment(Base):
     # Stage 3.15: changes what providers price (scope, location, work timing,
     # type of work, documents) -- as opposed to a title correction or more time.
     material: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="0")
+    # Stage 3.17: what each field was and became ({field: {"from": .., "to": ..}};
+    # documents: {"added": [..], "replaced": [..]}), so what providers saw before
+    # can be reconstructed. NULL on amendments recorded before 3.17.
+    changes: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # The requirement's material version once this amendment applied (a
+    # material amendment starts a new one; offers record the one they priced).
+    material_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     created_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

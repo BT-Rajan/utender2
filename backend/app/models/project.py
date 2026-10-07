@@ -119,6 +119,8 @@ class Project(Base):
     closure_reason: Mapped[str | None] = mapped_column(String(30), nullable=True)
     # The owner's private note on why it ended: shown to the owner side and admins, never to providers.
     closure_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The ended requirement this draft was started again from (Stage 3.16).
+    restarted_from_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True)
     # How many material amendments (changes to what providers price) have been
     # made since publication; an offer made against an earlier one is flagged.
     material_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
@@ -192,5 +194,9 @@ class ProjectDrawing(Base):
     # providers need it to price the work (True) or it's supplementary.
     category: Mapped[str] = mapped_column(String(20), nullable=False, default="drawing")
     is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Stage 3.17: the requirement's material version this file became current
+    # in (0 = as published). With the revision chain, it says which documents
+    # an offer made against a given version was priced on.
+    material_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     project = relationship("Project", back_populates="drawings")

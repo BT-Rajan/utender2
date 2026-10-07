@@ -181,6 +181,7 @@ def test_an_ended_requirement_can_be_started_again_as_a_new_draft(db):
     assert r.status_code == 201
     new = r.json()
     assert new["id"] != pid and new["status"] == "draft" and new["closure_reason"] is None and new["offer_count"] == 0
+    assert new["restarted_from_id"] == pid and owner.get(f"/projects/{new['id']}").json()["restarted_from_id"] == pid
     assert owner.post(f"/owner/projects/{pid}/restart", json={"creation_token": "again-1"}).json()["id"] == new["id"]  # a retry: same draft
     draft = owner.get(f"/projects/{new['id']}").json()
     assert (draft["title"], draft["description"]) == ("Majlis extension", "Extend the majlis by 4 m.")
@@ -193,8 +194,12 @@ def test_an_ended_requirement_can_be_started_again_as_a_new_draft(db):
     assert db.query(AuditLog).filter(AuditLog.action == "project.restart", AuditLog.previous_value == pid).count() == 1
 
 
-def test_providers_who_were_told_hear_it_ended(db):
+def test_providers_who_were_told_hear_it_ended(db, monkeypatch):
     from app.models.clarification import Clarification
+    from app.services import email as email_service
+
+    sent = []
+    monkeypatch.setattr(email_service, "_send", lambda to, subject, html: sent.append((to, subject)))
 
     owner = _verified(db, "owner", "owner@example.com")
     bidder = _verified(db, "service_provider", "alpha@example.com")
@@ -212,5 +217,6 @@ def test_providers_who_were_told_hear_it_ended(db):
     owner.post(f"/owner/projects/{pid}/close-externally")
     ended = {db.get(ServiceProviderProfile, n.user_id).company_name for n in db.query(Notification).filter(Notification.type == "requirement_ended")}
     assert ended == {"beta", "gamma"}  # the bidder gets its own notice instead
+    assert {to for to, subject in sent if subject.startswith("Requirement ended")} == {"beta@example.com", "gamma@example.com"}
     assert db.query(Notification).filter(Notification.type == "tender_no_award").count() == 1
     assert db.query(Notification).filter(Notification.type == "new_requirement", Notification.is_read.is_(False)).count() == 0

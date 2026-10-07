@@ -33,5 +33,7 @@ class ProjectAmendmentOut(BaseModel):
     reason: str | None
     deadline_extended: bool
     material: bool = False  # Stage 3.15: changed what providers price
+    changes: dict | None = None  # Stage 3.17: before/after per field
+    material_revision: int = 0  # the requirement version in force after it
     created_by: str
     created_at: UTCDateTime

@@ -80,4 +80,5 @@ class OfferRevisionOut(BaseModel):
     item_prices: list[dict] | None = None
     assumptions: str | None = None
     status: OfferStatus
+    based_on_material_revision: int = 0  # Stage 3.17: the requirement version it was made against
     recorded_at: datetime

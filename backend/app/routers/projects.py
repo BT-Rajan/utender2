@@ -20,6 +20,7 @@ from app.schemas.amendment import ProjectAmendmentOut, ProjectAmendmentRequest
 from app.schemas.award import AwardRecordOut
 from app.config import get_settings
 from app.schemas.project import (
+    RequirementVersionOut,
     DrawingOut,
     EligibilityCheckOut,
     ProjectCreate,
@@ -43,7 +44,7 @@ from app.services.notify import notify, notify_team
 from app.services.team import acting_id, acting_profile, mine, org_of, owns
 from app.services import requirement_quality
 from app.services.storage import drawing_url_expiry_seconds, get_storage
-from app.services.tender_lifecycle import lock_project, publish, sync_expired_projects
+from app.services.tender_lifecycle import interested_providers, lock_project, publish, sync_expired_projects
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -278,6 +279,7 @@ def get_project(project_id: str, user: User = Depends(get_current_user), db: Ses
     detail = _serialize_detail(project, db)
     if owns(db, user, project):
         detail.closure_note = project.closure_note  # Stage 3.16: the owner's private note, never a provider's to see
+        detail.restarted_from_id = project.restarted_from_id
     return detail
 
 
@@ -332,8 +334,29 @@ MATERIAL_FIELDS = {
 MATERIAL_NOTICE = timedelta(days=3)
 
 
+# Stage 3.17: the fields an amendment can change, whose before/after is kept
+# so the requirement as providers saw it at any version can be rebuilt.
+TRACKED_FIELDS = (
+    "title", "address", "governorate", "area", "description", "documents_required", "trade", "category_id",
+    "bid_deadline", "expected_start_date", "expected_completion_date", "expected_duration_days",
+)
+
+
+def _plain(value):
+    if isinstance(value, datetime):
+        return value.replace(microsecond=0).isoformat() + "Z"
+    if isinstance(value, date):
+        return value.isoformat()
+    return value
+
+
+def _field_changes(before: dict, project: Project) -> dict:
+    return {f: {"from": _plain(before[f]), "to": _plain(getattr(project, f))} for f in TRACKED_FIELDS if before[f] != getattr(project, f)}
+
+
 def _record_amendment(
-    db: Session, project: Project, user: User, changed: list[str], reason: str | None, deadline_extended: bool = False
+    db: Session, project: Project, user: User, changed: list[str], reason: str | None, deadline_extended: bool = False,
+    changes: dict | None = None, documents: list[ProjectDrawing] = (),
 ) -> None:
     material = bool(MATERIAL_FIELDS & set(changed))
     if material and project.bid_deadline - datetime.utcnow() < MATERIAL_NOTICE:
@@ -344,21 +367,26 @@ def _record_amendment(
         )
     amendment_number = db.query(ProjectAmendment).filter(ProjectAmendment.project_id == project.id).count() + 1
     summary = f"Updated {', '.join(changed)}."
-    db.add(
-        ProjectAmendment(
-            project_id=project.id,
-            amendment_number=amendment_number,
-            summary=summary,
-            changed_fields=", ".join(changed),
-            reason=reason,
-            deadline_extended=deadline_extended,
-            material=material,
-            created_by=user.id,
-        )
-    )
     project.revision += 1
     if material:
         project.material_revision += 1
+    amendment = ProjectAmendment(
+        project_id=project.id,
+        amendment_number=amendment_number,
+        summary=summary,
+        changed_fields=", ".join(changed),
+        reason=reason,
+        deadline_extended=deadline_extended,
+        material=material,
+        changes=changes or {},
+        material_revision=project.material_revision,
+        created_by=user.id,
+    )
+    db.add(amendment)
+    db.flush()
+    for document in documents:  # files this amendment brought in belong to its version
+        document.amendment_id = amendment.id
+        document.material_revision = project.material_revision
     db.commit()
     db.refresh(project)
 
@@ -385,6 +413,16 @@ def _record_amendment(
                 project_title=project.title,
                 summary=summary,
             )
+    # Stage 3.17: a change to what is priced also reaches the providers who
+    # were told about it or asked about it but haven't offered yet -- they may
+    # be preparing one against the earlier version.
+    if material:
+        for person in interested_providers(db, project):
+            notify(
+                db, person, NotificationType.tender_amendment, link=f"/service-provider/projects/{project.id}/offer",
+                project_title=project.title, summary=f"Updated {', '.join(changed)}. Check the current version before you prepare an offer.",
+            )
+        db.commit()
 
 
 @router.patch("/{project_id}", response_model=ProjectDetailOut)
@@ -408,6 +446,7 @@ def amend_project(
     if project.status not in (ProjectStatus.draft, ProjectStatus.open):
         raise HTTPException(status_code=400, detail="This project can no longer be amended.")
 
+    before = {f: getattr(project, f) for f in TRACKED_FIELDS}
     changed: list[str] = []
 
     if payload.title is not None:
@@ -506,7 +545,7 @@ def amend_project(
         db.refresh(project)
         return _serialize_detail(project, db)
 
-    _record_amendment(db, project, user, changed, (payload.reason or "").strip() or None, deadline_extended)
+    _record_amendment(db, project, user, changed, (payload.reason or "").strip() or None, deadline_extended, _field_changes(before, project))
     return _serialize_detail(project, db)
 
 
@@ -688,6 +727,60 @@ def list_amendments(project_id: str, user: User = Depends(get_current_user), db:
     )
 
 
+@router.get("/{project_id}/versions/{number}", response_model=RequirementVersionOut)
+def get_version(project_id: str, number: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Stage 3.17: the requirement as it stood at a material version -- 0 is
+    as published, N as after the Nth material amendment -- with the documents
+    current then. Rebuilt from today's record by undoing, newest first, the
+    recorded before/after of every amendment from the next version on; so an offer made against
+    version N can be read against exactly what it priced. Same visibility as
+    the requirement itself."""
+    project = db.get(Project, project_id)
+    if not project or not _can_view_project(user, project, db):
+        raise HTTPException(status_code=404, detail="Project not found.")
+    if project.published_at is None or not 0 <= number <= project.material_revision:
+        raise HTTPException(status_code=404, detail="No such version.")
+    amendments = db.query(ProjectAmendment).filter(ProjectAmendment.project_id == project_id).order_by(ProjectAmendment.amendment_number.desc()).all()
+    start = next((a for a in amendments if a.material and a.material_revision == number), None) if number else None
+    following = next((a for a in reversed(amendments) if a.material and a.material_revision == number + 1), None)
+    fields = {f: _plain(getattr(project, f)) for f in TRACKED_FIELDS}
+    complete = True
+    # Version N as it last stood (its non-material corrections included):
+    # undo everything from the amendment that started version N+1 on.
+    for a in amendments:
+        if following is None or a.amendment_number < following.amendment_number:
+            break
+        if a.changes is None:
+            complete = False  # recorded before 3.17: what it replaced wasn't kept
+            continue
+        for field, change in a.changes.items():
+            if field in fields:
+                fields[field] = change["from"]
+    # The documents then: of each file, its latest revision brought in by this version or before.
+    current: dict[str, ProjectDrawing] = {}
+    for d in db.query(ProjectDrawing).filter(ProjectDrawing.project_id == project_id).order_by(ProjectDrawing.revision.asc()):
+        if d.material_revision <= number:
+            current[d.file_name.lower()] = d
+    storage = get_storage()
+    expiry = drawing_url_expiry_seconds(project.bid_deadline)
+    return RequirementVersionOut(
+        number=number,
+        current=number == project.material_revision,
+        complete=complete,
+        effective_from=start.created_at if start else project.published_at,
+        superseded_at=following.created_at if following else None,
+        amendment_number=start.amendment_number if start else None,
+        fields=fields,
+        documents=[
+            DrawingOut(
+                id=d.id, file_name=d.file_name, uploaded_at=d.uploaded_at, revision=d.revision, is_current=d.is_current,
+                category=d.category, is_required=d.is_required, url=storage.signed_url("project-drawings", d.file_path, expiry),
+            )
+            for d in sorted(current.values(), key=lambda d: d.file_name.lower())
+        ],
+    )
+
+
 @router.get("/{project_id}/award", response_model=AwardRecordOut)
 def get_award(project_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     project = db.get(Project, project_id)
@@ -745,10 +838,22 @@ async def add_drawings(
             )
 
     real_files = [f for f in drawings if f.filename]
+    existing = {d.id for d in db.query(ProjectDrawing.id).filter(ProjectDrawing.project_id == project_id)}
     await upload_drawings_for_project(db, get_storage(), project_id, real_files, category, is_required)
     db.commit()
     if published:
-        _record_amendment(db, project, user, ["documents"], "Added: " + ", ".join(f.filename for f in real_files))
+        # Stage 3.17: a same-named file replaces the current one as a new
+        # revision; the old one stays, tied to the version it belonged to.
+        new = [d for d in db.query(ProjectDrawing).filter(ProjectDrawing.project_id == project_id) if d.id not in existing]
+        if new:
+            documents = {
+                "added": sorted(d.file_name for d in new if d.revision == 1),
+                "replaced": sorted(d.file_name for d in new if d.revision > 1),
+            }
+            _record_amendment(
+                db, project, user, ["documents"], None,  # the files are in `changes`
+                changes={"documents": documents}, documents=new,
+            )
     db.refresh(project)
     return _serialize_detail(project, db)
 

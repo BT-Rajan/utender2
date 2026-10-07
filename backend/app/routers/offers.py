@@ -142,6 +142,7 @@ def _snapshot_revision(db: Session, offer: Offer) -> None:
             item_prices=offer.item_prices,
             assumptions=offer.assumptions,
             status=offer.status,
+            based_on_material_revision=offer.based_on_material_revision,
         )
     )
     offer.revision += 1
@@ -257,6 +258,8 @@ def confirm_offer(project_id: str, user: User = Depends(require_marketplace_acti
     if offer.based_on_material_revision >= project.material_revision:
         raise HTTPException(status_code=400, detail="Your offer is already up to date with the requirement.")
     previous = offer.based_on_material_revision
+    # Stage 3.17: the trail keeps that it was first made against the earlier version.
+    _snapshot_revision(db, offer)
     offer.based_on_material_revision = project.material_revision
     offer.updated_at = datetime.utcnow()
     db.commit()

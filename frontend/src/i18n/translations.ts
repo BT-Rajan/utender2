@@ -169,6 +169,33 @@ export interface Dictionary {
     cancel: string;
     remove: string;
   };
+  versions: {
+    version: string;
+    before: string;
+    yourOfferVersion: string;
+    pricedOn: string;
+    from: string;
+    until: string;
+    current: string;
+    incomplete: string;
+    documents: string;
+    replacedSince: string;
+    docsAdded: string;
+    docsReplaced: string;
+    yes: string;
+    no: string;
+    field_title: string;
+    field_address: string;
+    field_governorate: string;
+    field_area: string;
+    field_trade: string;
+    field_description: string;
+    field_bid_deadline: string;
+    field_expected_start_date: string;
+    field_expected_completion_date: string;
+    field_expected_duration_days: string;
+    field_documents_required: string;
+  };
   closure: {
     open: string;
     heading: string;
@@ -207,6 +234,8 @@ export interface Dictionary {
     restart: string;
     restartConfirm: string;
     restartConfirmBody: string;
+    restartedFrom: string;
+    restartedFromLink: string;
   };
   postPub: {
     pause: string;
@@ -1175,6 +1204,33 @@ export const en: Dictionary = {
     cancel: "Cancel",
     remove: "Remove",
   },
+  versions: {
+    version: "Version {n}",
+    before: "See the requirement as it was before (version {n})",
+    yourOfferVersion: "See the requirement your offer was priced on (version {n})",
+    pricedOn: "Priced on version {n}",
+    from: "from {date}",
+    until: "until {date}",
+    current: "current",
+    incomplete: "Some earlier details weren’t kept for changes made before version history was recorded; they show as they are now.",
+    documents: "Documents in this version:",
+    replacedSince: "replaced since",
+    docsAdded: "Documents added:",
+    docsReplaced: "Documents replaced:",
+    yes: "Yes",
+    no: "No",
+    field_title: "Title",
+    field_address: "Location",
+    field_governorate: "Governorate",
+    field_area: "Area",
+    field_trade: "Type of work",
+    field_description: "Scope of work",
+    field_bid_deadline: "Offers close",
+    field_expected_start_date: "Expected start",
+    field_expected_completion_date: "Expected completion",
+    field_expected_duration_days: "Expected duration (days)",
+    field_documents_required: "Documents needed to price",
+  },
   closure: {
     open: "End this requirement…",
     heading: "End this requirement",
@@ -1213,6 +1269,8 @@ export const en: Dictionary = {
     restart: "Start a new draft from this",
     restartConfirm: "Start a new draft from this requirement?",
     restartConfirmBody: "A new draft is created with this requirement’s description, items, rules, eligibility and current documents. Set a new deadline, check it, then publish it as a new requirement. This one stays as it ended, with its offers.",
+    restartedFrom: "Started again from an ended requirement:",
+    restartedFromLink: "see the original",
   },
   postPub: {
     pause: "Pause this requirement",
@@ -2206,6 +2264,33 @@ export const ar: Dictionary = {
     cancel: "إلغاء",
     remove: "إزالة",
   },
+  versions: {
+    version: "النسخة {n}",
+    before: "اطّلع على الطلب كما كان قبل التغيير (النسخة {n})",
+    yourOfferVersion: "اطّلع على الطلب الذي سُعّر عرضك على أساسه (النسخة {n})",
+    pricedOn: "سُعّر على النسخة {n}",
+    from: "من {date}",
+    until: "حتى {date}",
+    current: "الحالية",
+    incomplete: "لم تُحفظ بعض التفاصيل السابقة للتغييرات التي جرت قبل بدء تسجيل النسخ؛ تظهر كما هي الآن.",
+    documents: "المستندات في هذه النسخة:",
+    replacedSince: "استُبدل لاحقًا",
+    docsAdded: "مستندات أُضيفت:",
+    docsReplaced: "مستندات استُبدلت:",
+    yes: "نعم",
+    no: "لا",
+    field_title: "العنوان",
+    field_address: "الموقع",
+    field_governorate: "المحافظة",
+    field_area: "المنطقة",
+    field_trade: "نوع العمل",
+    field_description: "نطاق العمل",
+    field_bid_deadline: "إغلاق العروض",
+    field_expected_start_date: "البدء المتوقع",
+    field_expected_completion_date: "الإنجاز المتوقع",
+    field_expected_duration_days: "المدة المتوقعة (أيام)",
+    field_documents_required: "المستندات لازمة للتسعير",
+  },
   closure: {
     open: "إنهاء هذا الطلب…",
     heading: "إنهاء هذا الطلب",
@@ -2244,6 +2329,8 @@ export const ar: Dictionary = {
     restart: "بدء مسودة جديدة من هذا الطلب",
     restartConfirm: "بدء مسودة جديدة من هذا الطلب؟",
     restartConfirmBody: "تُنشأ مسودة جديدة بوصف هذا الطلب وبنوده وقواعده وشروط الأهلية ومستنداته الحالية. حدّد موعداً نهائياً جديداً وراجعها ثم انشرها كطلب جديد. يبقى هذا الطلب كما انتهى، مع عروضه.",
+    restartedFrom: "بُدئ من جديد من طلب منتهٍ:",
+    restartedFromLink: "اطّلع على الطلب الأصلي",
   },
   postPub: {
     pause: "إيقاف الطلب مؤقتًا",
