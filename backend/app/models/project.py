@@ -128,6 +128,10 @@ class Project(Base):
     search_trade: Mapped[str | None] = mapped_column(String(150), nullable=True)
     search_place: Mapped[str | None] = mapped_column(String(300), nullable=True)
     search_scope: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Arabic roots (search_text.roots_of) of the listing text and of the scope, kept apart
+    # because the scope is searched only for providers who can read it.
+    search_roots: Mapped[str | None] = mapped_column(String(600), nullable=True)
+    search_scope_roots: Mapped[str | None] = mapped_column(Text, nullable=True)
     elig_org_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     elig_match_category: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     elig_match_governorate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
@@ -220,12 +224,14 @@ class ProjectDrawing(Base):
 
 def sync_derived(project: "Project") -> None:
     """Recompute the derived search and eligibility columns from the record."""
-    from app.services.search_text import GOVERNORATE_NAMES, normalize
+    from app.services.search_text import GOVERNORATE_NAMES, normalize, roots_of
 
     project.search_title = normalize(project.title)[:300]
     project.search_trade = normalize(project.trade)[:150] or None
     project.search_place = normalize(" ".join(x for x in (project.area, GOVERNORATE_NAMES.get(project.governorate or "")) if x))[:300] or None
     project.search_scope = normalize(project.description) or None
+    project.search_roots = (roots_of(" ".join(x for x in (project.title, project.trade, project.area) if x)) or "")[:600] or None
+    project.search_scope_roots = roots_of(project.description)
     rules = project.provider_eligibility or {}
     project.elig_org_only = rules.get("provider_type") == "organization"
     project.elig_match_category = bool(rules.get("match_category"))

@@ -181,3 +181,17 @@ def test_the_eligibility_rules_and_the_feed_condition_change_together():
         "The eligibility rules changed: update ineligibility_reasons(), feed_condition() and sync_derived() "
         "(plus a migration for any new elig_* column) together, then extend the parity test above and this list."
     )
+
+
+def test_arabic_roots_and_exact_matches_first(db):
+    owner = _verified(db, "owner", "owner@example.com")
+    sp = _verified(db, "service_provider", "sami@example.com")
+    _publish(owner, "تركيب مكيفات", description="ثلاثة مكيفات سبليت للمكتب.", days=4)
+    _publish(owner, "أعمال دهانات", description="دهان الواجهة.", days=5)
+    _publish(owner, "Office AC service", description="Service the AC units.", days=3)
+    # Words built on the same root meet: تكييف (air conditioning) finds مكيفات (air conditioners).
+    assert "تركيب مكيفات" in _titles(sp, search="تكييف")
+    assert _titles(sp, search="الدهان") == ["أعمال دهانات"]
+    # Exact words rank above synonyms: "مكيفات" puts the Arabic job before the English AC one.
+    assert _titles(sp, search="مكيفات", sort="relevance")[0] == "تركيب مكيفات"
+    assert _titles(sp, search="AC", sort="relevance")[0] == "Office AC service"

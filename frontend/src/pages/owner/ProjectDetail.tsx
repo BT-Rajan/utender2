@@ -303,6 +303,9 @@ export function OwnerProjectDetailPage() {
     queryKey: ["project", id],
     queryFn: () => apiFetch<ProjectDetail>(`/projects/${id}`),
     enabled: !!id,
+    // Stage 4.6: document links last an hour; refresh them -- but never under
+    // a draft being edited.
+    refetchInterval: (q) => (q.state.data && q.state.data.status !== "draft" ? 20 * 60 * 1000 : false),
   });
 
   const { data: offers } = useQuery({

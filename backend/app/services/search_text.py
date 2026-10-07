@@ -123,3 +123,46 @@ def expand(word: str, vocabulary: set[str] = frozenset()) -> list[str]:
             if _distance(word, candidate[: len(word)], cap) <= cap or _distance(word, candidate, cap) <= cap:
                 terms.add(candidate[: len(word)] if len(candidate) > len(word) else candidate)
     return sorted(terms)
+
+
+_AR = re.compile("^[؀-ۿ]+$")
+_ROOT_PREFIXES = ("وال", "بال", "كال", "فال", "لل", "ال")
+_ROOT_SUFFIXES = ("ات", "ون", "ين", "ان", "ها", "هم", "يه", "ه", "ي")
+_DERIVATION = ("م", "ت", "ا", "ي", "ن")
+_LONG_VOWELS = ("ا", "و", "ي")
+
+
+def arabic_root(word: str) -> str | None:
+    """A light root for one normalized Arabic word -- strip the article,
+    common endings, one derivational prefix and long-vowel infixes -- so
+    words built on the same root meet ("تكييف", "مكيفات", "مكيف" -> "كيف";
+    "دهان", "دهانات" -> "دهن"). Three or four letters, or None when the word
+    doesn't reduce to one. Deliberately approximate: used only as a further
+    way for a search to match, never to exclude."""
+    if not _AR.match(word or "") or len(word) < 3:
+        return None
+    for p in _ROOT_PREFIXES:
+        if word.startswith(p) and len(word) - len(p) >= 3:
+            word = word[len(p):]
+            break
+    for s in _ROOT_SUFFIXES:
+        if word.endswith(s) and len(word) - len(s) >= 3:
+            word = word[: -len(s)]
+            break
+    # م/ت (place, verbal noun) on four letters or more; ا/ي/ن only on longer
+    # words, where they are much more likely a prefix than part of the root.
+    if (len(word) >= 4 and word[0] in "مت") or (len(word) >= 5 and word[0] in _DERIVATION):
+        word = word[1:]
+    while len(word) > 3:
+        inner = next((i for i in range(1, len(word) - 1) if word[i] in _LONG_VOWELS), None)
+        if inner is None:
+            break
+        word = word[:inner] + word[inner + 1:]
+    return word if 3 <= len(word) <= 4 else None
+
+
+def roots_of(text: str | None) -> str | None:
+    """The distinct Arabic roots in a (normalized) text, space-delimited with
+    a space at each end so a root can be matched as a whole token."""
+    roots = sorted({r for w in normalize(text).split() if (r := arabic_root(w))})
+    return (" " + " ".join(roots) + " ") if roots else None

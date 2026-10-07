@@ -797,7 +797,7 @@ def get_version(project_id: str, number: int, user: User = Depends(get_current_u
         documents=[
             DrawingOut(
                 id=d.id, file_name=d.file_name, uploaded_at=d.uploaded_at, revision=d.revision, is_current=d.is_current,
-                category=d.category, is_required=d.is_required, size_bytes=d.size_bytes, url=storage.signed_url("project-drawings", d.file_path, expiry),
+                category=d.category, is_required=d.is_required, size_bytes=d.size_bytes, url=storage.signed_url("project-drawings", d.file_path, expiry, d.file_name),
             )
             for d in sorted(current.values(), key=lambda d: d.file_name.lower())
         ],
@@ -1012,7 +1012,7 @@ def drawing_history(project_id: str, user: User = Depends(get_current_user), db:
             category=d.category,
             is_required=d.is_required,
             size_bytes=d.size_bytes,
-            url=storage.signed_url("project-drawings", d.file_path, expiry),
+            url=storage.signed_url("project-drawings", d.file_path, expiry, d.file_name),
         )
         for d in rows
     ]
@@ -1039,7 +1039,7 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
             category=d.category,
             is_required=d.is_required,
             size_bytes=d.size_bytes,
-            url=storage.signed_url("project-drawings", d.file_path, expiry),
+            url=storage.signed_url("project-drawings", d.file_path, expiry, d.file_name),
         )
         for d in drawing_rows
     ]

@@ -49,6 +49,9 @@ export function ServiceProviderOfferPage() {
     queryKey: ["project", id],
     queryFn: () => apiFetch<ProjectDetail>(`/projects/${id}`),
     enabled: !!id,
+    // Stage 4.6: document links last an hour; keep them (and the state) fresh.
+    refetchInterval: 20 * 60 * 1000,
+    refetchOnWindowFocus: true,
   });
 
   // The backend 404s this endpoint identically whether the project doesn't

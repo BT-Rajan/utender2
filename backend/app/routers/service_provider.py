@@ -19,7 +19,7 @@ from app.schemas.project import FeedPage, ProjectOut
 from app.schemas.category import ProviderServices
 from app.services.categories import clean_services
 from app.services.eligibility import feed_condition, ineligibility_reasons, rules_out
-from app.services.search_text import expand, normalize, search_words
+from app.services.search_text import arabic_root, expand, normalize, search_words
 from app.models.category import ServiceCategory
 from app.services.team import acting_profile, mine, team_ids
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
@@ -140,8 +140,10 @@ def feed(
         # providers who can read it. Never the exact address: a search must
         # not let a listing-level viewer probe for a specific property.
         weighted = [(Project.search_title, 3), (Project.search_trade, 2), (Project.search_place, 1)]
+        roots = [Project.search_roots]
         if full_access:
             weighted.append((Project.search_scope, 1))
+            roots.append(Project.search_scope_roots)
         # Each word also matches its synonyms and, for a likely typo, the
         # nearest words open opportunities actually use (search_text.expand).
         vocabulary: set[str] = set()
@@ -150,10 +152,17 @@ def feed(
                 vocabulary.update(w for text in row if text for w in text.split() if len(w) >= 4)
         score = []
         for word in words:
+            # The word as typed counts double; its synonyms, typo corrections
+            # and (Arabic) root count once -- so they widen the search but
+            # rank below exact matches.
             terms = expand(word, vocabulary)
+            exact = [_contains(col, word) for col, _ in weighted]
             found = [or_(*(_contains(col, t) for t in terms)) for col, _ in weighted]
-            query = query.filter(or_(*found))
-            score += [case((hit, weight), else_=0) for hit, (_, weight) in zip(found, weighted)]
+            root = arabic_root(word)
+            by_root = [col.like(f"% {_like(root)} %", escape="/") for col in roots] if root else []
+            query = query.filter(or_(*found, *by_root))
+            score += [case((hit, 2 * weight), (any_, weight), else_=0) for hit, any_, (_, weight) in zip(exact, found, weighted)]
+            score += [case((hit, 1), else_=0) for hit in by_root]
         relevance = sum(score[1:], score[0])
 
     # "Newest" means newest on the marketplace: by publication (Stage 3.14),
