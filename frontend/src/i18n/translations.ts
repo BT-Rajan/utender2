@@ -291,6 +291,13 @@ export interface Dictionary {
     conflict_starts_later: string;
     conflict_finishes_later: string;
     conflict_takes_longer: string;
+    conflict_before_close: string;
+    ownerHeading: string;
+    requirementExpects: string;
+    ownerConflict_starts_later: string;
+    ownerConflict_finishes_later: string;
+    ownerConflict_takes_longer: string;
+    ownerConflict_before_close: string;
   };
   saved: {
     save: string;
@@ -1533,6 +1540,13 @@ export const en: Dictionary = {
     conflict_starts_later: "You propose to start after the owner’s expected start date.",
     conflict_finishes_later: "You propose to finish after the owner’s expected completion.",
     conflict_takes_longer: "You propose more days than the owner’s expected duration.",
+    conflict_before_close: "Your dates now fall before offers close (the deadline was moved). Revise your offer.",
+    ownerHeading: "Start and completion commitment",
+    requirementExpects: "The requirement expects (as it is now):",
+    ownerConflict_starts_later: "Starts after the start date you expect.",
+    ownerConflict_finishes_later: "Finishes after the completion you expect.",
+    ownerConflict_takes_longer: "Takes more days than the duration you expect.",
+    ownerConflict_before_close: "Its dates fall before offers now close: the deadline was moved after this offer was made.",
   },
   saved: {
     save: "Save",
@@ -2800,6 +2814,13 @@ export const ar: Dictionary = {
     conflict_starts_later: "تقترح البدء بعد تاريخ البدء الذي يتوقعه المالك.",
     conflict_finishes_later: "تقترح الإنجاز بعد موعد الإنجاز الذي يتوقعه المالك.",
     conflict_takes_longer: "تقترح مدة أطول من المدة التي يتوقعها المالك.",
+    conflict_before_close: "تواريخك تقع الآن قبل إغلاق العروض (تم تغيير الموعد النهائي). عدّل عرضك.",
+    ownerHeading: "التزام البدء والإنجاز",
+    requirementExpects: "يتوقع المتطلب (كما هو الآن):",
+    ownerConflict_starts_later: "يبدأ بعد تاريخ البدء الذي تتوقعه.",
+    ownerConflict_finishes_later: "ينتهي بعد موعد الإنجاز الذي تتوقعه.",
+    ownerConflict_takes_longer: "يستغرق أيامًا أكثر من المدة التي تتوقعها.",
+    ownerConflict_before_close: "تواريخه تقع قبل إغلاق العروض الآن: تم تغيير الموعد النهائي بعد تقديم هذا العرض.",
   },
   saved: {
     save: "حفظ",

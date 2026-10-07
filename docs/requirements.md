@@ -489,4 +489,16 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - a link to the requirement exactly as the offer answered it (scope, dates, documents then), always, not only after an amendment.
   - **No judgement:** nothing assesses, scores or passes/fails a technical response; the owner judges suitability.
 
+- **6.9 Delivery & commitment evaluation:**
+  - **Already working:** the provider's start, completion date or duration, and completion period are stored and shown exactly as submitted, on the offer page and in the comparison.
+    - They are checked when saved: completion or duration, not both; 1–3,650 days; completion not before start; nothing before offers close.
+    - Differences from what the owner expects (later start, later finish, longer duration) are flagged, never changed.
+    - Nothing is forced where the requirement sets no timing.
+    - Amendments, revisions (history keeps the original dates), withdrawals and competitors behave as in 6.2–6.5. Dates are calendar days shown with the existing date formatting.
+  - **Fixed:**
+    - The requirement's own expected timing is shown beside each commitment, on the offer page and the comparison's timing row.
+    - The owner's pages now speak about the offer ("Starts after the start date you expect"), not to the provider ("You propose…").
+    - New `before_close` flag. A deadline extension isn't a material change, so it can leave a still-current offer with dates before offers now close (a state the submission rules forbid). This is now flagged to the owner and the provider (who is asked to revise), never rewritten.
+  - **Facts only:** no scheduling, feasibility judgement or scoring.
+
 _Later Stage 6 steps are added as they are implemented._

@@ -270,7 +270,7 @@ export interface Offer {
   proposed_start_date?: string | null;
   proposed_completion_date?: string | null;
   proposed_duration_days?: number | null;
-  timing_conflicts?: ("starts_later" | "finishes_later" | "takes_longer")[];
+  timing_conflicts?: ("starts_later" | "finishes_later" | "takes_longer" | "before_close")[];
   created_at: string;
   updated_at: string;
   service_provider_company_name?: string | null;

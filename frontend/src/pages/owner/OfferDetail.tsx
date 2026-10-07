@@ -71,6 +71,7 @@ export function OwnerOfferDetailPage() {
         offer={offer}
         providerName={data.provider_name}
         onCurrentVersion={data.on_current_version}
+        viewer="owner"
         versionNote={
           <>
             <p className="text-xs text-steel mt-1" data-testid="owner-offer-answered">

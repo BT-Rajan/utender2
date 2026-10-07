@@ -6,6 +6,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { formatArea } from "@/lib/location";
 import { fullDate } from "@/lib/format";
 import { money } from "@/lib/money";
+import { formatWorkTiming } from "@/lib/dates";
 
 // Stage 5.8/5.9: which part of the form each quality-gate section is about.
 export const SECTION_ANCHORS: Record<OfferReadiness["issues"][number]["section"], string | null> = {
@@ -92,12 +93,15 @@ export function OfferRecord({
   providerName,
   onCurrentVersion,
   versionNote,
+  viewer = "provider",
 }: {
   requirement: OfferPreviewData["requirement"];
   offer: OfferPreviewData["offer"];
   providerName: string | null;
   onCurrentVersion: boolean;
   versionNote?: ReactNode;
+  // Stage 6.9: whose page this is -- the owner reads about "this offer", not "you".
+  viewer?: "owner" | "provider";
 }) {
   const { t, language } = useI18n();
   const items = new Map(req.items.map((i) => [i.id, i]));
@@ -195,7 +199,7 @@ export function OfferRecord({
       </section>
 
       <section className="border border-border rounded px-4 py-3" data-testid="preview-timing">
-        <div className={heading}>{t("timing.heading")}</div>
+        <div className={heading}>{viewer === "owner" ? t("timing.ownerHeading") : t("timing.heading")}</div>
         <div className="text-sm">
           {t("timing.start")}: {offer.proposed_start_date ? fullDate(offer.proposed_start_date, language, false) : none}
           {" · "}
@@ -209,8 +213,14 @@ export function OfferRecord({
             {req.completion_period && <span className="text-steel"> ({t(`response.${req.completion_period}`)})</span>}: {offer.timeline_estimate || none}
           </p>
         )}
+        {/* Stage 6.9: beside the commitment, what the requirement expects (Stage 3.7). */}
+        {formatWorkTiming(t, req) && (
+          <p className="text-xs text-steel mt-1" data-testid="preview-timing-expected">
+            {viewer === "owner" ? t("timing.requirementExpects") : t("timing.ownerExpects")} {formatWorkTiming(t, req)}
+          </p>
+        )}
         {offer.timing_conflicts?.map((code) => (
-          <p key={code} className="text-xs text-amber-dark">⚠ {t(`timing.conflict_${code}`)}</p>
+          <p key={code} className="text-xs text-amber-dark">⚠ {t(viewer === "owner" ? `timing.ownerConflict_${code}` : `timing.conflict_${code}`)}</p>
         ))}
       </section>
 

@@ -113,7 +113,11 @@ def timing_conflicts(project: Project, offer) -> list[str]:
       starts_later    proposed start after the expected start
       finishes_later  finishing after the expected completion (a completion
                       date, or start + duration on either side)
-      takes_longer    more days than the expected duration"""
+      takes_longer    more days than the expected duration
+      before_close    (Stage 6.9) starting or finishing before offers now
+                      close -- possible only when the deadline was moved
+                      after the commitment was made (an extension isn't a
+                      material change, so the offer stays current)"""
     def finish(start, completion, duration):
         return completion or (start + timedelta(days=duration) if start and duration else None)
 
@@ -129,6 +133,9 @@ def timing_conflicts(project: Project, offer) -> list[str]:
         conflicts.append("finishes_later")
     if theirs[2] and (s := span(*mine)) is not None and s > theirs[2]:
         conflicts.append("takes_longer")
+    closes = project.bid_deadline.date()
+    if (mine[0] and mine[0] < closes) or (mine[1] and mine[1] < closes):
+        conflicts.append("before_close")
     return conflicts
 
 

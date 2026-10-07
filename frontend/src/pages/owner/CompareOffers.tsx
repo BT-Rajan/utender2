@@ -7,6 +7,7 @@ import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
 import { fullDate } from "@/lib/format";
 import { money } from "@/lib/money";
+import { formatWorkTiming } from "@/lib/dates";
 
 // Stage 6.6: the owner's chosen offers on one requirement, side by side --
 // each exactly as its provider submitted it (nothing recalculated,
@@ -55,7 +56,7 @@ export function OwnerCompareOffersPage() {
           : `${t("timing.completion")}: ${o.proposed_completion_date ? fullDate(o.proposed_completion_date, language, false) : "—"}`}
       </div>
       {o.timeline_estimate && <div dir="auto">{t("response.completionPeriod")}: {o.timeline_estimate}</div>}
-      {o.timing_conflicts?.map((code) => <div key={code} className="text-amber-dark">⚠ {t(`timing.conflict_${code}`)}</div>)}
+      {o.timing_conflicts?.map((code) => <div key={code} className="text-amber-dark">⚠ {t(`timing.ownerConflict_${code}`)}</div>)}
     </>
   );
   // A row: its label, each offer's cell, and the plain value used only to see whether they differ.
@@ -84,7 +85,8 @@ export function OwnerCompareOffersPage() {
           value: (o: Offer) => JSON.stringify(o.item_prices?.find((l) => l.item_id === item.id) ?? null),
         }))
       : []),
-    { key: "timing", label: t(`${c}.timing`), cell: timing, value: (o) => [o.proposed_start_date, o.proposed_completion_date, o.proposed_duration_days, o.timeline_estimate].join("|") },
+    // Stage 6.9: what the requirement expects, beside every commitment.
+    { key: "timing", label: [t(`${c}.timing`), formatWorkTiming(t, req) && `${t("timing.requirementExpects")} ${formatWorkTiming(t, req)}`].filter(Boolean).join(" — "), cell: timing, value: (o) => [o.proposed_start_date, o.proposed_completion_date, o.proposed_duration_days, o.timeline_estimate].join("|") },
     { key: "approach", label: t(`${c}.approach`), cell: (o) => text(o.message), value: (o) => o.message ?? "" },
     { key: "assumptions", label: t(`${c}.assumptions`), cell: (o) => text(o.assumptions), value: (o) => o.assumptions ?? "" },
     ...req.requested_documents.map((d) => ({
