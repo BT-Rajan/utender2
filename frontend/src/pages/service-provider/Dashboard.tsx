@@ -32,6 +32,7 @@ interface MyBid {
   amount: string;
   offer_status: OfferStatus;
   revision: number;
+  submitted_at?: string | null; // Stage 5.16
   updated_at: string;
 }
 
@@ -218,13 +219,20 @@ export function ServiceProviderDashboardPage() {
                       <p className="text-[12px] text-steel mb-2">{b.project_address}</p>
                     </div>
                     <span className={`font-mono text-[10px] uppercase px-2 py-0.5 rounded-full whitespace-nowrap ${offerStatusBadge(b.offer_status)}`}>
-                      {b.offer_status}
+                      {b.offer_status === "submitted" ? t("service_provider.feed.bidPlaced") : t(`feed.offer_${b.offer_status}`)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between font-mono text-xs">
                     <span className="text-navy font-semibold">{money(b.amount)}</span>
                     <span className="text-steel-light">{b.project_suspended ? t("closure.labelSuspended") : outcomeLabel(t, b.project_status, b.closure_reason)}</span>
                   </div>
+                  {/* Stage 5.16: when -- first submitted, and the last change (a revision or the withdrawal). */}
+                  <p className="font-mono text-[10.5px] text-steel-light mt-1.5 mb-3" data-testid="bid-timing">
+                    {b.submitted_at && `${t("submitOffer.submittedAt")} ${fullDate(b.submitted_at, language)}`}
+                    {b.offer_status === "withdrawn"
+                      ? ` · ${t("submitOffer.withdrawnAt")} ${fullDate(b.updated_at, language)}`
+                      : b.revision > 1 && ` · ${t("submitOffer.revision")} ${b.revision} · ${fullDate(b.updated_at, language)}`}
+                  </p>
                 </Link>
               ))}
             </div>

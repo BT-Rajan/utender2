@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/api/client";
-import type { OfferPreview as OfferPreviewData, OfferReadiness } from "@/api/types";
+import type { OfferPreview as OfferPreviewData, OfferReadiness, OfferRevisionEntry } from "@/api/types";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatArea } from "@/lib/location";
 import { fullDate } from "@/lib/format";
@@ -23,7 +23,17 @@ export const SECTION_ANCHORS: Record<OfferReadiness["issues"][number]["section"]
 // send -- read fresh from the server each time it opens (no preview copy),
 // beside the requirement as it is now and the quality gate's verdict.
 // Nothing here submits, seals or locks the offer.
-export function OfferPreview({ projectId, onEdit }: { projectId: string; onEdit: (section?: string | null) => void }) {
+export function OfferPreview({
+  projectId,
+  onEdit,
+  readOnly = false,
+}: {
+  projectId: string;
+  onEdit?: (section?: string | null) => void;
+  // Stage 5.16: the provider's own offer once nothing can change it (offers
+  // closed): the same stored record, without the submit checks or editing.
+  readOnly?: boolean;
+}) {
   const { t, language } = useI18n();
   const { data, isError } = useQuery({
     queryKey: ["offer-preview", projectId],
@@ -43,15 +53,17 @@ export function OfferPreview({ projectId, onEdit }: { projectId: string; onEdit:
   return (
     <div className="grid gap-4" data-testid="offer-preview">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h2 className="font-display text-lg text-navy">{t("offerPreview.heading")}</h2>
-        <button type="button" onClick={() => onEdit()} className="border border-navy text-navy text-sm font-semibold rounded px-4 py-2">
-          {t("offerPreview.backToEdit")}
-        </button>
+        <h2 className="font-display text-lg text-navy">{readOnly ? t("offerHistory.yourOffer") : t("offerPreview.heading")}</h2>
+        {!readOnly && onEdit && (
+          <button type="button" onClick={() => onEdit()} className="border border-navy text-navy text-sm font-semibold rounded px-4 py-2">
+            {t("offerPreview.backToEdit")}
+          </button>
+        )}
       </div>
-      <p className="text-xs text-steel">{t("offerPreview.notSubmitted")}</p>
+      <p className="text-xs text-steel">{readOnly ? t("offerHistory.readOnlyNote") : t("offerPreview.notSubmitted")}</p>
 
       {/* The quality gate (Stage 5.8): never implies ready when it isn't. */}
-      <div className={`rounded px-4 py-3 text-sm border ${readiness.ready ? "border-green bg-green/5" : "border-amber-dark/40 bg-amber/10"}`} data-testid="preview-readiness">
+      {!readOnly && <div className={`rounded px-4 py-3 text-sm border ${readiness.ready ? "border-green bg-green/5" : "border-amber-dark/40 bg-amber/10"}`} data-testid="preview-readiness">
         <strong className="font-display text-navy">{readiness.ready ? t("offerPreview.passed") : t("readiness.notReady")}</strong>
         {!readiness.ready && (
           <ul className="mt-2 grid gap-1">
@@ -59,7 +71,7 @@ export function OfferPreview({ projectId, onEdit }: { projectId: string; onEdit:
               <li key={i} className="text-steel">
                 <span className="font-mono text-[10px] uppercase text-navy me-2">{t(`readiness.section_${issue.section}`)}</span>
                 {issue.message}
-                {SECTION_ANCHORS[issue.section] && (
+                {SECTION_ANCHORS[issue.section] && onEdit && (
                   <button type="button" onClick={() => onEdit(SECTION_ANCHORS[issue.section])} className="ms-2 text-xs text-blue underline">
                     {t("offerPreview.fix")}
                   </button>
@@ -68,7 +80,7 @@ export function OfferPreview({ projectId, onEdit }: { projectId: string; onEdit:
             ))}
           </ul>
         )}
-      </div>
+      </div>}
 
       <section className="border border-border rounded px-4 py-3" data-testid="preview-requirement">
         <div className={heading}>{t("offerPreview.requirement")}</div>
@@ -185,5 +197,40 @@ export function OfferPreview({ projectId, onEdit }: { projectId: string; onEdit:
         </section>
       )}
     </div>
+  );
+}
+
+// Stage 5.16: the provider's earlier versions of this offer, as submitted
+// (Stage 5.13 history) -- what changed, when, and the requirement version
+// each answered. Their own offer only; nothing of anyone else's.
+export function OfferHistory({ projectId, currency }: { projectId: string; currency: string }) {
+  const { t, language } = useI18n();
+  const { data: history } = useQuery({
+    queryKey: ["my-offer-history", projectId],
+    queryFn: () => apiFetch<OfferRevisionEntry[]>(`/projects/${projectId}/offers/mine/history`),
+  });
+  if (!history?.length) return null;
+  return (
+    <details className="border border-border rounded px-4 py-3 mt-4 text-sm" data-testid="offer-history">
+      <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-wide text-navy">
+        {t("offerHistory.earlier")} ({history.length})
+      </summary>
+      <ol className="mt-2 grid gap-2">
+        {[...history].reverse().map((h) => (
+          <li key={h.id} className="border-t border-border pt-2">
+            <div className="font-mono text-xs text-navy">
+              {t("submitOffer.revision")} {h.revision_number} · {h.status === "submitted" ? t("service_provider.feed.bidPlaced") : t(`feed.offer_${h.status}`)}
+              {h.submitted_at && ` · ${fullDate(h.submitted_at, language)}`} · {t("offerPreview.version")} {h.based_on_material_revision}
+            </div>
+            <div className="text-xs text-steel">
+              {money(h.amount, currency)}
+              {h.proposed_duration_days ? ` · ${h.proposed_duration_days} ${t("timing.days")}` : ""}
+              {h.documents?.length ? ` · ${h.documents.map((d) => d.file_name).join(", ")}` : ""}
+            </div>
+            {h.message && <p dir="auto" className="text-xs text-steel whitespace-pre-wrap break-words mt-0.5">{h.message}</p>}
+          </li>
+        ))}
+      </ol>
+    </details>
   );
 }

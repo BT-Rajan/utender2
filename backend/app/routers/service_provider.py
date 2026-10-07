@@ -388,7 +388,9 @@ def preparing(user: User = Depends(require_approved_service_provider), db: Sessi
     from app.models.participation import Participation as ParticipationRecord
 
     sync_expired_projects(db)
-    offered = {pid for (pid,) in db.query(Offer.project_id).filter(mine(db, user, Offer, Offer.service_provider_id), Offer.status == OfferStatus.submitted)}
+    # Stage 5.16: anything ever put forward (submitted, revised, withdrawn,
+    # decided) is listed among their offers (my-bids) -- once, not here too.
+    offered = {pid for (pid,) in db.query(Offer.project_id).filter(mine(db, user, Offer, Offer.service_provider_id), tendered())}
     rows = (
         db.query(ParticipationRecord, Project)
         .join(Project, Project.id == ParticipationRecord.project_id)
@@ -409,7 +411,13 @@ def preparing(user: User = Depends(require_approved_service_provider), db: Sessi
 
 
 @router.get("/my-bids", response_model=list[MyBidOut])
-def my_bids(user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
+def my_bids(
+    user: User = Depends(require_service_provider),
+    db: Session = Depends(get_db),
+    # Stage 5.16: bounded -- the most recent first, a page at a time.
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
     """Every offer this service provider has ever placed, across all projects —
     the dashboard's single source for 'active bids' / 'won' counts and the
     My Bids list. Requires only the role, not verification/payment: a
@@ -420,7 +428,9 @@ def my_bids(user: User = Depends(require_service_provider), db: Session = Depend
         db.query(Offer, Project)
         .join(Project, Offer.project_id == Project.id)
         .filter(mine(db, user, Offer, Offer.service_provider_id), tendered())
-        .order_by(Offer.updated_at.desc())
+        .order_by(Offer.updated_at.desc(), Offer.id)
+        .offset(offset)
+        .limit(limit)
         .all()
     )
     return [
@@ -436,6 +446,7 @@ def my_bids(user: User = Depends(require_service_provider), db: Session = Depend
             amount=o.amount,
             offer_status=o.status,
             revision=o.revision,
+            submitted_at=o.submitted_at,
             updated_at=o.updated_at,
         )
         for o, p in rows

@@ -377,4 +377,11 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - confirming an offer after an amendment re-checks its start/completion commitment, which an extended deadline may have invalidated (then it must be revised);
     - the offer page re-reads the server's state after any refused submit, revise or withdraw.
 
-_Further steps (5.16 onwards) are added as they are implemented._
+- **5.16 Provider offer history & status:**
+  - "My bids" lists each offer the provider's side has put forward, once each. Drafts appear only under "Preparing an offer"; a withdrawn offer is no longer listed there as well.
+  - Each entry shows its status as the provider sees it (offer placed, revised with its revision number, withdrawn, awarded, not selected), the requirement's outcome (open, suspended, closed, cancelled, ended outside U-Tender, no award, awarded), and when it was first submitted and last changed (UTC).
+  - Bounded: most recent first, 200 per page (up to 500), with an offset.
+  - After offers close, the provider can still open their own offer in full, read-only (the same stored record as the preview), with its earlier versions as submitted.
+  - Only their own side's offers; organisation members share them; never another provider's.
+
+_Further steps (5.17 onwards) are added as they are implemented._

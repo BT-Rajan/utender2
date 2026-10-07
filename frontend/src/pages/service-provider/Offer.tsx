@@ -8,6 +8,7 @@ import { ClarificationsPanel } from "@/components/ClarificationsPanel";
 import { IneligibleNotice } from "@/components/ProviderEligibility";
 import { ProviderRequirementView } from "@/components/ProviderRequirementView";
 import { OfferForm } from "@/components/OfferForm";
+import { OfferHistory, OfferPreview } from "@/components/OfferPreview";
 import { SaveButton } from "@/components/SaveOpportunity";
 import { useI18n } from "@/i18n/I18nContext";
 import { outcomeText } from "@/components/ClosureOutcome";
@@ -178,6 +179,13 @@ export function ServiceProviderOfferPage() {
             </div>
           )}
           {project.status === "awarded" && <AwardOutcome projectId={project.id} />}
+          {/* Stage 5.16: the provider's own offer in full, as it stands -- read-only now offers have closed. */}
+          {existingOffer && (
+            <div className="mt-4 text-start">
+              <OfferPreview projectId={project.id} readOnly />
+              <OfferHistory projectId={project.id} currency={project.currency} />
+            </div>
+          )}
           {(project.status === "no_award" || project.status === "canceled" || project.status === "expired") && (
             <p className="mt-3 font-mono text-xs text-steel-light">{t("closure.offersKept")}</p>
           )}
@@ -223,6 +231,7 @@ export function ServiceProviderOfferPage() {
           ) : (
             <OfferForm project={project} existingOffer={existingOffer ?? null} draft={draft} />
           )}
+          {existingOffer && existingOffer.revision > 1 && <OfferHistory projectId={project.id} currency={project.currency} />}
         </>
       ) : project.participation?.status === "can_participate" ? (
         <ParticipateStep projectId={project.id} />

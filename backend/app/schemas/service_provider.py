@@ -69,4 +69,7 @@ class MyBidOut(BaseModel):
     amount: Decimal
     offer_status: OfferStatus
     revision: int
-    updated_at: datetime
+    # Stage 5.16: when it was first submitted, and its last change (a revision
+    # or the withdrawal) -- explicit UTC instants.
+    submitted_at: UTCDateTime | None = None
+    updated_at: UTCDateTime

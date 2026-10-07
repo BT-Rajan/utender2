@@ -188,6 +188,20 @@ export interface OfferDocument {
   url: string;
 }
 
+// Stage 5.16: one earlier version of the provider's own offer, as submitted.
+export interface OfferRevisionEntry {
+  id: string;
+  revision_number: number;
+  amount: string;
+  status: OfferStatus;
+  message: string | null;
+  proposed_duration_days?: number | null;
+  documents?: { label: string; file_name: string }[];
+  based_on_material_revision: number;
+  submitted_at?: string | null;
+  recorded_at: string;
+}
+
 // Stage 5.8: the quality gate's answer for the saved draft.
 export interface OfferReadiness {
   ready: boolean;

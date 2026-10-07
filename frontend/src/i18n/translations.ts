@@ -186,6 +186,11 @@ export interface Dictionary {
     draftStarted: string;
     lastSaved: string;
   };
+  offerHistory: {
+    yourOffer: string;
+    readOnlyNote: string;
+    earlier: string;
+  };
   submitOffer: {
     confirmTitle: string;
     confirmBody: string;
@@ -1376,6 +1381,11 @@ export const en: Dictionary = {
     draftStatus: "Draft — not submitted. Nothing is sent to the owner until you submit it.",
     draftStarted: "started",
     lastSaved: "last saved",
+  },
+  offerHistory: {
+    yourOffer: "Your offer",
+    readOnlyNote: "Your offer as it stands. Offers have closed, so it can no longer be changed.",
+    earlier: "Earlier versions",
   },
   submitOffer: {
     confirmTitle: "Submit this offer?",
@@ -2592,6 +2602,11 @@ export const ar: Dictionary = {
     draftStatus: "مسودة — لم تُقدَّم. لا يُرسل شيء إلى المالك حتى تقدّمها.",
     draftStarted: "بدأت في",
     lastSaved: "آخر حفظ",
+  },
+  offerHistory: {
+    yourOffer: "عرضك",
+    readOnlyNote: "عرضك كما هو الآن. أُغلقت العروض، لذا لم يعد بالإمكان تغييره.",
+    earlier: "الإصدارات السابقة",
   },
   submitOffer: {
     confirmTitle: "تقديم هذا العرض؟",

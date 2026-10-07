@@ -164,6 +164,7 @@ export function OfferForm({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-offer", project.id] });
+      queryClient.invalidateQueries({ queryKey: ["my-offer-history", project.id] });
       queryClient.invalidateQueries({ queryKey: ["service-provider-feed"] });
     },
     // Stage 5.15: a refusal (deadline passed, closed, suspended...) shows the
@@ -226,6 +227,7 @@ export function OfferForm({
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["my-offer", project.id] });
+      queryClient.invalidateQueries({ queryKey: ["my-offer-history", project.id] });
       queryClient.invalidateQueries({ queryKey: ["project", project.id] });
     },
     onError: (err) => setError(err instanceof ApiError ? err.detail : t("service_provider.offer.withdrawError")),
