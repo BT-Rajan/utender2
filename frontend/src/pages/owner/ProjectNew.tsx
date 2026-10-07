@@ -186,7 +186,11 @@ export function OwnerProjectNewPage() {
             <button
               type="button"
               disabled={pending}
-              onClick={() => submitProject("open")}
+              onClick={() => {
+                const deadline = (formRef.current?.elements.namedItem("bid_deadline") as HTMLInputElement | null)?.value;
+                const text = t("draftDetails.publishNowConfirm").replace("{deadline}", deadline ? formatDeadline(new Date(deadline).toISOString()) : "—");
+                if (window.confirm(text)) submitProject("open");
+              }}
               className="bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 w-fit"
             >
               {pending ? t("owner.projectNew.posting") : t("owner.projectNew.postProject")}

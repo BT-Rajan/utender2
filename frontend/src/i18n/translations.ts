@@ -343,6 +343,9 @@ export interface Dictionary {
     untitled: string;
     lastSavedShort: string;
     expired: string;
+    publishConfirm: string;
+    publishNowConfirm: string;
+    published: string;
   };
   verification: {
     scopeLabel: string;
@@ -1273,6 +1276,9 @@ export const en: Dictionary = {
     untitled: "Untitled",
     lastSavedShort: "last saved {date}",
     expired: "This requirement expired at its offer deadline ({date}) without any offers. It is now read-only.",
+    publishConfirm: "Publish \"{title}\" now?\n\nVerified providers who meet your \"who can respond\" rules will be able to find it, open it and send offers until {deadline}.\n\nOnce published, its rules and conditions can't be changed here.",
+    publishNowConfirm: "Publish this requirement straight away, without saving it as a draft first?\n\nVerified providers will be able to find it and send offers until {deadline}. To review it as providers will see it first, save it as a draft and use Preview.",
+    published: "Published {date} — open to offers until {deadline}.",
   },
   verification: {
     scopeLabel: "Applies to",
@@ -2228,6 +2234,9 @@ export const ar: Dictionary = {
     untitled: "بدون عنوان",
     lastSavedShort: "آخر حفظ {date}",
     expired: "انتهت صلاحية هذا الطلب عند موعد إغلاق العروض ({date}) دون أي عروض. أصبح الآن للقراءة فقط.",
+    publishConfirm: "هل تريد نشر \"{title}\" الآن؟\n\nسيتمكن مقدمو الخدمة الموثقون الذين يستوفون شروط \"من يمكنه تقديم عرض\" من العثور عليه وفتحه وتقديم العروض حتى {deadline}.\n\nبعد النشر لا يمكن تغيير قواعده وشروطه من هنا.",
+    publishNowConfirm: "هل تريد نشر هذا الطلب فورًا دون حفظه كمسودة أولًا؟\n\nسيتمكن مقدمو الخدمة الموثقون من العثور عليه وتقديم العروض حتى {deadline}. لمراجعته كما سيراه مقدمو الخدمة أولًا، احفظه كمسودة واستخدم المعاينة.",
+    published: "نُشر في {date} — مفتوح للعروض حتى {deadline}.",
   },
   verification: {
     scopeLabel: "ينطبق على",

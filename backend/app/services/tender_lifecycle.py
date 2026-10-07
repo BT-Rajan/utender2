@@ -91,3 +91,27 @@ def sync_expired_projects(db: Session) -> None:
         # evaluate, so it never needs an owner decision to leave "open".
         project.status = ProjectStatus.closed if has_live_offer else ProjectStatus.expired
     db.commit()
+
+
+def publish(db: Session, project: Project, actor_id: str) -> None:
+    """Stage 3.14: the one transition from draft to published, used by every
+    path that publishes. The caller holds the row lock (lock_project), so the
+    checks below and the change are one step: a second publish finds it no
+    longer a draft, and nothing becomes visible to providers until the commit
+    that makes it open -- with its deadline, its server-recorded
+    publication time and its audit entry -- succeeds as a whole."""
+    from fastapi import HTTPException
+
+    from app.services import requirement_quality
+    from app.services.audit import log_action
+
+    if project.status != ProjectStatus.draft or project.discarded_at is not None:
+        raise HTTPException(status_code=400, detail="Only a draft project can be published.")
+    now = datetime.utcnow()
+    if project.bid_deadline is None or project.bid_deadline <= now:
+        raise HTTPException(status_code=400, detail="Set a bid deadline in the future before publishing.")
+    requirement_quality.assert_publishable(db, project)  # Stage 3.12, authoritative
+    project.status = ProjectStatus.open
+    project.published_at = now.replace(microsecond=0)
+    # log_action commits: the status, the timestamp and the audit entry land together.
+    log_action(db, actor_id=actor_id, action="project.publish", target_type="project", target_id=project.id, previous_value="draft", new_value="open")

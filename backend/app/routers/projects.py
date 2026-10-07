@@ -43,7 +43,7 @@ from app.services.notify import notify, notify_team
 from app.services.team import acting_id, acting_profile, mine, org_of, owns
 from app.services import requirement_quality
 from app.services.storage import drawing_url_expiry_seconds, get_storage
-from app.services.tender_lifecycle import lock_project, sync_expired_projects
+from app.services.tender_lifecycle import lock_project, publish, sync_expired_projects
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -208,13 +208,12 @@ async def create_project(
         expected_completion_date=expected_completion_date,
         expected_duration_days=expected_duration_days,
         tender_type=tender_type_value,
-        status=status_value,
+        # Always created as a draft; "publish now" publishes it below, through
+        # the one publication transition, once its files are in place.
+        status=ProjectStatus.draft,
         creation_token=creation_token or None,
         organization_id=org_of(db, user.id),  # an organization's requirement is shared by its members
     )
-    if status_value == ProjectStatus.open:
-        # Publishing straight from the start form passes the same gate.
-        requirement_quality.assert_publishable(db, project)
     db.add(project)
     try:
         db.commit()
@@ -236,6 +235,18 @@ async def create_project(
             # remove the project and anything already stored for it, so the
             # owner is never left with a half-created requirement -- possibly
             # already published -- that a retry would then duplicate.
+            _discard_project(db, project.id)
+            raise
+        db.refresh(project)
+
+    if status_value == ProjectStatus.open:
+        # Stage 3.14: "publish now" from the start form is the same transition
+        # as the Publish button (quality gate, deadline, timestamp, audit). If
+        # it is refused, nothing is left behind: not a draft the owner didn't
+        # ask for, and never a half-published requirement.
+        try:
+            publish(db, lock_project(db, project.id), user.id)
+        except HTTPException:
             _discard_project(db, project.id)
             raise
         db.refresh(project)
@@ -875,6 +886,7 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
         created_at=project.created_at,
         updated_at=project.updated_at,
         discarded_at=project.discarded_at,
+        published_at=project.published_at,
         version=project.version,
         documents_required=project.documents_required,
         offer_count=offer_count,

@@ -63,6 +63,7 @@ class ProjectOut(BaseModel):
     # Stage 3.11: last saved, and whether a draft was discarded.
     updated_at: UTCDateTime | None = None
     discarded_at: UTCDateTime | None = None
+    published_at: UTCDateTime | None = None  # set by the server on publication
     version: int = 1  # send back as If-Match when saving a draft
     documents_required: bool = False
     offer_count: int = 0

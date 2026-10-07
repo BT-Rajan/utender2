@@ -101,6 +101,9 @@ class Project(Base):
     # Sequential per project; bumped by the amendment service whenever a
     # published tender's material fields change (spec §2.8/§2.12).
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # Stage 3.14: when it was published -- set once, by the server, in the
+    # same transaction that makes it open. NULL = never published.
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     deadline_reminder_sent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     # Stage 3.11 (drafts): when the requirement was last saved (shown as

@@ -60,8 +60,9 @@ def test_pass10_feed_discovery():
     from app.models.project import Project as _Project
 
     _offsets_minutes_ago = {"Roof replacement on Maple St": 3, "Kitchen remodel": 2, "Fence repair": 1}
+    # "Newest" is newest on the marketplace: by publication time (Stage 3.14).
     for _p in db.query(_Project).all():
-        _p.created_at = datetime.utcnow() - timedelta(minutes=_offsets_minutes_ago[_p.title])
+        _p.published_at = datetime.utcnow() - timedelta(minutes=_offsets_minutes_ago[_p.title])
     db.commit()
 
     r = service_provider_client.get("/service-provider/feed")
@@ -83,7 +84,7 @@ def test_pass10_feed_discovery():
     check("search with no matches returns empty list", len(r.json()) == 0)
 
     r = service_provider_client.get("/service-provider/feed", params={"sort": "newest"})
-    check("sort=newest returns most recently created first", r.json()[0]["title"] == "Fence repair")
+    check("sort=newest returns most recently published first", r.json()[0]["title"] == "Fence repair")
 
     r = service_provider_client.get("/service-provider/feed")
     check("default sort is by deadline ascending (all same deadline here, so just check 3 results)", len(r.json()) == 3)

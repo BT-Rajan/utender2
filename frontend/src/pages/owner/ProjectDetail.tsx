@@ -418,6 +418,11 @@ export function OwnerProjectDetailPage() {
           {t("draftDetails.expired").replace("{date}", formatDeadline(project.bid_deadline))}
         </div>
       )}
+      {project.published_at && project.status === "open" && (
+        <p className="text-[12.5px] text-steel mb-4">
+          {t("draftDetails.published").replace("{date}", formatDeadline(project.published_at)).replace("{deadline}", formatDeadline(project.bid_deadline))}
+        </p>
+      )}
       {project.discarded_at && (
         <div className="border border-border bg-border/30 rounded px-4 py-3 mb-6 text-sm text-steel max-w-2xl">
           {t("draftDetails.discarded").replace("{date}", formatDeadline(project.discarded_at))}
@@ -449,7 +454,11 @@ export function OwnerProjectDetailPage() {
           {editableDraft && (
             <button
               type="button"
-              onClick={() => lifecycleMutation.mutate("publish")}
+              onClick={() => {
+                // Stage 3.14: publishing is a deliberate step, never a stray click.
+                const text = t("draftDetails.publishConfirm").replace("{title}", project.title).replace("{deadline}", formatDeadline(project.bid_deadline));
+                if (window.confirm(text)) lifecycleMutation.mutate("publish");
+              }}
               // The server refuses anyway; this just says so up front.
               disabled={lifecycleMutation.isPending || !quality?.ready}
               title={quality && !quality.ready ? t("quality.publishBlocked") : undefined}

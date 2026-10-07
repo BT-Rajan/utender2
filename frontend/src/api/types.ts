@@ -38,6 +38,7 @@ export interface Project {
   updated_at?: string | null;
   discarded_at?: string | null;
   version?: number;
+  published_at?: string | null;
   documents_required?: boolean;
   offer_count: number;
   my_offer_status: OfferStatus | null;

@@ -24,7 +24,6 @@ from app.services.email import notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify, notify_team
 from app.services.team import acting_profile, mine, owns
-from app.services import requirement_quality
 from app.services.eligibility import qualification_options
 from app.services.offer_response import documents_out
 from app.services.stakeholder import require_established
@@ -38,7 +37,7 @@ from app.services.verification import (
     profile_state_fields,
 )
 from app.services.storage import get_storage
-from app.services.tender_lifecycle import is_sealed_and_open, lock_project, sync_expired_projects
+from app.services.tender_lifecycle import is_sealed_and_open, lock_project, publish, sync_expired_projects
 
 router = APIRouter(prefix="/owner", tags=["owner"])
 
@@ -270,14 +269,7 @@ def _project_response(project: Project, db: Session) -> ProjectOut:
 @router.post("/projects/{project_id}/publish", response_model=ProjectOut)
 def publish_project(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     project = _get_owned_project(project_id, user, db, lock=True)
-    if project.status != ProjectStatus.draft or project.discarded_at is not None:
-        raise HTTPException(status_code=400, detail="Only a draft project can be published.")
-    if project.bid_deadline <= datetime.utcnow():
-        raise HTTPException(status_code=400, detail="Set a bid deadline in the future before publishing.")
-    # Stage 3.12: the quality gate, authoritative whatever the page showed.
-    requirement_quality.assert_publishable(db, project)
-    project.status = ProjectStatus.open
-    db.commit()
+    publish(db, project, user.id)  # the one publication transition (tender_lifecycle)
     db.refresh(project)
     return _project_response(project, db)
 
@@ -543,4 +535,5 @@ def _project_fields(p: Project) -> dict:
         updated_at=p.updated_at,
         discarded_at=p.discarded_at,
         version=p.version,
+        published_at=p.published_at,
     )

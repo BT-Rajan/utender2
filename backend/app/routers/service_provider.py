@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -81,7 +81,10 @@ def feed(
         term = f"%{search.strip()}%"
         query = query.filter(or_(Project.title.ilike(term), Project.area.ilike(term), Project.description.ilike(term)))
 
-    query = query.order_by(Project.created_at.desc()) if sort == "newest" else query.order_by(Project.bid_deadline.asc())
+    # "Newest" means newest on the marketplace: by publication (Stage 3.14),
+    # not by when the owner started the draft.
+    newest = func.coalesce(Project.published_at, Project.created_at).desc()
+    query = query.order_by(newest) if sort == "newest" else query.order_by(Project.bid_deadline.asc())
     projects = query.all()
     my_offers = {o.project_id: o.status.value for o in db.query(Offer).filter(mine(db, user, Offer, Offer.service_provider_id)).all()}
     profile = acting_profile(db, user)
