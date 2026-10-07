@@ -22,6 +22,10 @@ class Clarification(Base):
     service_provider_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("service_provider_profiles.user_id", ondelete="CASCADE"), nullable=False
     )
+    # The organization this was done for (services.team); NULL = an individual's.
+    organization_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     question: Mapped[str] = mapped_column(Text, nullable=False)
     answer: Mapped[str | None] = mapped_column(Text, nullable=True)
     shared_with_all: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

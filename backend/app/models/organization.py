@@ -5,7 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 from app.models.common import gen_uuid
-from app.models.enums import MembershipRole
+from app.models.enums import MembershipRole, UserRole
 
 
 # The commercial identity behind organization-based marketplace activity.
@@ -47,3 +47,27 @@ class OrganizationMembership(Base):
 
     organization = relationship("Organization", back_populates="memberships")
     user = relationship("User")
+
+
+# An invitation to act for an organization, sent by its authorized
+# representative to an email address -- whether or not that person has an
+# account yet. Nobody joins until they accept, signed in with that email.
+# The link carries a random token; only its hash is stored.
+class OrganizationInvitation(Base):
+    __tablename__ = "organization_invitations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    organization_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)  # lower-case
+    role: Mapped[UserRole] = mapped_column(Enum(UserRole, native_enum=True), nullable=False)  # the organization's side
+    position: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    invited_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    organization = relationship("Organization")

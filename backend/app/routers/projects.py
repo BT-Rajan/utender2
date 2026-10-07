@@ -1,7 +1,8 @@
 from datetime import date, datetime, timezone
 
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.responses import StreamingResponse
 
@@ -27,14 +28,20 @@ from app.schemas.project import (
     ProjectItemsUpdate,
     ProviderEligibilityIn,
     ResponseRequirements,
+    CommercialConditions,
+    TenderRulesIn,
+    TenderRulesOut,
 )
+from app.services.tender_rules import questions_close_at, questions_open
 from app.services.categories import resolve_trade
 from app.services.eligibility import ineligibility_reasons, rules_for, rules_out, validate_rules
 from app.services.drawings import DOCUMENT_CATEGORIES, upload_drawings_for_project
 from app.services.locations import clean_area, clean_governorate
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name
 from app.services.email import notify_service_provider_tender_amended
-from app.services.notify import notify
+from app.services.notify import notify, notify_team
+from app.services.team import acting_id, acting_profile, mine, org_of, owns
+from app.services import requirement_quality
 from app.services.storage import drawing_url_expiry_seconds, get_storage
 from app.services.tender_lifecycle import lock_project, sync_expired_projects
 
@@ -51,28 +58,32 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 # drawings) stays available on verification alone; that split is what lets
 # an unpaid service provider browse before paying instead of a hard app lockout.
 def _can_view_project(user: User, project: Project, db: Session) -> bool:
-    if user.role == UserRole.admin or project.owner_id == user.id:
+    if user.role == UserRole.admin or owns(db, user, project):
         return True
     if user.role != UserRole.service_provider:
         return False
-    # Draft is the only status a service provider never sees — every other state,
-    # including the newer under_evaluation/no_award/canceled/expired, stays
-    # visible so a service provider who bid can still see what happened to their
-    # bid after bidding itself has ended. An admin-suspended project is
-    # blocked the same way, even for a service provider who already bid on it —
-    # suspension is a moderation action meant to pull the whole project out
-    # of sight until an admin reactivates it.
+    # A draft is never seen by providers; nor is an admin-suspended project,
+    # even by a provider who already bid on it -- suspension is a moderation
+    # action meant to pull the whole project out of sight until an admin
+    # reactivates it.
     if project.status == ProjectStatus.draft or project.is_suspended:
         return False
-    profile = db.get(ServiceProviderProfile, user.id)
+    profile = acting_profile(db, user)
     if not (profile and profile.is_verified_active):
         return False
-    # Stage 3.9: and eligible for this particular requirement -- or already
-    # bidding on it (so a lapsed qualification never hides a provider's own
-    # bid; it only stops new or revised offers, see routers/offers.py).
-    if not ineligibility_reasons(db, project, profile):
-        return True
-    return db.query(Offer.id).filter(Offer.project_id == project.id, Offer.service_provider_id == user.id).first() is not None
+    has_bid = (
+        db.query(Offer.id).filter(Offer.project_id == project.id, mine(db, user, Offer, Offer.service_provider_id)).first() is not None
+    )
+    # Once offers have closed (closed, under evaluation, awarded, no award,
+    # canceled, expired -- including a draft that expired unpublished), only
+    # providers who took part can still open it, to see what happened to
+    # their bid. Nobody else needs the exact address and scope any more.
+    if project.status != ProjectStatus.open:
+        return has_bid
+    # Stage 3.9: open, and eligible for this particular requirement -- or
+    # already bidding on it (so a lapsed qualification never hides a
+    # provider's own bid; it only stops new or revised offers).
+    return has_bid or not ineligibility_reasons(db, project, profile)
 
 
 # The scope of work lives in Project.description (a TEXT column: 64 KB). A
@@ -136,6 +147,7 @@ async def create_project(
     description: str | None = Form(None),
     trade: str | None = Form(None),
     category_id: str | None = Form(None),
+    creation_token: str | None = Form(None, max_length=64),
     bid_deadline: str = Form(...),
     expected_start_date: date | None = Form(None),
     expected_completion_date: date | None = Form(None),
@@ -148,6 +160,12 @@ async def create_project(
     user: User = Depends(require_verified_owner),
     db: Session = Depends(get_db),
 ):
+    # Stage 3.11: the same start sent again (double click, retry after a lost
+    # response) returns the draft it already created.
+    if creation_token:
+        existing = db.query(Project).filter(Project.owner_id == acting_id(db, user), Project.creation_token == creation_token).first()
+        if existing:
+            return _serialize_detail(existing, db)
     try:
         tender_type_value = TenderType(tender_type)
     except ValueError:
@@ -163,7 +181,9 @@ async def create_project(
     category_value, trade = resolve_trade(db, category_id, trade)
     governorate_value, area_value = clean_governorate(governorate), clean_area(area)
     deadline = _parse_bid_deadline(bid_deadline)
-    if status_value == ProjectStatus.open and deadline <= datetime.utcnow():
+    # A draft is prepared for a future deadline too: a draft whose deadline
+    # passes expires (Stage 3.11).
+    if deadline <= datetime.utcnow():
         raise HTTPException(status_code=400, detail="Bid deadline must be in the future.")
     _check_execution_timing(deadline, expected_start_date, expected_completion_date, expected_duration_days)
 
@@ -173,7 +193,9 @@ async def create_project(
             assert_allowed_extension(f.filename, ALLOWED_DRAWING_EXTENSIONS)
 
     project = Project(
-        owner_id=user.id,
+        # Recorded under the stakeholder this person acts as (their
+        # organization's profile, for a member: services.team).
+        owner_id=acting_id(db, user),
         title=title,
         address=address,
         governorate=governorate_value,
@@ -187,9 +209,22 @@ async def create_project(
         expected_duration_days=expected_duration_days,
         tender_type=tender_type_value,
         status=status_value,
+        creation_token=creation_token or None,
+        organization_id=org_of(db, user.id),  # an organization's requirement is shared by its members
     )
+    if status_value == ProjectStatus.open:
+        # Publishing straight from the start form passes the same gate.
+        requirement_quality.assert_publishable(db, project)
     db.add(project)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Two copies of the same start arrived at once: the other one won.
+        db.rollback()
+        existing = db.query(Project).filter(Project.owner_id == acting_id(db, user), Project.creation_token == creation_token).first()
+        if not existing:
+            raise
+        return _serialize_detail(existing, db)
     db.refresh(project)
 
     real_files = [f for f in drawings if f.filename]
@@ -241,22 +276,50 @@ def _require_active_owner(user: User, db: Session) -> None:
     change it. Same rule and same "not_approved" code as
     deps.require_verified_owner, applied *after* the ownership lookup so
     everyone else keeps getting the 404 they always did."""
-    profile = db.get(OwnerProfile, user.id)
+    profile = acting_profile(db, user)
     if not profile or not profile.is_verified_active:
         raise HTTPException(status_code=403, detail="not_approved")
 
 
+def _guard_draft_write(project: Project, if_match: str | None) -> None:
+    """Stage 3.11: a discarded or expired draft is closed to changes; and a
+    save sent from a page showing an older version (another tab, another
+    device, another member of the organization) is refused rather than
+    silently overwriting newer work. Callers hold the row lock
+    (lock_project), so the check and the version bump are one step: two
+    saves can never both pass against the same version. If-Match carries
+    the version the page last saw."""
+    if project.discarded_at is not None:
+        raise HTTPException(status_code=409, detail="This draft was discarded and can no longer be changed.")
+    if if_match and if_match.strip('"') != str(project.version):
+        raise HTTPException(
+            status_code=409,
+            detail="This requirement was changed somewhere else (another tab, device or team member) since you opened it. Reload to see the latest version, then make your change again.",
+        )
+    _touch(project)
+
+
+def _touch(project: Project) -> None:
+    project.version = (project.version or 0) + 1
+    project.updated_at = datetime.utcnow().replace(microsecond=0)
+
+
 @router.patch("/{project_id}", response_model=ProjectDetailOut)
 def amend_project(
-    project_id: str, payload: ProjectAmendmentRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    project_id: str,
+    payload: ProjectAmendmentRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    if_match: str | None = Header(None, alias="If-Match"),
 ):
     sync_expired_projects(db)
     # Locked: "can't move the deadline earlier once bids exist" reads
     # tender_type_locked, which the first bid sets under this same lock.
     project = lock_project(db, project_id)
-    if not project or project.owner_id != user.id:
+    if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
+    _guard_draft_write(project, if_match)
     if project.status not in (ProjectStatus.draft, ProjectStatus.open, ProjectStatus.closed, ProjectStatus.under_evaluation):
         raise HTTPException(status_code=400, detail="This project can no longer be amended.")
 
@@ -302,6 +365,10 @@ def amend_project(
         changed.append("description")
         project.description = payload.description or None
 
+    if payload.documents_required is not None and payload.documents_required != project.documents_required:
+        changed.append("documents_required")
+        project.documents_required = payload.documents_required
+
     if "category_id" in payload.model_fields_set or payload.trade is not None:
         category_value, trade = resolve_trade(db, payload.category_id, payload.trade)
         if (category_value, trade) != (project.category_id, project.trade):
@@ -326,6 +393,11 @@ def amend_project(
         # bidders who priced against the original window.
         if new_deadline < project.bid_deadline and project.tender_type_locked:
             raise HTTPException(status_code=400, detail="Cannot move the deadline earlier once bids have been submitted.")
+        if project.status == ProjectStatus.draft and new_deadline <= datetime.utcnow():
+            raise HTTPException(status_code=400, detail="The offer deadline must be in the future.")
+        # Stage 3.10: questions close before offers do.
+        if project.questions_deadline and new_deadline <= project.questions_deadline:
+            raise HTTPException(status_code=400, detail="The offer deadline must be after the question deadline.")
         deadline_extended = new_deadline > project.bid_deadline
         changed.append("bid_deadline")
         project.bid_deadline = new_deadline
@@ -371,20 +443,21 @@ def amend_project(
     # Best-effort — every service provider with a live (non-withdrawn) bid gets
     # notified; a failed send never rolls back the amendment itself.
     bidder_ids = (
-        db.query(Offer.service_provider_id)
+        db.query(Offer.service_provider_id, Offer.organization_id)
         .filter(Offer.project_id == project_id, Offer.status != OfferStatus.withdrawn)
         .distinct()
         .all()
     )
-    for (service_provider_id,) in bidder_ids:
+    for service_provider_id, organization_id in bidder_ids:
         service_provider_user = db.get(User, service_provider_id)
         if service_provider_user:
             notify_service_provider_tender_amended(service_provider_user.email, project.title, project_id, summary)
-            notify(
+            notify_team(
                 db,
                 service_provider_user,
                 NotificationType.tender_amendment,
                 link=f"/service-provider/projects/{project_id}/offer",
+                organization_id=organization_id,
                 project_title=project.title,
                 summary=summary,
             )
@@ -394,16 +467,18 @@ def amend_project(
 
 @router.put("/{project_id}/items", response_model=ProjectDetailOut)
 def set_project_items(
-    project_id: str, payload: ProjectItemsUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    project_id: str, payload: ProjectItemsUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db),
+    if_match: str | None = Header(None, alias="If-Match"),
 ):
     """Stage 3.4: the requirement's pricing basis and its measurable items,
     saved together and replaced as a whole. Items are optional -- a
     requirement priced as one total needs none -- but pricing per item needs
     at least one item to price."""
-    project = db.get(Project, project_id)
-    if not project or project.owner_id != user.id:
+    project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
+    if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
+    _guard_draft_write(project, if_match)
     if project.status != ProjectStatus.draft:
         raise HTTPException(status_code=409, detail="Items and the pricing basis can only be changed while the requirement is a draft.")
 
@@ -433,14 +508,16 @@ def set_project_items(
 
 @router.put("/{project_id}/response-requirements", response_model=ProjectDetailOut)
 def set_response_requirements(
-    project_id: str, payload: ResponseRequirements, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    project_id: str, payload: ResponseRequirements, user: User = Depends(get_current_user), db: Session = Depends(get_db),
+    if_match: str | None = Header(None, alias="If-Match"),
 ):
     """Stage 3.8: what providers must submit with their price. Owner only,
     while a draft -- once published, providers rely on these terms."""
-    project = db.get(Project, project_id)
-    if not project or project.owner_id != user.id:
+    project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
+    if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
+    _guard_draft_write(project, if_match)
     if project.status != ProjectStatus.draft:
         raise HTTPException(status_code=409, detail="Response requirements can only be changed while the requirement is a draft.")
     project.response_requirements = payload.model_dump()
@@ -449,16 +526,80 @@ def set_response_requirements(
     return _serialize_detail(project, db)
 
 
+def _to_naive_utc(value: datetime | None, label: str) -> datetime | None:
+    if value is None or value.tzinfo is None:
+        return value
+    try:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    except OverflowError:
+        raise HTTPException(status_code=400, detail=f"Invalid {label}.")
+
+
+@router.get("/{project_id}/quality")
+def requirement_quality_report(project_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Stage 3.12: what is still missing or contradictory before this
+    requirement can go in front of providers (errors block publication;
+    warnings are advice). The owner's side only."""
+    sync_expired_projects(db)
+    project = db.get(Project, project_id)
+    if not project or not owns(db, user, project):
+        raise HTTPException(status_code=404, detail="Project not found.")
+    return requirement_quality.check(db, project).as_dict()
+
+
+@router.put("/{project_id}/tender-rules", response_model=ProjectDetailOut)
+def set_tender_rules(
+    project_id: str,
+    payload: TenderRulesIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    if_match: str | None = Header(None, alias="If-Match"),
+):
+    """Stage 3.10: how the opportunity is run -- who sees offers when,
+    whether and until when questions are taken, and the owner's commercial
+    conditions and instructions. Owner only, while a draft."""
+    project = lock_project(db, project_id)
+    if not project or not owns(db, user, project):
+        raise HTTPException(status_code=404, detail="Project not found.")
+    _require_active_owner(user, db)
+    _guard_draft_write(project, if_match)
+    if project.status != ProjectStatus.draft:
+        raise HTTPException(status_code=409, detail="Tender rules can only be changed while the requirement is a draft.")
+    if payload.tender_type != project.tender_type and project.tender_type_locked:
+        raise HTTPException(status_code=409, detail="Offer visibility can't change once an offer exists.")
+
+    cutoff = _to_naive_utc(payload.questions_deadline, "question deadline") if payload.questions_allowed else None
+    if cutoff is not None:
+        if cutoff <= datetime.utcnow():
+            raise HTTPException(status_code=400, detail="The question deadline must be in the future.")
+        if cutoff >= project.bid_deadline:
+            raise HTTPException(status_code=400, detail="Questions must close before offers close.")
+    for text in (payload.commercial_terms, payload.bidder_instructions):
+        _check_scope_length(text)
+
+    project.tender_type = payload.tender_type
+    project.questions_allowed = payload.questions_allowed
+    project.questions_deadline = cutoff
+    project.commercial_conditions = payload.commercial_conditions.model_dump(mode="json")
+    project.commercial_terms = (payload.commercial_terms or "").strip() or None
+    project.bidder_instructions = (payload.bidder_instructions or "").strip() or None
+    db.commit()
+    db.refresh(project)
+    return _serialize_detail(project, db)
+
+
 @router.put("/{project_id}/eligibility", response_model=ProjectDetailOut)
 def set_provider_eligibility(
-    project_id: str, payload: ProviderEligibilityIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    project_id: str, payload: ProviderEligibilityIn, user: User = Depends(get_current_user), db: Session = Depends(get_db),
+    if_match: str | None = Header(None, alias="If-Match"),
 ):
     """Stage 3.9: who may respond. Owner only, while a draft -- once
     published, providers have decided whether to respond on these terms."""
-    project = db.get(Project, project_id)
-    if not project or project.owner_id != user.id:
+    project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
+    if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
+    _guard_draft_write(project, if_match)
     if project.status != ProjectStatus.draft:
         raise HTTPException(status_code=409, detail="Eligibility can only be changed while the requirement is a draft.")
     project.provider_eligibility = validate_rules(db, payload, project)
@@ -475,7 +616,7 @@ def my_eligibility(project_id: str, user: User = Depends(require_approved_servic
     project = db.get(Project, project_id)
     if not project or project.status == ProjectStatus.draft or project.is_suspended:
         raise HTTPException(status_code=404, detail="Project not found.")
-    reasons = ineligibility_reasons(db, project, db.get(ServiceProviderProfile, user.id))
+    reasons = ineligibility_reasons(db, project, acting_profile(db, user))
     return EligibilityCheckOut(eligible=not reasons, reasons=reasons, rules=rules_out(db, project))
 
 
@@ -528,25 +669,28 @@ async def add_drawings(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    project = db.get(Project, project_id)
-    if not project or project.owner_id != user.id:
+    project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
+    if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
+    _guard_draft_write(project, None)
     if category not in DOCUMENT_CATEGORIES:
         raise HTTPException(status_code=400, detail="Unknown document type.")
 
     real_files = [f for f in drawings if f.filename]
     await upload_drawings_for_project(db, get_storage(), project_id, real_files, category, is_required)
+    db.commit()
     db.refresh(project)
     return _serialize_detail(project, db)
 
 
 def _owned_draft_document(project_id: str, drawing_id: str, user: User, db: Session) -> tuple[Project, ProjectDrawing]:
-    project = db.get(Project, project_id)
+    project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
     drawing = db.get(ProjectDrawing, drawing_id)
-    if not project or project.owner_id != user.id or not drawing or drawing.project_id != project_id:
+    if not project or not owns(db, user, project) or not drawing or drawing.project_id != project_id:
         raise HTTPException(status_code=404, detail="Document not found.")
     _require_active_owner(user, db)
+    _guard_draft_write(project, None)
     if project.status != ProjectStatus.draft:
         # Once published, providers may already be pricing against a file;
         # replace it by uploading a new revision instead.
@@ -719,11 +863,24 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
         tender_type_locked=project.tender_type_locked,
         is_suspended=project.is_suspended,
         created_at=project.created_at,
+        updated_at=project.updated_at,
+        discarded_at=project.discarded_at,
+        version=project.version,
+        documents_required=project.documents_required,
         offer_count=offer_count,
         drawings=drawings,
         pricing_basis=project.pricing_basis,
         items=[ProjectItemOut.model_validate(i) for i in project.items],
         provider_eligibility=rules_out(db, project),
+        tender_rules=TenderRulesOut(
+            questions_allowed=project.questions_allowed,
+            questions_deadline=project.questions_deadline,
+            questions_close_at=questions_close_at(project),
+            questions_open=questions_open(project),
+            commercial_conditions=CommercialConditions(**(project.commercial_conditions or {})),
+            commercial_terms=project.commercial_terms,
+            bidder_instructions=project.bidder_instructions,
+        ),
         response_requirements=ResponseRequirements(**(project.response_requirements or {})),
         currency=get_settings().marketplace_currency,
     )

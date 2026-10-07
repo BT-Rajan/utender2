@@ -35,6 +35,10 @@ export interface Project {
   tender_type_locked: boolean;
   is_suspended: boolean;
   created_at: string;
+  updated_at?: string | null;
+  discarded_at?: string | null;
+  version?: number;
+  documents_required?: boolean;
   offer_count: number;
   my_offer_status: OfferStatus | null;
   // Stage 3.9, provider feed only.
@@ -64,6 +68,26 @@ export interface ProjectDetail extends Project {
   currency: string;
   response_requirements: ResponseRequirements;
   provider_eligibility: ProviderEligibility;
+  tender_rules: TenderRules;
+}
+
+export interface CommercialConditions {
+  offer_validity_days: number | null;
+  payment_stages: { milestone: string; percent: string }[];
+  retention_percent: string | null;
+  retention_months: number | null;
+  warranty_months: number | null;
+}
+
+// Stage 3.10: how the opportunity is run (separate from what is requested).
+export interface TenderRules {
+  questions_allowed: boolean;
+  questions_deadline: string | null;
+  questions_close_at: string | null;
+  questions_open: boolean;
+  commercial_conditions: CommercialConditions;
+  commercial_terms: string | null;
+  bidder_instructions: string | null;
 }
 
 export interface EligibilityQualification {

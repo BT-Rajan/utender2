@@ -9,6 +9,7 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { RequirementItemsView } from "@/components/RequirementItems";
 import { ClarificationsPanel } from "@/components/ClarificationsPanel";
 import { ResponseRequirementsSummary } from "@/components/ResponseRequirements";
+import { ParticipationRules } from "@/components/TenderRules";
 import { IneligibleNotice, eligibilitySummary } from "@/components/ProviderEligibility";
 import { useI18n } from "@/i18n/I18nContext";
 import { money } from "@/lib/money";
@@ -255,10 +256,15 @@ export function ServiceProviderOfferPage() {
           {eligibilitySummary(t, project.provider_eligibility)}
         </p>
       )}
+      {!biddingClosed && <ParticipationRules project={project} />}
       {!biddingClosed && <ResponseRequirementsSummary project={project} />}
 
       <div className="mb-6">
-        <ClarificationsPanel projectId={project.id} role="service_provider" canAsk={project.status === "open"} />
+        {/* Stage 3.10: the same rule the server applies to new questions. */}
+        <ClarificationsPanel projectId={project.id} role="service_provider" canAsk={project.tender_rules.questions_open}
+          qaOpen={project.tender_rules.questions_open}
+          closesAt={project.tender_rules.questions_close_at}
+        />
       </div>
 
       <ErrorBanner message={error} />

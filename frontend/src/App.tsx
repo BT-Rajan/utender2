@@ -24,6 +24,7 @@ import { ServiceProviderSubscribePage } from "@/pages/service-provider/Subscribe
 import { AdminLayout } from "@/pages/admin/AdminLayout";
 import { AdminRequirementsPage } from "@/pages/admin/Requirements";
 import { AdminCategoriesPage } from "@/pages/admin/Categories";
+import { InvitePage } from "@/pages/Invite";
 import { AdminReviewPage } from "@/pages/admin/Review";
 import { AdminServiceProvidersPage } from "@/pages/admin/ServiceProviders";
 import { AdminServiceProviderDetailPage } from "@/pages/admin/ServiceProviderDetail";
@@ -44,6 +45,7 @@ export function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/invite/:token" element={<InvitePage />} />
         <Route
           path="/account"
           element={

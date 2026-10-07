@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, ApiError } from "@/api/client";
+import { apiFetch, ApiError, draftVersion } from "@/api/client";
 import type { PricingBasis, ProjectDetail, RequirementItem } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
@@ -98,6 +98,7 @@ export function RequirementItemsEditor({ project }: { project: ProjectDetail }) 
   const save = useMutation({
     mutationFn: () =>
       apiFetch<ProjectDetail>(`/projects/${project.id}/items`, {
+        headers: draftVersion(project),
         method: "PUT",
         body: {
           pricing_basis: basis,
@@ -121,7 +122,7 @@ export function RequirementItemsEditor({ project }: { project: ProjectDetail }) 
 
   const input = "w-full border border-border rounded px-2 py-1.5 text-sm";
   return (
-    <section className="bg-white border border-border border-t-4 border-t-navy rounded px-6 py-5 mb-8 max-w-4xl">
+    <section id="section-items" className="bg-white border border-border border-t-4 border-t-navy rounded px-6 py-5 mb-8 max-w-4xl">
       <h2 className="font-display text-lg font-semibold text-navy mb-1">{t("requirementItems.heading")}</h2>
       <p className="text-[13px] text-steel mb-4">{t("requirementItems.intro")}</p>
       <ErrorBanner message={error} />

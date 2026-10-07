@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.auth.security import decode_token_payload, token_matches_password
 from app.db import get_db
 from app.models.service_provider import ServiceProviderProfile
+from app.services.team import acting_profile
 from app.models.enums import UserRole
 from app.models.owner import OwnerProfile
 from app.models.user import User
@@ -60,7 +61,7 @@ require_service_provider = require_role(UserRole.service_provider)
 # not enough to see drawings or bid (see require_marketplace_active_service_provider
 # below for the P0 rule that adds the payment gate on top of this one).
 def require_approved_service_provider(user: User = Depends(require_service_provider), db: Session = Depends(get_db)) -> User:
-    profile = db.get(ServiceProviderProfile, user.id)
+    profile = acting_profile(db, user)
     if not profile or profile.verification_status.value != "approved" or profile.is_suspended:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -79,7 +80,7 @@ def require_approved_service_provider(user: User = Depends(require_service_provi
 # site (that's exactly how the pre-PASS-5 code drifted: submit_offer used
 # to check is_subscribed alone, which silently ignored payment_override_active).
 def require_marketplace_active_service_provider(user: User = Depends(require_service_provider), db: Session = Depends(get_db)) -> User:
-    profile = db.get(ServiceProviderProfile, user.id)
+    profile = acting_profile(db, user)
     if not profile or not profile.is_verified_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -89,7 +90,7 @@ def require_marketplace_active_service_provider(user: User = Depends(require_ser
 
 
 def get_service_provider_profile(user: User, db: Session) -> ServiceProviderProfile:
-    profile = db.get(ServiceProviderProfile, user.id)
+    profile = acting_profile(db, user)
     if not profile:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service provider profile not found")
     return profile
@@ -100,7 +101,7 @@ def get_service_provider_profile(user: User, db: Session) -> ServiceProviderProf
 # project. Re-derived every request, same reasoning as the service provider
 # gate — an admin can flip either flag at any time.
 def require_verified_owner(user: User = Depends(require_owner), db: Session = Depends(get_db)) -> User:
-    profile = db.get(OwnerProfile, user.id)
+    profile = acting_profile(db, user)
     if not profile or not profile.is_verified_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -110,7 +111,7 @@ def require_verified_owner(user: User = Depends(require_owner), db: Session = De
 
 
 def get_owner_profile(user: User, db: Session) -> OwnerProfile:
-    profile = db.get(OwnerProfile, user.id)
+    profile = acting_profile(db, user)
     if not profile:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Owner profile not found")
     return profile

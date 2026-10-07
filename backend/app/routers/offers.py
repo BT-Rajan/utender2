@@ -14,7 +14,8 @@ from app.schemas.offer import OfferCreate, OfferDocumentOut, OfferOut, OfferRevi
 from app.services.eligibility import assert_eligible
 from app.services.email import notify_owner_new_offer
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name, sanitize_path_segment
-from app.services.notify import notify
+from app.services.notify import notify, notify_team
+from app.services.team import acting_id, acting_profile, can_access, mine, org_of
 from app.services.offer_response import OFFER_DOCUMENTS_BUCKET, check_complete, documents_out, priced_total, requirements_for
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import bidding_is_open, lock_project
@@ -28,13 +29,13 @@ _AMOUNT_LIMIT = Decimal("10000000000")
 
 @router.get("/mine", response_model=OfferOut | None)
 def my_offer(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
-    offer = db.query(Offer).filter(Offer.project_id == project_id, Offer.service_provider_id == user.id).first()
+    offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
     return _with_documents(db, offer) if offer else None
 
 
 def _with_documents(db: Session, offer: Offer) -> OfferOut:
     out = OfferOut.model_validate(offer)
-    out.documents = documents_out(db, offer.project_id, offer.service_provider_id)
+    out.documents = documents_out(db, offer.project_id, offer.organization_id, offer.service_provider_id)
     return out
 
 
@@ -45,7 +46,7 @@ def _with_documents(db: Session, offer: Offer) -> OfferOut:
 def my_offer_documents(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
     """The provider's own response attachments (there may be some before the
     offer itself is first submitted)."""
-    return documents_out(db, project_id, user.id)
+    return documents_out(db, project_id, org_of(db, user.id), acting_id(db, user))
 
 
 @router.post("/documents", response_model=list[OfferDocumentOut])
@@ -59,7 +60,7 @@ async def upload_offer_document(
     project = lock_project(db, project_id)
     if not project or not bidding_is_open(project) or project.is_suspended:
         raise HTTPException(status_code=400, detail="Bidding on this project is closed.")
-    assert_eligible(db, project, get_service_provider_profile(user, db))
+    assert_eligible(db, project, acting_profile(db, user))
     requested = {d.name for d in requirements_for(project).documents}
     if label not in requested:
         raise HTTPException(status_code=400, detail="This requirement doesn't ask for that document.")
@@ -73,7 +74,7 @@ async def upload_offer_document(
     storage.save(OFFER_DOCUMENTS_BUCKET, path, content, file.content_type or "application/octet-stream")
     existing = (
         db.query(OfferDocument)
-        .filter(OfferDocument.project_id == project_id, OfferDocument.service_provider_id == user.id, OfferDocument.label == label)
+        .filter(OfferDocument.project_id == project_id, mine(db, user, OfferDocument, OfferDocument.service_provider_id), OfferDocument.label == label)
         .first()
     )
     replaced = existing.file_path if existing else None
@@ -81,14 +82,14 @@ async def upload_offer_document(
         existing.file_path, existing.file_name = path, safe_relative_name(file.filename)
         existing.uploaded_at = datetime.utcnow()
     else:
-        db.add(OfferDocument(project_id=project_id, service_provider_id=user.id, label=label, file_path=path, file_name=safe_relative_name(file.filename)))
+        db.add(OfferDocument(project_id=project_id, service_provider_id=acting_id(db, user), organization_id=org_of(db, user.id), label=label, file_path=path, file_name=safe_relative_name(file.filename)))
     db.commit()
     if replaced:
         try:
             storage.delete(OFFER_DOCUMENTS_BUCKET, [replaced])
         except Exception:
             pass
-    return documents_out(db, project_id, user.id)
+    return documents_out(db, project_id, org_of(db, user.id), acting_id(db, user))
 
 
 @router.delete("/documents/{document_id}", response_model=list[OfferDocumentOut])
@@ -97,7 +98,7 @@ def remove_offer_document(
 ):
     project = lock_project(db, project_id)
     doc = db.get(OfferDocument, document_id)
-    if not project or not doc or doc.project_id != project_id or doc.service_provider_id != user.id:
+    if not project or not doc or doc.project_id != project_id or not can_access(db, user, doc.organization_id, doc.service_provider_id):
         raise HTTPException(status_code=404, detail="Document not found.")
     if not bidding_is_open(project):
         raise HTTPException(status_code=400, detail="Bidding on this project has closed.")
@@ -108,12 +109,12 @@ def remove_offer_document(
         get_storage().delete(OFFER_DOCUMENTS_BUCKET, [path])
     except Exception:
         pass
-    return documents_out(db, project_id, user.id)
+    return documents_out(db, project_id, org_of(db, user.id), acting_id(db, user))
 
 
 @router.get("/mine/history", response_model=list[OfferRevisionOut])
 def my_offer_history(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
-    offer = db.query(Offer).filter(Offer.project_id == project_id, Offer.service_provider_id == user.id).first()
+    offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
     if not offer:
         return []
     return (
@@ -152,7 +153,7 @@ def submit_offer(
     user: User = Depends(require_marketplace_active_service_provider),
     db: Session = Depends(get_db),
 ):
-    profile = get_service_provider_profile(user, db)
+    profile = acting_profile(db, user)
 
     # Lock the tender row, THEN check it. Checking an unlocked copy let a bid
     # slip in after the owner's close had committed, and two near-simultaneous
@@ -174,14 +175,14 @@ def submit_offer(
     amount, item_prices = priced_total(project, payload)
     if amount is None or amount <= 0 or amount >= _AMOUNT_LIMIT:
         raise HTTPException(status_code=400, detail="Enter a valid bid amount.")
-    declarations = check_complete(db, project, user.id, payload)
+    declarations = check_complete(db, project, org_of(db, user.id), acting_id(db, user), payload)
 
     # The tender lock above already serializes every writer of this
     # service provider's offer (a plain read is enough). Deliberately NOT
     # SELECT ... FOR UPDATE on the offer: when no row exists yet that takes a
     # next-key/gap lock, and two such locks held at once deadlock on the
     # inserts that follow.
-    offer = db.query(Offer).filter(Offer.project_id == project_id, Offer.service_provider_id == user.id).first()
+    offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
     if offer:
         # upsert on the (project_id, service_provider_id) unique constraint — a
         # service provider revising their bid before the deadline updates the
@@ -199,7 +200,8 @@ def submit_offer(
     else:
         offer = Offer(
             project_id=project_id,
-            service_provider_id=user.id,
+            service_provider_id=acting_id(db, user),  # the stakeholder: the organization, for a member
+            organization_id=org_of(db, user.id),
             amount=amount,
             timeline_estimate=payload.timeline_estimate,
             message=payload.message,
@@ -222,10 +224,11 @@ def submit_offer(
     owner = db.get(User, project.owner_id)
     if owner:
         notify_owner_new_offer(owner.email, project.title, project_id, profile.company_name, float(amount), sealed=sealed)
-        notify(
+        notify_team(
             db,
             owner,
             NotificationType.bid_submitted,
+            organization_id=project.organization_id,
             link=f"/owner/projects/{project_id}",
             project_title=project.title,
             service_provider_name="A service provider" if sealed else profile.company_name,
@@ -242,7 +245,7 @@ def withdraw_offer(project_id: str, user: User = Depends(require_approved_servic
     # after the deadline would let a bidder walk away from a price the owner is
     # already evaluating).
     project = lock_project(db, project_id)
-    offer = db.query(Offer).filter(Offer.project_id == project_id, Offer.service_provider_id == user.id).first()
+    offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
     if not project or not offer:
         raise HTTPException(status_code=404, detail="No offer to withdraw.")
     if offer.status == OfferStatus.withdrawn:

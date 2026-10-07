@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.enums import PricingBasis, ProjectStatus, TenderType
 from app.schemas.common import UTCDateTime
@@ -60,6 +60,11 @@ class ProjectOut(BaseModel):
     tender_type_locked: bool
     is_suspended: bool = False
     created_at: datetime
+    # Stage 3.11: last saved, and whether a draft was discarded.
+    updated_at: UTCDateTime | None = None
+    discarded_at: UTCDateTime | None = None
+    version: int = 1  # send back as If-Match when saving a draft
+    documents_required: bool = False
     offer_count: int = 0
     my_offer_status: str | None = None  # only populated on the service provider feed
     # Stage 3.9, service provider feed only: whether this provider may respond,
@@ -169,6 +174,54 @@ class EligibilityCheckOut(BaseModel):
     rules: ProviderEligibilityOut
 
 
+class PaymentStage(BaseModel):
+    milestone: str = Field(min_length=1, max_length=200)  # e.g. "On mobilisation"
+    percent: Decimal = Field(gt=0, le=100, decimal_places=2)
+
+
+class CommercialConditions(BaseModel):
+    """Stage 3.10: the commercial terms owners most often set, as fields
+    providers can read at a glance. All optional; state only what applies."""
+
+    offer_validity_days: int | None = Field(default=None, ge=1, le=365)  # prices held after offers close
+    payment_stages: list[PaymentStage] = Field(default_factory=list, max_length=10)
+    retention_percent: Decimal | None = Field(default=None, gt=0, le=100, decimal_places=2)
+    retention_months: int | None = Field(default=None, ge=1, le=120)
+    warranty_months: int | None = Field(default=None, ge=1, le=240)  # defects liability from handover
+
+    @model_validator(mode="after")
+    def _consistent(self):
+        if self.payment_stages and sum(s.percent for s in self.payment_stages) != 100:
+            raise ValueError("Payment stages must add up to 100%.")
+        if (self.retention_percent is None) != (self.retention_months is None):
+            raise ValueError("Give both the retention percentage and how long it is held.")
+        return self
+
+
+class TenderRulesIn(BaseModel):
+    """Stage 3.10: the rules of participation the owner sets on a draft. The
+    offer deadline itself is set with the dates (Stage 3.7)."""
+
+    tender_type: TenderType = TenderType.owner_visible
+    questions_allowed: bool = True
+    questions_deadline: datetime | None = None  # with an offset; None = until offers close
+    commercial_conditions: CommercialConditions = Field(default_factory=CommercialConditions)
+    commercial_terms: str | None = Field(default=None, max_length=5000)  # other conditions
+    bidder_instructions: str | None = Field(default=None, max_length=5000)
+
+
+class TenderRulesOut(BaseModel):
+    questions_allowed: bool = True
+    questions_deadline: UTCDateTime | None = None
+    # Derived from the authoritative rules (services.tender_rules), so the
+    # page says exactly what the server will do.
+    questions_close_at: UTCDateTime | None = None
+    questions_open: bool = False
+    commercial_conditions: CommercialConditions = Field(default_factory=CommercialConditions)
+    commercial_terms: str | None = None
+    bidder_instructions: str | None = None
+
+
 class ProjectItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -189,4 +242,5 @@ class ProjectDetailOut(ProjectOut):
     items: list[ProjectItemOut] = []
     provider_eligibility: ProviderEligibilityOut = Field(default_factory=ProviderEligibilityOut)
     response_requirements: ResponseRequirements = Field(default_factory=ResponseRequirements)
+    tender_rules: TenderRulesOut = Field(default_factory=TenderRulesOut)
     currency: str = "KWD"

@@ -111,14 +111,16 @@ def test_create_project_accepts_iso_deadlines_and_stores_utc(db, submitted, stor
 
 
 def test_create_project_draft_with_offset_is_stored_at_the_correct_instant(db):
-    """Drafts skip the 'must be in the future' check; previously the offset
-    was dropped on the way into the naive column, so +03:00 was off by 3h."""
+    """Previously the offset was dropped on the way into the naive column, so
+    +03:00 was off by 3h. (Drafts now need a future deadline too: a draft
+    whose deadline passes expires -- Stage 3.11.)"""
     owner = _owner_client(db)
+    year = datetime.utcnow().year + 1
 
-    r = _post_project(owner, "2020-01-01T00:00:00+03:00", status="draft")
+    r = _post_project(owner, f"{year}-01-01T00:00:00+03:00", status="draft")
 
     assert r.status_code == 201, r.text
-    assert r.json()["bid_deadline"] == "2019-12-31T21:00:00Z"
+    assert r.json()["bid_deadline"] == f"{year - 1}-12-31T21:00:00Z"
 
 
 def test_offset_is_applied_not_just_stripped_when_checking_the_future(db):

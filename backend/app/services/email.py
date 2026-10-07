@@ -33,7 +33,7 @@ def notify_owner_new_offer(
         f"<p>You received a new sealed offer on <strong>{project_title}</strong>. "
         f"Bidder identity and amount stay hidden until you close bidding.</p>"
         if sealed
-        else f"<p><strong>{service_provider_name}</strong> submitted an offer of ${amount:,.2f} on <strong>{project_title}</strong>.</p>"
+        else f"<p><strong>{service_provider_name}</strong> submitted an offer of {settings.marketplace_currency} {amount:,.3f} on <strong>{project_title}</strong>.</p>"
     )
     _send(
         owner_email,
@@ -110,4 +110,17 @@ def notify_owner_deadline_approaching(owner_email: str, project_title: str, proj
         f"<p><strong>{project_title}</strong> stops accepting offers in less than 24 hours. "
         f"You currently have {offer_count} offer{plural}.</p>"
         f'<p><a href="{settings.app_url}/owner/projects/{project_id}">Review offers</a></p>',
+    )
+
+
+def notify_organization_invitation(to_email: str, organization_name: str, invited_by: str, token: str) -> None:
+    link = f"{settings.app_url}/invite/{token}"
+    _send(
+        to_email,
+        f"{invited_by} invited you to act for {organization_name} on U-Tender",
+        f"<p><strong>{invited_by}</strong> invited you to join <strong>{organization_name}</strong> on U-Tender, "
+        f"so you can work on its requirements and offers with your colleagues.</p>"
+        f'<p><a href="{link}">Accept the invitation</a> (sign up first if you don\'t have an account).</p>'
+        f"<p dir=\"rtl\"><strong>{invited_by}</strong> دعاك للانضمام إلى <strong>{organization_name}</strong> على U-Tender. "
+        f'<a href="{link}">اقبل الدعوة</a>.</p>',
     )

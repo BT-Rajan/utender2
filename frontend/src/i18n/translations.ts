@@ -28,6 +28,122 @@ export interface Dictionary {
     choose: string;
     none: string;
   };
+  tenderRules: {
+    heading: string;
+    hint: string;
+    offersClose: string;
+    offersCloseHint: string;
+    visibility: string;
+    ownerVisible: string;
+    sealed: string;
+    questions: string;
+    questionsAllowed: string;
+    questionsUntil: string;
+    questionsUntilHint: string;
+    commercialTerms: string;
+    commercialTermsHint: string;
+    instructions: string;
+    instructionsHint: string;
+    save: string;
+    saved: string;
+    saveError: string;
+    providerHeading: string;
+    pOffersClose: string;
+    pRevise: string;
+    pSealed: string;
+    pOwnerVisible: string;
+    pQuestionsUntil: string;
+    pQuestionsClosed: string;
+    pNoQuestions: string;
+    pDeclarations: string;
+    pCommercial: string;
+    pInstructions: string;
+    offerValidity: string;
+    paymentStages: string;
+    paymentStagesHint: string;
+    milestone: string;
+    percent: string;
+    addStage: string;
+    remove: string;
+    stagesTotal: string;
+    retention: string;
+    retentionPercent: string;
+    retentionMonths: string;
+    warranty: string;
+    otherConditions: string;
+    pValidity: string;
+    pPayment: string;
+    pRetention: string;
+    pWarranty: string;
+    pOther: string;
+  };
+  organization: {
+    heading: string;
+    hint: string;
+    representative: string;
+    member: string;
+    remove: string;
+    removeConfirm: string;
+    email: string;
+    emailPlaceholder: string;
+    position: string;
+    add: string;
+    addHint: string;
+    error: string;
+    invite: string;
+    inviteHint: string;
+    inviteSent: string;
+    pending: string;
+    expires: string;
+    withdraw: string;
+  };
+  quality: {
+    ready: string;
+    readyHint: string;
+    notReady: string;
+    notReadyHint: string;
+    warningsHeading: string;
+    section_details: string;
+    section_dates: string;
+    section_rules: string;
+    section_items: string;
+    section_response: string;
+    section_eligibility: string;
+    section_documents: string;
+    title_too_short: string;
+    scope_missing: string;
+    scope_brief: string;
+    type_missing: string;
+    type_unlisted: string;
+    address_missing: string;
+    governorate_missing: string;
+    area_missing: string;
+    deadline_passed: string;
+    deadline_soon: string;
+    timing_missing: string;
+    questions_deadline_passed: string;
+    per_item_without_items: string;
+    item_unit_missing: string;
+    item_quantity_missing: string;
+    eligibility_category_missing: string;
+    eligibility_governorate_missing: string;
+    qualification_retired: string;
+    documents_missing: string;
+    publishBlocked: string;
+    documents_required_missing: string;
+  };
+  invite: {
+    heading: string;
+    body: string;
+    someone: string;
+    expires: string;
+    accept: string;
+    signUp: string;
+    logIn: string;
+    wrongAccount: string;
+    invalid: string;
+    acceptError: string;
+  };
   eligibility: {
     heading: string;
     hint: string;
@@ -133,6 +249,8 @@ export interface Dictionary {
     uploadHint: string;
     heading: string;
     saveError: string;
+    neededToPrice: string;
+    neededToPriceHint: string;
   };
   location: {
     governorate: string;
@@ -195,6 +313,15 @@ export interface Dictionary {
     saved: string;
     saveError: string;
     notSet: string;
+    lastSaved: string;
+    discard: string;
+    discardConfirm: string;
+    discarded: string;
+    resumeHeading: string;
+    resumeHint: string;
+    untitled: string;
+    lastSavedShort: string;
+    expired: string;
   };
   verification: {
     scopeLabel: string;
@@ -337,6 +464,9 @@ export interface Dictionary {
     askButton: string;
     askError: string;
     answerError: string;
+    closesAt: string;
+    closedAt: string;
+    unansweredClosed: string;
   };
   service_provider: {
     roleLabel: string;
@@ -807,6 +937,122 @@ export const en: Dictionary = {
     choose: "Choose a type of work",
     none: "Not specified",
   },
+  tenderRules: {
+    heading: "Offer & question rules",
+    hint: "How this opportunity is run — kept apart from what you're asking for. Providers see these rules before they respond.",
+    offersClose: "Offers close",
+    offersCloseHint: "Set under Dates. Offers, changes and withdrawals are refused after this moment.",
+    visibility: "Who sees offers, and when",
+    ownerVisible: "I see each offer as it arrives",
+    sealed: "Sealed — I see offers only after offers close",
+    questions: "Questions from providers",
+    questionsAllowed: "Providers may ask questions",
+    questionsUntil: "Questions close at (optional)",
+    questionsUntilHint: "Leave blank to take questions until offers close. At the cut-off, questions and answers both close. In your local time.",
+    commercialTerms: "Commercial conditions",
+    commercialTermsHint: "Only what applies, e.g. payment stages, retention, warranty, how long prices must stay valid.",
+    instructions: "Instructions for providers",
+    instructionsHint: "Anything providers must know or do before responding, e.g. site-visit arrangements.",
+    save: "Save rules",
+    saved: "Saved",
+    saveError: "Could not save the rules.",
+    providerHeading: "Rules for this opportunity",
+    pOffersClose: "Offers close {date}. After that, offers can't be submitted, changed or withdrawn.",
+    pRevise: "Until then you can revise or withdraw your offer. Every revision is recorded.",
+    pSealed: "Sealed: the owner sees offers only after offers close.",
+    pOwnerVisible: "The owner sees each offer as it arrives.",
+    pQuestionsUntil: "Questions are accepted until {date}.",
+    pQuestionsClosed: "Questions are closed.",
+    pNoQuestions: "This requirement doesn't accept questions.",
+    pDeclarations: "Before submitting, you must confirm the owner's declarations ({count}).",
+    pCommercial: "Commercial conditions",
+    pInstructions: "Instructions",
+    offerValidity: "Offer validity (days after offers close)",
+    paymentStages: "Payment stages",
+    paymentStagesHint: "How you will pay, e.g. 30% on mobilisation, 60% on progress, 10% on handover. Must add up to 100%.",
+    milestone: "Milestone",
+    percent: "%",
+    addStage: "Add stage",
+    remove: "Remove",
+    stagesTotal: "Total {total}%",
+    retention: "Retention",
+    retentionPercent: "% held",
+    retentionMonths: "for (months)",
+    warranty: "Warranty / defects liability (months from handover)",
+    otherConditions: "Other conditions",
+    pValidity: "Prices must stay valid for {days} days after offers close.",
+    pPayment: "Payment:",
+    pRetention: "Retention: {percent}% held for {months} months.",
+    pWarranty: "Warranty: {months} months from handover.",
+    pOther: "Other conditions",
+  },
+  organization: {
+    heading: "Organization members",
+    hint: "Everyone here acts for the organization and shares everything done for it: its verification, requirements, offers and questions.",
+    representative: "Authorized representative",
+    member: "Member",
+    remove: "Remove",
+    removeConfirm: "Remove this member? They will no longer act for the organization. Everything they worked on stays with the organization.",
+    email: "Colleague's email",
+    emailPlaceholder: "colleague@company.com",
+    position: "Position (optional)",
+    add: "Add member",
+    addHint: "Your colleague signs up for their own account first. They then act for the organization; they don't need to verify separately.",
+    error: "Could not update the members.",
+    invite: "Send invitation",
+    inviteHint: "We email them a link. They accept it after signing in (or signing up) with that email, and then act for the organization — no separate verification. You can also share the link yourself.",
+    inviteSent: "Invitation sent. You can also share this link (for example on WhatsApp); it only works for that email:",
+    pending: "Invitations waiting to be accepted",
+    expires: "link valid until {date}",
+    withdraw: "Withdraw",
+  },
+  quality: {
+    ready: "Ready for preview",
+    readyHint: "Nothing essential is missing. Look over any suggestions below, then preview and publish when you're ready — nothing is published until you do.",
+    notReady: "{count} thing(s) to fix before publishing",
+    notReadyHint: "Providers couldn't understand or price this requirement yet. Each item says what is missing and where to fix it.",
+    warningsHeading: "Suggestions (won't stop you publishing)",
+    section_details: "Fix in Details",
+    section_dates: "Fix in Dates",
+    section_rules: "Fix in Offer & question rules",
+    section_items: "Fix in What to price",
+    section_response: "Fix in What providers must submit",
+    section_eligibility: "Fix in Who can respond",
+    section_documents: "Add documents",
+    title_too_short: "Give the requirement a title that says what the work is (at least 5 characters).",
+    scope_missing: "Describe the work: what needs doing, where on the site and to what standard. A provider can't price a requirement without it.",
+    scope_brief: "The scope is very brief. Providers price more accurately when they know exactly what's included and what isn't.",
+    type_missing: "Choose the type of work, so the right providers find it.",
+    type_unlisted: "The type of work isn't one of the platform's categories, so providers filtering by category won't find it.",
+    address_missing: "Give the site address or a description of where the site is.",
+    governorate_missing: "Choose the governorate, so providers can judge travel and whether they cover the area.",
+    area_missing: "Add the area (e.g. Salwa), so providers can judge the location without the exact address.",
+    deadline_passed: "Set an offer deadline in the future.",
+    deadline_soon: "Offers close in under 3 days. Providers may not have time to visit the site and price properly.",
+    timing_missing: "Say roughly when the work should happen (a start date or a duration), so providers can check their availability.",
+    questions_deadline_passed: "The question deadline has passed: move it later, or remove it to take questions until offers close.",
+    per_item_without_items: "The requirement is priced per item but lists no items. Add the items, or price it as one total.",
+    item_unit_missing: "Item {position} has a quantity but no unit.",
+    item_quantity_missing: "Item {position} has no quantity, so providers will price it as a lump sum.",
+    eligibility_category_missing: "Who can respond depends on the type of work, but none from the platform's list is chosen.",
+    eligibility_governorate_missing: "Who can respond depends on the governorate, but none is chosen.",
+    qualification_retired: "A required qualification is no longer on the platform's list. Choose again under Who can respond.",
+    documents_missing: "No drawings, BOQ or photos are attached. For detailed work, providers usually need them to price accurately.",
+    publishBlocked: "Fix the items above before publishing.",
+    documents_required_missing: "You said providers need the documents to price this, but none are uploaded. Upload them, or untick that option.",
+  },
+  invite: {
+    heading: "Join {organization} on U-Tender",
+    body: "{inviter} invited {email} to act for {organization}: to work on its requirements or offers together with colleagues.",
+    someone: "Someone",
+    expires: "This invitation is valid until {date}.",
+    accept: "Join {organization}",
+    signUp: "Sign up with this email",
+    logIn: "Log in",
+    wrongAccount: "You're signed in with a different account. Log out and sign in as {email} to accept.",
+    invalid: "This invitation link is invalid, has expired or was withdrawn. Ask for a new one.",
+    acceptError: "Could not accept the invitation.",
+  },
   eligibility: {
     heading: "Who can respond",
     hint: "Every provider must already be verified by U-Tender. Narrow it further only if the work genuinely needs it — each restriction reduces the offers you receive.",
@@ -912,6 +1158,8 @@ export const en: Dictionary = {
     uploadHint: "PDF, DWG, Excel (.xlsx), Word (.docx), JPG/PNG, or a .zip of them, up to 50 MB per upload. Uploading a file with the same name replaces it as a new version.",
     heading: "Documents",
     saveError: "Could not update the document.",
+    neededToPrice: "Providers need these documents to price this work",
+    neededToPriceHint: "Tick this if the work can't be priced without the drawings, BOQ or photos. Publishing then needs at least one document.",
   },
   location: {
     governorate: "Governorate",
@@ -974,6 +1222,15 @@ export const en: Dictionary = {
     saved: "Saved",
     saveError: "Could not save the draft.",
     notSet: "Not set",
+    lastSaved: "Draft — last saved {date}. Only you can see it; nothing is published until you publish it.",
+    discard: "Discard draft",
+    discardConfirm: "Discard this draft? It will no longer be listed or editable, and it can't be published. This can't be undone.",
+    discarded: "This draft was discarded on {date}. It is kept for your records but can no longer be edited or published.",
+    resumeHeading: "You have drafts in progress",
+    resumeHint: "Continue one instead of starting again:",
+    untitled: "Untitled",
+    lastSavedShort: "last saved {date}",
+    expired: "This requirement expired at its offer deadline ({date}) without any offers. It is now read-only.",
   },
   verification: {
     scopeLabel: "Applies to",
@@ -1133,6 +1390,9 @@ export const en: Dictionary = {
     askButton: "Ask",
     askError: "Could not submit your question.",
     answerError: "Could not submit your answer.",
+    closesAt: "Questions and answers close {date}.",
+    closedAt: "Questions and answers closed {date}. No new questions or answers.",
+    unansweredClosed: "Not answered before the question cut-off.",
   },
   service_provider: {
     roleLabel: "Service provider",
@@ -1611,6 +1871,122 @@ export const ar: Dictionary = {
     choose: "اختر نوع العمل",
     none: "غير محدد",
   },
+  tenderRules: {
+    heading: "قواعد العروض والأسئلة",
+    hint: "طريقة إدارة هذه الفرصة — منفصلة عما تطلبه. يرى مقدمو الخدمة هذه القواعد قبل تقديم عروضهم.",
+    offersClose: "موعد إغلاق العروض",
+    offersCloseHint: "يُحدد في قسم التواريخ. تُرفض العروض والتعديلات والسحب بعد هذا الموعد.",
+    visibility: "من يرى العروض ومتى",
+    ownerVisible: "أرى كل عرض فور وصوله",
+    sealed: "مختوم — أرى العروض بعد إغلاقها فقط",
+    questions: "أسئلة مقدمي الخدمة",
+    questionsAllowed: "يمكن لمقدمي الخدمة طرح الأسئلة",
+    questionsUntil: "موعد إغلاق الأسئلة (اختياري)",
+    questionsUntilHint: "اتركه فارغًا لاستقبال الأسئلة حتى إغلاق العروض. عند هذا الموعد تُغلق الأسئلة والأجوبة معًا. بتوقيتك المحلي.",
+    commercialTerms: "الشروط التجارية",
+    commercialTermsHint: "ما ينطبق فقط، مثل: مراحل الدفع، المحتجزات، الضمان، مدة صلاحية الأسعار.",
+    instructions: "تعليمات لمقدمي الخدمة",
+    instructionsHint: "أي شيء يجب أن يعرفه مقدم الخدمة أو يفعله قبل تقديم العرض، مثل ترتيبات زيارة الموقع.",
+    save: "حفظ القواعد",
+    saved: "تم الحفظ",
+    saveError: "تعذر حفظ القواعد.",
+    providerHeading: "قواعد هذه الفرصة",
+    pOffersClose: "تُغلق العروض في {date}. بعد ذلك لا يمكن تقديم العروض أو تعديلها أو سحبها.",
+    pRevise: "حتى ذلك الحين يمكنك تعديل عرضك أو سحبه. يُسجل كل تعديل.",
+    pSealed: "مختوم: لا يرى المالك العروض إلا بعد إغلاقها.",
+    pOwnerVisible: "يرى المالك كل عرض فور وصوله.",
+    pQuestionsUntil: "تُقبل الأسئلة حتى {date}.",
+    pQuestionsClosed: "باب الأسئلة مغلق.",
+    pNoQuestions: "هذا الطلب لا يقبل الأسئلة.",
+    pDeclarations: "قبل التقديم، يجب أن تؤكد إقرارات المالك ({count}).",
+    pCommercial: "الشروط التجارية",
+    pInstructions: "التعليمات",
+    offerValidity: "صلاحية العرض (أيام بعد إغلاق العروض)",
+    paymentStages: "مراحل الدفع",
+    paymentStagesHint: "طريقة الدفع، مثل: 30% عند بدء الأعمال، 60% حسب الإنجاز، 10% عند التسليم. يجب أن يكون المجموع 100%.",
+    milestone: "المرحلة",
+    percent: "%",
+    addStage: "إضافة مرحلة",
+    remove: "إزالة",
+    stagesTotal: "المجموع {total}%",
+    retention: "المحتجزات",
+    retentionPercent: "% محتجزة",
+    retentionMonths: "لمدة (أشهر)",
+    warranty: "الضمان / مسؤولية العيوب (أشهر من التسليم)",
+    otherConditions: "شروط أخرى",
+    pValidity: "يجب أن تبقى الأسعار سارية لمدة {days} يومًا بعد إغلاق العروض.",
+    pPayment: "الدفع:",
+    pRetention: "المحتجزات: {percent}% لمدة {months} شهرًا.",
+    pWarranty: "الضمان: {months} شهرًا من التسليم.",
+    pOther: "شروط أخرى",
+  },
+  organization: {
+    heading: "أعضاء الجهة",
+    hint: "كل من هنا يعمل باسم الجهة ويشارك كل ما يتم باسمها: توثيقها وطلباتها وعروضها وأسئلتها.",
+    representative: "الممثل المفوض",
+    member: "عضو",
+    remove: "إزالة",
+    removeConfirm: "هل تريد إزالة هذا العضو؟ لن يعمل باسم الجهة بعد ذلك، وكل ما عمل عليه يبقى للجهة.",
+    email: "بريد الزميل",
+    emailPlaceholder: "colleague@company.com",
+    position: "المنصب (اختياري)",
+    add: "إضافة عضو",
+    addHint: "ينشئ زميلك حسابه الخاص أولًا، ثم يعمل باسم الجهة دون حاجة إلى توثيق منفصل.",
+    error: "تعذر تحديث الأعضاء.",
+    invite: "إرسال دعوة",
+    inviteHint: "نرسل لهم رابطًا بالبريد. يقبلونه بعد تسجيل الدخول (أو التسجيل) بهذا البريد، ثم يعملون باسم الجهة دون توثيق منفصل. يمكنك أيضًا مشاركة الرابط بنفسك.",
+    inviteSent: "تم إرسال الدعوة. يمكنك أيضًا مشاركة هذا الرابط (مثلًا عبر واتساب)؛ لا يعمل إلا لهذا البريد:",
+    pending: "دعوات بانتظار القبول",
+    expires: "الرابط صالح حتى {date}",
+    withdraw: "سحب",
+  },
+  quality: {
+    ready: "جاهز للمعاينة",
+    readyHint: "لا ينقص شيء أساسي. راجع الاقتراحات أدناه، ثم عاين وانشر عندما تكون جاهزًا — لن يُنشر شيء حتى تقوم بذلك.",
+    notReady: "{count} أمر(أمور) يجب إصلاحها قبل النشر",
+    notReadyHint: "لا يستطيع مقدمو الخدمة فهم هذا الطلب أو تسعيره بعد. يوضح كل بند ما ينقص وأين يُصلح.",
+    warningsHeading: "اقتراحات (لن تمنعك من النشر)",
+    section_details: "أصلحه في التفاصيل",
+    section_dates: "أصلحه في التواريخ",
+    section_rules: "أصلحه في قواعد العروض والأسئلة",
+    section_items: "أصلحه في ما يجب تسعيره",
+    section_response: "أصلحه في ما يجب على مقدمي الخدمة تقديمه",
+    section_eligibility: "أصلحه في من يمكنه تقديم عرض",
+    section_documents: "إضافة مستندات",
+    title_too_short: "أعطِ الطلب عنوانًا يوضح نوع العمل (5 أحرف على الأقل).",
+    scope_missing: "صف العمل: ما المطلوب، وأين في الموقع، وبأي مستوى. لا يمكن لمقدم الخدمة تسعير طلب بدون ذلك.",
+    scope_brief: "نطاق العمل مختصر جدًا. يسعّر مقدمو الخدمة بدقة أكبر عندما يعرفون ما يشمله العمل وما لا يشمله.",
+    type_missing: "اختر نوع العمل ليجده مقدمو الخدمة المناسبون.",
+    type_unlisted: "نوع العمل ليس من فئات المنصة، لذا لن يجده من يبحث حسب الفئة.",
+    address_missing: "أدخل عنوان الموقع أو وصفًا لمكانه.",
+    governorate_missing: "اختر المحافظة ليتمكن مقدمو الخدمة من تقدير التنقل وتغطية المنطقة.",
+    area_missing: "أضف المنطقة (مثل سلوى) ليتمكن مقدمو الخدمة من تقدير الموقع دون العنوان الدقيق.",
+    deadline_passed: "حدد موعدًا مستقبليًا لإغلاق العروض.",
+    deadline_soon: "تُغلق العروض خلال أقل من 3 أيام. قد لا يتسع الوقت لزيارة الموقع والتسعير بشكل صحيح.",
+    timing_missing: "حدد تقريبًا متى يجب أن يتم العمل (تاريخ بدء أو مدة) ليتحقق مقدمو الخدمة من توفرهم.",
+    questions_deadline_passed: "انتهى موعد الأسئلة: أجّله، أو احذفه لاستقبال الأسئلة حتى إغلاق العروض.",
+    per_item_without_items: "الطلب مسعّر حسب البنود لكنه لا يتضمن بنودًا. أضف البنود أو اجعله سعرًا إجماليًا واحدًا.",
+    item_unit_missing: "البند {position} له كمية بدون وحدة.",
+    item_quantity_missing: "البند {position} بدون كمية، لذا سيسعّره مقدمو الخدمة كمبلغ مقطوع.",
+    eligibility_category_missing: "شرط من يمكنه تقديم عرض يعتمد على نوع العمل، لكن لم يُختر نوع من قائمة المنصة.",
+    eligibility_governorate_missing: "شرط من يمكنه تقديم عرض يعتمد على المحافظة، لكن لم تُختر محافظة.",
+    qualification_retired: "أحد المؤهلات المطلوبة لم يعد ضمن قائمة المنصة. اختر مجددًا في من يمكنه تقديم عرض.",
+    documents_missing: "لا توجد مخططات أو جدول كميات أو صور. في الأعمال التفصيلية يحتاجها مقدمو الخدمة عادةً للتسعير بدقة.",
+    publishBlocked: "أصلح البنود أعلاه قبل النشر.",
+    documents_required_missing: "ذكرت أن مقدمي الخدمة يحتاجون المستندات للتسعير، لكن لم يُرفع أي منها. ارفعها أو ألغِ تحديد هذا الخيار.",
+  },
+  invite: {
+    heading: "انضم إلى {organization} على U-Tender",
+    body: "دعا {inviter} البريد {email} للعمل باسم {organization}: للعمل على طلباتها أو عروضها مع الزملاء.",
+    someone: "شخص ما",
+    expires: "هذه الدعوة صالحة حتى {date}.",
+    accept: "انضم إلى {organization}",
+    signUp: "سجّل بهذا البريد",
+    logIn: "تسجيل الدخول",
+    wrongAccount: "أنت مسجل الدخول بحساب مختلف. سجّل الخروج وادخل باسم {email} لقبول الدعوة.",
+    invalid: "رابط الدعوة غير صالح أو منتهي أو تم سحبه. اطلب رابطًا جديدًا.",
+    acceptError: "تعذر قبول الدعوة.",
+  },
   eligibility: {
     heading: "من يمكنه تقديم عرض",
     hint: "يجب أن يكون كل مقدم خدمة موثقًا مسبقًا لدى U-Tender. لا تضيّق النطاق إلا إذا تطلّب العمل ذلك فعلًا — فكل قيد يقلل عدد العروض التي تصلك.",
@@ -1716,6 +2092,8 @@ export const ar: Dictionary = {
     uploadHint: "PDF أو DWG أو Excel (.xlsx) أو Word (.docx) أو JPG/PNG أو ملف .zip يضمها، حتى 50 ميجابايت لكل رفع. رفع ملف بالاسم نفسه يستبدله كنسخة جديدة.",
     heading: "المستندات",
     saveError: "تعذر تحديث المستند.",
+    neededToPrice: "يحتاج مقدمو الخدمة هذه المستندات لتسعير العمل",
+    neededToPriceHint: "حدد هذا إذا تعذر تسعير العمل بدون المخططات أو جدول الكميات أو الصور. عندها يتطلب النشر مستندًا واحدًا على الأقل.",
   },
   location: {
     governorate: "المحافظة",
@@ -1778,6 +2156,15 @@ export const ar: Dictionary = {
     saved: "تم الحفظ",
     saveError: "تعذر حفظ المسودة.",
     notSet: "غير محدد",
+    lastSaved: "مسودة — آخر حفظ {date}. لا يراها أحد غيرك؛ لن يُنشر شيء حتى تقوم بالنشر.",
+    discard: "تجاهل المسودة",
+    discardConfirm: "هل تريد تجاهل هذه المسودة؟ لن تظهر في القائمة ولن يمكن تعديلها أو نشرها. لا يمكن التراجع عن ذلك.",
+    discarded: "تم تجاهل هذه المسودة في {date}. تُحفظ لسجلاتك لكن لا يمكن تعديلها أو نشرها.",
+    resumeHeading: "لديك مسودات قيد الإعداد",
+    resumeHint: "تابع إحداها بدلًا من البدء من جديد:",
+    untitled: "بدون عنوان",
+    lastSavedShort: "آخر حفظ {date}",
+    expired: "انتهت صلاحية هذا الطلب عند موعد إغلاق العروض ({date}) دون أي عروض. أصبح الآن للقراءة فقط.",
   },
   verification: {
     scopeLabel: "ينطبق على",
@@ -1937,6 +2324,9 @@ export const ar: Dictionary = {
     askButton: "إرسال السؤال",
     askError: "تعذر إرسال سؤالك.",
     answerError: "تعذر إرسال إجابتك.",
+    closesAt: "تُغلق الأسئلة والأجوبة في {date}.",
+    closedAt: "أُغلقت الأسئلة والأجوبة في {date}. لا أسئلة أو أجوبة جديدة.",
+    unansweredClosed: "لم تتم الإجابة قبل موعد إغلاق الأسئلة.",
   },
   service_provider: {
     roleLabel: "مزوّد خدمة",

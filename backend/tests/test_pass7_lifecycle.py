@@ -159,8 +159,10 @@ def test_pass7_lifecycle():
     r = owner_client.post(f"/owner/projects/{project3_id}/cancel")
     check("cancel from open succeeds", r.status_code == 200 and r.json()["status"] == "canceled")
 
+    # Once offers have closed, only providers who took part can open it
+    # (this provider never bid on project3).
     r = service_provider_client.get(f"/projects/{project3_id}")
-    check("canceled project still viewable by service provider (not draft)", r.status_code == 200)
+    check("canceled project hidden from a provider who never bid", r.status_code == 404)
 
 
     # ---------- auto-expire / auto-close on deadline (sync_expired_projects) ----------

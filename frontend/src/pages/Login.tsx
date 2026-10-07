@@ -4,12 +4,13 @@ import { useAuth } from "@/auth/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ApiError } from "@/api/client";
+import { safeNext } from "@/lib/next";
 
 export function LoginPage() {
   const { login } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
-  const location = useLocation() as { state?: { notice?: string } };
+  const location = useLocation() as { state?: { notice?: string }; search: string };
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -20,7 +21,7 @@ export function LoginPage() {
     const form = new FormData(e.currentTarget);
     try {
       await login(form.get("email") as string, form.get("password") as string);
-      navigate("/");
+      navigate(safeNext(new URLSearchParams(location.search).get("next")) ?? "/");
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : t("auth.login.genericError"));
     } finally {

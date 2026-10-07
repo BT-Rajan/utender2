@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, ApiError, API_URL } from "@/api/client";
+import { apiFetch, ApiError, API_URL, draftVersion } from "@/api/client";
 import type { Drawing, Offer, ProjectDetail } from "@/api/types";
-import { timeRemaining, stars } from "@/lib/format";
+import { formatDeadline, timeRemaining, stars } from "@/lib/format";
 import { RatingInput } from "@/components/RatingInput";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { RequirementItemsEditor, RequirementItemsView } from "@/components/RequirementItems";
@@ -16,6 +16,8 @@ import { DraftDates } from "@/components/DraftDates";
 import { OfferResponseDetails, ResponseRequirementsEditor } from "@/components/ResponseRequirements";
 import { ProviderEligibilityEditor } from "@/components/ProviderEligibility";
 import { CategoryField } from "@/components/CategoryField";
+import { TenderRulesEditor } from "@/components/TenderRules";
+import { QualityCheck, type QualityReport } from "@/components/QualityCheck";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
 import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
 
@@ -104,6 +106,41 @@ function statusBadgeClasses(status: string) {
 // Mirrors MAX_SCOPE_CHARS in backend/app/routers/projects.py.
 const MAX_SCOPE_CHARS = 20000;
 
+// Stage 3.12: the owner says outright whether providers need the documents
+// to price (rather than the quality check guessing from the wording).
+function DocumentsNeeded({ project }: { project: ProjectDetail }) {
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const save = useMutation({
+    mutationFn: (value: boolean) =>
+      apiFetch<ProjectDetail>(`/projects/${project.id}`, { method: "PATCH", body: { documents_required: value }, headers: draftVersion(project) }),
+    onSuccess: (data) => {
+      setError(null);
+      queryClient.setQueryData(["project", project.id], data);
+    },
+    onError: (err) => setError(err instanceof ApiError ? err.detail : t("draftDetails.saveError")),
+  });
+  return (
+    <div className="mt-3">
+      <label className="flex items-start gap-2 text-[12.5px] text-navy">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={!!project.documents_required}
+          disabled={save.isPending}
+          onChange={(e) => save.mutate(e.target.checked)}
+        />
+        <span>
+          {t("documents.neededToPrice")}
+          <span className="block text-[11px] text-steel-light">{t("documents.neededToPriceHint")}</span>
+        </span>
+      </label>
+      {error && <p className="text-[11px] text-red mt-1">{error}</p>}
+    </div>
+  );
+}
+
 // Stage 3.2: the requirement's basic identity -- what the work is and where --
 // editable while it is still a private draft.
 function DraftDetailsForm({ project }: { project: ProjectDetail }) {
@@ -136,7 +173,11 @@ function DraftDetailsForm({ project }: { project: ProjectDetail }) {
     description !== (project.description ?? "");
 
   const save = useMutation({
-    mutationFn: () => apiFetch<ProjectDetail>(`/projects/${project.id}`, { method: "PATCH", body: { title, trade, governorate, area, address, description } }),
+    mutationFn: () => apiFetch<ProjectDetail>(`/projects/${project.id}`, {
+        method: "PATCH",
+        body: { title, trade, governorate, area, address, description },
+        headers: draftVersion(project),
+      }),
     onSuccess: (data) => {
       setError(null);
       setSaved(true);
@@ -150,7 +191,7 @@ function DraftDetailsForm({ project }: { project: ProjectDetail }) {
   const label = "block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5";
   const hint = "text-xs text-steel-light mt-1";
   return (
-    <section className="bg-white border border-border border-t-4 border-t-navy rounded px-6 py-5 mb-8 max-w-2xl">
+    <section id="section-details" className="bg-white border border-border border-t-4 border-t-navy rounded px-6 py-5 mb-8 max-w-2xl">
       <h2 className="font-display text-lg font-semibold text-navy mb-1">{t("draftDetails.heading")}</h2>
       <p className="text-[13px] text-steel mb-4">{t("draftDetails.intro")}</p>
       <ErrorBanner message={error} />
@@ -323,7 +364,7 @@ export function OwnerProjectDetailPage() {
   });
 
   const lifecycleMutation = useMutation({
-    mutationFn: (action: "publish" | "close" | "start-evaluation" | "no-award" | "cancel") =>
+    mutationFn: (action: "publish" | "close" | "start-evaluation" | "no-award" | "cancel" | "discard") =>
       apiFetch(`/owner/projects/${id}/${action}`, { method: "POST" }),
     onSuccess: () => {
       setError(null);
@@ -333,7 +374,16 @@ export function OwnerProjectDetailPage() {
     onError: (err) => setError(errorMessage(err, t("owner.projectDetail.statusError"))),
   });
 
+  // Stage 3.12: the server's quality check, re-read after every save.
+  const { data: quality } = useQuery({
+    queryKey: ["quality", id, project?.version],
+    queryFn: () => apiFetch<QualityReport>(`/projects/${id}/quality`),
+    enabled: !!project && project.status === "draft" && !project.discarded_at,
+  });
+
   if (!project) return <PageLoading />;
+  // Stage 3.11: a discarded draft stays readable to its owner but is closed to changes.
+  const editableDraft = project.status === "draft" && !project.discarded_at;
 
   const deadlinePassed = new Date(project.bid_deadline) < new Date();
 
@@ -359,22 +409,42 @@ export function OwnerProjectDetailPage() {
 
       <ErrorBanner message={error} />
 
-      {project.status === "draft" && <DraftDetailsForm project={project} />}
-      {project.status === "draft" && <DraftDates project={project} />}
-      {project.status === "draft" && <RequirementItemsEditor project={project} />}
-      {project.status === "draft" && <ResponseRequirementsEditor project={project} />}
-      {project.status === "draft" && <ProviderEligibilityEditor project={project} />}
+      {/* Stage 3.11: where this draft stands. */}
+      {editableDraft && project.updated_at && (
+        <p className="text-[12.5px] text-steel mb-4">{t("draftDetails.lastSaved").replace("{date}", formatDeadline(project.updated_at))}</p>
+      )}
+      {project.status === "expired" && project.offer_count === 0 && (
+        <div className="border border-border bg-border/30 rounded px-4 py-3 mb-6 text-sm text-steel max-w-2xl">
+          {t("draftDetails.expired").replace("{date}", formatDeadline(project.bid_deadline))}
+        </div>
+      )}
+      {project.discarded_at && (
+        <div className="border border-border bg-border/30 rounded px-4 py-3 mb-6 text-sm text-steel max-w-2xl">
+          {t("draftDetails.discarded").replace("{date}", formatDeadline(project.discarded_at))}
+        </div>
+      )}
 
-      {(project.status === "draft" ||
+      {editableDraft && <DraftDetailsForm project={project} />}
+      {editableDraft && <DraftDates project={project} />}
+      {editableDraft && <TenderRulesEditor project={project} />}
+      {editableDraft && <RequirementItemsEditor project={project} />}
+      {editableDraft && <ResponseRequirementsEditor project={project} />}
+      {editableDraft && <ProviderEligibilityEditor project={project} />}
+
+      {editableDraft && <QualityCheck report={quality} />}
+
+      {(editableDraft ||
         project.status === "open" ||
         project.status === "closed" ||
         project.status === "under_evaluation") && (
         <div className="flex flex-wrap gap-2 mb-6">
-          {project.status === "draft" && (
+          {editableDraft && (
             <button
               type="button"
               onClick={() => lifecycleMutation.mutate("publish")}
-              disabled={lifecycleMutation.isPending}
+              // The server refuses anyway; this just says so up front.
+              disabled={lifecycleMutation.isPending || !quality?.ready}
+              title={quality && !quality.ready ? t("quality.publishBlocked") : undefined}
               className="bg-amber hover:bg-amber-dark disabled:opacity-60 text-white text-xs font-semibold rounded px-4 py-2"
             >
               {t("owner.projectDetail.publish")}
@@ -410,14 +480,27 @@ export function OwnerProjectDetailPage() {
               {t("owner.projectDetail.markNoAward")}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => lifecycleMutation.mutate("cancel")}
-            disabled={lifecycleMutation.isPending}
-            className="text-xs text-red underline disabled:opacity-60"
-          >
-            {t("owner.projectDetail.cancelProject")}
-          </button>
+          {editableDraft ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(t("draftDetails.discardConfirm"))) lifecycleMutation.mutate("discard");
+              }}
+              disabled={lifecycleMutation.isPending}
+              className="text-xs text-red underline disabled:opacity-60"
+            >
+              {t("draftDetails.discard")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => lifecycleMutation.mutate("cancel")}
+              disabled={lifecycleMutation.isPending}
+              className="text-xs text-red underline disabled:opacity-60"
+            >
+              {t("owner.projectDetail.cancelProject")}
+            </button>
+          )}
         </div>
       )}
 
@@ -440,7 +523,7 @@ export function OwnerProjectDetailPage() {
                       {" "}
                       · {t(`documents.${d.category}`)} · {d.is_required ? t("documents.essential") : t("documents.supplementary")}
                     </span>
-                    {project.status === "draft" && (
+                    {editableDraft && (
                       <div className="flex flex-wrap items-center gap-2 mt-1 normal-case">
                         <select
                           aria-label={`${t("documents.typeLabel")}: ${d.file_name}`}
@@ -495,8 +578,11 @@ export function OwnerProjectDetailPage() {
           </button>
           {showHistory && <DrawingHistory projectId={project.id} t={t} />}
 
+          {editableDraft && <DocumentsNeeded project={project} />}
           <form
+            id="section-documents"
             ref={drawingsFormRef}
+            hidden={!!project.discarded_at}
             onSubmit={(e) => {
               e.preventDefault();
               const form = new FormData(e.currentTarget);
@@ -547,7 +633,12 @@ export function OwnerProjectDetailPage() {
             </div>
           )}
           <div className="mt-4">
-            <ClarificationsPanel projectId={project.id} role="owner" />
+            <ClarificationsPanel
+              projectId={project.id}
+              role="owner"
+              qaOpen={project.tender_rules.questions_open}
+              closesAt={project.tender_rules.questions_close_at}
+            />
           </div>
         </div>
 

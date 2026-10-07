@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, ApiError } from "@/api/client";
+import { apiFetch, ApiError, draftVersion } from "@/api/client";
 import type { Offer, ProjectDetail, ResponseRequirements } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
@@ -57,7 +57,7 @@ export function ResponseRequirementsEditor({ project }: { project: ProjectDetail
   };
 
   const save = useMutation({
-    mutationFn: () => apiFetch<ProjectDetail>(`/projects/${project.id}/response-requirements`, { method: "PUT", body: payload() }),
+    mutationFn: () => apiFetch<ProjectDetail>(`/projects/${project.id}/response-requirements`, { method: "PUT", body: payload() , headers: draftVersion(project) }),
     onSuccess: (data) => {
       setError(null);
       setSaved(true);
@@ -83,7 +83,7 @@ export function ResponseRequirementsEditor({ project }: { project: ProjectDetail
   );
 
   return (
-    <section className="bg-white border border-border border-t-4 border-t-navy rounded px-6 py-5 mb-8 max-w-2xl">
+    <section id="section-response" className="bg-white border border-border border-t-4 border-t-navy rounded px-6 py-5 mb-8 max-w-2xl">
       <h2 className="font-display text-lg font-semibold text-navy mb-1">{t("response.heading")}</h2>
       <p className="text-xs text-steel-light mb-3">{withCurrency(t("response.hint"), project.currency)}</p>
       <ErrorBanner message={error} />

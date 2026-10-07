@@ -180,6 +180,9 @@ export function OwnerDashboardPage() {
               <p className="font-mono text-xs text-blue">
                 {p.offer_count} {t("owner.dashboard.offersReceived")}
                 {p.status === "closed" && <span className="text-amber-dark"> · {t("owner.dashboard.readyToReview")}</span>}
+                {p.status === "draft" && p.updated_at && (
+                  <span className="text-steel-light"> · {t("draftDetails.lastSavedShort").replace("{date}", formatDeadline(p.updated_at))}</span>
+                )}
               </p>
               <div className="tblock-strip mt-4">
                 <div className="tblock-field">

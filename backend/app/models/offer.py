@@ -11,7 +11,12 @@ from app.models.enums import OfferStatus
 
 class Offer(Base):
     __tablename__ = "offers"
-    __table_args__ = (UniqueConstraint("project_id", "service_provider_id", name="uq_project_service_provider"),)
+    # One offer per provider -- and per organization (NULLs, individuals, are
+    # distinct to the database, so this only binds organizations).
+    __table_args__ = (
+        UniqueConstraint("project_id", "service_provider_id", name="uq_project_service_provider"),
+        UniqueConstraint("project_id", "organization_id", name="uq_project_organization"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
     project_id: Mapped[str] = mapped_column(
@@ -19,6 +24,10 @@ class Offer(Base):
     )
     service_provider_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("service_provider_profiles.user_id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # The organization this was done for (services.team); NULL = an individual's.
+    organization_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(15, 3), nullable=False)  # KWD: 3 decimals (fils)
     timeline_estimate: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -78,6 +87,7 @@ class OfferDocument(Base):
     __tablename__ = "offer_documents"
     __table_args__ = (
         UniqueConstraint("project_id", "service_provider_id", "label", name="uq_offer_document_label"),
+        UniqueConstraint("project_id", "organization_id", "label", name="uq_offer_document_org_label"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
@@ -86,6 +96,10 @@ class OfferDocument(Base):
     )
     service_provider_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("service_provider_profiles.user_id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # The organization this was done for (services.team); NULL = an individual's.
+    organization_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
     )
     label: Mapped[str] = mapped_column(String(120), nullable=False)
     file_path: Mapped[str] = mapped_column(String(500), nullable=False)

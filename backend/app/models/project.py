@@ -2,12 +2,16 @@ from datetime import date, datetime
 
 from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 from app.models.common import gen_uuid
 from app.models.enums import PricingBasis, ProjectStatus, TenderType
+
+
+def _now_s() -> datetime:
+    return datetime.utcnow().replace(microsecond=0)
 
 
 class Project(Base):
@@ -16,6 +20,10 @@ class Project(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
     owner_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # The organization this was done for (services.team); NULL = an individual's.
+    organization_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     # Exact address or site description. Shown only where a provider can open
@@ -63,6 +71,28 @@ class Project(Base):
     # Stage 3.9: who may respond (see schemas.project.ProviderEligibilityIn).
     # NULL = every verified provider with active access.
     provider_eligibility: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Stage 3.10: the rules of participation, as distinct from what is being
+    # requested (title/scope/items above). The offer deadline (bid_deadline),
+    # the offer visibility (tender_type) and the declarations
+    # (response_requirements) already exist; these complete them.
+    # Questions: whether providers may ask, and until when (NULL = until
+    # offers close). Enforced by services.tender_rules.
+    questions_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
+    questions_deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Conditions the price is given under (payment stages, retention,
+    # warranty, offer validity...) and anything a provider must know or do
+    # before responding (site visit arrangements, access...). Free text, as
+    # the owner writes them; nothing is assumed.
+    commercial_terms: Mapped[str | None] = mapped_column(Text, nullable=True)  # "other conditions"
+    # Stage 3.12: the owner says providers can't price this without its
+    # documents (drawings, BOQ, photos). The quality gate then requires at
+    # least one -- an explicit statement, not a guess from the wording.
+    documents_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    # The common commercial terms as structured fields (schemas.project.
+    # CommercialConditions): offer validity, payment stages, retention,
+    # warranty. Each optional; NULL = none stated.
+    commercial_conditions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    bidder_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Admin moderation flag — independent of the owner-driven lifecycle
     # `status` above. Hides the project from the service provider feed and blocks
     # new bids while set, but leaves `status` untouched so un-suspending
@@ -73,6 +103,23 @@ class Project(Base):
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     deadline_reminder_sent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # Stage 3.11 (drafts): when the requirement was last saved (shown as
+    # "last saved"), and its version: +1 on every save, checked under the
+    # row lock against the version the saving page last saw (If-Match), so a
+    # stale page can never overwrite newer work -- however close together
+    # the two saves are.
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=_now_s, onupdate=_now_s)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    # A draft the owner deliberately discarded. It stays a draft (so it is as
+    # private as ever) but is no longer active: not listed, not editable,
+    # not publishable. Soft, so the audit trail keeps pointing at a record.
+    discarded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Sent with the "start a requirement" request so a repeated submission
+    # (double click, retry, resend after a dropped response) returns the
+    # draft already created instead of making a second one.
+    creation_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    __table_args__ = (UniqueConstraint("owner_id", "creation_token", name="uq_project_creation_token"),)
 
     drawings = relationship("ProjectDrawing", back_populates="project", cascade="all, delete-orphan")
     items = relationship(

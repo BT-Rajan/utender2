@@ -10,6 +10,11 @@ export class ApiError extends Error {
   }
 }
 
+// The language the interface is showing (I18nProvider keeps <html lang> in step).
+function interfaceLanguage(): string {
+  return typeof document !== "undefined" && document.documentElement.lang === "ar" ? "ar" : "en";
+}
+
 async function parseError(res: Response): Promise<never> {
   let detail = res.statusText;
   try {
@@ -41,19 +46,21 @@ async function tryRefresh(): Promise<boolean> {
 // Supabase's auto-refreshing session cookie.
 export async function apiFetch<T>(
   path: string,
-  options: { method?: string; body?: unknown; formData?: FormData; retry?: boolean } = {}
+  options: { method?: string; body?: unknown; formData?: FormData; retry?: boolean; headers?: Record<string, string> } = {}
 ): Promise<T> {
-  const { method = "GET", body, formData, retry = true } = options;
+  const { method = "GET", body, formData, retry = true, headers = {} } = options;
 
   const init: RequestInit = {
     method,
     credentials: "include",
+    // The server sends its messages in the interface's language.
+    headers: { "Accept-Language": interfaceLanguage(), ...headers },
   };
 
   if (formData) {
     init.body = formData;
   } else if (body !== undefined) {
-    init.headers = { "Content-Type": "application/json" };
+    init.headers = { "Accept-Language": interfaceLanguage(), ...headers, "Content-Type": "application/json" };
     init.body = JSON.stringify(body);
   }
 
@@ -77,4 +84,11 @@ export async function apiFetch<T>(
     return res.json();
   }
   return (await res.blob()) as unknown as T;
+}
+
+// Stage 3.11: a draft save carries the version the page last saw, so a stale
+// page (another tab or device) gets a clear refusal instead of overwriting
+// newer work.
+export function draftVersion(project: { version?: number | null }): Record<string, string> {
+  return project.version != null ? { "If-Match": String(project.version) } : {};
 }

@@ -22,7 +22,9 @@ from app.schemas.review import ReviewCreate, ReviewOut
 from app.services.audit import log_action
 from app.services.email import notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
-from app.services.notify import notify
+from app.services.notify import notify, notify_team
+from app.services.team import acting_profile, mine, owns
+from app.services import requirement_quality
 from app.services.eligibility import qualification_options
 from app.services.offer_response import documents_out
 from app.services.stakeholder import require_established
@@ -55,14 +57,14 @@ def _get_owned_project(project_id: str, user: User, db: Session, *, lock: bool =
     # transitions at once -- close vs cancel, award vs award, award vs a bid
     # -- are serialized instead of both passing a stale check.
     project = lock_project(db, project_id) if lock else db.get(Project, project_id)
-    if not project or project.owner_id != user.id:
+    if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     if lock:
         # A suspended (or unapproved) owner keeps read access to their tender
         # but can't change its state or award it -- the same rule and code as
         # require_verified_owner, checked after ownership so everyone else
         # still gets the 404 they always did.
-        profile = db.get(OwnerProfile, user.id)
+        profile = acting_profile(db, user)
         if not profile or not profile.is_verified_active:
             raise HTTPException(status_code=403, detail="not_approved")
     return project
@@ -72,7 +74,12 @@ def _get_owned_project(project_id: str, user: User, db: Session, *, lock: bool =
 def dashboard(user: User = Depends(require_owner), db: Session = Depends(get_db)):
     sync_expired_projects(db)
     projects = (
-        db.query(Project).filter(Project.owner_id == user.id).order_by(Project.created_at.desc()).all()
+        db.query(Project)
+        # A discarded draft is no longer one of the owner's active requirements.
+        # The organization's requirements, whoever in it started them.
+        .filter(mine(db, user, Project, Project.owner_id), Project.discarded_at.is_(None))
+        .order_by(Project.created_at.desc())
+        .all()
     )
     out = []
     for p in projects:
@@ -134,7 +141,7 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
             item_prices=o.item_prices,
             assumptions=o.assumptions,
             declarations_accepted=o.declarations_accepted,
-            documents=documents_out(db, project_id, o.service_provider_id),
+            documents=documents_out(db, project_id, o.organization_id, o.service_provider_id),
             status=o.status,
             revision=o.revision,
             created_at=o.created_at,
@@ -239,12 +246,12 @@ def approve_offer(project_id: str, offer_id: str, user: User = Depends(require_o
     winner_user = db.get(User, winning_offer.service_provider_id)
     if winner_user:
         notify_service_provider_offer_decision(winner_user.email, project.title, approved=True)
-        notify(db, winner_user, NotificationType.award_won, link=f"/service-provider/projects/{project_id}/offer", project_title=project.title)
+        notify_team(db, winner_user, NotificationType.award_won, link=f"/service-provider/projects/{project_id}/offer", organization_id=winning_offer.organization_id, project_title=project.title)
     for o in other_offers:
         loser_user = db.get(User, o.service_provider_id)
         if loser_user:
             notify_service_provider_offer_decision(loser_user.email, project.title, approved=False)
-            notify(db, loser_user, NotificationType.award_lost, link=f"/service-provider/projects/{project_id}/offer", project_title=project.title)
+            notify_team(db, loser_user, NotificationType.award_lost, link=f"/service-provider/projects/{project_id}/offer", organization_id=o.organization_id, project_title=project.title)
 
     db.refresh(project)
     offer_count = db.query(Offer).filter(Offer.project_id == project_id).count()
@@ -263,10 +270,12 @@ def _project_response(project: Project, db: Session) -> ProjectOut:
 @router.post("/projects/{project_id}/publish", response_model=ProjectOut)
 def publish_project(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     project = _get_owned_project(project_id, user, db, lock=True)
-    if project.status != ProjectStatus.draft:
+    if project.status != ProjectStatus.draft or project.discarded_at is not None:
         raise HTTPException(status_code=400, detail="Only a draft project can be published.")
     if project.bid_deadline <= datetime.utcnow():
         raise HTTPException(status_code=400, detail="Set a bid deadline in the future before publishing.")
+    # Stage 3.12: the quality gate, authoritative whatever the page showed.
+    requirement_quality.assert_publishable(db, project)
     project.status = ProjectStatus.open
     db.commit()
     db.refresh(project)
@@ -308,16 +317,18 @@ def start_evaluation(project_id: str, user: User = Depends(require_owner), db: S
 
 
 def _notify_bidders(db: Session, project: Project, notification_type: NotificationType) -> None:
-    bidder_ids = (
-        db.query(Offer.service_provider_id)
+    bidders = (
+        db.query(Offer.service_provider_id, Offer.organization_id)
         .filter(Offer.project_id == project.id, Offer.status != OfferStatus.withdrawn)
         .distinct()
         .all()
     )
-    for (service_provider_id,) in bidder_ids:
+    for service_provider_id, organization_id in bidders:
         bidder = db.get(User, service_provider_id)
         if bidder:
-            notify(db, bidder, notification_type, link=f"/service-provider/projects/{project.id}/offer", project_title=project.title)
+            notify_team(
+                db, bidder, notification_type, link=f"/service-provider/projects/{project.id}/offer", organization_id=organization_id, project_title=project.title
+            )
 
 
 @router.post("/projects/{project_id}/no-award", response_model=ProjectOut)
@@ -334,10 +345,32 @@ def mark_no_award(project_id: str, user: User = Depends(require_owner), db: Sess
     return _project_response(project, db)
 
 
+@router.post("/projects/{project_id}/discard", response_model=ProjectOut)
+def discard_draft(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 3.11: the owner decides not to go ahead with a draft. It stays a
+    draft -- never published, so as private as ever -- marked discarded: no
+    longer listed, editable or publishable. Kept (with its files) rather than
+    deleted, so the audit trail still points at a record."""
+    project = _get_owned_project(project_id, user, db, lock=True)
+    if project.status != ProjectStatus.draft:
+        raise HTTPException(status_code=400, detail="Only a draft can be discarded.")
+    if project.discarded_at is not None:
+        raise HTTPException(status_code=400, detail="This draft has already been discarded.")
+    project.discarded_at = datetime.utcnow().replace(microsecond=0)
+    log_action(db, actor_id=user.id, action="project.discard_draft", target_type="project", target_id=project_id, previous_value="draft", new_value="discarded")
+    db.refresh(project)
+    return _project_response(project, db)
+
+
 @router.post("/projects/{project_id}/cancel", response_model=ProjectOut)
 def cancel_project(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     sync_expired_projects(db)
     project = _get_owned_project(project_id, user, db, lock=True)
+    if project.status == ProjectStatus.draft:
+        # A draft was never published: "cancelling" it is discarding it. It
+        # must not become a canceled tender, which providers can open.
+        db.rollback()
+        return discard_draft(project_id, user, db)
     if project.status not in (ProjectStatus.draft, ProjectStatus.open, ProjectStatus.closed, ProjectStatus.under_evaluation):
         raise HTTPException(status_code=400, detail="This project can no longer be canceled.")
     previous = project.status.value
@@ -351,7 +384,7 @@ def cancel_project(project_id: str, user: User = Depends(require_owner), db: Ses
 @router.get("/projects/{project_id}/review", response_model=ReviewOut | None)
 def get_review(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     project = db.get(Project, project_id)
-    if not project or project.owner_id != user.id:
+    if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     return db.query(Review).filter(Review.project_id == project_id).first()
 
@@ -359,7 +392,7 @@ def get_review(project_id: str, user: User = Depends(require_owner), db: Session
 @router.post("/reviews", response_model=ReviewOut)
 def submit_review(payload: ReviewCreate, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     project = db.get(Project, payload.project_id)
-    if not project or project.owner_id != user.id:
+    if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     if project.status != ProjectStatus.awarded:
         raise HTTPException(status_code=400, detail="You can only review a project after it's awarded.")
@@ -507,4 +540,7 @@ def _project_fields(p: Project) -> dict:
         tender_type_locked=p.tender_type_locked,
         is_suspended=p.is_suspended,
         created_at=p.created_at,
+        updated_at=p.updated_at,
+        discarded_at=p.discarded_at,
+        version=p.version,
     )

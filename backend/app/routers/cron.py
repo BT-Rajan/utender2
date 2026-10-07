@@ -10,7 +10,7 @@ from app.models.offer import Offer
 from app.models.project import Project
 from app.models.user import User
 from app.services.email import notify_owner_deadline_approaching
-from app.services.notify import notify
+from app.services.notify import notify, notify_team
 
 router = APIRouter(tags=["cron"])
 settings = get_settings()
@@ -46,7 +46,7 @@ def deadline_reminders(authorization: str | None = Header(default=None), db: Ses
         owner = db.get(User, p.owner_id)
         if owner:
             notify_owner_deadline_approaching(owner.email, p.title, p.id, offer_count)
-            notify(db, owner, NotificationType.deadline_approaching, link=f"/owner/projects/{p.id}", project_title=p.title)
+            notify_team(db, owner, NotificationType.deadline_approaching, link=f"/owner/projects/{p.id}", organization_id=p.organization_id, project_title=p.title)
         p.deadline_reminder_sent = True
         sent += 1
     db.commit()

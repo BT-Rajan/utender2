@@ -201,3 +201,23 @@ def approve_owner(db_session, owner_id: str) -> None:
     profile = db_session.get(OwnerProfile, owner_id)
     profile.verification_status = VerificationStatus.approved
     db_session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Stage 3.12 quality gate. Most tests predate it and publish deliberately
+# minimal requirements ("T" at "A") to exercise bidding, awards and the like;
+# for them the gate is stubbed out here, in the tests only (the application
+# has no switch to turn it off). Every test that is about publication quality
+# opts back in with @pytest.mark.quality_gate and runs the real gate.
+# ---------------------------------------------------------------------------
+def pytest_configure(config):
+    config.addinivalue_line("markers", "quality_gate: run with the real Stage 3.12 publication quality gate")
+
+
+@pytest.fixture(autouse=True)
+def _quality_gate(request, monkeypatch):
+    if request.node.get_closest_marker("quality_gate") is None:
+        from app.services import requirement_quality
+
+        monkeypatch.setattr(requirement_quality, "assert_publishable", lambda db, project: None)
+    yield
