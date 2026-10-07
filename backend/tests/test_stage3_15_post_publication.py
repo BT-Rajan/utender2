@@ -56,7 +56,7 @@ def test_pause_and_resume(db):
     assert r.status_code == 200 and r.json()["paused_at"] and r.json()["status"] == "open"
     assert _types(db, "tender_paused") == 1  # the bidder is told
     # Providers see it is paused, and why -- in the list and when they open it.
-    card = next(p for p in beta.get("/service-provider/feed").json() if p["id"] == pid)
+    card = next(p for p in beta.get("/service-provider/feed").json()["items"] if p["id"] == pid)
     assert card["paused_at"] and card["pause_reason"] == "Waiting for the municipality permit."
     assert alpha.get(f"/projects/{pid}").json()["tender_rules"]["questions_open"] is False
     # Nothing is accepted while paused...

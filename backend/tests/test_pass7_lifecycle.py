@@ -79,7 +79,7 @@ def test_pass7_lifecycle():
     check("draft project invisible to service_provider", r.status_code == 404)
 
     r = service_provider_client.get("/service-provider/feed")
-    check("draft project absent from feed", all(p["id"] != project_id for p in r.json()))
+    check("draft project absent from feed", all(p["id"] != project_id for p in r.json()["items"]))
 
     # non-owner can't publish
     r = service_provider_client.post(f"/owner/projects/{project_id}/publish")
@@ -204,7 +204,7 @@ def test_pass7_lifecycle():
     db.commit()
 
     r = service_provider_client.get("/service-provider/feed")
-    check("expired project no longer in feed after sync", all(p["id"] != project6_id for p in r.json()))
+    check("expired project no longer in feed after sync", all(p["id"] != project6_id for p in r.json()["items"]))
 
     r = admin_client.get(f"/projects/{project6_id}")  # admin can always view regardless of status
     check("admin sees synced expired status via single-project GET", r.status_code == 200 and r.json()["status"] == "expired")

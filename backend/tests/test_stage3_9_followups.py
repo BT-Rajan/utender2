@@ -82,8 +82,8 @@ def test_category_and_governorate_matching(db):
     sami, _ = _provider(db, "sami@example.com")
     assert sami.put("/service-provider/services", json={"categories": [plumbing["id"]], "governorates": ["mars"]}).status_code == 400
     sami.put("/service-provider/services", json={"categories": [plumbing["id"]], "governorates": ["ahmadi"]})
-    card = next(p for p in sami.get("/service-provider/feed").json() if p["id"] == pid)
-    assert [(r["code"], r["name"], r["governorate"]) for r in card["ineligible_reasons"]] == [
+    assert all(p["id"] != pid for p in sami.get("/service-provider/feed").json()["items"])  # Stage 4.1: not in their feed
+    assert [(r["code"], r["name"], r["governorate"]) for r in sami.get(f"/projects/{pid}/eligibility").json()["reasons"]] == [
         ("category_not_offered", "Electrical", None),
         ("governorate_not_served", None, "hawalli"),
     ]

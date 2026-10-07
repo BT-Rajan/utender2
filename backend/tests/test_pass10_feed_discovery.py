@@ -66,36 +66,41 @@ def test_pass10_feed_discovery():
     db.commit()
 
     r = service_provider_client.get("/service-provider/feed")
-    check("unfiltered feed returns all 3 open projects", len(r.json()) == 3)
+    check("unfiltered feed returns all 3 open projects", len(r.json()["items"]) == 3)
 
     r = service_provider_client.get("/service-provider/feed", params={"trade": "roof"})
-    check("trade filter (partial, case-insensitive) matches Roofing", len(r.json()) == 1 and r.json()[0]["trade"] == "Roofing")
+    check("trade filter (partial, case-insensitive) matches Roofing", len(r.json()["items"]) == 1 and r.json()["items"][0]["trade"] == "Roofing")
 
     r = service_provider_client.get("/service-provider/feed", params={"trade": "electrical"})
-    check("trade filter with no matches returns empty list", len(r.json()) == 0)
+    check("trade filter with no matches returns empty list", len(r.json()["items"]) == 0)
 
     r = service_provider_client.get("/service-provider/feed", params={"search": "Maple"})
-    check("search matches title (never the exact address)", len(r.json()) == 1)
+    check("search matches title (never the exact address)", len(r.json()["items"]) == 1)
 
+    # Stage 4.2: the scope is searched only for providers who can read it --
+    # this one has no paid access yet, so it can't probe the scope's wording.
     r = service_provider_client.get("/service-provider/feed", params={"search": "cedar fence"})
-    check("search matches description", len(r.json()) == 1 and r.json()[0]["title"] == "Fence repair")
+    check("search skips the scope for a provider who can't read it", len(r.json()["items"]) == 0)
+    r = service_provider_client.get("/service-provider/feed", params={"search": "fence"})
+    check("search matches title", len(r.json()["items"]) == 1 and r.json()["items"][0]["title"] == "Fence repair")
 
     r = service_provider_client.get("/service-provider/feed", params={"search": "nonexistent keyword xyz"})
-    check("search with no matches returns empty list", len(r.json()) == 0)
+    check("search with no matches returns empty list", len(r.json()["items"]) == 0)
 
     r = service_provider_client.get("/service-provider/feed", params={"sort": "newest"})
-    check("sort=newest returns most recently published first", r.json()[0]["title"] == "Fence repair")
+    check("sort=newest returns most recently published first", r.json()["items"][0]["title"] == "Fence repair")
 
     r = service_provider_client.get("/service-provider/feed")
-    check("default sort is by deadline ascending (all same deadline here, so just check 3 results)", len(r.json()) == 3)
+    check("default sort is by deadline ascending (all same deadline here, so just check 3 results)", len(r.json()["items"]) == 3)
 
+    # Stage 4.2 follow-up: the old distinct-trades list is gone; the feed's
+    # type-of-work filter uses the platform's category list (/categories).
     r = service_provider_client.get("/service-provider/feed/trades")
-    check("distinct trades endpoint returns 200", r.status_code == 200)
-    check("distinct trades returns all 3 trades sorted", r.json() == sorted(["Roofing", "Carpentry", "Fencing"]))
+    check("retired feed/trades endpoint is gone", r.status_code == 404)
 
-    # unauthenticated / wrong-role access rejected
-    r = owner_client.get("/service-provider/feed/trades")
-    check("owner cannot access service provider feed/trades", r.status_code == 403)
+    # wrong-role access rejected
+    r = owner_client.get("/service-provider/feed")
+    check("owner cannot access the service provider feed", r.status_code == 403)
 
 
     failed = [n for n, ok in results if not ok]

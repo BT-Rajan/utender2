@@ -28,6 +28,10 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.en: ("New question on {project_title}", "A service provider asked a question about {project_title}."),
         Language.ar: ("سؤال جديد على {project_title}", "طرح أحد مزوّدي الخدمات سؤالاً حول {project_title}."),
     },
+    NotificationType.clarification_shared: {
+        Language.en: ("New clarification on {project_title}", "The owner of {project_title} answered a question for every provider. Read it before you price."),
+        Language.ar: ("توضيح جديد على {project_title}", "أجاب مالك {project_title} عن سؤال لجميع مقدّمي الخدمة. اطّلع عليه قبل التسعير."),
+    },
     NotificationType.clarification_answered: {
         Language.en: ("Your question was answered", "The owner of {project_title} answered your question."),
         Language.ar: ("تمت الإجابة على سؤالك", "أجاب مالك {project_title} على سؤالك."),

@@ -88,7 +88,7 @@ def test_existing_deadline_enforcement_is_unchanged(db):
     project = owner.post(
         "/projects", data={"title": "Live", "address": "A", "bid_deadline": deadline, "status": "open", "expected_duration_days": "30"}
     ).json()
-    listing = next(p for p in sp.get("/service-provider/feed").json() if p["id"] == project["id"])
+    listing = next(p for p in sp.get("/service-provider/feed").json()["items"] if p["id"] == project["id"])
     assert listing["expected_duration_days"] == 30 and listing["bid_deadline"].endswith("Z")
     assert sp.post(f"/projects/{project['id']}/offers", json={"amount": "1000"}).status_code in (200, 201)
 

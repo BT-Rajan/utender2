@@ -7,12 +7,14 @@ from sqlalchemy.orm import Session
 from starlette.responses import StreamingResponse
 
 from app.db import get_db
-from app.deps import get_current_user, require_approved_service_provider, require_verified_owner
+from app.deps import get_current_user, require_approved_service_provider, require_service_provider, require_verified_owner
 from app.models.award_record import AwardRecord
 from app.models.service_provider import ServiceProviderProfile
 from app.models.enums import NotificationType, OfferStatus, PricingBasis, ProjectStatus, TenderType, UserRole
 from app.models.offer import Offer
 from app.models.owner import OwnerProfile
+from app.models.clarification import Clarification
+from app.models.participation import Participation as ParticipationRecord
 from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.project_amendment import ProjectAmendment
 from app.models.user import User
@@ -20,6 +22,9 @@ from app.schemas.amendment import ProjectAmendmentOut, ProjectAmendmentRequest
 from app.schemas.award import AwardRecordOut
 from app.config import get_settings
 from app.schemas.project import (
+    Participation as ParticipationOut,
+    ProviderEligibilityOut,
+    OpportunityListing,
     RequirementVersionOut,
     DrawingOut,
     EligibilityCheckOut,
@@ -35,7 +40,7 @@ from app.schemas.project import (
 )
 from app.services.tender_rules import questions_close_at, questions_open
 from app.services.categories import resolve_trade
-from app.services.eligibility import audience, ineligibility_reasons, rules_for, rules_out, validate_rules
+from app.services.eligibility import audience, ineligibility_reasons, participation, rules_for, rules_out, validate_rules
 from app.services.drawings import DOCUMENT_CATEGORIES, upload_drawings_for_project
 from app.services.locations import clean_area, clean_governorate
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name
@@ -280,6 +285,19 @@ def get_project(project_id: str, user: User = Depends(get_current_user), db: Ses
     if owns(db, user, project):
         detail.closure_note = project.closure_note  # Stage 3.16: the owner's private note, never a provider's to see
         detail.restarted_from_id = project.restarted_from_id
+    elif user.role == UserRole.service_provider:
+        # Stage 4.4: whether this provider may respond, and if not why -- the
+        # same check the offer endpoints enforce. (Only ever their own.)
+        profile = acting_profile(db, user)
+        reasons = ineligibility_reasons(db, project, profile)
+        detail.eligible, detail.ineligible_reasons = not reasons, reasons
+        detail.participation = participation(db, project, profile, reasons)  # Stage 4.5
+        _with_decision(db, user, project, detail.participation)  # Stage 4.9
+        from app.models.saved_opportunity import SavedOpportunity
+
+        detail.saved = db.query(SavedOpportunity.id).filter(  # Stage 4.8
+            SavedOpportunity.project_id == project.id, mine(db, user, SavedOpportunity, SavedOpportunity.service_provider_id)
+        ).first() is not None
     return detail
 
 
@@ -446,6 +464,15 @@ def amend_project(
     if project.status not in (ProjectStatus.draft, ProjectStatus.open):
         raise HTTPException(status_code=400, detail="This project can no longer be amended.")
 
+    # Stage 4.7: a change made because of an answered question is tied to it.
+    clarification = None
+    if payload.clarification_id:
+        clarification = db.get(Clarification, payload.clarification_id)
+        if not clarification or clarification.project_id != project.id or clarification.answer is None:
+            raise HTTPException(status_code=400, detail="Choose an answered question on this requirement.")
+        if project.status == ProjectStatus.draft:
+            raise HTTPException(status_code=400, detail="Choose an answered question on this requirement.")
+
     before = {f: getattr(project, f) for f in TRACKED_FIELDS}
     changed: list[str] = []
 
@@ -545,7 +572,14 @@ def amend_project(
         db.refresh(project)
         return _serialize_detail(project, db)
 
-    _record_amendment(db, project, user, changed, (payload.reason or "").strip() or None, deadline_extended, _field_changes(before, project))
+    reason = (payload.reason or "").strip() or None
+    if clarification is not None and not reason:
+        reason = f"Following a question: {clarification.question[:200]}"
+    _record_amendment(db, project, user, changed, reason, deadline_extended, _field_changes(before, project))
+    if clarification is not None:
+        latest = db.query(ProjectAmendment).filter(ProjectAmendment.project_id == project.id).order_by(ProjectAmendment.amendment_number.desc()).first()
+        clarification.amendment_id = latest.id
+        db.commit()
     return _serialize_detail(project, db)
 
 
@@ -707,11 +741,25 @@ def my_eligibility(project_id: str, user: User = Depends(require_approved_servic
     """A provider's standing against one requirement, and why. Available at
     the same level as the feed listing (platform-verified), so a provider who
     can't open the full requirement can still see the reason."""
+    sync_expired_projects(db)
     project = db.get(Project, project_id)
-    if not project or project.status == ProjectStatus.draft or project.is_suspended:
+    if not project or project.status == ProjectStatus.draft:
         raise HTTPException(status_code=404, detail="Project not found.")
-    reasons = ineligibility_reasons(db, project, acting_profile(db, user))
-    return EligibilityCheckOut(eligible=not reasons, reasons=reasons, rules=rules_out(db, project))
+    profile = acting_profile(db, user)
+    if project.is_suspended:
+        # Stage 4.5: say it's unavailable for now -- nothing about it, or why.
+        return EligibilityCheckOut(eligible=False, rules=ProviderEligibilityOut(provider_type="any", qualifications=[], match_category=False, match_governorate=False), participation=participation(db, project, profile))
+    reasons = ineligibility_reasons(db, project, profile)
+    listing = None
+    if project.status == ProjectStatus.open and project.bid_deadline > datetime.utcnow():  # open (paused or not), as the feed shows it
+        listing = OpportunityListing(
+            title=project.title, trade=project.trade, governorate=project.governorate, area=project.area,
+            bid_deadline=project.bid_deadline, tender_type=project.tender_type, published_at=project.published_at,
+            paused=project.paused_at is not None,
+        )
+    return EligibilityCheckOut(
+        eligible=not reasons, reasons=reasons, rules=rules_out(db, project), listing=listing, participation=participation(db, project, profile, reasons)
+    )
 
 
 @router.get("/{project_id}/amendments", response_model=list[ProjectAmendmentOut])
@@ -774,11 +822,82 @@ def get_version(project_id: str, number: int, user: User = Depends(get_current_u
         documents=[
             DrawingOut(
                 id=d.id, file_name=d.file_name, uploaded_at=d.uploaded_at, revision=d.revision, is_current=d.is_current,
-                category=d.category, is_required=d.is_required, url=storage.signed_url("project-drawings", d.file_path, expiry),
+                category=d.category, is_required=d.is_required, size_bytes=d.size_bytes, url=storage.signed_url("project-drawings", d.file_path, expiry, d.file_name),
             )
             for d in sorted(current.values(), key=lambda d: d.file_name.lower())
         ],
     )
+
+
+# ---------- Stage 4.9: the decision to take part ----------
+
+def _decision(db: Session, user: User, project: Project) -> ParticipationRecord | None:
+    return db.query(ParticipationRecord).filter(
+        ParticipationRecord.project_id == project.id, mine(db, user, ParticipationRecord, ParticipationRecord.service_provider_id)
+    ).first()
+
+
+def _with_decision(db: Session, user: User, project: Project, verdict) -> None:
+    record = _decision(db, user, project)
+    if record:
+        verdict.started, verdict.started_at, verdict.seen_material_revision = True, record.started_at, record.seen_material_revision
+
+
+def record_decision(db: Session, user: User, project: Project) -> None:
+    """Record that this provider takes part (idempotent: one per provider and
+    requirement) at the requirement's current version. Used by Participate
+    and by every offer submitted. The caller commits."""
+    record = _decision(db, user, project)
+    if record is None:
+        db.add(ParticipationRecord(
+            project_id=project.id, service_provider_id=acting_id(db, user), organization_id=org_of(db, user.id),
+            started_by=user.id, seen_material_revision=project.material_revision,
+        ))
+    else:
+        record.seen_material_revision = project.material_revision
+
+
+_NOT_NOW = {
+    "paused": "This requirement is paused by its owner; you can take part once it resumes.",
+    "ended": "This requirement is no longer accepting offers.",
+    "unavailable": "This requirement is temporarily unavailable.",
+}
+
+
+@router.post("/{project_id}/participate", response_model=ParticipationOut)
+def participate(project_id: str, user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
+    """Stage 4.9: the provider decides to take part -- from evaluating the
+    opportunity to preparing an offer. Allowed only when every condition
+    holds now, judged under the requirement's lock (the same lock a close,
+    a pause or the deadline sync takes): open and before its deadline, the
+    provider verified with marketplace access, and eligible. Each refusal
+    says why. Doing it again records nothing new; after a material change it
+    marks the provider as having seen the current version. Nothing is sent
+    to the owner."""
+    sync_expired_projects(db)
+    project = lock_project(db, project_id)
+    if not project or project.status == ProjectStatus.draft:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    profile = acting_profile(db, user)
+    reasons = ineligibility_reasons(db, project, profile) if profile else []
+    verdict = participation(db, project, profile, reasons)
+    if verdict.status == "unavailable":
+        raise HTTPException(status_code=400, detail=_NOT_NOW[verdict.availability])
+    if verdict.status == "action_required":
+        detail = {
+            "activate_access": "Activate your marketplace access to take part.",
+            "account_suspended": "Your account is suspended, so you can't take part in opportunities. Contact support.",
+        }.get(verdict.action, "Complete your verification to take part in opportunities.")
+        raise HTTPException(status_code=403, detail=detail)
+    if verdict.status == "not_eligible":
+        raise HTTPException(status_code=403, detail="You aren't eligible to respond to this requirement. " + " ".join(r.message for r in reasons))
+    record_decision(db, user, project)
+    try:
+        db.commit()
+    except IntegrityError:  # the same decision from another request at the same moment
+        db.rollback()
+    _with_decision(db, user, project, verdict)
+    return verdict
 
 
 @router.get("/{project_id}/award", response_model=AwardRecordOut)
@@ -988,7 +1107,8 @@ def drawing_history(project_id: str, user: User = Depends(get_current_user), db:
             is_current=d.is_current,
             category=d.category,
             is_required=d.is_required,
-            url=storage.signed_url("project-drawings", d.file_path, expiry),
+            size_bytes=d.size_bytes,
+            url=storage.signed_url("project-drawings", d.file_path, expiry, d.file_name),
         )
         for d in rows
     ]
@@ -1014,7 +1134,8 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
             is_current=d.is_current,
             category=d.category,
             is_required=d.is_required,
-            url=storage.signed_url("project-drawings", d.file_path, expiry),
+            size_bytes=d.size_bytes,
+            url=storage.signed_url("project-drawings", d.file_path, expiry, d.file_name),
         )
         for d in drawing_rows
     ]

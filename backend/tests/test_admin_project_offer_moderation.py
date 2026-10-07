@@ -139,14 +139,14 @@ def test_admin_suspend_project_hides_from_feed_and_blocks_bidding():
     project_id = r.json()["id"]
 
     r = c1.get("/service-provider/feed")
-    assert any(p["id"] == project_id for p in r.json())
+    assert any(p["id"] == project_id for p in r.json()["items"])
 
     r = admin_client.post(f"/admin/projects/{project_id}/suspend", json={"suspended": True})
     assert r.status_code == 200
     assert r.json()["is_suspended"] is True
 
     r = c1.get("/service-provider/feed")
-    assert all(p["id"] != project_id for p in r.json())
+    assert all(p["id"] != project_id for p in r.json()["items"])
 
     r = c1.get(f"/projects/{project_id}")
     assert r.status_code == 404
@@ -164,7 +164,7 @@ def test_admin_suspend_project_hides_from_feed_and_blocks_bidding():
     r = admin_client.post(f"/admin/projects/{project_id}/suspend", json={"suspended": False})
     assert r.status_code == 200
     r = c1.get("/service-provider/feed")
-    assert any(p["id"] == project_id for p in r.json())
+    assert any(p["id"] == project_id for p in r.json()["items"])
     r = owner_client.get("/notifications")
     assert any(n["type"] == "project_reactivated" for n in r.json())
 

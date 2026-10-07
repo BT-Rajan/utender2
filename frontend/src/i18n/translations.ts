@@ -169,6 +169,69 @@ export interface Dictionary {
     cancel: string;
     remove: string;
   };
+  participate: {
+    heading: string;
+    body: string;
+    button: string;
+    notNow: string;
+    error: string;
+    changedHeading: string;
+    changedBody: string;
+    reviewed: string;
+    preparingHeading: string;
+    changedShort: string;
+  };
+  saved: {
+    save: string;
+    saved: string;
+    unsave: string;
+    saveForLater: string;
+    heading: string;
+    intro: string;
+    backToFeed: string;
+    empty: string;
+    unavailable: string;
+    remove: string;
+  };
+  detail: {
+    addedAfter: string;
+    needsAccess: string;
+    kuwaitTime: string;
+  };
+  feed: {
+    pricing: string;
+    items: string;
+    loadMore: string;
+    loading: string;
+    hiddenIneligible: string;
+    checkServices: string;
+    lump_sum: string;
+    per_item: string;
+    timeLeft: string;
+    anyTimeLeft: string;
+    atLeastDays: string;
+    sortBy: string;
+    sortLatest: string;
+    sortedLatest: string;
+    myServices: string;
+    myAreas: string;
+    acceptingNow: string;
+    clear: string;
+    sortRelevance: string;
+    sortedRelevance: string;
+    closedNow: string;
+    leftDays: string;
+    leftHours: string;
+    documents: string;
+    published: string;
+    sealed: string;
+    sealedHint: string;
+    whoCanRespond: string;
+    youQualify: string;
+    offer_withdrawn: string;
+    offer_approved: string;
+    offer_rejected: string;
+  };
   versions: {
     version: string;
     before: string;
@@ -298,6 +361,12 @@ export interface Dictionary {
     matchingHeading: string;
     fixServices: string;
     addQualification: string;
+    notForYou: string;
+    youCanFix: string;
+    canParticipate: string;
+    ended: string;
+    unavailable: string;
+    verificationNeeded: string;
   };
   response: {
     heading: string;
@@ -595,6 +664,14 @@ export interface Dictionary {
     closesAt: string;
     closedAt: string;
     unansweredClosed: string;
+    yourQuestion: string;
+    answeredOn: string;
+    cameWithChange: string;
+    publishForAll: string;
+    materialHint: string;
+    becauseOf: string;
+    notBecauseOf: string;
+    attachFiles: string;
   };
   service_provider: {
     roleLabel: string;
@@ -1206,6 +1283,69 @@ export const en: Dictionary = {
     cancel: "Cancel",
     remove: "Remove",
   },
+  participate: {
+    heading: "Decided to take part?",
+    body: "Start preparing your offer. Nothing is sent to the owner until you submit it, and you can stop at any time before then.",
+    button: "Participate — prepare an offer",
+    notNow: "Not for you? You don’t need to do anything. Save it if you want to decide later.",
+    error: "Couldn’t start preparing an offer.",
+    changedHeading: "The requirement changed after you decided to take part",
+    changedBody: "Review the changes above: the current requirement is the one your offer will be made against.",
+    reviewed: "I’ve reviewed the current requirement",
+    preparingHeading: "Preparing an offer",
+    changedShort: "changed since you started",
+  },
+  saved: {
+    save: "Save",
+    saved: "Saved",
+    unsave: "Remove from saved",
+    saveForLater: "Save for later",
+    heading: "Saved opportunities",
+    intro: "Opportunities you marked to come back to, as they stand now. Still open first.",
+    backToFeed: "Back to all opportunities",
+    empty: "Nothing saved yet. Use Save on an opportunity to keep it here.",
+    unavailable: "An opportunity you saved is temporarily unavailable.",
+    remove: "Remove",
+  },
+  detail: {
+    addedAfter: "Added after publishing · {date}",
+    needsAccess: "You meet this opportunity’s conditions. Activate your marketplace access to read the full requirement, open its documents and send an offer.",
+    kuwaitTime: "Kuwait time",
+  },
+  feed: {
+    pricing: "Priced as",
+    items: "{n} items",
+    loadMore: "Show more opportunities",
+    loading: "Loading…",
+    hiddenIneligible: "{n} open requirement(s) aren’t shown because their conditions (provider type, qualifications, type of work or area) don’t match your account.",
+    checkServices: "Check the services and areas you declared",
+    lump_sum: "One total",
+    per_item: "Per item",
+    timeLeft: "Time left to respond",
+    anyTimeLeft: "Any time left",
+    atLeastDays: "At least {n} days left",
+    sortBy: "Sort",
+    sortLatest: "Closing latest",
+    sortedLatest: "Open opportunities, closing latest first",
+    myServices: "My types of work",
+    myAreas: "My service areas",
+    acceptingNow: "Accepting offers now",
+    clear: "Clear search and filters",
+    sortRelevance: "Best match to search",
+    sortedRelevance: "Open opportunities, best match to your search first",
+    closedNow: "Offers closed",
+    leftDays: "{d} d {h} h left to respond",
+    leftHours: "{h} h left to respond",
+    documents: "{n} documents",
+    published: "Published {date}",
+    sealed: "Sealed offers",
+    sealedHint: "Offers stay sealed: the owner sees prices only after the deadline.",
+    whoCanRespond: "Who can respond:",
+    youQualify: "you meet these",
+    offer_withdrawn: "Offer withdrawn",
+    offer_approved: "Awarded",
+    offer_rejected: "Not selected",
+  },
   versions: {
     version: "Version {n}",
     before: "See the requirement as it was before (version {n})",
@@ -1335,6 +1475,12 @@ export const en: Dictionary = {
     matchingHeading: "Type of work and location",
     fixServices: "Update your services",
     addQualification: "Add a qualification",
+    notForYou: "This opportunity’s conditions — not something you can change:",
+    youCanFix: "You can put these right, if they are true of your business:",
+    canParticipate: "You can take part in this opportunity.",
+    ended: "This opportunity is no longer accepting offers.",
+    unavailable: "This opportunity is temporarily unavailable.",
+    verificationNeeded: "Complete your verification to take part in opportunities.",
   },
   response: {
     heading: "What providers must submit",
@@ -1649,6 +1795,14 @@ export const en: Dictionary = {
     closesAt: "Questions and answers close {date}.",
     closedAt: "Questions and answers closed {date}. No new questions or answers.",
     unansweredClosed: "Not answered before the question cut-off.",
+    yourQuestion: "Your question",
+    answeredOn: "Answered {date}",
+    cameWithChange: "This answer came with a change to the requirement (change #{n}) — see the changes above.",
+    publishForAll: "Publish this question and answer to every provider (the asker stays anonymous)",
+    materialHint: "If the answer changes the scope, quantities, documents, timing or who can respond, change the requirement itself too (Change the published requirement) and choose this question there.",
+    becauseOf: "Because of a question (optional)",
+    notBecauseOf: "Not because of a question",
+    attachFiles: "Attach files (optional, up to 5: PDF, images, drawings, Excel, Word)",
   },
   service_provider: {
     roleLabel: "Service provider",
@@ -1686,12 +1840,12 @@ export const en: Dictionary = {
       sortedClosest: "Sorted by closing soonest.",
       subscribeBanner: "You're approved, but drawings and offers stay locked until you subscribe.",
       viewPlans: "View plans",
-      searchPlaceholder: "Search title, address, or scope…",
+      searchPlaceholder: "Search title, area, type of work or scope…",
       allTrades: "All trades",
       sortClosest: "Closing soonest",
       sortNewest: "Newest first",
-      noMatch: "No projects match your filters.",
-      noOpenProjects: "No open projects right now. Check back soon.",
+      noMatch: "No open opportunities match your search and filters.",
+      noOpenProjects: "No opportunities you can respond to right now. New ones appear here as soon as they are published.",
       deadline: "Deadline",
       offersSoFar: "Offers so far",
       trade: "Trade",
@@ -2268,6 +2422,69 @@ export const ar: Dictionary = {
     cancel: "إلغاء",
     remove: "إزالة",
   },
+  participate: {
+    heading: "قررت المشاركة؟",
+    body: "ابدأ إعداد عرضك. لا يُرسل شيء إلى المالك حتى تقدّمه، ويمكنك التوقف في أي وقت قبل ذلك.",
+    button: "المشاركة — إعداد عرض",
+    notNow: "ليست مناسبة لك؟ لا حاجة لأي إجراء. احفظها إن أردت أن تقرر لاحقًا.",
+    error: "تعذّر بدء إعداد العرض.",
+    changedHeading: "تغيّر الطلب بعد قرارك بالمشاركة",
+    changedBody: "راجع التعديلات أعلاه: الطلب الحالي هو الذي سيُقدَّم عرضك على أساسه.",
+    reviewed: "راجعت الطلب الحالي",
+    preparingHeading: "عروض قيد الإعداد",
+    changedShort: "تغيّر منذ أن بدأت",
+  },
+  saved: {
+    save: "حفظ",
+    saved: "محفوظ",
+    unsave: "إزالة من المحفوظات",
+    saveForLater: "احفظ لوقت لاحق",
+    heading: "الفرص المحفوظة",
+    intro: "الفرص التي حفظتها للرجوع إليها، بحالتها الحالية. المفتوحة أولًا.",
+    backToFeed: "العودة إلى جميع الفرص",
+    empty: "لا شيء محفوظ بعد. استخدم «حفظ» على أي فرصة لتظهر هنا.",
+    unavailable: "فرصة حفظتها غير متاحة مؤقتًا.",
+    remove: "إزالة",
+  },
+  detail: {
+    addedAfter: "أُضيف بعد النشر · {date}",
+    needsAccess: "أنت تستوفي شروط هذه الفرصة. فعّل وصولك إلى السوق لقراءة الطلب كاملًا وفتح مستنداته وتقديم عرض.",
+    kuwaitTime: "بتوقيت الكويت",
+  },
+  feed: {
+    pricing: "طريقة التسعير",
+    items: "{n} بنود",
+    loadMore: "عرض المزيد من الفرص",
+    loading: "جارٍ التحميل…",
+    hiddenIneligible: "لا تظهر {n} من الطلبات المفتوحة لأن شروطها (نوع مقدّم الخدمة أو المؤهلات أو نوع العمل أو المنطقة) لا تطابق حسابك.",
+    checkServices: "راجع الخدمات والمناطق التي أعلنتها",
+    lump_sum: "مبلغ إجمالي",
+    per_item: "لكل بند",
+    timeLeft: "الوقت المتبقي للرد",
+    anyTimeLeft: "أي وقت متبقٍ",
+    atLeastDays: "{n} أيام على الأقل",
+    sortBy: "الترتيب",
+    sortLatest: "الأبعد إغلاقًا",
+    sortedLatest: "الفرص المفتوحة، الأبعد إغلاقًا أولًا",
+    myServices: "أنواع العمل الخاصة بي",
+    myAreas: "مناطق خدمتي",
+    acceptingNow: "تقبل العروض الآن",
+    clear: "مسح البحث والفلاتر",
+    sortRelevance: "الأقرب لبحثك",
+    sortedRelevance: "الفرص المفتوحة، الأقرب لبحثك أولًا",
+    closedNow: "أُغلق تقديم العروض",
+    leftDays: "متبقٍ {d} يوم و{h} ساعة للرد",
+    leftHours: "متبقٍ {h} ساعة للرد",
+    documents: "{n} مستندات",
+    published: "نُشر {date}",
+    sealed: "عروض مختومة",
+    sealedHint: "تبقى العروض مختومة: لا يرى المالك الأسعار إلا بعد الموعد النهائي.",
+    whoCanRespond: "من يمكنه الرد:",
+    youQualify: "أنت تستوفيها",
+    offer_withdrawn: "تم سحب العرض",
+    offer_approved: "تمت الترسية",
+    offer_rejected: "لم يُختر",
+  },
   versions: {
     version: "النسخة {n}",
     before: "اطّلع على الطلب كما كان قبل التغيير (النسخة {n})",
@@ -2397,6 +2614,12 @@ export const ar: Dictionary = {
     matchingHeading: "نوع العمل والموقع",
     fixServices: "تحديث خدماتك",
     addQualification: "إضافة مؤهل",
+    notForYou: "شروط هذه الفرصة — ليست مما يمكنك تغييره:",
+    youCanFix: "يمكنك تصحيح ما يلي إن كان ينطبق على نشاطك:",
+    canParticipate: "يمكنك المشاركة في هذه الفرصة.",
+    ended: "لم تعد هذه الفرصة تقبل العروض.",
+    unavailable: "هذه الفرصة غير متاحة مؤقتًا.",
+    verificationNeeded: "أكمل التحقق من حسابك للمشاركة في الفرص.",
   },
   response: {
     heading: "ما يجب على مقدمي الخدمة تقديمه",
@@ -2711,6 +2934,14 @@ export const ar: Dictionary = {
     closesAt: "تُغلق الأسئلة والأجوبة في {date}.",
     closedAt: "أُغلقت الأسئلة والأجوبة في {date}. لا أسئلة أو أجوبة جديدة.",
     unansweredClosed: "لم تتم الإجابة قبل موعد إغلاق الأسئلة.",
+    yourQuestion: "سؤالك",
+    answeredOn: "أُجيب في {date}",
+    cameWithChange: "جاءت هذه الإجابة مع تعديل على الطلب (التعديل رقم {n}) — اطّلع على التعديلات أعلاه.",
+    publishForAll: "انشر هذا السؤال وإجابته لجميع مقدّمي الخدمة (يبقى السائل مجهولًا)",
+    materialHint: "إن غيّرت الإجابة نطاق العمل أو الكميات أو المستندات أو التوقيت أو من يمكنه الرد، فعدّل الطلب نفسه أيضًا (تعديل الطلب المنشور) واختر هذا السؤال هناك.",
+    becauseOf: "بسبب سؤال (اختياري)",
+    notBecauseOf: "ليس بسبب سؤال",
+    attachFiles: "إرفاق ملفات (اختياري، حتى 5: PDF أو صور أو مخططات أو Excel أو Word)",
   },
   service_provider: {
     roleLabel: "مزوّد خدمة",
@@ -2748,12 +2979,12 @@ export const ar: Dictionary = {
       sortedClosest: "مرتبة حسب الأقرب إغلاقًا.",
       subscribeBanner: "تمت الموافقة عليك، لكن المخططات والعروض تبقى مقفلة حتى تشترك.",
       viewPlans: "عرض الباقات",
-      searchPlaceholder: "ابحث بالعنوان أو الموقع أو نطاق العمل…",
+      searchPlaceholder: "ابحث بالعنوان أو المنطقة أو نوع العمل أو نطاق العمل…",
       allTrades: "كل التخصصات",
       sortClosest: "الأقرب إغلاقًا",
       sortNewest: "الأحدث أولاً",
-      noMatch: "لا توجد مشاريع مطابقة لعوامل التصفية.",
-      noOpenProjects: "لا توجد مشاريع مفتوحة حاليًا. تحقق مرة أخرى قريبًا.",
+      noMatch: "لا توجد فرص مفتوحة تطابق البحث والفلاتر.",
+      noOpenProjects: "لا توجد فرص يمكنك الاستجابة لها حاليًا. تظهر الفرص الجديدة هنا فور نشرها.",
       deadline: "الموعد النهائي",
       offersSoFar: "العروض حتى الآن",
       trade: "التخصص",

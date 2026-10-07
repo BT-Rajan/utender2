@@ -14,7 +14,7 @@ from app.models.service_provider import ServiceProviderProfile
 DEADLINE = (datetime.utcnow() + timedelta(days=14)).isoformat() + "Z"
 # Fields that describe the requirement's state rather than its content: they
 # legitimately change when it is published (or as offers arrive).
-STATE = {"status", "published_at", "version", "updated_at", "offer_count", "tender_type_locked", "my_offer_status", "eligible", "ineligible_reasons"}
+STATE = {"status", "published_at", "version", "updated_at", "offer_count", "tender_type_locked", "my_offer_status", "eligible", "ineligible_reasons", "participation", "saved"}
 
 
 def _verified(db, role: str, email: str) -> TestClient:
@@ -63,7 +63,7 @@ def test_preview_is_what_the_provider_receives(db):
     preview = owner.get(f"/projects/{pid}").json()
     assert preview["status"] == "draft"
     assert sp.get(f"/projects/{pid}").status_code == 404
-    assert all(p["id"] != pid for p in sp.get("/service-provider/feed").json())
+    assert all(p["id"] != pid for p in sp.get("/service-provider/feed").json()["items"])
     assert sp.get(f"/projects/{pid}/drawings-zip").status_code == 404
     # Previewing changes nothing.
     assert owner.get(f"/projects/{pid}").json()["version"] == preview["version"]
@@ -79,7 +79,7 @@ def test_preview_is_what_the_provider_receives(db):
     received = sp.get(f"/projects/{pid}").json()
     assert _content(received) == _content(preview)
     # The listing card shows the same, less: no exact address and no scope.
-    card = next(p for p in sp.get("/service-provider/feed").json() if p["id"] == pid)
+    card = next(p for p in sp.get("/service-provider/feed").json()["items"] if p["id"] == pid)
     assert card["address"] is None and card["description"] is None
     assert (card["title"], card["area"], card["trade"]) == (preview["title"], preview["area"], preview["trade"])
 

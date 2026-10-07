@@ -2,7 +2,7 @@ from app.models.audit_log import AuditLog
 from app.models.auth_token import AuthToken
 from app.models.award_record import AwardRecord
 from app.models.category import ServiceCategory
-from app.models.clarification import Clarification
+from app.models.clarification import Clarification, ClarificationAttachment
 from app.models.cms_content import CmsContent
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import ServiceProviderDocument, DocumentRequirement, OwnerDocument
@@ -45,3 +45,5 @@ __all__ = [
     "AuditLog",
     "CmsContent",
 ]
+from app.models.saved_opportunity import SavedOpportunity  # noqa: E402,F401
+from app.models.participation import Participation  # noqa: E402,F401

@@ -6,6 +6,9 @@ from app.schemas.common import UTCDateTime
 
 
 class ProjectAmendmentRequest(BaseModel):
+    # Stage 4.7: the answered question this change comes from, when a
+    # clarification turned out to change the requirement itself.
+    clarification_id: str | None = None
     title: str | None = None
     description: str | None = None
     trade: str | None = None

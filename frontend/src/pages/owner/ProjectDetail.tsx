@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError, API_URL, draftVersion } from "@/api/client";
 import type { Drawing, Offer, ProjectDetail } from "@/api/types";
-import { formatDeadline, timeRemaining, stars } from "@/lib/format";
+import { formatDeadline, formatSize, timeRemaining, stars } from "@/lib/format";
 import { RatingInput } from "@/components/RatingInput";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { RequirementItemsEditor, RequirementItemsView } from "@/components/RequirementItems";
@@ -303,6 +303,9 @@ export function OwnerProjectDetailPage() {
     queryKey: ["project", id],
     queryFn: () => apiFetch<ProjectDetail>(`/projects/${id}`),
     enabled: !!id,
+    // Stage 4.6: document links last an hour; refresh them -- but never under
+    // a draft being edited.
+    refetchInterval: (q) => (q.state.data && q.state.data.status !== "draft" ? 20 * 60 * 1000 : false),
   });
 
   const { data: offers } = useQuery({
@@ -556,6 +559,7 @@ export function OwnerProjectDetailPage() {
                       <span>{d.file_name}</span>
                     )}
                     {d.revision > 1 && <span className="text-white/50"> · v{d.revision}</span>}
+                    {formatSize(d.size_bytes) && <span className="text-white/50"> · {formatSize(d.size_bytes)}</span>}
                     <span className="text-white/60">
                       {" "}
                       · {t(`documents.${d.category}`)} · {d.is_required ? t("documents.essential") : t("documents.supplementary")}

@@ -54,6 +54,18 @@ export interface Project {
   eligible?: boolean | null;
   ineligible_reasons?: EligibilityReason[];
   category_id?: string | null;
+  // Stage 4.1, provider feed only.
+  summary?: string | null;
+  pricing_basis?: "lump_sum" | "per_item" | null;
+  item_count?: number | null;
+  // Stage 4.3, provider feed only.
+  document_count?: number | null;
+  conditions?: ProviderEligibility | null;
+  // Stage 4.5, providers only.
+  participation?: Participation | null;
+  // Stage 4.8, provider views: saved by this provider; in the saved list, where it stands now.
+  saved?: boolean | null;
+  availability?: "open" | "paused" | "ended" | "unavailable" | null;
 }
 
 export interface Drawing {
@@ -65,6 +77,7 @@ export interface Drawing {
   // Stage 3.6: what the file is, and whether providers need it to price.
   category: DocumentCategory;
   is_required: boolean;
+  size_bytes?: number | null;
   url: string | null;
 }
 
@@ -121,12 +134,28 @@ export interface EligibilityReason {
   date: string | null;
   governorate: string | null;
   message: string;
+  // Stage 4.5: something the provider can put right themselves.
+  fixable?: boolean;
+}
+
+// Stage 4.5: the server's one answer to "can I take part, and if not why?"
+export interface Participation {
+  status: "can_participate" | "not_eligible" | "action_required" | "unavailable";
+  action: "activate_access" | "verification" | "account_suspended" | null;
+  availability: "open" | "paused" | "ended" | "unavailable";
+  // Stage 4.9: this provider decided to take part, when, and on which version.
+  started?: boolean;
+  started_at?: string | null;
+  seen_material_revision?: number | null;
 }
 
 export interface EligibilityCheck {
   eligible: boolean;
   reasons: EligibilityReason[];
   rules: ProviderEligibility;
+  // Stage 4.4 follow-up: what the opportunity is, at listing level, while it is open.
+  listing?: OpportunityListing | null;
+  participation?: Participation | null;
 }
 
 export interface ServiceCategory {
@@ -351,6 +380,19 @@ export interface Clarification {
   created_at: string;
   answered_at: string | null;
   service_provider_company_name: string | null;
+  // Stage 4.7.
+  mine?: boolean;
+  answered_by_name?: string | null;
+  amendment_number?: number | null;
+  attachments?: ClarificationAttachment[];
+}
+
+export interface ClarificationAttachment {
+  id: string;
+  part: "question" | "answer";
+  file_name: string;
+  size_bytes: number;
+  url: string;
 }
 
 export interface ProjectAmendment {
@@ -411,4 +453,22 @@ export interface RequirementItem {
   quantity: string | null;
   unit: string | null;
   specification: string | null;
+}
+
+// Stage 4.1: one page of the provider opportunity feed.
+export interface FeedPage {
+  items: Project[];
+  next_offset: number | null;
+  hidden_ineligible: number | null;
+}
+
+export interface OpportunityListing {
+  title: string;
+  trade: string | null;
+  governorate: string | null;
+  area: string | null;
+  bid_deadline: string;
+  tender_type: TenderType;
+  published_at: string | null;
+  paused: boolean;
 }

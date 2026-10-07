@@ -19,8 +19,36 @@ POST_DEADLINE_BUFFER = 60 * 15  # 15 minutes grace after the deadline
 
 
 def drawing_url_expiry_seconds(bid_deadline) -> int:
+    """Stage 4.6: a requirement document link lasts an hour (less when the
+    deadline's grace ends sooner, but never under 15 minutes). Links are
+    issued afresh every time the requirement is read, by someone authorized
+    to read it then; so a link that's passed on, or kept after access ends
+    (a lapsed qualification, a requirement that ended), stops working within
+    the hour instead of lasting until the deadline."""
     seconds_remaining = int((bid_deadline.timestamp() + POST_DEADLINE_BUFFER) - time.time())
-    return min(max(seconds_remaining, ONE_HOUR), NINETY_DAYS)
+    return max(min(seconds_remaining, DOCUMENT_LINK_SECONDS), MIN_DOCUMENT_LINK_SECONDS)
+
+
+DOCUMENT_LINK_SECONDS = ONE_HOUR
+MIN_DOCUMENT_LINK_SECONDS = 60 * 15
+
+# File types a browser may show in place (Stage 4.6); everything else is
+# offered as a download under its real name.
+INLINE_TYPES = {"pdf": "application/pdf", "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg"}
+
+
+def content_headers(filename: str | None, key: str) -> tuple[str, str]:
+    """(media type, Content-Disposition) for serving a stored file under its
+    real name: inline for PDFs and images, an attachment otherwise."""
+    from urllib.parse import quote
+
+    name = (filename or key.rsplit("/", 1)[-1]).replace("\r", "").replace("\n", "").replace('"', "")
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    media = INLINE_TYPES.get(ext, "application/octet-stream")
+    disposition = "inline" if ext in INLINE_TYPES else "attachment"
+    ascii_name = name.encode("ascii", "replace").decode().replace("?", "_")
+    return media, f"{disposition}; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(name)}"
+
 
 
 class Storage(ABC):
@@ -28,7 +56,7 @@ class Storage(ABC):
     def save(self, bucket: str, key: str, content: bytes, content_type: str) -> None: ...
 
     @abstractmethod
-    def signed_url(self, bucket: str, key: str, expires_in: int) -> str: ...
+    def signed_url(self, bucket: str, key: str, expires_in: int, filename: str | None = None) -> str: ...
 
     @abstractmethod
     def download(self, bucket: str, key: str) -> bytes | None: ...
@@ -69,10 +97,13 @@ class LocalFileStorage(Storage):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(content)
 
-    def signed_url(self, bucket: str, key: str, expires_in: int) -> str:
+    def signed_url(self, bucket: str, key: str, expires_in: int, filename: str | None = None) -> str:
+        from urllib.parse import quote
+
         expires_at = int(time.time()) + expires_in
-        signature = self._sign(bucket, key, expires_at)
-        return f"{settings.api_url}/files/{bucket}/{key}?exp={expires_at}&sig={signature}"
+        signature = self._sign(bucket, key, expires_at, filename)
+        name = f"&name={quote(filename)}" if filename else ""
+        return f"{settings.api_url}/files/{bucket}/{key}?exp={expires_at}&sig={signature}{name}"
 
     def download(self, bucket: str, key: str) -> bytes | None:
         path = self._path(bucket, key)
@@ -89,15 +120,17 @@ class LocalFileStorage(Storage):
         return self._path(bucket, key).is_file()
 
     @staticmethod
-    def _sign(bucket: str, key: str, expires_at: int) -> str:
-        message = f"{bucket}:{key}:{expires_at}".encode()
-        return hmac.new(settings.storage_signing_secret.encode(), message, hashlib.sha256).hexdigest()
+    def _sign(bucket: str, key: str, expires_at: int, name: str | None = None) -> str:
+        # The download name, when given, is signed too: a link can't be
+        # re-labelled to make one file pass for another.
+        message = f"{bucket}:{key}:{expires_at}" + (f":{name}" if name else "")
+        return hmac.new(settings.storage_signing_secret.encode(), message.encode(), hashlib.sha256).hexdigest()
 
     @classmethod
-    def verify(cls, bucket: str, key: str, expires_at: int, signature: str) -> bool:
+    def verify(cls, bucket: str, key: str, expires_at: int, signature: str, name: str | None = None) -> bool:
         if time.time() > expires_at:
             return False
-        expected = cls._sign(bucket, key, expires_at)
+        expected = cls._sign(bucket, key, expires_at, name)
         return hmac.compare_digest(expected, signature)
 
 
@@ -124,6 +157,9 @@ class S3Storage(Storage):
             # Stage 3.8 response attachments share the documents bucket; their
             # keys are namespaced by project and provider.
             "offer-documents": settings.s3_bucket_documents,
+            # Stage 4.7 follow-up: files on questions and answers, keyed by
+            # project and question.
+            "clarification-documents": settings.s3_bucket_documents,
         }.get(bucket, bucket)
 
     def _resolve_key(self, key: str) -> str:
@@ -134,12 +170,12 @@ class S3Storage(Storage):
             Bucket=self._resolve_bucket(bucket), Key=self._resolve_key(key), Body=content, ContentType=content_type
         )
 
-    def signed_url(self, bucket: str, key: str, expires_in: int) -> str:
-        return self._client.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": self._resolve_bucket(bucket), "Key": self._resolve_key(key)},
-            ExpiresIn=expires_in,
-        )
+    def signed_url(self, bucket: str, key: str, expires_in: int, filename: str | None = None) -> str:
+        params = {"Bucket": self._resolve_bucket(bucket), "Key": self._resolve_key(key)}
+        if filename:  # S3 serves it under its real name and type, as the local route does
+            media, disposition = content_headers(filename, key)
+            params.update(ResponseContentType=media, ResponseContentDisposition=disposition)
+        return self._client.generate_presigned_url("get_object", Params=params, ExpiresIn=expires_in)
 
     def download(self, bucket: str, key: str) -> bytes | None:
         try:

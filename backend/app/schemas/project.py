@@ -26,11 +26,12 @@ class DrawingOut(BaseModel):
 
     id: str
     file_name: str
-    uploaded_at: datetime
+    uploaded_at: UTCDateTime  # Stage 4.4: an explicit UTC instant, like every other time sent
     revision: int
     is_current: bool
     category: str = "drawing"
     is_required: bool = True
+    size_bytes: int | None = None
     url: str | None = None
 
 
@@ -79,10 +80,24 @@ class ProjectOut(BaseModel):
     documents_required: bool = False
     offer_count: int = 0
     my_offer_status: str | None = None  # only populated on the service provider feed
+    # Stage 4.1, feed only: enough to decide whether to open it. summary is the
+    # opening of the scope, for providers with full access who may respond.
+    summary: str | None = None
+    pricing_basis: str | None = None
+    item_count: int | None = None
+    # Stage 4.3, feed only: how many current documents come with it, and who
+    # may respond when the owner narrowed it (None = open to every verified provider).
+    document_count: int | None = None
+    # Stage 4.8, provider views only: saved by this provider; and, in the
+    # saved list, where it stands now (eligibility.availability).
+    saved: bool | None = None
+    availability: str | None = None
+    conditions: "ProviderEligibilityOut | None" = None
     # Stage 3.9, service provider feed only: whether this provider may respond,
     # and if not, why.
     eligible: bool | None = None
     ineligible_reasons: list["EligibilityReason"] = Field(default_factory=list)
+    participation: "Participation | None" = None  # Stage 4.5, providers only
     category_id: str | None = None
 
 
@@ -175,6 +190,42 @@ class EligibilityReason(BaseModel):
     date: str | None = None  # expiry date (ISO)
     governorate: str | None = None
     message: str
+    # Stage 4.5: something the provider can put right themselves (supply or
+    # renew a qualification; declare a type of work or area they do serve)
+    # -- as opposed to the requirement simply not being for them.
+    fixable: bool = False
+
+
+class Participation(BaseModel):
+    """Stage 4.5: the one answer to "can this provider take part, and if not
+    why?" -- computed by services.eligibility.participation(), the same
+    checks the offer endpoints enforce.
+
+      status        can_participate | not_eligible | action_required | unavailable
+      action        with action_required: "activate_access" (verified, but
+                    marketplace access isn't active), "verification", or
+                    "account_suspended" (the provider's account, by U-Tender)
+      availability  open | paused | ended | unavailable (hidden by U-Tender)"""
+
+    status: str
+    action: str | None = None
+    availability: str
+    # Stage 4.9: whether this provider has decided to take part (Participate,
+    # or an offer), when, and the requirement version they decided on.
+    started: bool = False
+    started_at: UTCDateTime | None = None
+    seen_material_revision: int | None = None
+
+
+class OpportunityListing(BaseModel):
+    title: str
+    trade: str | None
+    governorate: str | None
+    area: str | None
+    bid_deadline: UTCDateTime
+    tender_type: TenderType
+    published_at: UTCDateTime | None
+    paused: bool
 
 
 class EligibilityCheckOut(BaseModel):
@@ -184,6 +235,10 @@ class EligibilityCheckOut(BaseModel):
     eligible: bool
     reasons: list[EligibilityReason] = Field(default_factory=list)
     rules: ProviderEligibilityOut
+    # Stage 4.4 follow-up: what the opportunity is, at listing level (no
+    # address, no scope) -- only while it is open, as in the feed.
+    listing: OpportunityListing | None = None
+    participation: Participation | None = None
 
 
 class PaymentStage(BaseModel):
@@ -270,3 +325,13 @@ class RequirementVersionOut(BaseModel):
     amendment_number: int | None  # the amendment that started it; None = as published
     fields: dict
     documents: list[DrawingOut]
+
+
+class FeedPage(BaseModel):
+    """Stage 4.1: one page of the provider opportunity feed."""
+
+    items: list[ProjectOut]
+    next_offset: int | None  # pass back as offset for the next page; None = no more
+    # Only when nothing at all is available: how many open requirements were
+    # left out because their conditions don't match this provider.
+    hidden_ineligible: int | None = None

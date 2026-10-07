@@ -1,3 +1,4 @@
+import time
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -28,12 +29,23 @@ register_error_handlers(app)
 app.add_middleware(MaxBodySizeMiddleware, max_body_bytes=settings.max_upload_mb * 1024 * 1024)
 app.add_middleware(LanguageMiddleware)
 
+
+# Stage 4.3 follow-up: the server's clock on every response, so the interface
+# counts time to a deadline from the same clock that enforces it -- not from
+# a device clock that may be wrong.
+@app.middleware("http")
+async def server_time(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Server-Time"] = str(int(time.time() * 1000))
+    return response
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Server-Time"],
 )
 
 app.include_router(auth_router)

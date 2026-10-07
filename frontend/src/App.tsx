@@ -16,6 +16,7 @@ import { OwnerVerifyPage } from "@/pages/owner/Verify";
 import { OwnerStatusPage } from "@/pages/owner/Status";
 import { ServiceProviderLayout } from "@/pages/service-provider/ServiceProviderLayout";
 import { ServiceProviderDashboardPage } from "@/pages/service-provider/Dashboard";
+import { ServiceProviderSavedPage } from "@/pages/service-provider/Saved";
 import { ServiceProviderFeedPage } from "@/pages/service-provider/Feed";
 import { ServiceProviderVerifyPage } from "@/pages/service-provider/Verify";
 import { ServiceProviderStatusPage } from "@/pages/service-provider/Status";
@@ -129,6 +130,7 @@ export function App() {
           }
         >
           <Route path="feed" element={<ServiceProviderFeedPage />} />
+          <Route path="saved" element={<ServiceProviderSavedPage />} />
           <Route path="subscribe" element={<ServiceProviderSubscribePage />} />
           <Route path="projects/:id/offer" element={<ServiceProviderOfferPage />} />
         </Route>

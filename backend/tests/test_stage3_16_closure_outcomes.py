@@ -58,7 +58,7 @@ def test_cancel(db):
     assert r.status_code == 200 and (r.json()["status"], r.json()["closure_reason"]) == ("canceled", "postponed") and r.json()["closed_at"]
     # No new offers; not an open opportunity; the existing offer and its history stay.
     assert beta.post(f"/projects/{pid}/offers", json={"amount": "2000"}).status_code == 400
-    assert all(p["id"] != pid for p in beta.get("/service-provider/feed").json())
+    assert all(p["id"] != pid for p in beta.get("/service-provider/feed").json()["items"])
     mine = alpha.get(f"/projects/{pid}/offers/mine").json()
     assert (mine["amount"], mine["message"], mine["status"]) == ("3000.000", "Our quotation.", "submitted")
     # The bidder sees it was canceled -- but not the owner's private note.

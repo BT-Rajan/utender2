@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError, draftVersion } from "@/api/client";
-import type { Offer, ProjectAmendment, ProjectDetail, RequirementVersion } from "@/api/types";
+import type { Clarification, Offer, ProjectAmendment, ProjectDetail, RequirementVersion } from "@/api/types";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
@@ -106,8 +106,15 @@ export function AmendPublishedForm({ project }: { project: ProjectDetail }) {
     start: project.expected_start_date ?? "",
     completion: project.expected_completion_date ?? "",
     reason: "",
+    clarification: "",
   });
   const [values, setValues] = useState(initial);
+  // Stage 4.7: a change prompted by an answered question is tied to it.
+  const { data: answered = [] } = useQuery({
+    queryKey: ["clarifications", project.id],
+    queryFn: () => apiFetch<Clarification[]>(`/projects/${project.id}/clarifications`),
+    select: (rows) => rows.filter((c) => c.answer),
+  });
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const set = (patch: Partial<typeof values>) => setValues((v) => ({ ...v, ...patch }));
@@ -115,6 +122,7 @@ export function AmendPublishedForm({ project }: { project: ProjectDetail }) {
     mutationFn: () => {
       const base = initial();
       const body: Record<string, unknown> = { reason: values.reason || null };
+      if (values.clarification) body.clarification_id = values.clarification;
       if (values.title !== base.title) body.title = values.title;
       if (values.description !== base.description) body.description = values.description;
       if (values.address !== base.address) body.address = values.address;
@@ -128,9 +136,11 @@ export function AmendPublishedForm({ project }: { project: ProjectDetail }) {
       setError(null);
       setDone(t((data.material_revision ?? 0) > (project.material_revision ?? 0) ? "postPub.savedMaterial" : "postPub.savedMinor"));
       refresh();
+      queryClient.invalidateQueries({ queryKey: ["clarifications", project.id] });
     },
     onError: (err) => setError(err instanceof ApiError ? err.detail : t("postPub.error")),
   });
+  const queryClient = useQueryClient();
   const field = "w-full border border-border rounded px-3 py-2 text-sm";
   const label = "block text-xs text-steel mb-1";
   return (
@@ -159,6 +169,19 @@ export function AmendPublishedForm({ project }: { project: ProjectDetail }) {
           <div><label htmlFor="amend-completion" className={label}>{t("dates.completion")}</label><input id="amend-completion" type="date" value={values.completion} onChange={(e) => set({ completion: e.target.value })} className={field} /></div>
         </div>
         <div><label htmlFor="amend-reason" className={label}>{t("postPub.reason")}</label><input id="amend-reason" value={values.reason} onChange={(e) => set({ reason: e.target.value })} className={field} /></div>
+        {answered.length > 0 && (
+          <div>
+            <label htmlFor="amend-clarification" className={label}>{t("clarifications.becauseOf")}</label>
+            <select id="amend-clarification" value={values.clarification} onChange={(e) => set({ clarification: e.target.value })} className={field}>
+              <option value="">{t("clarifications.notBecauseOf")}</option>
+              {answered.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.question.length > 90 ? `${c.question.slice(0, 90)}…` : c.question}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <button type="submit" disabled={save.isPending} className="bg-navy hover:bg-navy-deep disabled:opacity-50 text-white text-sm font-semibold rounded px-5 py-2.5 w-fit">{t("postPub.amendSave")}</button>
       </form>
     </details>
