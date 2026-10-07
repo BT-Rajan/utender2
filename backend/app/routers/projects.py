@@ -864,6 +864,17 @@ _NOT_NOW = {
 }
 
 
+def _deadline_ended(project: Project) -> bool:
+    """Stage 5.1: offers stopped because the response deadline passed (by the
+    server's clock) -- as opposed to the owner ending it early."""
+    if project.bid_deadline > datetime.utcnow():
+        return False
+    if project.status == ProjectStatus.open:
+        return True
+    stopped = project.closed_at
+    return project.status in (ProjectStatus.closed, ProjectStatus.expired) and (stopped is None or stopped >= project.bid_deadline)
+
+
 @router.post("/{project_id}/participate", response_model=ParticipationOut)
 def participate(project_id: str, user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
     """Stage 4.9: the provider decides to take part -- from evaluating the
@@ -882,7 +893,10 @@ def participate(project_id: str, user: User = Depends(require_service_provider),
     reasons = ineligibility_reasons(db, project, profile) if profile else []
     verdict = participation(db, project, profile, reasons)
     if verdict.status == "unavailable":
-        raise HTTPException(status_code=400, detail=_NOT_NOW[verdict.availability])
+        detail = _NOT_NOW[verdict.availability]
+        if verdict.availability == "ended" and _deadline_ended(project):
+            detail += " Its response deadline has passed."
+        raise HTTPException(status_code=400, detail=detail)
     if verdict.status == "action_required":
         detail = {
             "activate_access": "Activate your marketplace access to take part.",

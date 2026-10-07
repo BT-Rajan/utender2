@@ -247,6 +247,7 @@ AR: dict[str, str] = {
     "That file is empty.": "هذا الملف فارغ.",
     "This requirement is paused by its owner; you can take part once it resumes.": "أوقف المالك هذا الطلب مؤقتًا؛ يمكنك المشاركة عند استئنافه.",
     "This requirement is no longer accepting offers.": "لم يعد هذا الطلب يقبل العروض.",
+    "Its response deadline has passed.": "انتهى موعد تقديم العروض.",
     "This requirement is temporarily unavailable.": "هذا الطلب غير متاح مؤقتًا.",
     "Activate your marketplace access to take part.": "فعّل وصولك إلى السوق للمشاركة.",
     "Complete your verification to take part in opportunities.": "أكمل التحقق من حسابك للمشاركة في الفرص.",

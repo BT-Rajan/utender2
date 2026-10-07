@@ -16,7 +16,12 @@ from app.models.common import gen_uuid
 # of the requirement they decided on, so a later material change is flagged.
 class Participation(Base):
     __tablename__ = "participations"
-    __table_args__ = (UniqueConstraint("project_id", "service_provider_id", name="uq_participation"),)
+    # Stage 5.1: one per stakeholder, like offers -- and per organization (NULLs,
+    # individuals, are distinct to the database, so this only binds organizations).
+    __table_args__ = (
+        UniqueConstraint("project_id", "service_provider_id", name="uq_participation"),
+        UniqueConstraint("project_id", "organization_id", name="uq_participation_organization"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
     project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)

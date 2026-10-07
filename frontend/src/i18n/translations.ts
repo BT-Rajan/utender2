@@ -180,6 +180,8 @@ export interface Dictionary {
     reviewed: string;
     preparingHeading: string;
     changedShort: string;
+    preparingFor: string;
+    reviewFirst: string;
   };
   saved: {
     save: string;
@@ -1294,6 +1296,8 @@ export const en: Dictionary = {
     reviewed: "I’ve reviewed the current requirement",
     preparingHeading: "Preparing an offer",
     changedShort: "changed since you started",
+    preparingFor: "You are preparing an offer for",
+    reviewFirst: "Confirm you’ve reviewed the current requirement to continue preparing your offer.",
   },
   saved: {
     save: "Save",
@@ -2433,6 +2437,8 @@ export const ar: Dictionary = {
     reviewed: "راجعت الطلب الحالي",
     preparingHeading: "عروض قيد الإعداد",
     changedShort: "تغيّر منذ أن بدأت",
+    preparingFor: "أنت تُعِدّ عرضًا للطلب",
+    reviewFirst: "أكّد أنك راجعت الطلب الحالي لمتابعة إعداد عرضك.",
   },
   saved: {
     save: "حفظ",

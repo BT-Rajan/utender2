@@ -180,11 +180,17 @@ export function ServiceProviderOfferPage() {
         </div>
       ) : existingOffer || project.participation?.started ? (
         <>
-          {/* Stage 4.9: changed materially since they decided -- the current requirement is what applies. */}
-          {!existingOffer && (project.material_revision ?? 0) > (project.participation?.seen_material_revision ?? 0) && (
+          {/* Stage 5.1: which requirement this offer is for. */}
+          <p className="mb-4 text-sm text-navy" data-testid="preparing-for">
+            {t("participate.preparingFor")} <strong dir="auto" className="font-display">{project.title}</strong>
+          </p>
+          {/* Stage 4.9 / 5.1: changed materially since they decided -- the offer
+              is prepared against the current requirement only, once they've seen it. */}
+          {!existingOffer && (project.material_revision ?? 0) > (project.participation?.seen_material_revision ?? 0) ? (
             <ChangedSinceDecided projectId={project.id} />
+          ) : (
+            <OfferForm project={project} existingOffer={existingOffer ?? null} />
           )}
-          <OfferForm project={project} existingOffer={existingOffer ?? null} />
         </>
       ) : project.participation?.status === "can_participate" ? (
         <ParticipateStep projectId={project.id} />
@@ -264,6 +270,7 @@ function ChangedSinceDecided({ projectId }: { projectId: string }) {
     <div className="border border-amber-dark/40 bg-amber/10 rounded px-4 py-3 mb-4 text-sm" data-testid="changed-since">
       <strong className="font-display text-navy block">{t("participate.changedHeading")}</strong>
       <p className="text-steel">{t("participate.changedBody")}</p>
+      <p className="text-steel mt-1">{t("participate.reviewFirst")}</p>
       <button type="button" disabled={seen.isPending} onClick={() => seen.mutate()} className="mt-2 border border-navy text-navy text-xs font-semibold rounded px-3 py-1.5">
         {t("participate.reviewed")}
       </button>

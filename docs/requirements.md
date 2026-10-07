@@ -209,4 +209,12 @@ be added as its prompts (5.1, 5.2, …) are delivered.
 
 ## Stage 5 — Offer submission & competition
 
-_To be filled in as prompts 5.1, 5.2, … are implemented._
+- **5.1 Start an offer:**
+  - "Participate — prepare an offer" creates or reuses exactly one offer workspace per provider stakeholder and requirement, shared within an organisation, enforced by the database (per provider and per organisation) and under the requirement's lock.
+  - Checked on the server at that moment: signed in as a provider acting for their stakeholder; requirement exists, is published, open, not paused or suspended, and before its deadline by the server's clock; eligible; verified with marketplace access.
+  - Bound to the requirement, its current version (material revision), the stakeholder, and the user who started it.
+  - After a material amendment the provider confirms they've reviewed the current requirement before continuing; the offer is always prepared against the current version.
+  - Refusals say why: no longer accepting offers (and when the deadline passed, that), paused, temporarily unavailable, not eligible, verification or access needed.
+  - The offer page states "You are preparing an offer for [requirement]".
+
+_Further steps (5.2 onwards) are added as they are implemented._
