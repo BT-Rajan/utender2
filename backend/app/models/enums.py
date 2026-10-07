@@ -152,3 +152,5 @@ class NotificationType(str, enum.Enum):
     tender_resumed = "tender_resumed"
     requirement_ended = "requirement_ended"
     clarification_shared = "clarification_shared"
+    offer_clarification_requested = "offer_clarification_requested"
+    offer_clarification_answered = "offer_clarification_answered"

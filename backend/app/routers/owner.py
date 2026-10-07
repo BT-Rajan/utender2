@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import get_owner_profile, require_owner
 from app.models.award_record import AwardRecord
+from app.models.clarification import Clarification
 from app.models.notification import Notification
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import DocumentRequirement
@@ -17,6 +18,7 @@ from app.models.owner import OwnerProfile
 from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.review import Review
 from app.models.user import User
+from app.schemas.clarification import OfferClarificationAsk, OfferClarificationOut
 from app.schemas.document import DocumentRequirementOut, OwnerDocumentOut
 from app.schemas.offer import OfferComparisonOut, OfferOut, OfferRevisionOut, OwnerOfferOut
 from app.schemas.owner import OwnerProfileOut
@@ -28,6 +30,8 @@ from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allow
 from app.services.notify import notify, notify_team
 from app.services.team import acting_profile, mine, owns
 from app.services.eligibility import qualification_options
+from app.services.offer_clarifications import clarification_out, offer_clarifications
+from app.services.offer_clarifications import closed_reason as clarification_closed_reason
 from app.services.offer_response import history_out, offer_file, open_file, submitted_documents_out, timing_conflicts
 from app.services.stakeholder import require_established
 from app.services.verification import (
@@ -283,6 +287,57 @@ def offer_detail(project_id: str, offer_id: str, user: User = Depends(require_ow
         offer=_owner_offer_out(db, project, offer, cp),
         on_current_version=offer.based_on_material_revision >= project.material_revision,
     )
+
+
+@router.get("/projects/{project_id}/offers/{offer_id}/clarifications", response_model=list[OfferClarificationOut])
+def list_offer_clarifications(project_id: str, offer_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 6.10: the clarifications asked about this offer, with any
+    answers -- beside the offer, which they never change."""
+    return offer_clarifications(db, _readable_offer(project_id, offer_id, user, db), owner_side=True)
+
+
+@router.post("/projects/{project_id}/offers/{offer_id}/clarifications", response_model=OfferClarificationOut, status_code=201)
+def ask_offer_clarification(
+    project_id: str, offer_id: str, payload: OfferClarificationAsk, user: User = Depends(require_owner), db: Session = Depends(get_db)
+):
+    """Stage 6.10: ask the offer's provider to clarify it, during evaluation.
+    The offer is found on this requirement only (its id and the
+    requirement's are checked together); the question goes to that offer's
+    side alone. A repeat of a question still waiting for its answer is the
+    same question."""
+    project = _get_owned_project(project_id, user, db, lock=True)  # serialized with the requirement's outcome
+    offer = _readable_offer(project_id, offer_id, user, db)
+    reason = clarification_closed_reason(project, offer)
+    if reason:
+        raise HTTPException(status_code=400, detail=reason)
+    question = payload.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Enter a question.")
+    existing = (
+        db.query(Clarification)
+        .filter(Clarification.offer_id == offer.id, Clarification.question == question, Clarification.answer.is_(None))
+        .first()
+    )
+    if existing:
+        db.rollback()  # release the lock; nothing changed
+        return clarification_out(db, existing, owner_side=True)
+    clarification = Clarification(
+        project_id=project_id, offer_id=offer.id, offer_revision=offer.revision,
+        service_provider_id=offer.service_provider_id, organization_id=offer.organization_id,
+        question=question, shared_with_all=False, asked_by=user.id,
+    )
+    db.add(clarification)
+    db.flush()
+    # log_action commits: the question and its audit entry land together.
+    log_action(db, actor_id=user.id, action="offer_clarification.ask", target_type="offer", target_id=offer.id, new_value=clarification.id)
+    db.refresh(clarification)
+    provider = db.get(User, offer.service_provider_id)
+    if provider:
+        notify_team(
+            db, provider, NotificationType.offer_clarification_requested, organization_id=offer.organization_id,
+            link=f"/service-provider/projects/{project_id}/offer", project_title=project.title,
+        )
+    return clarification_out(db, clarification, owner_side=True)
 
 
 @router.get("/projects/{project_id}/offers/{offer_id}/documents/file")

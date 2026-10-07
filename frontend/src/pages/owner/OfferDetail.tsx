@@ -4,6 +4,7 @@ import { apiFetch, ApiError } from "@/api/client";
 import type { OwnerOffer } from "@/api/types";
 import { PageLoading } from "@/components/PageLoading";
 import { OfferHistory, OfferRecord } from "@/components/OfferPreview";
+import { OfferClarifications } from "@/components/OfferClarifications";
 import { VersionView } from "@/components/PostPublication";
 import { useI18n } from "@/i18n/I18nContext";
 import { fullDate } from "@/lib/format";
@@ -89,6 +90,13 @@ export function OwnerOfferDetailPage() {
         }
       />
       <OfferHistory projectId={requirement.id} offerId={offer.id} currency={requirement.currency} />
+      {/* Stage 6.10: clarifying this offer while it is being evaluated. */}
+      <OfferClarifications
+        projectId={requirement.id}
+        offerId={offer.id}
+        role="owner"
+        canAsk={offer.status === "submitted" && (requirement.status === "closed" || requirement.status === "under_evaluation")}
+      />
     </div>
   );
 }

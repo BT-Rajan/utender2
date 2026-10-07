@@ -46,3 +46,30 @@ class ClarificationOut(BaseModel):
     answered_by_name: str | None = None
     amendment_number: int | None = None
     attachments: list[ClarificationAttachmentOut] = Field(default_factory=list)
+
+
+class OfferClarificationAsk(BaseModel):
+    """Stage 6.10: the owner's question about one submitted offer."""
+
+    question: str = Field(min_length=1, max_length=4000)
+
+
+class OfferClarificationAnswer(BaseModel):
+    """Stage 6.10: the provider's answer. Text only: it never changes the offer."""
+
+    answer: str = Field(min_length=1, max_length=4000)
+
+
+class OfferClarificationOut(BaseModel):
+    """Stage 6.10: one offer clarification, as either side reads it."""
+
+    id: str
+    project_id: str
+    offer_id: str
+    offer_revision: int | None  # the version of the offer it was about
+    question: str
+    asked_at: UTCDateTime | None
+    asked_by_name: str | None = None  # the owner's side only
+    answer: str | None
+    answered_at: UTCDateTime | None
+    answered_by_name: str | None = None

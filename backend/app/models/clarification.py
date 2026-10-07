@@ -36,6 +36,15 @@ class Clarification(Base):
     # material clarification is never just text beside an unchanged record.
     answered_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     amendment_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("project_amendments.id", ondelete="SET NULL"), nullable=True)
+    # Stage 6.10: an offer clarification -- the owner's side asking the
+    # provider about their submitted offer during evaluation. The question is
+    # the owner's (asked_by), the answer the provider side's (answered_by);
+    # always private to the two (never shared_with_all); tied to the offer and
+    # the version of it the question was about. NULL offer_id: a Stage 4.7
+    # requirement question from a provider.
+    offer_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("offers.id", ondelete="CASCADE"), nullable=True, index=True)
+    offer_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    asked_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 
 # A file attached to a question (by the asker's side) or to its answer (by the

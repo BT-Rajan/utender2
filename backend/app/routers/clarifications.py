@@ -90,7 +90,9 @@ def list_clarifications(project_id: str, user: User = Depends(get_current_user),
     rows = (
         db.query(Clarification, ServiceProviderProfile)
         .join(ServiceProviderProfile, Clarification.service_provider_id == ServiceProviderProfile.user_id)
-        .filter(Clarification.project_id == project_id)
+        # Stage 6.10: offer clarifications are private to the owner and that
+        # offer's provider, read only beside the offer -- never in the Q&A.
+        .filter(Clarification.project_id == project_id, Clarification.offer_id.is_(None))
         .order_by(Clarification.created_at.asc())
         .all()
     )
@@ -178,7 +180,7 @@ def answer_clarification(
     # Locked: two people on the owner's side answering at once -- one answer
     # is recorded, the other is told it was already answered.
     clarification = db.query(Clarification).filter(Clarification.id == clarification_id).populate_existing().with_for_update().first()
-    if not clarification or clarification.project_id != project_id:
+    if not clarification or clarification.project_id != project_id or clarification.offer_id is not None:  # Stage 6.10: not a Q&A question
         raise HTTPException(status_code=404, detail="Question not found.")
     if clarification.answer is not None:
         raise HTTPException(status_code=400, detail="This question has already been answered.")
@@ -265,7 +267,7 @@ async def attach_files(
     if not project or not _can_view_project(user, project, db):
         raise HTTPException(status_code=404, detail="Project not found.")
     clarification = db.query(Clarification).filter(Clarification.id == clarification_id).populate_existing().with_for_update().first()
-    if not clarification or clarification.project_id != project_id:
+    if not clarification or clarification.project_id != project_id or clarification.offer_id is not None:  # Stage 6.10: not a Q&A question
         raise HTTPException(status_code=404, detail="Question not found.")
     owner_side = owns(db, user, project)
     if owner_side:

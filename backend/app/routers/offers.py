@@ -7,12 +7,16 @@ from app.config import get_settings
 from app.db import get_db
 from app.i18n_server import translate
 from app.deps import get_service_provider_profile, require_approved_service_provider, require_marketplace_active_service_provider, require_service_provider
+from app.models.clarification import Clarification
 from app.models.enums import NotificationType, OfferStatus, ProjectStatus, TenderType
 from app.models.offer import Offer, OfferDocument, OfferRevision
 from app.models.project import Project
 from app.models.user import User
 from app.schemas.offer import OfferAssumptionsDraft, OfferCommercialDraft, OfferDeclarationsDraft, OfferDraftSave, OfferPreviewOut, OfferReadiness, PreviewRequirement, OfferCreate, OfferTechnicalDraft, OfferTimingDraft, OfferDocumentOut, OfferOut, OfferRevisionOut
+from app.schemas.clarification import OfferClarificationAnswer, OfferClarificationOut
 from app.services.audit import log_action
+from app.services.offer_clarifications import clarification_out, offer_clarifications
+from app.services.offer_clarifications import closed_reason as clarification_closed_reason
 from app.services.eligibility import assert_eligible
 from app.services.email import notify_owner_new_offer
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name, sanitize_path_segment
@@ -233,7 +237,7 @@ def preview_requirement(db: Session, project: Project) -> PreviewRequirement:
         amendment_number=latest[0] if latest else None,
         items=[ProjectItemOut.model_validate(i) for i in sorted(project.items, key=lambda i: i.position)],
         declarations=list(reqs.declarations), requested_documents=[{"name": d.name, "required": d.required} for d in reqs.documents],
-        approach=reqs.approach, completion_period=reqs.completion_period,
+        approach=reqs.approach, completion_period=reqs.completion_period, status=project.status.value,
     )
 
 
@@ -423,6 +427,50 @@ def open_my_offer_document(
     if not found:
         raise HTTPException(status_code=404, detail="Document not found.")
     return open_file(*found)
+
+
+@router.get("/mine/clarifications", response_model=list[OfferClarificationOut])
+def my_offer_clarifications(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """Stage 6.10: what the owner has asked about this side's own offer (found
+    by who is asking, never an id from the request), with any answers."""
+    offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
+    return offer_clarifications(db, offer, owner_side=False) if offer else []
+
+
+@router.post("/mine/clarifications/{clarification_id}/answer", response_model=OfferClarificationOut)
+def answer_offer_clarification(
+    project_id: str, clarification_id: str, payload: OfferClarificationAnswer,
+    user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db),
+):
+    """Stage 6.10: answer the owner's clarification of this side's own offer,
+    during evaluation. Text beside the offer: the price, response, timing,
+    documents and assumptions stay exactly as submitted. Answered once."""
+    project = lock_project(db, project_id)  # serialized with the requirement's outcome and the offer's state
+    offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first() if project else None
+    clarification = (
+        db.query(Clarification).filter(Clarification.id == clarification_id).populate_existing().with_for_update().first() if offer else None
+    )
+    if not clarification or clarification.offer_id != offer.id:
+        raise HTTPException(status_code=404, detail="Clarification not found.")
+    if clarification.answer is not None:
+        raise HTTPException(status_code=400, detail="This clarification has already been answered.")
+    reason = clarification_closed_reason(project, offer)
+    if reason:
+        raise HTTPException(status_code=400, detail=reason)
+    answer = payload.answer.strip()
+    if not answer:
+        raise HTTPException(status_code=400, detail="Enter an answer.")
+    clarification.answer, clarification.answered_at, clarification.answered_by = answer, datetime.utcnow(), user.id
+    # log_action commits: the answer and its audit entry land together.
+    log_action(db, actor_id=user.id, action="offer_clarification.answer", target_type="offer", target_id=offer.id, new_value=clarification.id)
+    db.refresh(clarification)
+    owner = db.get(User, project.owner_id)
+    if owner:
+        notify_team(
+            db, owner, NotificationType.offer_clarification_answered, organization_id=project.organization_id,
+            link=f"/owner/projects/{project_id}/offers/{offer.id}", project_title=project.title,
+        )
+    return clarification_out(db, clarification, owner_side=False)
 
 
 @router.get("/documents/{document_id}/file")

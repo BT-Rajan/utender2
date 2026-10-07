@@ -224,6 +224,9 @@ class PreviewRequirement(BaseModel):
     # completion period ("required" | "optional") -- fixed once published.
     approach: str = "optional"
     completion_period: str = "optional"
+    # Stage 6.10: where the requirement is in its life (open, closed, under
+    # evaluation, awarded...) -- e.g. whether an offer can be clarified now.
+    status: str | None = None
 
 
 class OfferPreviewOut(BaseModel):

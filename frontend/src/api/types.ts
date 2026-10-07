@@ -231,6 +231,7 @@ export interface OfferPreview {
     requested_documents: { name: string; required: boolean }[];
     approach?: "required" | "optional"; // Stage 6.8
     completion_period?: "required" | "optional";
+    status?: string | null; // Stage 6.10
   };
   provider_name: string | null;
   offer: Offer;
@@ -244,6 +245,20 @@ export interface OwnerOffer {
   provider_name: string | null;
   offer: Offer;
   on_current_version: boolean;
+}
+
+// Stage 6.10: the owner's clarification of one offer, and the provider's answer.
+export interface OfferClarification {
+  id: string;
+  project_id: string;
+  offer_id: string;
+  offer_revision: number | null;
+  question: string;
+  asked_at: string | null;
+  asked_by_name: string | null;
+  answer: string | null;
+  answered_at: string | null;
+  answered_by_name: string | null;
 }
 
 // Stage 6.6: chosen offers side by side, as stored, in the order chosen.

@@ -501,4 +501,18 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - New `before_close` flag. A deadline extension isn't a material change, so it can leave a still-current offer with dates before offers now close (a state the submission rules forbid). This is now flagged to the owner and the provider (who is asked to revise), never rewritten.
   - **Facts only:** no scheduling, feasibility judgement or scoring.
 
+- **6.10 Clarification during evaluation:**
+  - **Before:** the Stage 4.7 clarification system was one-way: a provider asks about the requirement while offers are open, and the owner answers, privately or for everyone. It had no way for the owner to ask a provider about a submitted offer.
+  - **Now:** the same `clarifications` record carries the owner's questions about a submitted offer. Migration 0045 adds `offer_id`, `offer_revision` and `asked_by`, plus the notification types `offer_clarification_requested` and `offer_clarification_answered`. No separate messaging system was added.
+  - **Owner endpoints:** `GET/POST /owner/projects/{id}/offers/{offer}/clarifications`. Same access as reviewing the offer: the owner side, the offer on that requirement (ids checked together), unsealed, live, not suspended.
+    - Asking needs an approved, active owner account and takes the requirement's lock, so it can't race the award or other outcome.
+    - A retry of a question still waiting for its answer is the same question.
+  - **Provider endpoints:** `GET /projects/{id}/offers/mine/clarifications` and `POST …/mine/clarifications/{c}/answer`. Only for the offer's own side (found from who is asking, never an id from the request), and each question is answered once.
+  - **Private:** only the owner side and that offer's side see the question and answer. Offer clarifications never appear in the requirement's Q&A, can't be answered or given files through it, and can't be cited by an amendment. Competitors get nothing.
+  - **Offer unchanged:** an answer is text beside the offer. Price, response, timing, documents, assumptions, revision and timestamps stay as submitted. Formal changes are Stage 5 revisions, which aren't possible once offers have closed. Nor can the requirement be amended then, so each question's offer and version context stays fixed; it records the offer version it was about.
+  - **When:** only while offers are being evaluated (closed or under evaluation). Not while open, since the provider can still revise formally then. Not after the outcome (awarded, no award, cancelled, expired), and not on a suspended requirement or suspended offer. Answers are given after the bid deadline by nature. The history stays readable.
+  - **Notifications and history:** each side is notified through the existing notifications, and each question and answer is recorded in the audit log (who, when, which offer).
+  - **Pages:** the owner's offer page (6.4) shows the clarifications and a form to ask while allowed. The provider's read-only offer page shows them with an answer form.
+  - **Rollback guard:** a downgrade below 0045 is refused while any offer clarification exists, unless `ALLOW_CLARIFICATION_LOSS=1` is set.
+
 _Later Stage 6 steps are added as they are implemented._

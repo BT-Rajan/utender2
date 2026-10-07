@@ -208,6 +208,18 @@ export interface Dictionary {
     needTwo: string;
     sealed: string;
   };
+  offerClarification: {
+    heading: string;
+    ownerNote: string;
+    providerNote: string;
+    asked: string;
+    answered: string;
+    waiting: string;
+    answer: string;
+    sendAnswer: string;
+    ask: string;
+    askPlaceholder: string;
+  };
   ownerOffer: {
     open: string;
     back: string;
@@ -1456,6 +1468,18 @@ export const en: Dictionary = {
     loadError: "Could not load the comparison. Refresh the page to try again.",
     needTwo: "Select at least two offers to compare.",
     sealed: "These offers can't be compared yet: the tender is sealed until its deadline.",
+  },
+  offerClarification: {
+    heading: "Clarifications on this offer",
+    ownerNote: "Ask this provider to clarify their offer. Only they see your question. Their answer appears here and doesn't change the offer; to change it they would need to revise it, which isn't possible once offers have closed.",
+    providerNote: "The owner asked you to clarify your offer. Only the owner sees your answer. Answering doesn't change your offer: its price, response, timing and documents stay exactly as submitted.",
+    asked: "Asked",
+    answered: "Answered",
+    waiting: "Waiting for the provider's answer.",
+    answer: "Your answer",
+    sendAnswer: "Send answer",
+    ask: "Ask for clarification",
+    askPlaceholder: "What would you like this provider to clarify?",
   },
   ownerOffer: {
     open: "View offer",
@@ -2730,6 +2754,18 @@ export const ar: Dictionary = {
     loadError: "تعذر تحميل المقارنة. حدّث الصفحة للمحاولة مجددًا.",
     needTwo: "حدّد عرضين على الأقل للمقارنة.",
     sealed: "لا يمكن مقارنة هذه العروض بعد: المناقصة مختومة حتى موعدها النهائي.",
+  },
+  offerClarification: {
+    heading: "توضيحات على هذا العرض",
+    ownerNote: "اطلب من هذا المزوّد توضيح عرضه. لا يرى سؤالك غيره. تظهر إجابته هنا ولا تغيّر العرض؛ ولتغييره عليه تعديله، وهذا غير ممكن بعد إغلاق العروض.",
+    providerNote: "طلب المالك منك توضيح عرضك. لا يرى إجابتك غير المالك. الإجابة لا تغيّر عرضك: يبقى السعر والرد والمواعيد والمستندات كما قُدّمت تمامًا.",
+    asked: "سُئل في",
+    answered: "أُجيب في",
+    waiting: "بانتظار إجابة المزوّد.",
+    answer: "إجابتك",
+    sendAnswer: "أرسل الإجابة",
+    ask: "اطلب توضيحًا",
+    askPlaceholder: "ما الذي تريد من هذا المزوّد توضيحه؟",
   },
   ownerOffer: {
     open: "عرض العرض",

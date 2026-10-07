@@ -470,7 +470,7 @@ def amend_project(
     clarification = None
     if payload.clarification_id:
         clarification = db.get(Clarification, payload.clarification_id)
-        if not clarification or clarification.project_id != project.id or clarification.answer is None:
+        if not clarification or clarification.project_id != project.id or clarification.answer is None or clarification.offer_id is not None:
             raise HTTPException(status_code=400, detail="Choose an answered question on this requirement.")
         if project.status == ProjectStatus.draft:
             raise HTTPException(status_code=400, detail="Choose an answered question on this requirement.")

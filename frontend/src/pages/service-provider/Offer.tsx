@@ -9,6 +9,7 @@ import { IneligibleNotice } from "@/components/ProviderEligibility";
 import { ProviderRequirementView } from "@/components/ProviderRequirementView";
 import { OfferForm } from "@/components/OfferForm";
 import { OfferHistory, OfferPreview } from "@/components/OfferPreview";
+import { OfferClarifications } from "@/components/OfferClarifications";
 import { SaveButton } from "@/components/SaveOpportunity";
 import { useI18n } from "@/i18n/I18nContext";
 import { outcomeText } from "@/components/ClosureOutcome";
@@ -184,6 +185,8 @@ export function ServiceProviderOfferPage() {
             <div className="mt-4 text-start">
               <OfferPreview projectId={project.id} readOnly />
               <OfferHistory projectId={project.id} currency={project.currency} />
+              {/* Stage 6.10: the owner's clarification requests on this offer. */}
+              <OfferClarifications projectId={project.id} role="provider" />
             </div>
           )}
           {(project.status === "no_award" || project.status === "canceled" || project.status === "expired") && (
