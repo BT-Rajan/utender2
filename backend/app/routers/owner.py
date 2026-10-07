@@ -147,8 +147,29 @@ def list_offers(
             for o, _cp in offers
         ]
 
+    # Stage 6.2: a withdrawn offer is no longer one the owner may consider --
+    # they see who withdrew and when, never its content. Otherwise a sealed
+    # offer withdrawn before the deadline would be opened at the deadline.
     return [
         OfferOut(
+            id=o.id,
+            project_id=o.project_id,
+            service_provider_id=o.service_provider_id,
+            amount=None,
+            timeline_estimate=None,
+            message=None,
+            status=o.status,
+            revision=o.revision,
+            based_on_material_revision=o.based_on_material_revision,
+            submitted_at=o.submitted_at,
+            created_at=o.created_at,
+            updated_at=o.updated_at,
+            service_provider_company_name=cp.company_name,
+            service_provider_avg_rating=cp.avg_rating,
+            service_provider_review_count=cp.review_count,
+        )
+        if o.status == OfferStatus.withdrawn
+        else OfferOut(
             id=o.id,
             project_id=o.project_id,
             service_provider_id=o.service_provider_id,
@@ -190,7 +211,8 @@ def offer_history(project_id: str, offer_id: str, user: User = Depends(require_o
     offer = db.get(Offer, offer_id)
     # Stage 6.1: an admin-suspended offer is withheld from the owner (see
     # list_offers) -- its id doesn't open its history either.
-    if not offer or offer.project_id != project_id or offer.status == OfferStatus.draft or offer.is_suspended:
+    # Stage 6.2: nor does a withdrawn offer's (its content stays the provider's).
+    if not offer or offer.project_id != project_id or offer.status in (OfferStatus.draft, OfferStatus.withdrawn) or offer.is_suspended:
         raise HTTPException(status_code=404, detail="Offer not found.")
 
     return history_out(db, db.query(OfferRevision).filter(OfferRevision.offer_id == offer_id).order_by(OfferRevision.revision_number.asc()))

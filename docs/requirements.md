@@ -404,4 +404,11 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - Bounded: 200 per page (up to 500), with an offset, in a fixed order (live first, then by price, submission time and id; by submission time while sealed).
   - The page shows "couldn't load the offers" on an error, never "no offers", and "no offers were received" once offers have closed.
 
+- **6.2 Offer access & confidentiality:** all offer read paths were traced: the owner workflow, the provider's own-offer routes, admin oversight, the offer-document file route, the award record and notifications.
+  - Every offer read is authorised on the server, for the specific requirement. The owner side (organisation members, or the individual owner) reads its own requirement's offers. A provider reads only its own side's offer. Admin routes need the admin role, which can't be self-assigned at sign-up.
+  - Ids from another requirement, another owner or another provider find nothing. Removing a member takes away their access on their very next request.
+  - Offer documents are reached only through short-lived signed links (Stage 4.6), issued only to someone who may read the offer. A forged or re-pointed link is refused.
+  - **Withdrawn offers:** the owner sees who withdrew and when, never the content (price, items, response, timing, assumptions, documents or history). This also means a sealed offer withdrawn before the deadline isn't opened at the deadline. The provider keeps their own in full.
+  - **By design:** a signed document link works for whoever holds it until it expires, at most an hour. A link issued to someone who has since left the organisation therefore works until then. Admins see all offers for oversight.
+
 _Later Stage 6 steps are added as they are implemented._
