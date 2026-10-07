@@ -250,6 +250,7 @@ AR: dict[str, str] = {
     "This requirement is temporarily unavailable.": "هذا الطلب غير متاح مؤقتًا.",
     "Activate your marketplace access to take part.": "فعّل وصولك إلى السوق للمشاركة.",
     "Complete your verification to take part in opportunities.": "أكمل التحقق من حسابك للمشاركة في الفرص.",
+    "Your account is suspended, so you can't take part in opportunities. Contact support.": "حسابك موقوف، لذا لا يمكنك المشاركة في الفرص. تواصل مع الدعم.",
     "No such version.": "لا توجد نسخة بهذا الرقم.",
     "Only an ended requirement can be started again.": "لا يمكن البدء من جديد إلا بطلب منتهٍ.",
     "This project can no longer be closed.": "لم يعد من الممكن إغلاق هذا المشروع.",

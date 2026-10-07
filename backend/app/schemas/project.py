@@ -203,7 +203,8 @@ class Participation(BaseModel):
 
       status        can_participate | not_eligible | action_required | unavailable
       action        with action_required: "activate_access" (verified, but
-                    marketplace access isn't active) or "verification"
+                    marketplace access isn't active), "verification", or
+                    "account_suspended" (the provider's account, by U-Tender)
       availability  open | paused | ended | unavailable (hidden by U-Tender)"""
 
     status: str

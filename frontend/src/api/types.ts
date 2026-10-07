@@ -141,7 +141,7 @@ export interface EligibilityReason {
 // Stage 4.5: the server's one answer to "can I take part, and if not why?"
 export interface Participation {
   status: "can_participate" | "not_eligible" | "action_required" | "unavailable";
-  action: "activate_access" | "verification" | null;
+  action: "activate_access" | "verification" | "account_suspended" | null;
   availability: "open" | "paused" | "ended" | "unavailable";
   // Stage 4.9: this provider decided to take part, when, and on which version.
   started?: boolean;

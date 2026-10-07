@@ -884,7 +884,10 @@ def participate(project_id: str, user: User = Depends(require_service_provider),
     if verdict.status == "unavailable":
         raise HTTPException(status_code=400, detail=_NOT_NOW[verdict.availability])
     if verdict.status == "action_required":
-        detail = "Activate your marketplace access to take part." if verdict.action == "activate_access" else "Complete your verification to take part in opportunities."
+        detail = {
+            "activate_access": "Activate your marketplace access to take part.",
+            "account_suspended": "Your account is suspended, so you can't take part in opportunities. Contact support.",
+        }.get(verdict.action, "Complete your verification to take part in opportunities.")
         raise HTTPException(status_code=403, detail=detail)
     if verdict.status == "not_eligible":
         raise HTTPException(status_code=403, detail="You aren't eligible to respond to this requirement. " + " ".join(r.message for r in reasons))

@@ -213,7 +213,9 @@ def participation(db: Session, project: Project, profile: ServiceProviderProfile
     state = availability(project)
     if state != "open":
         return Participation(status="unavailable", availability=state)
-    if not profile or profile.is_suspended or profile.verification_status != VerificationStatus.approved:
+    if profile and profile.is_suspended:
+        return Participation(status="action_required", action="account_suspended", availability=state)
+    if not profile or profile.verification_status != VerificationStatus.approved:
         return Participation(status="action_required", action="verification", availability=state)
     if reasons is None:
         reasons = ineligibility_reasons(db, project, profile)
