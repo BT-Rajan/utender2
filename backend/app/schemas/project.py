@@ -26,7 +26,7 @@ class DrawingOut(BaseModel):
 
     id: str
     file_name: str
-    uploaded_at: datetime
+    uploaded_at: UTCDateTime  # Stage 4.4: an explicit UTC instant, like every other time sent
     revision: int
     is_current: bool
     category: str = "drawing"

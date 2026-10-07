@@ -169,6 +169,9 @@ export interface Dictionary {
     cancel: string;
     remove: string;
   };
+  detail: {
+    addedAfter: string;
+  };
   feed: {
     pricing: string;
     items: string;
@@ -1239,6 +1242,9 @@ export const en: Dictionary = {
   confirm: {
     cancel: "Cancel",
     remove: "Remove",
+  },
+  detail: {
+    addedAfter: "Added after publishing · {date}",
   },
   feed: {
     pricing: "Priced as",
@@ -2335,6 +2341,9 @@ export const ar: Dictionary = {
   confirm: {
     cancel: "إلغاء",
     remove: "إزالة",
+  },
+  detail: {
+    addedAfter: "أُضيف بعد النشر · {date}",
   },
   feed: {
     pricing: "طريقة التسعير",

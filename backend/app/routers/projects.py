@@ -280,6 +280,11 @@ def get_project(project_id: str, user: User = Depends(get_current_user), db: Ses
     if owns(db, user, project):
         detail.closure_note = project.closure_note  # Stage 3.16: the owner's private note, never a provider's to see
         detail.restarted_from_id = project.restarted_from_id
+    elif user.role == UserRole.service_provider:
+        # Stage 4.4: whether this provider may respond, and if not why -- the
+        # same check the offer endpoints enforce. (Only ever their own.)
+        reasons = ineligibility_reasons(db, project, acting_profile(db, user))
+        detail.eligible, detail.ineligible_reasons = not reasons, reasons
     return detail
 
 

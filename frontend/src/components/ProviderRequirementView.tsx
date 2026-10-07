@@ -3,10 +3,11 @@ import type { ProjectDetail } from "@/api/types";
 import { RequirementItemsView } from "@/components/RequirementItems";
 import { ResponseRequirementsSummary } from "@/components/ResponseRequirements";
 import { ParticipationRules } from "@/components/TenderRules";
-import { eligibilitySummary } from "@/components/ProviderEligibility";
+import { eligibilitySummary, IneligibleNotice } from "@/components/ProviderEligibility";
+import { outcomeLabel } from "@/components/ClosureOutcome";
 import { AmendmentsList } from "@/components/PostPublication";
 import { useI18n } from "@/i18n/I18nContext";
-import { formatDeadline, timeRemaining } from "@/lib/format";
+import { formatDeadline, fullDate, timeLeft } from "@/lib/format";
 import { formatWorkTiming } from "@/lib/dates";
 import { sortDocuments } from "@/lib/documents";
 import { formatArea } from "@/lib/location";
@@ -17,7 +18,13 @@ import { formatArea } from "@/lib/location";
 // and in the owner's preview -- so the owner can't see one thing and the
 // provider another.
 export function ProviderRequirementView({ project, closed }: { project: ProjectDetail; closed: boolean }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const ended = ["closed", "under_evaluation", "awarded", "no_award", "canceled", "expired"].includes(project.status);
+  const restricted =
+    project.provider_eligibility.provider_type === "organization" ||
+    project.provider_eligibility.qualifications.length > 0 ||
+    project.provider_eligibility.match_category ||
+    project.provider_eligibility.match_governorate;
   return (
     <>
       <div className="bg-navy text-white rounded px-5 py-4 mb-6 flex items-center justify-between flex-wrap gap-2.5">
@@ -26,13 +33,27 @@ export function ProviderRequirementView({ project, closed }: { project: ProjectD
           <div className="font-mono text-[11.5px] text-white/70 mt-0.5">
             {project.trade && `${project.trade} · `}
             {formatArea(t, project.governorate, project.area)}
-            {project.address && ` — ${project.address}`} · {t("service_provider.offer.deadlineLabel")} {formatDeadline(project.bid_deadline)}
+            {project.address && ` — ${project.address}`} · {t("service_provider.offer.deadlineLabel")} {fullDate(project.bid_deadline, language)}
             {formatWorkTiming(t, project) && ` · ${formatWorkTiming(t, project)}`}
           </div>
         </div>
-        <span className="font-mono text-[10px] uppercase tracking-wide px-2.5 py-1 rounded-full bg-white/15">
-          {project.paused_at && project.status === "open" ? t("postPub.pausedPill") : closed ? t("service_provider.offer.closed") : timeRemaining(project.bid_deadline)}
-        </span>
+        <div className="flex items-center gap-2">
+          {project.tender_type === "sealed" && (
+            <span className="font-mono text-[10px] uppercase tracking-wide px-2.5 py-1 rounded-full bg-white/15" title={t("feed.sealedHint")}>
+              {t("feed.sealed")}
+            </span>
+          )}
+          {/* Stage 4.4: where it stands, from the server's state. */}
+          <span className="font-mono text-[10px] uppercase tracking-wide px-2.5 py-1 rounded-full bg-white/15" data-testid="requirement-state">
+            {project.paused_at && project.status === "open"
+              ? t("postPub.pausedPill")
+              : ended && project.status !== "closed"
+                ? outcomeLabel(t, project.status, project.closure_reason)
+                : closed
+                  ? t("service_provider.offer.closed")
+                  : timeLeft(t, project.bid_deadline)}
+          </span>
+        </div>
       </div>
 
       {project.paused_at && (
@@ -78,6 +99,12 @@ export function ProviderRequirementView({ project, closed }: { project: ProjectD
                 ) : (
                   <span className="font-mono text-xs text-steel">{d.file_name}</span>
                 )}
+                {/* Stage 4.4: a file that arrived (or was replaced) after publication. */}
+                {project.published_at && new Date(d.uploaded_at) > new Date(project.published_at) && (
+                  <span className="font-mono text-[10px] text-amber-dark mt-0.5">
+                    {t("detail.addedAfter").replace("{date}", fullDate(d.uploaded_at, language, false))}
+                  </span>
+                )}
               </li>
             ))}
           </ul>
@@ -86,14 +113,20 @@ export function ProviderRequirementView({ project, closed }: { project: ProjectD
         )}
       </div>
 
-      {!closed && (
-        <p className="mb-3 text-[12.5px] text-steel">
-          <span className="font-mono text-[11px] uppercase tracking-wide text-navy">{t("eligibility.rulesLine")}:</span>{" "}
-          {eligibilitySummary(t, project.provider_eligibility)}
-        </p>
+      {/* Who may respond -- and, for the provider reading it, whether that's them. */}
+      <div className="mb-3 text-[12.5px] text-steel" data-testid="eligibility-line">
+        <span className="font-mono text-[11px] uppercase tracking-wide text-navy">{t("eligibility.rulesLine")}:</span>{" "}
+        {eligibilitySummary(t, project.provider_eligibility)}
+        {project.eligible === true && restricted && <span className="text-green"> · {t("feed.youQualify")}</span>}
+      </div>
+      {project.eligible === false && (
+        <div className="mb-4">
+          <IneligibleNotice reasons={project.ineligible_reasons ?? []} />
+        </div>
       )}
-      {!closed && <ParticipationRules project={project} />}
-      {!closed && <ResponseRequirementsSummary project={project} />}
+      {/* The rules and what to submit stay readable while paused or after it ends. */}
+      <ParticipationRules project={project} />
+      <ResponseRequirementsSummary project={project} />
 
     </>
   );

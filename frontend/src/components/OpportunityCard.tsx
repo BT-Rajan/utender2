@@ -1,33 +1,9 @@
 import type { Project } from "@/api/types";
 import { eligibilitySummary, IneligibleNotice } from "@/components/ProviderEligibility";
 import { useI18n } from "@/i18n/I18nContext";
-import { formatDeadline } from "@/lib/format";
+import { formatDeadline, fullDate, timeLeft } from "@/lib/format";
 import { formatWorkTiming } from "@/lib/dates";
 import { formatArea } from "@/lib/location";
-
-type T = (key: string) => string;
-
-// Stage 4.3: the response deadline in full -- weekday, date (the year when
-// it isn't this year) and time -- from the server's deadline.
-function deadlineText(iso: string, lang: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString(lang === "ar" ? "ar-KW" : "en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    ...(d.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}),
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function remaining(t: T, iso: string): string {
-  const ms = new Date(iso).getTime() - Date.now();
-  if (ms <= 0) return t("feed.closedNow");
-  const days = Math.floor(ms / 86_400_000);
-  const hours = Math.floor((ms % 86_400_000) / 3_600_000);
-  return days > 0 ? t("feed.leftDays").replace("{d}", String(days)).replace("{h}", String(hours)) : t("feed.leftHours").replace("{h}", String(Math.max(hours, 0)));
-}
 
 // One opportunity in the providers' list -- enough to decide whether to open
 // it, not the requirement itself: no exact address, only the opening of the
@@ -38,7 +14,7 @@ export function OpportunityCard({ project, locked = false }: { project: Project;
   const scope = [
     project.document_count ? t("feed.documents").replace("{n}", String(project.document_count)) : null,
     project.pricing_basis === "per_item" && project.item_count ? t("feed.items").replace("{n}", String(project.item_count)) : null,
-    project.published_at ? t("feed.published").replace("{date}", formatDeadline(project.published_at)) : null,
+    project.published_at ? t("feed.published").replace("{date}", fullDate(project.published_at, language, false)) : null,
   ].filter(Boolean);
   return (
     <div className="tblock rounded px-5 pt-4 relative overflow-hidden h-full" data-testid="opportunity-card">
@@ -69,13 +45,13 @@ export function OpportunityCard({ project, locked = false }: { project: Project;
         {project.paused_at ? (
           <span className="text-amber-dark uppercase">{t("postPub.pausedProvider").replace("{date}", formatDeadline(project.paused_at))}</span>
         ) : (
-          remaining(t, project.bid_deadline)
+          timeLeft(t, project.bid_deadline)
         )}
       </p>
       <div className="tblock-strip mt-4">
         <div className="tblock-field">
           <span className="k">{t("service_provider.feed.deadline")}</span>
-          <span className="v">{deadlineText(project.bid_deadline, language)}</span>
+          <span className="v">{fullDate(project.bid_deadline, language)}</span>
         </div>
         <div className="tblock-field">
           <span className="k">{t("service_provider.feed.trade")}</span>

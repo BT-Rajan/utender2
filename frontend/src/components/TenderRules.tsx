@@ -5,7 +5,7 @@ import type { ProjectDetail, TenderType } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
 import { localInputToUtcIso, toLocalInputValue } from "@/lib/dates";
-import { formatDeadline } from "@/lib/format";
+import { formatDeadline, fullDate } from "@/lib/format";
 
 // Stage 3.10: the rules of participation, kept apart from the requirement
 // itself. The offer deadline stays with the dates (Stage 3.7) and the
@@ -242,7 +242,7 @@ export function TenderRulesEditor({ project }: { project: ProjectDetail }) {
 // What a provider is told before responding. Every line comes from the same
 // fields the server enforces.
 export function ParticipationRules({ project }: { project: ProjectDetail }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const rules = project.tender_rules;
   const declarations = project.response_requirements.declarations.length;
   // Stage 3.13: for a draft (the owner's preview) state the rule as it will
@@ -251,13 +251,13 @@ export function ParticipationRules({ project }: { project: ProjectDetail }) {
   const questions = !rules.questions_allowed
     ? t("tenderRules.pNoQuestions")
     : questionsWillBeOpen && rules.questions_close_at
-      ? t("tenderRules.pQuestionsUntil").replace("{date}", formatDeadline(rules.questions_close_at))
+      ? t("tenderRules.pQuestionsUntil").replace("{date}", fullDate(rules.questions_close_at, language))
       : t("tenderRules.pQuestionsClosed");
   return (
     <section className="mb-6 bg-white border border-border rounded px-4 py-3">
       <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-1.5">{t("tenderRules.providerHeading")}</h3>
       <ul className="text-sm text-navy list-disc ps-5 leading-[1.8]">
-        <li>{t("tenderRules.pOffersClose").replace("{date}", formatDeadline(project.bid_deadline))}</li>
+        <li>{t("tenderRules.pOffersClose").replace("{date}", fullDate(project.bid_deadline, language))}</li>
         <li>{t("tenderRules.pRevise")}</li>
         <li>{t(project.tender_type === "sealed" ? "tenderRules.pSealed" : "tenderRules.pOwnerVisible")}</li>
         <li>{questions}</li>

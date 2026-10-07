@@ -110,7 +110,8 @@ export function ServiceProviderOfferPage() {
           {project.paused_at ? t("postPub.pausedProviderBody") : outcomeText(t, project.status, project.closure_reason) ?? t("service_provider.offer.biddingClosedNotice")}
           {existingOffer && (
             <div className="mt-3 font-mono text-xs text-navy">
-              {t("service_provider.offer.yourFinalOffer")} {money(existingOffer.amount, project.currency)} — status: {existingOffer.status}
+              {t("service_provider.offer.yourFinalOffer")} {money(existingOffer.amount, project.currency)} —{" "}
+              {existingOffer.status === "submitted" ? t("service_provider.feed.bidPlaced") : t(`feed.offer_${existingOffer.status}`)}
             </div>
           )}
           {project.status === "awarded" && <AwardOutcome projectId={project.id} />}
