@@ -306,4 +306,16 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - Only the provider's own side's offer, on a requirement they may open; anything else is not found. Documents are listed through the usual short-lived signed links, never storage paths.
   - Previewing submits, seals and locks nothing.
 
-_Further steps (5.10 onwards) are added as they are implemented._
+- **5.10 Save / resume:**
+  - "Save draft" saves the whole form in one step (`PUT /projects/{id}/offers/draft`): price, technical approach, assumptions, declarations and timing. Every part is checked by its 5.3–5.8 rule before anything is written, so a save lands whole (one new draft version) or not at all. A failure, refresh or retry never leaves a half-saved draft or a false "changed somewhere else" conflict. Documents are attached separately (5.6).
+  - Resume: the same draft after a refresh, leaving, or logging out and in; opening the requirement again never creates another. The offer page shows "Draft — not submitted · started … · last saved …". Feed and Saved cards say "Offer in progress", and the dashboard's "Preparing an offer" shows when each was last saved.
+  - Typed-but-unsaved changes are marked "Unsaved changes", and the browser asks before the page is left or refreshed. No autosave.
+  - Organisation members share the one draft. A save from an out-of-date tab, a colleague's older copy or a repeated request is refused (If-Match), never merged or overwritten.
+  - On resume everything is re-judged as it is now:
+    - the current deadline is shown (saving never moves it);
+    - after a material amendment, saving, "ready" and submitting wait for the current requirement to be reviewed;
+    - suspended, past-deadline or cancelled requirements keep the draft as saved but allow no saving or submitting.
+  - Saving never submits, seals, or shows the draft to the owner or competitors.
+  - Offer timestamps are sent as explicit UTC instants.
+
+_Further steps (5.11 onwards) are added as they are implemented._

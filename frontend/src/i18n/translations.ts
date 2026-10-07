@@ -184,6 +184,7 @@ export interface Dictionary {
     reviewFirst: string;
     draftStatus: string;
     draftStarted: string;
+    lastSaved: string;
   };
   offerPreview: {
     open: string;
@@ -280,6 +281,7 @@ export interface Dictionary {
     whoCanRespond: string;
     youQualify: string;
     offer_withdrawn: string;
+    offer_draft: string;
     offer_approved: string;
     offer_rejected: string;
   };
@@ -443,6 +445,7 @@ export interface Dictionary {
     pricePerItem: string;
     rateCol: string;
     saveDraft: string;
+    unsaved: string;
     approachGuide: string;
     assumptionsGuide: string;
     draftSaved: string;
@@ -1354,6 +1357,7 @@ export const en: Dictionary = {
     reviewFirst: "Confirm you’ve reviewed the current requirement to continue preparing your offer.",
     draftStatus: "Draft — not submitted. Nothing is sent to the owner until you submit it.",
     draftStarted: "started",
+    lastSaved: "last saved",
   },
   offerPreview: {
     open: "Preview offer",
@@ -1450,6 +1454,7 @@ export const en: Dictionary = {
     whoCanRespond: "Who can respond:",
     youQualify: "you meet these",
     offer_withdrawn: "Offer withdrawn",
+    offer_draft: "Offer in progress",
     offer_approved: "Awarded",
     offer_rejected: "Not selected",
   },
@@ -1613,6 +1618,7 @@ export const en: Dictionary = {
     pricePerItem: "A rate in {currency} for every item listed",
     rateCol: "Rate ({currency})",
     saveDraft: "Save draft",
+    unsaved: "Unsaved changes",
     approachGuide: "Explain how your offer meets the item specifications and the instructions to bidders shown above.",
     assumptionsGuide: "State what your price or programme depends on (access, items the owner provides), what is excluded, and any departure from the specification that needs the owner’s acceptance. The owner receives these with your offer. To ask about the requirement itself, use Questions & answers.",
     draftSaved: "Draft saved — not submitted.",
@@ -2549,6 +2555,7 @@ export const ar: Dictionary = {
     reviewFirst: "أكّد أنك راجعت الطلب الحالي لمتابعة إعداد عرضك.",
     draftStatus: "مسودة — لم تُقدَّم. لا يُرسل شيء إلى المالك حتى تقدّمها.",
     draftStarted: "بدأت في",
+    lastSaved: "آخر حفظ",
   },
   offerPreview: {
     open: "معاينة العرض",
@@ -2645,6 +2652,7 @@ export const ar: Dictionary = {
     whoCanRespond: "من يمكنه الرد:",
     youQualify: "أنت تستوفيها",
     offer_withdrawn: "تم سحب العرض",
+    offer_draft: "عرض قيد الإعداد",
     offer_approved: "تمت الترسية",
     offer_rejected: "لم يُختر",
   },
@@ -2808,6 +2816,7 @@ export const ar: Dictionary = {
     pricePerItem: "سعر وحدة بعملة {currency} لكل بند مدرج",
     rateCol: "سعر الوحدة ({currency})",
     saveDraft: "حفظ المسودة",
+    unsaved: "تغييرات غير محفوظة",
     approachGuide: "اشرح كيف يلبّي عرضك مواصفات البنود والتعليمات الموجّهة لمقدمي العروض الموضّحة أعلاه.",
     assumptionsGuide: "اذكر ما يعتمد عليه سعرك أو برنامجك (إتاحة الموقع، ما يوفّره المالك)، وما هو مستثنى، وأي اختلاف عن المواصفات يحتاج إلى قبول المالك. يتسلّم المالك ذلك مع عرضك. للاستفسار عن الطلب نفسه، استخدم الأسئلة والأجوبة.",
     draftSaved: "حُفظت المسودة — لم تُقدَّم.",

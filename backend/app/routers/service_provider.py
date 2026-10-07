@@ -195,7 +195,7 @@ def feed(
         hidden = query.filter(not_(available)).count()
 
     saved_ids = _saved_ids(db, user)
-    out = _cards(db, page, profile, my_offers, full_access, saved_ids)
+    out = _cards(db, page, profile, _with_drafts(db, user, my_offers), full_access, saved_ids)
     return FeedPage(
         items=out,
         next_offset=offset + len(out) if more else None,
@@ -204,6 +204,15 @@ def feed(
         # requirements match a given search.
         hidden_ineligible=hidden if not out and offset == 0 and not narrowed else None,
     )
+
+
+def _with_drafts(db: Session, user: User, my_offers: dict) -> dict:
+    """Stage 5.10: the card's offer status, including an offer still being
+    prepared ("draft") -- so returning to the feed or the saved list shows
+    the provider an offer is already in progress. Only their own side's;
+    the feed's rule for what it lists is unchanged."""
+    drafts = {pid: "draft" for (pid,) in db.query(Offer.project_id).filter(mine(db, user, Offer, Offer.service_provider_id), Offer.status == OfferStatus.draft)}
+    return {**drafts, **my_offers}
 
 
 def _cards(db: Session, page: list[Project], profile, my_offers: dict, full_access: bool, saved_ids: set[str]) -> list[ProjectOut]:
@@ -346,7 +355,7 @@ def saved_opportunities(user: User = Depends(require_approved_service_provider),
     state = {p.id: availability(p) for p in rows}
     rank = {"open": 0, "paused": 0, "ended": 1, "unavailable": 2}
     rows.sort(key=lambda p: (rank[state[p.id]], p.bid_deadline if rank[state[p.id]] == 0 else -p.bid_deadline.timestamp(), p.id))
-    cards = _cards(db, rows, profile, my_offers, full_access, {p.id for p in rows})
+    cards = _cards(db, rows, profile, _with_drafts(db, user, my_offers), full_access, {p.id for p in rows})
     for card in cards:
         card.availability = state[card.id]
         if card.availability == "unavailable":
@@ -366,6 +375,9 @@ class PreparingOut(BaseModel):
     started_at: UTCDateTime | None
     # The requirement changed materially since the provider decided.
     changed_since: bool
+    # Stage 5.10: the draft in progress, and when it was last saved.
+    offer_id: str | None = None
+    last_saved_at: UTCDateTime | None = None
 
 
 @router.get("/preparing", response_model=list[PreparingOut])
@@ -384,10 +396,12 @@ def preparing(user: User = Depends(require_approved_service_provider), db: Sessi
         .order_by(Project.bid_deadline.asc())
         .all()
     )
+    drafts = {o.project_id: o for o in db.query(Offer).filter(mine(db, user, Offer, Offer.service_provider_id), Offer.status == OfferStatus.draft)}
     return [
         PreparingOut(
             project_id=p.id, project_title="" if p.is_suspended else p.title, bid_deadline=p.bid_deadline,
             availability=availability(p), started_at=r.started_at, changed_since=p.material_revision > r.seen_material_revision,
+            offer_id=drafts[p.id].id if p.id in drafts else None, last_saved_at=drafts[p.id].updated_at if p.id in drafts else None,
         )
         for r, p in rows
         if p.id not in offered and availability(p) in ("open", "paused")

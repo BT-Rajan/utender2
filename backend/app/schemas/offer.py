@@ -57,6 +57,22 @@ class OfferAssumptionsDraft(BaseModel):
     assumptions: str | None = Field(default=None, max_length=10_000)
 
 
+class OfferDraftSave(BaseModel):
+    """Stage 5.10: the whole offer form saved in one step -- every part the
+    section saves (5.3-5.8) take, validated by the same rules, applied
+    together or not at all. Anything may be empty while a draft."""
+
+    amount: Decimal | None = Field(default=None, decimal_places=3)
+    item_prices: list[OfferItemPrice] | None = Field(default=None, max_length=300)
+    message: str | None = Field(default=None, max_length=10_000)
+    assumptions: str | None = Field(default=None, max_length=10_000)
+    accepted_declarations: list[str] = Field(default_factory=list, max_length=10)
+    proposed_start_date: date | None = None
+    proposed_completion_date: date | None = None
+    proposed_duration_days: int | None = None
+    timeline_estimate: str | None = Field(default=None, max_length=255)
+
+
 class OfferDeclarationsDraft(BaseModel):
     """Stage 5.8: the requirement's declarations the provider accepts, as
     worded on the requirement, saved on the draft so the quality gate can see
@@ -138,8 +154,8 @@ class OfferOut(BaseModel):
     # last confirmed against (lower than the requirement's = before a change).
     based_on_material_revision: int = 0
     draft_version: int = 0  # Stage 5.3: send back as If-Match when saving the draft
-    created_at: datetime
-    updated_at: datetime
+    created_at: UTCDateTime  # Stage 5.10: explicit UTC instants, like every other time sent
+    updated_at: UTCDateTime
     service_provider_company_name: str | None = None
     service_provider_avg_rating: Decimal | None = None
     service_provider_review_count: int | None = None

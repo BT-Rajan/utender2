@@ -11,7 +11,7 @@ from app.models.enums import NotificationType, OfferStatus, ProjectStatus, Tende
 from app.models.offer import Offer, OfferDocument, OfferRevision
 from app.models.project import Project
 from app.models.user import User
-from app.schemas.offer import OfferAssumptionsDraft, OfferCommercialDraft, OfferDeclarationsDraft, OfferPreviewOut, OfferReadiness, PreviewRequirement, OfferCreate, OfferTechnicalDraft, OfferTimingDraft, OfferDocumentOut, OfferOut, OfferRevisionOut
+from app.schemas.offer import OfferAssumptionsDraft, OfferCommercialDraft, OfferDeclarationsDraft, OfferDraftSave, OfferPreviewOut, OfferReadiness, PreviewRequirement, OfferCreate, OfferTechnicalDraft, OfferTimingDraft, OfferDocumentOut, OfferOut, OfferRevisionOut
 from app.services.audit import log_action
 from app.services.eligibility import assert_eligible
 from app.services.email import notify_owner_new_offer
@@ -82,6 +82,39 @@ def _saved(db: Session, user: User, offer: Offer) -> OfferOut:
     db.commit()
     db.refresh(offer)
     return _with_documents(db, offer)
+
+
+@router.put("/draft", response_model=OfferOut)
+def save_draft(
+    project_id: str,
+    payload: OfferDraftSave,
+    if_match: str | None = Header(None, alias="If-Match"),
+    user: User = Depends(require_marketplace_active_service_provider),
+    db: Session = Depends(get_db),
+):
+    """Stage 5.10: save the whole offer form on the provider's draft in one
+    step -- price, technical response, assumptions, declarations and timing
+    -- without submitting it. Every part is checked by the same rules as its
+    own save (5.3-5.8) before anything is written, so a save either lands
+    whole, once, with one new draft_version, or not at all: no half-saved
+    draft after a failure, a refresh or a retry. Same gates as every draft
+    save, including If-Match against a stale page. Documents are attached
+    separately (5.6) and are untouched."""
+    project, offer = _draft_for_edit(db, user, project_id, if_match)
+    amount, item_prices = draft_pricing(project, payload.amount, payload.item_prices)
+    check_commitment(project, payload.proposed_start_date, payload.proposed_completion_date, payload.proposed_duration_days)
+    declared = requirements_for(project).declarations
+    if set(payload.accepted_declarations) - set(declared):
+        raise HTTPException(status_code=400, detail="That declaration isn't part of this requirement.")
+    offer.amount, offer.item_prices = amount, item_prices
+    offer.message = (payload.message or "").strip() or None
+    offer.assumptions = (payload.assumptions or "").strip() or None
+    offer.declarations_accepted = [d for d in declared if d in set(payload.accepted_declarations)] or None
+    offer.proposed_start_date = payload.proposed_start_date
+    offer.proposed_completion_date = payload.proposed_completion_date
+    offer.proposed_duration_days = payload.proposed_duration_days
+    offer.timeline_estimate = (payload.timeline_estimate or "").strip() or None
+    return _saved(db, user, offer)
 
 
 @router.put("/draft/commercial", response_model=OfferOut)

@@ -35,29 +35,55 @@ export function OfferForm({
   const [rates, setRates] = useState<Record<string, string>>({});
   const [accepted, setAccepted] = useState<string[]>([]);
   const [savedNotice, setSavedNotice] = useState(false);
+  // Stage 5.5: the execution commitment, in the requirement's terms.
+  const [startDate, setStartDate] = useState("");
+  const [completionDate, setCompletionDate] = useState("");
+  const [durationDays, setDurationDays] = useState("");
+  // Stage 5.10: what was last saved, to tell typed-but-unsaved changes apart
+  // and warn before they're lost by leaving or refreshing the page.
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
+  const currentSnapshot = snapshotOf({ amount, rates, message, timeline, assumptions, accepted, startDate, completionDate, durationDays });
+  const unsaved = !!draft && !existingOffer && !preview && savedSnapshot !== null && currentSnapshot !== savedSnapshot;
+  useEffect(() => {
+    if (!unsaved) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [unsaved]);
   // Stage 5.9: preview the saved draft; the form stays mounted (hidden) so nothing typed is lost.
   const [previewing, setPreviewing] = useState(false);
   const backToEdit = (anchor?: string | null) => {
     setPreviewing(false);
     if (anchor) setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
   };
-  // Stage 5.5: the execution commitment, in the requirement's terms.
-  const [startDate, setStartDate] = useState("");
-  const [completionDate, setCompletionDate] = useState("");
-  const [durationDays, setDurationDays] = useState("");
 
-  // Stage 5.3/5.4: the price and technical response saved on the draft, when returning to it.
+  // Stage 5.3-5.10: everything saved on the draft, when returning to it.
   useEffect(() => {
     if (draft && !existingOffer) {
-      setAmount(draft.amount === null ? "" : String(Number(draft.amount)));
-      setRates(Object.fromEntries((draft.item_prices ?? []).map((l) => [l.item_id, String(Number(l.rate))])));
-      setMessage(draft.message ?? "");
-      setTimeline(draft.timeline_estimate ?? "");
-      setAssumptions(draft.assumptions ?? "");
-      setAccepted(draft.declarations_accepted ?? []);
-      setStartDate(draft.proposed_start_date ?? "");
-      setCompletionDate(draft.proposed_completion_date ?? "");
-      setDurationDays(draft.proposed_duration_days == null ? "" : String(draft.proposed_duration_days));
+      const saved = {
+        amount: draft.amount === null ? "" : String(Number(draft.amount)),
+        rates: Object.fromEntries((draft.item_prices ?? []).map((l) => [l.item_id, String(Number(l.rate))])),
+        message: draft.message ?? "",
+        timeline: draft.timeline_estimate ?? "",
+        assumptions: draft.assumptions ?? "",
+        accepted: draft.declarations_accepted ?? [],
+        startDate: draft.proposed_start_date ?? "",
+        completionDate: draft.proposed_completion_date ?? "",
+        durationDays: draft.proposed_duration_days == null ? "" : String(draft.proposed_duration_days),
+      };
+      setAmount(saved.amount);
+      setRates(saved.rates);
+      setMessage(saved.message);
+      setTimeline(saved.timeline);
+      setAssumptions(saved.assumptions);
+      setAccepted(saved.accepted);
+      setStartDate(saved.startDate);
+      setCompletionDate(saved.completionDate);
+      setDurationDays(saved.durationDays);
+      setSavedSnapshot(snapshotOf(saved));
     }
     // Only when a different draft (or a newer save of it) arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -137,9 +163,14 @@ export function OfferForm({
   // draft -- nothing is submitted. The server prices it on the requirement's
   // basis and computes every total; If-Match makes a save from a stale tab
   // fail instead of overwriting (each save moves the draft's version on).
+  // Stage 5.10: save the whole form on the draft in one step -- nothing is
+  // submitted. The server checks every part before writing any of it (so a
+  // failure leaves the saved draft as it was), prices it on the requirement's
+  // basis, and refuses a save from a stale page (If-Match) instead of
+  // overwriting newer work.
   const saveDraftMutation = useMutation({
-    mutationFn: async () => {
-      const commercial = await apiFetch<Offer>(`/projects/${project.id}/offers/draft/commercial`, {
+    mutationFn: (_snapshot: string) =>
+      apiFetch<Offer>(`/projects/${project.id}/offers/draft`, {
         method: "PUT",
         headers: draft ? { "If-Match": String(draft.draft_version ?? 0) } : undefined,
         body: {
@@ -147,37 +178,19 @@ export function OfferForm({
           item_prices: perItem
             ? project.items.filter((item) => clean(rates[item.id] ?? "")).map((item) => ({ item_id: item.id, rate: clean(rates[item.id] ?? "") }))
             : null,
-        },
-      });
-      const technical = await apiFetch<Offer>(`/projects/${project.id}/offers/draft/technical`, {
-        method: "PUT",
-        headers: { "If-Match": String(commercial.draft_version ?? 0) },
-        body: { message: message || null },
-      });
-      const conditions = await apiFetch<Offer>(`/projects/${project.id}/offers/draft/assumptions`, {
-        method: "PUT",
-        headers: { "If-Match": String(technical.draft_version ?? 0) },
-        body: { assumptions: assumptions || null },
-      });
-      const declared = await apiFetch<Offer>(`/projects/${project.id}/offers/draft/declarations`, {
-        method: "PUT",
-        headers: { "If-Match": String(conditions.draft_version ?? 0) },
-        body: { accepted_declarations: accepted },
-      });
-      return apiFetch<Offer>(`/projects/${project.id}/offers/draft/timing`, {
-        method: "PUT",
-        headers: { "If-Match": String(declared.draft_version ?? 0) },
-        body: {
+          message: message || null,
+          assumptions: assumptions || null,
+          accepted_declarations: accepted,
           proposed_start_date: startDate || null,
           proposed_completion_date: completionDate || null,
           proposed_duration_days: durationDays ? Number(durationDays) : null,
           timeline_estimate: timeline || null,
         },
-      });
-    },
-    onSuccess: (saved) => {
+      }),
+    onSuccess: (saved, snapshot) => {
       setError(null);
       setSavedNotice(true);
+      setSavedSnapshot(snapshot);
       queryClient.setQueryData(["my-offer", project.id], saved);
       queryClient.invalidateQueries({ queryKey: ["offer-check", project.id] });
       queryClient.invalidateQueries({ queryKey: ["offer-preview", project.id] });
@@ -427,7 +440,7 @@ export function OfferForm({
               {draft && !existingOffer && !preview && (
                 <button
                   type="button"
-                  onClick={() => saveDraftMutation.mutate()}
+                  onClick={() => saveDraftMutation.mutate(currentSnapshot)}
                   disabled={saveDraftMutation.isPending}
                   className="border border-navy text-navy font-semibold text-sm rounded px-4 py-2.5 disabled:opacity-60"
                   data-testid="save-draft"
@@ -440,7 +453,10 @@ export function OfferForm({
                   {t("offerPreview.open")}
                 </button>
               )}
-              {savedNotice && !saveDraftMutation.isPending && (
+              {unsaved && !saveDraftMutation.isPending && (
+                <span className="text-xs text-amber-dark" data-testid="unsaved">{t("response.unsaved")}</span>
+              )}
+              {savedNotice && !unsaved && !saveDraftMutation.isPending && (
                 <span className="text-xs text-green" data-testid="draft-saved">{t("response.draftSaved")}</span>
               )}
               {existingOffer && existingOffer.status !== "withdrawn" && (
@@ -510,4 +526,20 @@ function ReadinessPanel({ projectId, onGoTo }: { projectId: string; onGoTo: (anc
       <p className="text-xs text-steel-light mt-2">{t("readiness.savedOnly")}</p>
     </div>
   );
+}
+
+// Stage 5.10: a comparable picture of the form's saved fields.
+function snapshotOf(v: {
+  amount: string;
+  rates: Record<string, string>;
+  message: string;
+  timeline: string;
+  assumptions: string;
+  accepted: string[];
+  startDate: string;
+  completionDate: string;
+  durationDays: string;
+}): string {
+  const rates = Object.fromEntries(Object.entries(v.rates).filter(([, r]) => r !== "").sort(([a], [b]) => a.localeCompare(b)));
+  return JSON.stringify({ ...v, rates, accepted: [...v.accepted].sort() });
 }

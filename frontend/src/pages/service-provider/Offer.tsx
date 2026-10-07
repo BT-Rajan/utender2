@@ -191,6 +191,7 @@ export function ServiceProviderOfferPage() {
               <span className="block font-mono text-xs text-steel mt-1" data-testid="draft-status">
                 {t("participate.draftStatus")}
                 {project.participation?.started_at && ` · ${t("participate.draftStarted")} ${fullDate(project.participation.started_at, language)}`}
+                {draft.draft_version ? ` · ${t("participate.lastSaved")} ${fullDate(draft.updated_at, language)}` : ""}
               </span>
             )}
           </p>

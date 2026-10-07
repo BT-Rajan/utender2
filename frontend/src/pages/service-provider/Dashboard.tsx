@@ -6,7 +6,7 @@ import type { ClosureReason, ServiceProviderProfile, OfferStatus, ProjectStatus 
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
 import { money } from "@/lib/money";
-import { timeLeft } from "@/lib/format";
+import { timeLeft, fullDate } from "@/lib/format";
 import { outcomeLabel } from "@/components/ClosureOutcome";
 
 interface Preparing {
@@ -16,6 +16,8 @@ interface Preparing {
   availability: "open" | "paused";
   started_at: string | null;
   changed_since: boolean;
+  offer_id?: string | null;
+  last_saved_at?: string | null; // Stage 5.10
 }
 
 interface MyBid {
@@ -103,7 +105,7 @@ function offerStatusBadge(status: OfferStatus) {
 }
 
 export function ServiceProviderDashboardPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { data: profile } = useQuery({
     queryKey: ["service-provider-profile"],
     queryFn: () => apiFetch<ServiceProviderProfile>("/service-provider/profile"),
@@ -183,6 +185,7 @@ export function ServiceProviderDashboardPage() {
                     <span className="font-mono text-[11px] text-steel">
                       {p.availability === "paused" ? t("postPub.pausedPill") : timeLeft(t, p.bid_deadline)}
                       {p.changed_since && <span className="text-amber-dark"> · {t("participate.changedShort")}</span>}
+                      {p.last_saved_at && p.offer_id && <span> · {t("participate.lastSaved")} {fullDate(p.last_saved_at, language)}</span>}
                     </span>
                   </li>
                 ))}
