@@ -7,13 +7,14 @@ from sqlalchemy.orm import Session
 from starlette.responses import StreamingResponse
 
 from app.db import get_db
-from app.deps import get_current_user, require_approved_service_provider, require_verified_owner
+from app.deps import get_current_user, require_approved_service_provider, require_service_provider, require_verified_owner
 from app.models.award_record import AwardRecord
 from app.models.service_provider import ServiceProviderProfile
 from app.models.enums import NotificationType, OfferStatus, PricingBasis, ProjectStatus, TenderType, UserRole
 from app.models.offer import Offer
 from app.models.owner import OwnerProfile
 from app.models.clarification import Clarification
+from app.models.participation import Participation as ParticipationRecord
 from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.project_amendment import ProjectAmendment
 from app.models.user import User
@@ -21,6 +22,7 @@ from app.schemas.amendment import ProjectAmendmentOut, ProjectAmendmentRequest
 from app.schemas.award import AwardRecordOut
 from app.config import get_settings
 from app.schemas.project import (
+    Participation as ParticipationOut,
     ProviderEligibilityOut,
     OpportunityListing,
     RequirementVersionOut,
@@ -290,6 +292,7 @@ def get_project(project_id: str, user: User = Depends(get_current_user), db: Ses
         reasons = ineligibility_reasons(db, project, profile)
         detail.eligible, detail.ineligible_reasons = not reasons, reasons
         detail.participation = participation(db, project, profile, reasons)  # Stage 4.5
+        _with_decision(db, user, project, detail.participation)  # Stage 4.9
         from app.models.saved_opportunity import SavedOpportunity
 
         detail.saved = db.query(SavedOpportunity.id).filter(  # Stage 4.8
@@ -824,6 +827,74 @@ def get_version(project_id: str, number: int, user: User = Depends(get_current_u
             for d in sorted(current.values(), key=lambda d: d.file_name.lower())
         ],
     )
+
+
+# ---------- Stage 4.9: the decision to take part ----------
+
+def _decision(db: Session, user: User, project: Project) -> ParticipationRecord | None:
+    return db.query(ParticipationRecord).filter(
+        ParticipationRecord.project_id == project.id, mine(db, user, ParticipationRecord, ParticipationRecord.service_provider_id)
+    ).first()
+
+
+def _with_decision(db: Session, user: User, project: Project, verdict) -> None:
+    record = _decision(db, user, project)
+    if record:
+        verdict.started, verdict.started_at, verdict.seen_material_revision = True, record.started_at, record.seen_material_revision
+
+
+def record_decision(db: Session, user: User, project: Project) -> None:
+    """Record that this provider takes part (idempotent: one per provider and
+    requirement) at the requirement's current version. Used by Participate
+    and by every offer submitted. The caller commits."""
+    record = _decision(db, user, project)
+    if record is None:
+        db.add(ParticipationRecord(
+            project_id=project.id, service_provider_id=acting_id(db, user), organization_id=org_of(db, user.id),
+            started_by=user.id, seen_material_revision=project.material_revision,
+        ))
+    else:
+        record.seen_material_revision = project.material_revision
+
+
+_NOT_NOW = {
+    "paused": "This requirement is paused by its owner; you can take part once it resumes.",
+    "ended": "This requirement is no longer accepting offers.",
+    "unavailable": "This requirement is temporarily unavailable.",
+}
+
+
+@router.post("/{project_id}/participate", response_model=ParticipationOut)
+def participate(project_id: str, user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
+    """Stage 4.9: the provider decides to take part -- from evaluating the
+    opportunity to preparing an offer. Allowed only when every condition
+    holds now, judged under the requirement's lock (the same lock a close,
+    a pause or the deadline sync takes): open and before its deadline, the
+    provider verified with marketplace access, and eligible. Each refusal
+    says why. Doing it again records nothing new; after a material change it
+    marks the provider as having seen the current version. Nothing is sent
+    to the owner."""
+    sync_expired_projects(db)
+    project = lock_project(db, project_id)
+    if not project or project.status == ProjectStatus.draft:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    profile = acting_profile(db, user)
+    reasons = ineligibility_reasons(db, project, profile) if profile else []
+    verdict = participation(db, project, profile, reasons)
+    if verdict.status == "unavailable":
+        raise HTTPException(status_code=400, detail=_NOT_NOW[verdict.availability])
+    if verdict.status == "action_required":
+        detail = "Activate your marketplace access to take part." if verdict.action == "activate_access" else "Complete your verification to take part in opportunities."
+        raise HTTPException(status_code=403, detail=detail)
+    if verdict.status == "not_eligible":
+        raise HTTPException(status_code=403, detail="You aren't eligible to respond to this requirement. " + " ".join(r.message for r in reasons))
+    record_decision(db, user, project)
+    try:
+        db.commit()
+    except IntegrityError:  # the same decision from another request at the same moment
+        db.rollback()
+    _with_decision(db, user, project, verdict)
+    return verdict
 
 
 @router.get("/{project_id}/award", response_model=AwardRecordOut)

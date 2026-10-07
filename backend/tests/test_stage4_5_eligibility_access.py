@@ -62,9 +62,8 @@ def _setup(db):
 
 def _verdict(client, pid):
     detail = client.get(f"/projects/{pid}")
-    if detail.status_code == 200:
-        return detail.json()["participation"]
-    return client.get(f"/projects/{pid}/eligibility").json()["participation"]
+    verdict = detail.json()["participation"] if detail.status_code == 200 else client.get(f"/projects/{pid}/eligibility").json()["participation"]
+    return {k: verdict[k] for k in ("status", "action", "availability")}  # the 4.5 answer (4.9 adds the decision)
 
 
 def _provider(db, email, licence, electrical, organization=None, paid=True, govs=("capital",)):
@@ -108,7 +107,7 @@ def test_eligible_unverified_wrong_category_area_and_qualification(db):
     assert [(x["code"], x["fixable"]) for x in r["reasons"]] == [("organization_only", False)]
     # Verified and eligible, but marketplace access not active: one action, named.
     unpaid, _ = _provider(db, "unpaid@example.com", licence, electrical, paid=False)
-    assert unpaid.get(f"/projects/{pid}/eligibility").json()["participation"] == {"status": "action_required", "action": "activate_access", "availability": "open"}
+    assert _verdict(unpaid, pid) == {"status": "action_required", "action": "activate_access", "availability": "open"}
     assert unpaid.post(f"/projects/{pid}/offers", json={"amount": "900"}).status_code == 403
 
 
@@ -157,13 +156,13 @@ def test_lifecycle_comes_first(db):
     # 9. Hidden by U-Tender: unavailable, and nothing about it or why.
     admin.post(f"/admin/projects/{pid}/suspend", json={"suspended": True})
     r = good.get(f"/projects/{pid}/eligibility").json()
-    assert r["participation"] == {"status": "unavailable", "action": None, "availability": "unavailable"} and r["listing"] is None and r["reasons"] == []
+    assert {k: r["participation"][k] for k in ("status", "action", "availability")} == {"status": "unavailable", "action": None, "availability": "unavailable"} and r["listing"] is None and r["reasons"] == []
     assert good.post(f"/projects/{pid}/offers", json={"amount": "900"}).status_code == 400
     admin.post(f"/admin/projects/{pid}/suspend", json={"suspended": False})
     # 10. Past the deadline: eligibility doesn't reopen it.
     db.get(Project, pid).bid_deadline = datetime.utcnow() - timedelta(seconds=1)
     db.commit()
-    assert good.get(f"/projects/{pid}/eligibility").json()["participation"] == {"status": "unavailable", "action": None, "availability": "ended"}
+    assert _verdict(good, pid) == {"status": "unavailable", "action": None, "availability": "ended"}
     assert good.post(f"/projects/{pid}/offers", json={"amount": "900"}).status_code == 400
 
 

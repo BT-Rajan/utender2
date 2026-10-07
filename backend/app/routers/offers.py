@@ -221,6 +221,11 @@ def submit_offer(
     # on every subsequent revision too.
     if not project.tender_type_locked:
         project.tender_type_locked = True
+    # Stage 4.9: offering is deciding to take part (recorded once, at the
+    # version the offer is made against), in the same commit.
+    from app.routers.projects import record_decision
+
+    record_decision(db, user, project)
     db.commit()
     db.refresh(offer)
 

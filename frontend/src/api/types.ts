@@ -143,6 +143,10 @@ export interface Participation {
   status: "can_participate" | "not_eligible" | "action_required" | "unavailable";
   action: "activate_access" | "verification" | null;
   availability: "open" | "paused" | "ended" | "unavailable";
+  // Stage 4.9: this provider decided to take part, when, and on which version.
+  started?: boolean;
+  started_at?: string | null;
+  seen_material_revision?: number | null;
 }
 
 export interface EligibilityCheck {

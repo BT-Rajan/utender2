@@ -6,7 +6,17 @@ import type { ClosureReason, ServiceProviderProfile, OfferStatus, ProjectStatus 
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
 import { money } from "@/lib/money";
+import { timeLeft } from "@/lib/format";
 import { outcomeLabel } from "@/components/ClosureOutcome";
+
+interface Preparing {
+  project_id: string;
+  project_title: string;
+  bid_deadline: string;
+  availability: "open" | "paused";
+  started_at: string | null;
+  changed_since: boolean;
+}
 
 interface MyBid {
   project_id: string;
@@ -103,6 +113,12 @@ export function ServiceProviderDashboardPage() {
     queryFn: () => apiFetch<MyBid[]>("/service-provider/my-bids"),
     enabled: !!profile,
   });
+  // Stage 4.9: opportunities they decided to take part in, with no offer yet.
+  const { data: preparing } = useQuery({
+    queryKey: ["service-provider-preparing"],
+    queryFn: () => apiFetch<Preparing[]>("/service-provider/preparing"),
+    enabled: !!profile && profile.verification_status === "approved",
+  });
 
   if (!profile) return <PageLoading />;
 
@@ -154,6 +170,25 @@ export function ServiceProviderDashboardPage() {
               <div className="font-mono text-[10px] uppercase tracking-wide text-steel mt-1">{t("service_provider.dashboard.kpiTotalBids")}</div>
             </div>
           </div>
+
+          {!!preparing?.length && (
+            <section className="mb-6" data-testid="preparing">
+              <h2 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-2">{t("participate.preparingHeading")}</h2>
+              <ul className="grid gap-2">
+                {preparing.map((p) => (
+                  <li key={p.project_id} className="tblock rounded px-4 py-2.5 flex items-center justify-between gap-3 text-sm">
+                    <Link to={`/service-provider/projects/${p.project_id}/offer`} className="text-navy underline" dir="auto">
+                      {p.project_title || t("saved.unavailable")}
+                    </Link>
+                    <span className="font-mono text-[11px] text-steel">
+                      {p.availability === "paused" ? t("postPub.pausedPill") : timeLeft(t, p.bid_deadline)}
+                      {p.changed_since && <span className="text-amber-dark"> · {t("participate.changedShort")}</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-mono text-[11px] uppercase tracking-wide text-navy">{t("service_provider.dashboard.myBids")}</h2>

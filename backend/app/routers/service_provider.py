@@ -11,13 +11,14 @@ from app.db import get_db
 from app.deps import get_service_provider_profile, get_current_user, require_approved_service_provider, require_service_provider
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import DocumentRequirement
-from app.models.enums import DocumentStatus, ProjectStatus, UserRole
+from app.models.enums import DocumentStatus, OfferStatus, ProjectStatus, UserRole
 from app.models.offer import Offer
 from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.saved_opportunity import SavedOpportunity
 from app.models.user import User
 from app.schemas.service_provider import ServiceProviderProfileOut, MyBidOut, SubmitForReview
 from app.schemas.document import ServiceProviderDocumentOut, DocumentRequirementOut
+from app.schemas.common import UTCDateTime
 from app.schemas.project import FeedPage, ProjectOut
 from app.schemas.category import ProviderServices
 from app.services.categories import clean_services
@@ -355,6 +356,42 @@ def saved_opportunities(user: User = Depends(require_approved_service_provider),
         elif card.availability == "ended" and card.id not in my_offers:
             card.summary, card.pause_reason = None, None
     return cards
+
+
+class PreparingOut(BaseModel):
+    project_id: str
+    project_title: str
+    bid_deadline: UTCDateTime
+    availability: str
+    started_at: UTCDateTime | None
+    # The requirement changed materially since the provider decided.
+    changed_since: bool
+
+
+@router.get("/preparing", response_model=list[PreparingOut])
+def preparing(user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """Stage 4.9: requirements this provider decided to take part in but has
+    no offer on yet -- where they left off, and whether each is still open
+    or has changed since."""
+    from app.models.participation import Participation as ParticipationRecord
+
+    sync_expired_projects(db)
+    offered = {pid for (pid,) in db.query(Offer.project_id).filter(mine(db, user, Offer, Offer.service_provider_id), Offer.status == OfferStatus.submitted)}
+    rows = (
+        db.query(ParticipationRecord, Project)
+        .join(Project, Project.id == ParticipationRecord.project_id)
+        .filter(mine(db, user, ParticipationRecord, ParticipationRecord.service_provider_id))
+        .order_by(Project.bid_deadline.asc())
+        .all()
+    )
+    return [
+        PreparingOut(
+            project_id=p.id, project_title="" if p.is_suspended else p.title, bid_deadline=p.bid_deadline,
+            availability=availability(p), started_at=r.started_at, changed_since=p.material_revision > r.seen_material_revision,
+        )
+        for r, p in rows
+        if p.id not in offered and availability(p) in ("open", "paused")
+    ]
 
 
 @router.get("/my-bids", response_model=list[MyBidOut])

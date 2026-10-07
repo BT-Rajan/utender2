@@ -169,6 +169,18 @@ export interface Dictionary {
     cancel: string;
     remove: string;
   };
+  participate: {
+    heading: string;
+    body: string;
+    button: string;
+    notNow: string;
+    error: string;
+    changedHeading: string;
+    changedBody: string;
+    reviewed: string;
+    preparingHeading: string;
+    changedShort: string;
+  };
   saved: {
     save: string;
     saved: string;
@@ -1270,6 +1282,18 @@ export const en: Dictionary = {
   confirm: {
     cancel: "Cancel",
     remove: "Remove",
+  },
+  participate: {
+    heading: "Decided to take part?",
+    body: "Start preparing your offer. Nothing is sent to the owner until you submit it, and you can stop at any time before then.",
+    button: "Participate — prepare an offer",
+    notNow: "Not for you? You don’t need to do anything. Save it if you want to decide later.",
+    error: "Couldn’t start preparing an offer.",
+    changedHeading: "The requirement changed after you decided to take part",
+    changedBody: "Review the changes above: the current requirement is the one your offer will be made against.",
+    reviewed: "I’ve reviewed the current requirement",
+    preparingHeading: "Preparing an offer",
+    changedShort: "changed since you started",
   },
   saved: {
     save: "Save",
@@ -2397,6 +2421,18 @@ export const ar: Dictionary = {
   confirm: {
     cancel: "إلغاء",
     remove: "إزالة",
+  },
+  participate: {
+    heading: "قررت المشاركة؟",
+    body: "ابدأ إعداد عرضك. لا يُرسل شيء إلى المالك حتى تقدّمه، ويمكنك التوقف في أي وقت قبل ذلك.",
+    button: "المشاركة — إعداد عرض",
+    notNow: "ليست مناسبة لك؟ لا حاجة لأي إجراء. احفظها إن أردت أن تقرر لاحقًا.",
+    error: "تعذّر بدء إعداد العرض.",
+    changedHeading: "تغيّر الطلب بعد قرارك بالمشاركة",
+    changedBody: "راجع التعديلات أعلاه: الطلب الحالي هو الذي سيُقدَّم عرضك على أساسه.",
+    reviewed: "راجعت الطلب الحالي",
+    preparingHeading: "عروض قيد الإعداد",
+    changedShort: "تغيّر منذ أن بدأت",
   },
   saved: {
     save: "حفظ",

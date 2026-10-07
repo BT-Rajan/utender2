@@ -46,3 +46,4 @@ __all__ = [
     "CmsContent",
 ]
 from app.models.saved_opportunity import SavedOpportunity  # noqa: E402,F401
+from app.models.participation import Participation  # noqa: E402,F401

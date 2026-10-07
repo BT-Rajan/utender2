@@ -209,6 +209,11 @@ class Participation(BaseModel):
     status: str
     action: str | None = None
     availability: str
+    # Stage 4.9: whether this provider has decided to take part (Participate,
+    # or an offer), when, and the requirement version they decided on.
+    started: bool = False
+    started_at: UTCDateTime | None = None
+    seen_material_revision: int | None = None
 
 
 class OpportunityListing(BaseModel):

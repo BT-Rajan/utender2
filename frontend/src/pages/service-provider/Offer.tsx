@@ -1,7 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { apiFetch, serverNow } from "@/api/client";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiFetch, ApiError, serverNow } from "@/api/client";
 import type { EligibilityCheck, Offer, OpportunityListing, ProjectDetail } from "@/api/types";
 import { PageLoading } from "@/components/PageLoading";
 import { ClarificationsPanel } from "@/components/ClarificationsPanel";
@@ -178,6 +178,16 @@ export function ServiceProviderOfferPage() {
             <p className="mt-3 font-mono text-xs text-steel-light">{t("closure.offersKept")}</p>
           )}
         </div>
+      ) : existingOffer || project.participation?.started ? (
+        <>
+          {/* Stage 4.9: changed materially since they decided -- the current requirement is what applies. */}
+          {!existingOffer && (project.material_revision ?? 0) > (project.participation?.seen_material_revision ?? 0) && (
+            <ChangedSinceDecided projectId={project.id} />
+          )}
+          <OfferForm project={project} existingOffer={existingOffer ?? null} />
+        </>
+      ) : project.participation?.status === "can_participate" ? (
+        <ParticipateStep projectId={project.id} />
       ) : (
         <OfferForm project={project} existingOffer={existingOffer ?? null} />
       )}
@@ -202,6 +212,61 @@ function ListingSummary({ listing }: { listing: OpportunityListing }) {
           {listing.paused ? t("postPub.pausedPill") : timeLeft(t, listing.bid_deadline)}
         </span>
       </div>
+    </div>
+  );
+}
+
+// Stage 4.9: the decision to take part -- the step from evaluating the
+// opportunity to preparing an offer. The server checks every condition again
+// when it's taken; nothing is sent to the owner until an offer is submitted.
+function ParticipateStep({ projectId }: { projectId: string }) {
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const go = useMutation({
+    mutationFn: () => apiFetch(`/projects/${projectId}/participate`, { method: "POST" }),
+    onSuccess: () => {
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+    },
+    // A refusal says why (closed, paused, eligibility...); the page then shows the current state.
+    onError: (err) => {
+      setError(err instanceof ApiError ? err.detail : t("participate.error"));
+      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+    },
+  });
+  return (
+    <div className="border border-navy rounded px-5 py-4 bg-blue-tint/40" data-testid="participate-step">
+      <strong className="font-display text-navy block">{t("participate.heading")}</strong>
+      <p className="text-sm text-steel mt-1 mb-3">{t("participate.body")}</p>
+      {error && <p className="text-xs bg-red-tint text-red border border-red rounded px-3 py-2 mb-3">{error}</p>}
+      <button
+        type="button"
+        disabled={go.isPending}
+        onClick={() => go.mutate()}
+        className="bg-amber hover:bg-amber-dark disabled:opacity-60 text-white text-sm font-semibold rounded px-5 py-2.5"
+      >
+        {t("participate.button")}
+      </button>
+      <p className="text-xs text-steel-light mt-2">{t("participate.notNow")}</p>
+    </div>
+  );
+}
+
+function ChangedSinceDecided({ projectId }: { projectId: string }) {
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
+  const seen = useMutation({
+    mutationFn: () => apiFetch(`/projects/${projectId}/participate`, { method: "POST" }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
+  });
+  return (
+    <div className="border border-amber-dark/40 bg-amber/10 rounded px-4 py-3 mb-4 text-sm" data-testid="changed-since">
+      <strong className="font-display text-navy block">{t("participate.changedHeading")}</strong>
+      <p className="text-steel">{t("participate.changedBody")}</p>
+      <button type="button" disabled={seen.isPending} onClick={() => seen.mutate()} className="mt-2 border border-navy text-navy text-xs font-semibold rounded px-3 py-1.5">
+        {t("participate.reviewed")}
+      </button>
     </div>
   );
 }
