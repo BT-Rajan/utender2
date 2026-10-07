@@ -166,6 +166,10 @@ export function OfferForm({
       queryClient.invalidateQueries({ queryKey: ["my-offer", project.id] });
       queryClient.invalidateQueries({ queryKey: ["service-provider-feed"] });
     },
+    // Stage 5.15: a refusal (deadline passed, closed, suspended...) shows the
+    // requirement as the server now has it. The offer itself isn't re-read
+    // here, so a stale-page refusal never overwrites what was typed.
+    onError: () => queryClient.invalidateQueries({ queryKey: ["project", project.id] }),
   });
 
   // Stage 5.3/5.4: save the price, then the technical response, on the
@@ -220,7 +224,10 @@ export function OfferForm({
       queryClient.setQueryData(["my-offer", project.id], withdrawn);
       queryClient.invalidateQueries({ queryKey: ["project", project.id] });
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["my-offer", project.id] }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-offer", project.id] });
+      queryClient.invalidateQueries({ queryKey: ["project", project.id] });
+    },
     onError: (err) => setError(err instanceof ApiError ? err.detail : t("service_provider.offer.withdrawError")),
   });
 
@@ -245,6 +252,12 @@ export function OfferForm({
       queryClient.invalidateQueries({ queryKey: ["service-provider-preparing"] });
     },
     // A refusal (incomplete, closed, changed...) leaves the draft as saved; the checks say why.
+    // Stage 5.15: and the page re-reads the server's state -- e.g. "already
+    // submitted" by another tab or a colleague shows that submitted offer.
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-offer", project.id] });
+      queryClient.invalidateQueries({ queryKey: ["project", project.id] });
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["offer-check", project.id] }),
   });
 

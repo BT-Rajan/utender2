@@ -364,4 +364,17 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - The page asks for confirmation, then shows "Offer withdrawn" with the time. The button becomes "Submit again" while offers are open.
   - The owner isn't notified of a withdrawal: the existing `bid_withdrawn` notification type was never wired up and is left as is.
 
-_Further steps (5.15 onwards) are added as they are implemented._
+- **5.15 Deadline / concurrency / submission integrity:**
+  - Every route that changes an offer or starts one runs under the requirement's row lock (the same lock the owner's close, pause, cancel and amend, the admin's suspend, the award and the deadline sync take). These are: participate, draft saves, document attach/remove, submit, revise, confirm and withdraw. Each is judged at that moment by the server's clock (exactly at the deadline is too late) and the requirement's current lifecycle. No client-supplied time is consulted.
+  - One outcome per race:
+    - two submissions: one, the other "already submitted";
+    - revise vs withdraw: both applied in order, or the stale one refused;
+    - submit vs suspend or close: accepted before it, or refused after it;
+    - award vs offer suspension: never an award of a suspended offer.
+  - Submission is atomic (the final Stage 5.8 gate on exactly what is committed, or a full rollback). Retries and old tabs are refused with If-Match. The offer keeps the requirement version it was made against until it is revised.
+  - Fixes:
+    - the admin's offer suspend and delete now take the requirement lock;
+    - confirming an offer after an amendment re-checks its start/completion commitment, which an extended deadline may have invalidated (then it must be revised);
+    - the offer page re-reads the server's state after any refused submit, revise or withdraw.
+
+_Further steps (5.16 onwards) are added as they are implemented._

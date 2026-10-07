@@ -1394,6 +1394,11 @@ def suspend_offer(
     offer = db.get(Offer, offer_id)
     if not offer or offer.status == OfferStatus.draft:  # Stage 5.2: a draft isn't an offer yet
         raise HTTPException(status_code=404, detail="Offer not found.")
+    # Stage 5.15: the requirement's lock, like every other change to its offers
+    # -- so a suspension can't land between an award's "not suspended" check
+    # and its commit, or under a provider's revision. Re-read under it.
+    lock_project(db, offer.project_id)
+    db.refresh(offer)
     previous = offer.is_suspended
     offer.is_suspended = payload.suspended
     db.commit()
@@ -1431,6 +1436,8 @@ def delete_offer(offer_id: str, admin: User = Depends(require_admin), db: Sessio
     offer = db.get(Offer, offer_id)
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found.")
+    lock_project(db, offer.project_id)  # Stage 5.15: serialized with awards and provider changes
+    db.refresh(offer)
 
     awarded = db.query(AwardRecord).filter(AwardRecord.offer_id == offer_id).first()
     if awarded:

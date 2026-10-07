@@ -653,6 +653,11 @@ def confirm_offer(project_id: str, user: User = Depends(require_marketplace_acti
     assert_eligible(db, project, acting_profile(db, user))
     if offer.based_on_material_revision >= project.material_revision:
         raise HTTPException(status_code=400, detail="Your offer is already up to date with the requirement.")
+    # Stage 5.15: confirming re-states the offer against the requirement as it
+    # now is -- its start/completion commitment must still be valid now (an
+    # amendment may have moved the deadline past it); if not, it is revised,
+    # not confirmed.
+    check_commitment(project, offer.proposed_start_date, offer.proposed_completion_date, offer.proposed_duration_days)
     previous = offer.based_on_material_revision
     # Stage 3.17: the trail keeps that it was first made against the earlier version.
     _snapshot_revision(db, offer)
