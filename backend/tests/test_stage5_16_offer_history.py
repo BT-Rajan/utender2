@@ -75,7 +75,8 @@ def test_one_entry_per_offer_with_status_outcome_and_timing(db):
     assert r["submitted_at"].endswith("Z") and r["updated_at"].endswith("Z") and r["revision"] == 2 and r["amount"] == "900.000"
     assert bids[pids["withdrawn"]]["revision"] == 2
     # Nothing of anyone else's offer is in the provider's list.
-    assert "800" not in str(bids) and all(b["offer_id"] != rival_offer for b in bids.values())
+    # (amounts compared exactly: "800" can occur inside a random id)
+    assert all(b["amount"] != "800.000" for b in bids.values()) and all(b["offer_id"] != rival_offer for b in bids.values())
 
 
 def test_the_full_offer_and_its_versions_stay_openable_after_offers_close(db):
