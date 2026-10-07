@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import type { Offer, OfferDocument, OfferReadiness, ProjectDetail } from "@/api/types";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { OfferPreview, SECTION_ANCHORS } from "@/components/OfferPreview";
 import { OutdatedOfferNotice } from "@/components/PostPublication";
@@ -26,6 +27,7 @@ export function OfferForm({
   preview?: boolean;
 }) {
   const { t, language } = useI18n();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
@@ -210,11 +212,44 @@ export function OfferForm({
     onError: (err) => setError(err instanceof ApiError ? err.detail : t("service_provider.offer.withdrawError")),
   });
 
+  // Stage 5.11: a draft is submitted as stored -- the form is saved first
+  // (one step, 5.10), then that saved version (If-Match) is submitted, so
+  // what goes to the owner is exactly what the preview shows. The server
+  // re-checks everything at that moment. A submitted offer is revised
+  // through the existing route.
+  const submitDraftMutation = useMutation({
+    mutationFn: async () => {
+      const saved = await saveDraftMutation.mutateAsync(currentSnapshot);
+      return apiFetch<Offer>(`/projects/${project.id}/offers/draft/submit`, {
+        method: "POST",
+        headers: { "If-Match": String(saved.draft_version ?? 0) },
+      });
+    },
+    onSuccess: (submitted) => {
+      setSavedNotice(false);
+      queryClient.setQueryData(["my-offer", project.id], submitted);
+      queryClient.invalidateQueries({ queryKey: ["project", project.id] });
+      queryClient.invalidateQueries({ queryKey: ["service-provider-feed"] });
+      queryClient.invalidateQueries({ queryKey: ["service-provider-preparing"] });
+    },
+    // A refusal (incomplete, closed, changed...) leaves the draft as saved; the checks say why.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["offer-check", project.id] }),
+  });
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const isDraft = !!draft && !existingOffer;
+    if (isDraft) {
+      const ok = await confirm({
+        title: t("submitOffer.confirmTitle"),
+        body: t("submitOffer.confirmBody"),
+        confirmLabel: t("service_provider.offer.submitOffer"),
+      });
+      if (!ok) return;
+    }
     try {
-      await submitMutation.mutateAsync();
+      await (isDraft ? submitDraftMutation.mutateAsync() : submitMutation.mutateAsync());
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : t("service_provider.offer.submitError"));
     }
@@ -432,7 +467,7 @@ export function OfferForm({
             <div className="flex items-center gap-3">
               <button
                 type="submit"
-                disabled={submitMutation.isPending}
+                disabled={submitMutation.isPending || submitDraftMutation.isPending}
                 className="bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 w-fit"
               >
                 {existingOffer ? t("service_provider.offer.updateOffer") : t("service_provider.offer.submitOffer")}

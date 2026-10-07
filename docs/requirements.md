@@ -318,4 +318,21 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - Saving never submits, seals, or shows the draft to the owner or competitors.
   - Offer timestamps are sent as explicit UTC instants.
 
-_Further steps (5.11 onwards) are added as they are implemented._
+- **5.11 Submit offer:**
+  - Draft → Validate → Preview → Submit: "Submit offer" asks for confirmation, saves the form, then submits the stored draft exactly as previewed (`POST /projects/{id}/offers/draft/submit`, If-Match the saved draft version). A colleague's or another tab's later change is never submitted unseen.
+  - Everything is re-checked at that moment, on the server, under the requirement's lock (the lock every close, pause, suspension, amendment and deadline sync takes), so one outcome wins any race:
+    - signed in, acting for the stakeholder, the offer belongs to them;
+    - requirement open, not paused or suspended, before its deadline (strictly: exactly at the deadline is too late);
+    - still eligible, with active access;
+    - still a draft, on the current requirement version;
+    - then the full Stage 5.8 gate on exactly what will be committed.
+  - Atomic: one commit, or a rollback leaving the draft exactly as saved (still a draft, no submission time, the tender type not locked).
+  - Once only: a repeated request, another tab or a colleague gets "already submitted". There's one offer row per provider and organisation.
+  - The direct submission route (`POST /projects/{id}/offers`, also used for revisions) runs the same final gate.
+  - After submission:
+    - the offer has `submitted_at` (when first submitted), and the provider sees "Offer submitted" with the time, the revision number, and that it can be updated or withdrawn until offers close;
+    - it appears in "my bids", and the owner gets it through the existing offer list (sealed tenders reveal nothing until the deadline, ordered by submission time);
+    - competitors can't reach it.
+  - Notifications: the owner gets "New offer" on the first submission only. Later revisions send "Offer revised" (an existing notification type that had no template yet). Nothing is sent for a failed submission.
+
+_Further steps (5.12 onwards) are added as they are implemented._

@@ -16,6 +16,11 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.en: ("New offer on {project_title}", "{service_provider_name} submitted an offer on {project_title}."),
         Language.ar: ("عرض جديد على {project_title}", "قدم {service_provider_name} عرضًا على {project_title}."),
     },
+    # Stage 5.11: a provider revised an offer already submitted.
+    NotificationType.bid_revised: {
+        Language.en: ("Offer revised on {project_title}", "{service_provider_name} revised their offer on {project_title}."),
+        Language.ar: ("تعديل عرض على {project_title}", "عدّل {service_provider_name} عرضه على {project_title}."),
+    },
     NotificationType.award_won: {
         Language.en: ("You won {project_title}", "Your offer on {project_title} was accepted."),
         Language.ar: ("لقد فزت بـ {project_title}", "تم قبول عرضك على {project_title}."),

@@ -186,6 +186,16 @@ export interface Dictionary {
     draftStarted: string;
     lastSaved: string;
   };
+  submitOffer: {
+    confirmTitle: string;
+    confirmBody: string;
+    submitted: string;
+    submittedAt: string;
+    revision: string;
+    sealedNote: string;
+    visibleNote: string;
+    canStill: string;
+  };
   offerPreview: {
     open: string;
     heading: string;
@@ -1358,6 +1368,16 @@ export const en: Dictionary = {
     draftStatus: "Draft — not submitted. Nothing is sent to the owner until you submit it.",
     draftStarted: "started",
     lastSaved: "last saved",
+  },
+  submitOffer: {
+    confirmTitle: "Submit this offer?",
+    confirmBody: "Your saved offer is sent to the owner exactly as the preview shows it. Until offers close you can still update or withdraw it, and every change is recorded.",
+    submitted: "Offer submitted",
+    submittedAt: "Submitted",
+    revision: "revision",
+    sealedNote: "This tender is sealed: the owner sees your offer's content only after the deadline.",
+    visibleNote: "The owner can see your offer now.",
+    canStill: "Until offers close you can update or withdraw it.",
   },
   offerPreview: {
     open: "Preview offer",
@@ -2556,6 +2576,16 @@ export const ar: Dictionary = {
     draftStatus: "مسودة — لم تُقدَّم. لا يُرسل شيء إلى المالك حتى تقدّمها.",
     draftStarted: "بدأت في",
     lastSaved: "آخر حفظ",
+  },
+  submitOffer: {
+    confirmTitle: "تقديم هذا العرض؟",
+    confirmBody: "يُرسل عرضك المحفوظ إلى المالك كما يظهر في المعاينة تمامًا. حتى إغلاق العروض يمكنك تحديثه أو سحبه، ويُسجَّل كل تغيير.",
+    submitted: "تم تقديم العرض",
+    submittedAt: "قُدّم في",
+    revision: "المراجعة",
+    sealedNote: "هذه مناقصة مختومة: لا يرى المالك محتوى عرضك إلا بعد الموعد النهائي.",
+    visibleNote: "يمكن للمالك رؤية عرضك الآن.",
+    canStill: "حتى إغلاق العروض يمكنك تحديثه أو سحبه.",
   },
   offerPreview: {
     open: "معاينة العرض",

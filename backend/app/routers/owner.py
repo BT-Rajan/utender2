@@ -107,7 +107,7 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
     # tender (the owner could infer who's cheapest from list order alone
     # even with the amounts blanked out) — order by submission time instead
     # while sealed, by amount once the seal is lifted for real evaluation.
-    query = query.order_by(Offer.created_at.asc()) if sealed else query.order_by(Offer.amount.asc())
+    query = query.order_by(Offer.submitted_at.asc()) if sealed else query.order_by(Offer.amount.asc())
     offers = query.all()
 
     if sealed:
@@ -125,6 +125,7 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
                 status=o.status,
                 revision=o.revision,
             based_on_material_revision=o.based_on_material_revision,
+                submitted_at=o.submitted_at,
                 created_at=o.created_at,
                 updated_at=o.updated_at,
                 sealed=True,
@@ -152,6 +153,7 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
             status=o.status,
             revision=o.revision,
             based_on_material_revision=o.based_on_material_revision,
+            submitted_at=o.submitted_at,
             created_at=o.created_at,
             updated_at=o.updated_at,
             service_provider_company_name=cp.company_name,

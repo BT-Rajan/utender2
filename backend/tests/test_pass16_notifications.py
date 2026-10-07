@@ -82,19 +82,21 @@ def test_pass16_notifications():
     check("bid_submitted notification links to the project", bid_notif["link"] == f"/owner/projects/{project_id}")
     check("unread count reflects the new notification", owner_client.get("/notifications/unread-count").json()["count"] == 1)
 
-    # ---------- dedup: a second bid revision before the first is read does NOT create a second row ----------
+    # ---------- dedup: revisions before the notice is read do NOT create a second row ----------
+    # (Stage 5.11: a revision is "Offer revised", not another "New offer".)
     c1.post(f"/projects/{project_id}/offers", json={"amount": "4900.00"})
+    c1.post(f"/projects/{project_id}/offers", json={"amount": "4850.00"})
     r = owner_client.get("/notifications")
-    bid_notifs = [n for n in r.json() if n["type"] == "bid_submitted"]
-    check("revising the SAME bid before the notification is read does not duplicate it", len(bid_notifs) == 1)
+    check("a revision is not reported as a new offer", len([n for n in r.json() if n["type"] == "bid_submitted"]) == 1)
+    revised = [n for n in r.json() if n["type"] == "bid_revised"]
+    check("revising the SAME bid before the notification is read does not duplicate it", len(revised) == 1)
 
     # mark it read, then a new bid event creates a fresh notification
-    notif_id = bid_notifs[0]["id"]
-    owner_client.post(f"/notifications/{notif_id}/read")
+    owner_client.post(f"/notifications/{revised[0]['id']}/read")
     c1.post(f"/projects/{project_id}/offers", json={"amount": "4800.00"})
     r = owner_client.get("/notifications")
-    bid_notifs = [n for n in r.json() if n["type"] == "bid_submitted"]
-    check("a new bid event AFTER the prior one was read creates a fresh notification", len(bid_notifs) == 2)
+    revised = [n for n in r.json() if n["type"] == "bid_revised"]
+    check("a new bid event AFTER the prior one was read creates a fresh notification", len(revised) == 2)
 
 
     # ---------- sealed tender: notification never names the service provider ----------

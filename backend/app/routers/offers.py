@@ -478,6 +478,7 @@ def submit_offer(
     # the quality gate applies; a submission can't skip it.
     if offer:
         check_commitment(project, offer.proposed_start_date, offer.proposed_completion_date, offer.proposed_duration_days)
+    first = offer is None or offer.status == OfferStatus.draft  # Stage 5.11: put forward for the first time
     if offer:
         # upsert on the (project_id, service_provider_id) unique constraint — a
         # service provider revising their bid before the deadline updates the
@@ -514,6 +515,29 @@ def submit_offer(
             updated_by=user.id,
         )
         db.add(offer)
+    return _put_forward(db, user, project, offer, profile, first)
+
+
+def _put_forward(db: Session, user: User, project: Project, offer: Offer, profile, first: bool) -> OfferOut:
+    """Stage 5.11: the one way an offer becomes (or, revised, stays) a formal
+    submitted offer -- for a direct submission and for submitting the stored
+    draft alike. The caller holds the requirement's lock and has written the
+    offer's content on the row (not yet committed). Here, under that same
+    lock: the Stage 5.8 quality gate runs on exactly what will be committed
+    (state, server deadline, version, standing, eligibility and the
+    requirement's own rules), so nothing incomplete, late or ineligible is
+    ever committed -- on any failure the whole change is rolled back and the
+    stored draft is as it was. Then one commit, and only after it the
+    owner's notifications."""
+    offer.status = OfferStatus.submitted
+    issues = readiness(db, project, profile, offer)
+    if issues:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=" ".join(dict.fromkeys(i.message for i in issues)))
+    now = datetime.utcnow()
+    if first or offer.submitted_at is None:
+        offer.submitted_at = now
+    offer.updated_at, offer.updated_by = now, user.id
     # The tender type is a material term of the tender — once at least one
     # bid exists, the owner can no longer switch sealed <-> owner-visible
     # out from under bidders (spec §19-21, D-001). Idempotent: stays locked
@@ -531,18 +555,57 @@ def submit_offer(
     sealed = project.tender_type == TenderType.sealed and project.status == ProjectStatus.open
     owner = db.get(User, project.owner_id)
     if owner:
-        notify_owner_new_offer(owner.email, project.title, project_id, profile.company_name, float(amount), sealed=sealed)
+        if first:
+            notify_owner_new_offer(owner.email, project.title, project.id, profile.company_name, float(offer.amount), sealed=sealed)
         notify_team(
             db,
             owner,
-            NotificationType.bid_submitted,
+            NotificationType.bid_submitted if first else NotificationType.bid_revised,  # Stage 5.11: a revision is not a new offer
             organization_id=project.organization_id,
-            link=f"/owner/projects/{project_id}",
+            link=f"/owner/projects/{project.id}",
             project_title=project.title,
             service_provider_name="A service provider" if sealed else profile.company_name,
         )
 
     return _with_documents(db, offer)
+
+
+@router.post("/draft/submit", response_model=OfferOut)
+def submit_draft(
+    project_id: str,
+    if_match: str | None = Header(None, alias="If-Match"),
+    user: User = Depends(require_marketplace_active_service_provider),
+    db: Session = Depends(get_db),
+):
+    """Stage 5.11: submit the stored draft -- exactly what was saved and
+    previewed (5.9), nothing from the request but If-Match: the
+    draft_version the provider reviewed, so a colleague's or another tab's
+    later change is never submitted unseen. Under the requirement's lock
+    (the one every close, pause, suspension, amendment and the deadline
+    sync takes), so one authoritative outcome wins any race. Re-checks
+    everything at this moment through the same gate as every submission;
+    a draft that has already been submitted, by a repeat request, another
+    tab or a colleague, is not submitted again."""
+    project = lock_project(db, project_id)
+    if project and project.is_suspended:
+        raise HTTPException(status_code=400, detail="This project has been suspended and is not accepting offers.")
+    if not project or not bidding_is_open(project):
+        raise HTTPException(status_code=400, detail="Bidding on this project is closed.")
+    profile = acting_profile(db, user)
+    assert_eligible(db, project, profile)
+    offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
+    if not offer:
+        raise HTTPException(status_code=404, detail="Start preparing your offer first.")
+    if offer.status != OfferStatus.draft:
+        raise HTTPException(status_code=409, detail="Your offer has already been submitted. Change it by updating your offer.")
+    if offer.based_on_material_revision < project.material_revision:
+        raise HTTPException(status_code=409, detail="The requirement changed after you started this offer. Review the current requirement first.")
+    if if_match is not None and if_match.strip('"') != str(offer.draft_version):
+        raise HTTPException(
+            status_code=409,
+            detail="Your offer draft was changed somewhere else (another tab, device or team member) since you opened it. Reload to see the latest, then make your change again.",
+        )
+    return _put_forward(db, user, project, offer, profile, first=True)
 
 
 @router.post("/confirm", response_model=OfferOut)

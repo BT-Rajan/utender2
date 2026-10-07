@@ -154,6 +154,7 @@ class OfferOut(BaseModel):
     # last confirmed against (lower than the requirement's = before a change).
     based_on_material_revision: int = 0
     draft_version: int = 0  # Stage 5.3: send back as If-Match when saving the draft
+    submitted_at: UTCDateTime | None = None  # Stage 5.11: when first submitted; None while a draft
     created_at: UTCDateTime  # Stage 5.10: explicit UTC instants, like every other time sent
     updated_at: UTCDateTime
     service_provider_company_name: str | None = None

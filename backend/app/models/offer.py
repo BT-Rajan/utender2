@@ -69,6 +69,9 @@ class Offer(Base):
     # showing an older draft (another tab, another member) is refused
     # instead of overwriting newer work (If-Match, as for requirement drafts).
     draft_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    # Stage 5.11: when it was first put forward (submitted); NULL while a draft.
+    # created_at is when the draft was started.
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Stage 5.2: the people who started it and last changed it (an
     # organization's members share one offer).
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

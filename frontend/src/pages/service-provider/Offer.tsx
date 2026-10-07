@@ -184,6 +184,19 @@ export function ServiceProviderOfferPage() {
         </div>
       ) : existingOffer || project.participation?.started ? (
         <>
+          {/* Stage 5.11: a submitted offer says so, when, and what can still be done. */}
+          {existingOffer?.status === "submitted" && (
+            <div className="border border-green bg-green/5 rounded px-4 py-3 mb-4 text-sm" data-testid="offer-submitted">
+              <strong className="font-display text-navy block">✓ {t("submitOffer.submitted")}</strong>
+              <span className="text-steel">
+                {existingOffer.submitted_at && `${t("submitOffer.submittedAt")} ${fullDate(existingOffer.submitted_at, language)}`}
+                {existingOffer.revision > 1 && ` · ${t("submitOffer.revision")} ${existingOffer.revision}`}
+              </span>
+              <p className="text-xs text-steel mt-1">
+                {project.tender_type === "sealed" ? t("submitOffer.sealedNote") : t("submitOffer.visibleNote")} {t("submitOffer.canStill")}
+              </p>
+            </div>
+          )}
           {/* Stage 5.1: which requirement this offer is for. */}
           <p className="mb-4 text-sm text-navy" data-testid="preparing-for">
             {t("participate.preparingFor")} <strong dir="auto" className="font-display">{project.title}</strong>
