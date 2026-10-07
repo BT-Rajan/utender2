@@ -3,6 +3,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import JSON, Boolean, Date, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import event
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -119,6 +120,18 @@ class Project(Base):
     closure_reason: Mapped[str | None] = mapped_column(String(30), nullable=True)
     # The owner's private note on why it ended: shown to the owner side and admins, never to providers.
     closure_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Stage 4.2 follow-up, derived on every save (sync_derived below), never
+    # set directly: normalized text for the provider feed's search, and the
+    # eligibility rules as plain columns so the feed can apply them in the
+    # database query (services.eligibility.feed_condition).
+    search_title: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    search_trade: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    search_place: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    search_scope: Mapped[str | None] = mapped_column(Text, nullable=True)
+    elig_org_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    elig_match_category: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    elig_match_governorate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    elig_quals: Mapped[str | None] = mapped_column(String(2000), nullable=True)  # ",id,id," or NULL
     # The ended requirement this draft was started again from (Stage 3.16).
     restarted_from_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True)
     # How many material amendments (changes to what providers price) have been
@@ -200,3 +213,25 @@ class ProjectDrawing(Base):
     material_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     project = relationship("Project", back_populates="drawings")
+
+
+def sync_derived(project: "Project") -> None:
+    """Recompute the derived search and eligibility columns from the record."""
+    from app.services.search_text import GOVERNORATE_NAMES, normalize
+
+    project.search_title = normalize(project.title)[:300]
+    project.search_trade = normalize(project.trade)[:150] or None
+    project.search_place = normalize(" ".join(x for x in (project.area, GOVERNORATE_NAMES.get(project.governorate or "")) if x))[:300] or None
+    project.search_scope = normalize(project.description) or None
+    rules = project.provider_eligibility or {}
+    project.elig_org_only = rules.get("provider_type") == "organization"
+    project.elig_match_category = bool(rules.get("match_category"))
+    project.elig_match_governorate = bool(rules.get("match_governorate"))
+    quals = sorted(set(rules.get("qualifications") or []))
+    project.elig_quals = ("," + ",".join(quals) + ",") if quals else None
+
+
+@event.listens_for(Project, "before_insert")
+@event.listens_for(Project, "before_update")
+def _sync_derived(mapper, connection, project) -> None:
+    sync_derived(project)

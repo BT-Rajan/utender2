@@ -37,7 +37,9 @@ def resolve_trade(db: Session, category_id: str | None, trade: str | None) -> tu
 def rename_category(db: Session, category: ServiceCategory, name: str) -> None:
     category.name = name
     # Keep the shown name of every requirement filed under it in step.
-    db.query(Project).filter(Project.category_id == category.id).update({Project.trade: name}, synchronize_session=False)
+    # Row by row, so each requirement's derived search text follows the new name.
+    for project in db.query(Project).filter(Project.category_id == category.id):
+        project.trade = name
 
 
 def clean_services(db: Session, categories: list[str], governorates: list[str]) -> tuple[list[str], list[str]]:

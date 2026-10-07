@@ -84,6 +84,10 @@ class ProjectOut(BaseModel):
     summary: str | None = None
     pricing_basis: str | None = None
     item_count: int | None = None
+    # Stage 4.3, feed only: how many current documents come with it, and who
+    # may respond when the owner narrowed it (None = open to every verified provider).
+    document_count: int | None = None
+    conditions: "ProviderEligibilityOut | None" = None
     # Stage 3.9, service provider feed only: whether this provider may respond,
     # and if not, why.
     eligible: bool | None = None

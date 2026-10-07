@@ -9,7 +9,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { KUWAIT_GOVERNORATES } from "@/lib/location";
 import { useCategories } from "@/components/CategoryField";
 
-type Sort = "deadline" | "deadline_latest" | "newest";
+type Sort = "deadline" | "deadline_latest" | "newest" | "relevance";
 const FILTER_KEYS = ["search", "category_id", "governorate", "min_days", "my_services", "my_areas", "accepting"] as const;
 
 export function ServiceProviderFeedPage() {
@@ -25,7 +25,8 @@ export function ServiceProviderFeedPage() {
   const myServices = params.get("my_services") === "1";
   const myAreas = params.get("my_areas") === "1";
   const accepting = params.get("accepting") === "1";
-  const sort = (params.get("sort") as Sort | null) ?? "deadline";
+  // With a search, the best text matches come first unless another order is chosen.
+  const sort = (params.get("sort") as Sort | null) ?? (search ? "relevance" : "deadline");
   const [searchInput, setSearchInput] = useState(search);
   const { data: categories } = useCategories();
 
@@ -73,10 +74,11 @@ export function ServiceProviderFeedPage() {
     queryFn: ({ pageParam }) => {
       // Every page is the same query: the controls travel with each request.
       const query = new URLSearchParams();
-      for (const k of [...FILTER_KEYS, "sort"]) {
+      for (const k of FILTER_KEYS) {
         const v = params.get(k);
         if (v) query.set(k, v === "1" && k !== "min_days" ? "true" : v);
       }
+      query.set("sort", sort);
       query.set("offset", String(pageParam));
       return apiFetch<FeedPage>(`/service-provider/feed?${query.toString()}`);
     },
@@ -98,7 +100,7 @@ export function ServiceProviderFeedPage() {
       <div className="mb-6">
         <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">{t("service_provider.feed.eyebrow")}</span>
         <h1 className="font-display text-2xl font-semibold text-navy mb-1">{t("service_provider.feed.heading")}</h1>
-        <p className="text-[13.5px] text-steel">{sort === "newest" ? t("service_provider.feed.sortedNewest") : sort === "deadline_latest" ? t("feed.sortedLatest") : t("service_provider.feed.sortedClosest")}</p>
+        <p className="text-[13.5px] text-steel">{sort === "newest" ? t("service_provider.feed.sortedNewest") : sort === "deadline_latest" ? t("feed.sortedLatest") : sort === "relevance" ? t("feed.sortedRelevance") : t("service_provider.feed.sortedClosest")}</p>
       </div>
 
       {location.state?.notice && (
@@ -149,7 +151,8 @@ export function ServiceProviderFeedPage() {
               </option>
             ))}
           </select>
-          <select value={sort} onChange={(e) => update({ sort: e.target.value === "deadline" ? "" : e.target.value })} aria-label={t("feed.sortBy")} className="border border-border rounded px-3 py-2 text-sm font-mono">
+          <select value={sort} onChange={(e) => update({ sort: e.target.value })} aria-label={t("feed.sortBy")} className="border border-border rounded px-3 py-2 text-sm font-mono">
+            {search && <option value="relevance">{t("feed.sortRelevance")}</option>}
             <option value="deadline">{t("service_provider.feed.sortClosest")}</option>
             <option value="deadline_latest">{t("feed.sortLatest")}</option>
             <option value="newest">{t("service_provider.feed.sortNewest")}</option>
@@ -168,8 +171,8 @@ export function ServiceProviderFeedPage() {
             <input type="checkbox" checked={accepting} onChange={(e) => update({ accepting: e.target.checked })} />
             {t("feed.acceptingNow")}
           </label>
-          {filtersActive && (
-            <button type="button" onClick={() => { setSearchInput(""); setParams(sort === "deadline" ? {} : { sort }, { replace: true }); }} className="text-blue underline">
+          {(filtersActive || !!params.get("sort")) && (
+            <button type="button" onClick={() => { setSearchInput(""); setParams({}, { replace: true }); }} className="text-blue underline">
               {t("feed.clear")}
             </button>
           )}
@@ -182,7 +185,7 @@ export function ServiceProviderFeedPage() {
         <div className="border border-dashed border-border rounded p-10 text-center text-sm text-steel" data-testid="feed-empty">
           {filtersActive ? t("service_provider.feed.noMatch") : t("service_provider.feed.noOpenProjects")}
           {filtersActive && (
-            <button type="button" onClick={() => { setSearchInput(""); setParams(sort === "deadline" ? {} : { sort }, { replace: true }); }} className="block mx-auto mt-2 text-blue underline">
+            <button type="button" onClick={() => { setSearchInput(""); setParams({}, { replace: true }); }} className="block mx-auto mt-2 text-blue underline">
               {t("feed.clear")}
             </button>
           )}

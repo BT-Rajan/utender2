@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from sqlalchemy import false, func, or_
+from sqlalchemy import and_, case, false, func, not_, or_
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -11,14 +11,16 @@ from app.models.service_provider import ServiceProviderProfile
 from app.models.document import DocumentRequirement
 from app.models.enums import DocumentStatus, ProjectStatus, UserRole
 from app.models.offer import Offer
-from app.models.project import Project, ProjectItem
+from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.user import User
 from app.schemas.service_provider import ServiceProviderProfileOut, MyBidOut, SubmitForReview
 from app.schemas.document import ServiceProviderDocumentOut, DocumentRequirementOut
 from app.schemas.project import FeedPage, ProjectOut
 from app.schemas.category import ProviderServices
 from app.services.categories import clean_services
-from app.services.eligibility import ineligibility_reasons
+from app.services.eligibility import feed_condition, ineligibility_reasons, rules_out
+from app.services.search_text import normalize, search_words
+from app.models.category import ServiceCategory
 from app.services.team import acting_profile, mine, team_ids
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.locations import clean_governorate
@@ -59,7 +61,6 @@ def _eligibility_fields(db: Session, project: Project, profile) -> dict:
 
 FEED_PAGE = 20
 FEED_PAGE_MAX = 50
-_FEED_BATCH = 100
 SUMMARY_CHARS = 240
 
 
@@ -68,8 +69,9 @@ def feed(
     trade: str | None = None,
     governorate: str | None = None,
     search: str | None = Query(None, max_length=200),
-    # "deadline" (closing soonest, default) | "deadline_latest" | "newest" (published)
-    sort: Literal["deadline", "deadline_latest", "newest"] = "deadline",
+    # "deadline" (closing soonest, default) | "deadline_latest" | "newest"
+    # (published) | "relevance" (with a search: best text match first)
+    sort: Literal["deadline", "deadline_latest", "newest", "relevance"] = "deadline",
     # Stage 4.2: the platform's type of work; the provider's own declared
     # services/areas; time left to respond; only those accepting offers now.
     category_id: str | None = None,
@@ -84,9 +86,8 @@ def feed(
 ):
     """Stage 4.1: the opportunities this provider can actually take part in --
     published, open, not suspended, before their deadline, and (Stage 3.9)
-    whose conditions they meet; or that they already bid on. A page at a
-    time: the database is read in bounded batches, in a stable order, only as
-    far as the page needs."""
+    whose conditions they meet; or that they already bid on. One bounded
+    page at a time, every condition in the database query."""
     # The feed itself requires verification approval (mirrors middleware.ts's
     # serviceProviderGatedPaths) — subscription is a separate, softer gate applied
     # only to drawings and offer submission below, not to seeing the feed.
@@ -104,7 +105,7 @@ def feed(
     # Every condition below is part of the database query, applied before
     # the page is cut -- and only ever narrows what this provider may see.
     if trade and trade.strip():
-        query = query.filter(Project.trade.ilike(f"%{_like(trade.strip())}%", escape="/"))
+        query = query.filter(Project.search_trade.like(f"%{_like(normalize(trade))}%", escape="/"))
     if category_id:
         query = query.filter(Project.category_id == category_id)
     if governorate and governorate.strip():
@@ -114,7 +115,13 @@ def feed(
         team = db.query(ServiceProviderProfile).filter(ServiceProviderProfile.user_id.in_(team_ids(db, user.id))).all()
         if my_services:
             offered = sorted({c for p in team for c in (p.service_categories or [])})
-            query = query.filter(Project.category_id.in_(offered)) if offered else query.filter(false())
+            # Filed under one of those types of work -- or, filed with a
+            # free-text type of work, naming one of them.
+            names = [normalize(c.name) for c in db.query(ServiceCategory).filter(ServiceCategory.id.in_(offered))] if offered else []
+            query = query.filter(or_(
+                Project.category_id.in_(offered),
+                and_(Project.category_id.is_(None), or_(false(), *(Project.search_trade.like(f"%{_like(n)}%", escape="/") for n in names if n))),
+            ))
         if my_areas:
             served = sorted({g for p in team for g in (p.service_governorates or [])})
             if served:  # none declared = all of Kuwait
@@ -123,54 +130,57 @@ def feed(
         query = query.filter(Project.bid_deadline >= now + timedelta(days=min_days))
     if accepting:
         query = query.filter(Project.paused_at.is_(None))
-    if search and search.strip():
-        # Every word must appear somewhere the provider can see: title, area,
-        # type of work -- and the scope only for providers who can read it.
-        # Never the exact address: a search must not let a listing-level
-        # viewer probe for a specific property.
-        fields = [Project.title, Project.area, Project.trade] + ([Project.description] if full_access else [])
-        for word in search.split()[:8]:
+    words = search_words(search or "")
+    relevance = None
+    if words:
+        # Every word (normalized: Arabic letter variants, diacritics, digits,
+        # case; lightly stemmed) must appear somewhere the provider can see:
+        # title, area/governorate, type of work -- and the scope only for
+        # providers who can read it. Never the exact address: a search must
+        # not let a listing-level viewer probe for a specific property.
+        weighted = [(Project.search_title, 3), (Project.search_trade, 2), (Project.search_place, 1)]
+        if full_access:
+            weighted.append((Project.search_scope, 1))
+        score = []
+        for word in words:
             term = f"%{_like(word)}%"
-            query = query.filter(or_(*(f.ilike(term, escape="/") for f in fields)))
+            query = query.filter(or_(*(col.like(term, escape="/") for col, _ in weighted)))
+            score += [case((col.like(term, escape="/"), weight), else_=0) for col, weight in weighted]
+        relevance = sum(score[1:], score[0])
 
     # "Newest" means newest on the marketplace: by publication (Stage 3.14),
-    # not by when the owner started the draft. The id breaks ties so pages
+    # not by when the owner started the draft. "Relevance" (with a search):
+    # where the words were found -- title, then type of work, then place and
+    # scope -- closing soonest among equals. The id breaks ties so pages
     # never overlap or skip.
-    if sort == "newest":
+    if sort == "relevance" and relevance is not None:
+        query = query.order_by(relevance.desc(), Project.bid_deadline.asc(), Project.id)
+    elif sort == "newest":
         query = query.order_by(func.coalesce(Project.published_at, Project.created_at).desc(), Project.id)
     elif sort == "deadline_latest":
         query = query.order_by(Project.bid_deadline.desc(), Project.id)
     else:
         query = query.order_by(Project.bid_deadline.asc(), Project.id)
-    narrowed = bool(trade or category_id or governorate or my_services or my_areas or min_days or accepting or (search and search.strip()))
+    narrowed = bool(trade or category_id or governorate or my_services or my_areas or min_days or accepting or words)
 
     my_offers = {o.project_id: o.status.value for o in db.query(Offer).filter(mine(db, user, Offer, Offer.service_provider_id)).all()}
-
-    # Walk the matches in order, keeping those this provider may respond to,
-    # until the page (plus one, to know whether there is more) is filled.
-    page: list[Project] = []
-    seen_available, hidden, scanned, more = 0, 0, 0, False
-    while not more:
-        batch = query.offset(scanned).limit(_FEED_BATCH).all()
-        scanned += len(batch)
-        for p in batch:
-            if p.id not in my_offers and ineligibility_reasons(db, p, profile):
-                hidden += 1
-                continue
-            seen_available += 1
-            if seen_available <= offset:
-                continue
-            if len(page) < limit:
-                page.append(p)
-            else:
-                more = True
-                break
-        if len(batch) < _FEED_BATCH:
-            break
+    # Stage 3.9 eligibility, in the query (services.eligibility.feed_condition):
+    # what this provider may respond to, or already bid on.
+    available = or_(feed_condition(db, profile), Project.id.in_(list(my_offers)))
+    rows = query.filter(available).offset(offset).limit(limit + 1).all()
+    page, more = rows[:limit], len(rows) > limit
+    hidden = 0
+    if not page and offset == 0 and not narrowed:
+        hidden = query.filter(not_(available)).count()
 
     ids = [p.id for p in page]
     offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(Offer.project_id.in_(ids)).group_by(Offer.project_id).all()) if ids else {}
     item_counts = dict(db.query(ProjectItem.project_id, func.count(ProjectItem.id)).filter(ProjectItem.project_id.in_(ids)).group_by(ProjectItem.project_id).all()) if ids else {}
+    document_counts = dict(
+        db.query(ProjectDrawing.project_id, func.count(ProjectDrawing.id))
+        .filter(ProjectDrawing.project_id.in_(ids), ProjectDrawing.is_current.is_(True))
+        .group_by(ProjectDrawing.project_id).all()
+    ) if ids else {}
 
     out = []
     for p in page:
@@ -202,6 +212,8 @@ def feed(
                 tender_type_locked=p.tender_type_locked,
                 pricing_basis=p.pricing_basis.value,
                 item_count=item_counts.get(p.id, 0),
+                document_count=document_counts.get(p.id, 0),
+                conditions=rules_out(db, p) if (p.elig_org_only or p.elig_quals or p.elig_match_category or p.elig_match_governorate) else None,
                 created_at=p.created_at,
                 offer_count=offer_counts.get(p.id, 0),
                 my_offer_status=my_offers.get(p.id),
@@ -228,21 +240,6 @@ def _summary(text: str | None) -> str | None:
         return None
     text = " ".join(text.split())
     return text if len(text) <= SUMMARY_CHARS else text[: SUMMARY_CHARS].rsplit(" ", 1)[0] + "…"
-
-
-@router.get("/feed/trades", response_model=list[str])
-def feed_trades(user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
-    """Distinct trades among currently open projects, for populating the
-    feed's filter control — only values actually worth filtering by."""
-    sync_expired_projects(db)
-    rows = (
-        db.query(Project.trade)
-        .filter(Project.status == ProjectStatus.open, Project.is_suspended.is_(False), Project.bid_deadline > datetime.utcnow(), Project.trade.isnot(None))
-        .distinct()
-        .order_by(Project.trade.asc())
-        .all()
-    )
-    return [r[0] for r in rows if r[0]]
 
 
 @router.get("/my-bids", response_model=list[MyBidOut])

@@ -58,6 +58,9 @@ export interface Project {
   summary?: string | null;
   pricing_basis?: "lump_sum" | "per_item" | null;
   item_count?: number | null;
+  // Stage 4.3, provider feed only.
+  document_count?: number | null;
+  conditions?: ProviderEligibility | null;
 }
 
 export interface Drawing {

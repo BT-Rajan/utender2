@@ -144,6 +144,41 @@ def ineligibility_reasons(db: Session, project: Project, profile: ServiceProvide
     return reasons
 
 
+def feed_condition(db: Session, profile: ServiceProviderProfile):
+    """Stage 4.2 follow-up: ineligibility_reasons() as one SQL condition over
+    the derived Project.elig_* columns, so the provider feed filters and pages
+    in the database. It must decide exactly as ineligibility_reasons() does
+    (tests/test_stage4_2_followups.py checks the two agree); that function
+    stays the authority for everything a provider is told or refused."""
+    from sqlalchemy import and_, func, or_, true
+
+    conditions = []
+    if profile.stakeholder_type != StakeholderType.organization:
+        conditions.append(Project.elig_org_only.is_(False))
+    # Qualifications: every one the requirement lists must be held, approved
+    # and in date, by someone in the provider's organization.
+    today = date.today()
+    held = sorted({
+        d.requirement_id
+        for d in db.query(ServiceProviderDocument).filter(
+            ServiceProviderDocument.service_provider_id.in_(team_ids(db, profile.user_id)),
+            ServiceProviderDocument.status == DocumentStatus.approved,
+            or_(ServiceProviderDocument.expires_on.is_(None), ServiceProviderDocument.expires_on >= today),
+        )
+    })
+    remaining = Project.elig_quals
+    for requirement_id in held:  # strike each held one from ",a,b,"; all held leaves ","
+        remaining = func.replace(remaining, f",{requirement_id},", ",")
+    conditions.append(or_(Project.elig_quals.is_(None), remaining == ","))
+    team_profiles = db.query(ServiceProviderProfile).filter(ServiceProviderProfile.user_id.in_(team_ids(db, profile.user_id))).all()
+    offered = sorted({c for p in team_profiles for c in (p.service_categories or [])})
+    conditions.append(or_(Project.elig_match_category.is_(False), Project.category_id.is_(None), Project.category_id.in_(offered)))
+    served = sorted({g for p in team_profiles for g in (p.service_governorates or [])})
+    if served:  # none declared = all of Kuwait
+        conditions.append(or_(Project.elig_match_governorate.is_(False), Project.governorate.is_(None), Project.governorate.in_(served)))
+    return and_(true(), *conditions)
+
+
 def assert_eligible(db: Session, project: Project, profile: ServiceProviderProfile) -> None:
     reasons = ineligibility_reasons(db, project, profile)
     if reasons:

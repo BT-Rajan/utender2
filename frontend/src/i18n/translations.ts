@@ -188,6 +188,20 @@ export interface Dictionary {
     myAreas: string;
     acceptingNow: string;
     clear: string;
+    sortRelevance: string;
+    sortedRelevance: string;
+    closedNow: string;
+    leftDays: string;
+    leftHours: string;
+    documents: string;
+    published: string;
+    sealed: string;
+    sealedHint: string;
+    whoCanRespond: string;
+    youQualify: string;
+    offer_withdrawn: string;
+    offer_approved: string;
+    offer_rejected: string;
   };
   versions: {
     version: string;
@@ -1245,6 +1259,20 @@ export const en: Dictionary = {
     myAreas: "My service areas",
     acceptingNow: "Accepting offers now",
     clear: "Clear search and filters",
+    sortRelevance: "Best match to search",
+    sortedRelevance: "Open opportunities, best match to your search first",
+    closedNow: "Offers closed",
+    leftDays: "{d} d {h} h left to respond",
+    leftHours: "{h} h left to respond",
+    documents: "{n} documents",
+    published: "Published {date}",
+    sealed: "Sealed offers",
+    sealedHint: "Offers stay sealed: the owner sees prices only after the deadline.",
+    whoCanRespond: "Who can respond:",
+    youQualify: "you meet these",
+    offer_withdrawn: "Offer withdrawn",
+    offer_approved: "Awarded",
+    offer_rejected: "Not selected",
   },
   versions: {
     version: "Version {n}",
@@ -2327,6 +2355,20 @@ export const ar: Dictionary = {
     myAreas: "مناطق خدمتي",
     acceptingNow: "تقبل العروض الآن",
     clear: "مسح البحث والفلاتر",
+    sortRelevance: "الأقرب لبحثك",
+    sortedRelevance: "الفرص المفتوحة، الأقرب لبحثك أولًا",
+    closedNow: "أُغلق تقديم العروض",
+    leftDays: "متبقٍ {d} يوم و{h} ساعة للرد",
+    leftHours: "متبقٍ {h} ساعة للرد",
+    documents: "{n} مستندات",
+    published: "نُشر {date}",
+    sealed: "عروض مختومة",
+    sealedHint: "تبقى العروض مختومة: لا يرى المالك الأسعار إلا بعد الموعد النهائي.",
+    whoCanRespond: "من يمكنه الرد:",
+    youQualify: "أنت تستوفيها",
+    offer_withdrawn: "تم سحب العرض",
+    offer_approved: "تمت الترسية",
+    offer_rejected: "لم يُختر",
   },
   versions: {
     version: "النسخة {n}",

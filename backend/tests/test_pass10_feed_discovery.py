@@ -93,13 +93,14 @@ def test_pass10_feed_discovery():
     r = service_provider_client.get("/service-provider/feed")
     check("default sort is by deadline ascending (all same deadline here, so just check 3 results)", len(r.json()["items"]) == 3)
 
+    # Stage 4.2 follow-up: the old distinct-trades list is gone; the feed's
+    # type-of-work filter uses the platform's category list (/categories).
     r = service_provider_client.get("/service-provider/feed/trades")
-    check("distinct trades endpoint returns 200", r.status_code == 200)
-    check("distinct trades returns all 3 trades sorted", r.json() == sorted(["Roofing", "Carpentry", "Fencing"]))
+    check("retired feed/trades endpoint is gone", r.status_code == 404)
 
-    # unauthenticated / wrong-role access rejected
-    r = owner_client.get("/service-provider/feed/trades")
-    check("owner cannot access service provider feed/trades", r.status_code == 403)
+    # wrong-role access rejected
+    r = owner_client.get("/service-provider/feed")
+    check("owner cannot access the service provider feed", r.status_code == 403)
 
 
     failed = [n for n, ok in results if not ok]

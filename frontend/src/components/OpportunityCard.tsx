@@ -1,43 +1,81 @@
 import type { Project } from "@/api/types";
-import { IneligibleNotice } from "@/components/ProviderEligibility";
+import { eligibilitySummary, IneligibleNotice } from "@/components/ProviderEligibility";
 import { useI18n } from "@/i18n/I18nContext";
-import { formatDeadline, timeRemaining } from "@/lib/format";
+import { formatDeadline } from "@/lib/format";
 import { formatWorkTiming } from "@/lib/dates";
 import { formatArea } from "@/lib/location";
 
-// One opportunity in the providers' list (what they see before opening it:
-// no exact address, no scope). Shared by the feed and the owner's preview
-// (Stage 3.13).
+type T = (key: string) => string;
+
+// Stage 4.3: the response deadline in full -- weekday, date (the year when
+// it isn't this year) and time -- from the server's deadline.
+function deadlineText(iso: string, lang: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString(lang === "ar" ? "ar-KW" : "en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    ...(d.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}),
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function remaining(t: T, iso: string): string {
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms <= 0) return t("feed.closedNow");
+  const days = Math.floor(ms / 86_400_000);
+  const hours = Math.floor((ms % 86_400_000) / 3_600_000);
+  return days > 0 ? t("feed.leftDays").replace("{d}", String(days)).replace("{h}", String(hours)) : t("feed.leftHours").replace("{h}", String(Math.max(hours, 0)));
+}
+
+// One opportunity in the providers' list -- enough to decide whether to open
+// it, not the requirement itself: no exact address, only the opening of the
+// scope. Shared by the feed and the owner's preview (Stage 3.13).
 export function OpportunityCard({ project, locked = false }: { project: Project; locked?: boolean }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const timing = formatWorkTiming(t, project);
+  const scope = [
+    project.document_count ? t("feed.documents").replace("{n}", String(project.document_count)) : null,
+    project.pricing_basis === "per_item" && project.item_count ? t("feed.items").replace("{n}", String(project.item_count)) : null,
+    project.published_at ? t("feed.published").replace("{date}", formatDeadline(project.published_at)) : null,
+  ].filter(Boolean);
   return (
-    <div className="tblock rounded px-5 pt-4 relative overflow-hidden h-full">
+    <div className="tblock rounded px-5 pt-4 relative overflow-hidden h-full" data-testid="opportunity-card">
       <div className="flex justify-between items-start gap-2">
         <div>
-          <h3 className="font-display font-semibold text-[16.5px] mb-0.5">{project.title}</h3>
-          <p className="text-[12.5px] text-steel mb-3">
+          <h3 dir="auto" className="font-display font-semibold text-[16.5px] mb-0.5">{project.title}</h3>
+          <p className="text-[12.5px] text-steel mb-2">
             {formatArea(t, project.governorate, project.area)}
-            {formatWorkTiming(t, project) && <span className="block text-[11.5px]">{formatWorkTiming(t, project)}</span>}
+            {timing && <span className="block text-[11.5px]">{timing}</span>}
           </p>
         </div>
-        {project.my_offer_status && (
-          <span className="font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-green-tint text-green whitespace-nowrap">
-            {project.my_offer_status === "submitted" ? t("service_provider.feed.bidPlaced") : project.my_offer_status}
-          </span>
-        )}
+        <div className="flex flex-col items-end gap-1">
+          {project.my_offer_status && (
+            <span className="font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-green-tint text-green whitespace-nowrap">
+              {project.my_offer_status === "submitted" ? t("service_provider.feed.bidPlaced") : t(`feed.offer_${project.my_offer_status}`)}
+            </span>
+          )}
+          {project.tender_type === "sealed" && (
+            <span className="font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-blue-tint text-steel whitespace-nowrap" title={t("feed.sealedHint")}>
+              {t("feed.sealed")}
+            </span>
+          )}
+        </div>
       </div>
-      {project.summary && <p className="text-[13px] text-navy mb-2 line-clamp-3">{project.summary}</p>}
+      {project.summary && <p dir="auto" className="text-[13px] text-navy mb-2 line-clamp-3">{project.summary}</p>}
+      {scope.length > 0 && <p className="text-[11.5px] text-steel mb-1.5">{scope.join(" · ")}</p>}
       <p className="font-mono text-xs text-blue">
-        {project.paused_at ? <span className="text-amber-dark uppercase">{t("postPub.pausedProvider").replace("{date}", formatDeadline(project.paused_at))}</span> : timeRemaining(project.bid_deadline)}
+        {project.paused_at ? (
+          <span className="text-amber-dark uppercase">{t("postPub.pausedProvider").replace("{date}", formatDeadline(project.paused_at))}</span>
+        ) : (
+          remaining(t, project.bid_deadline)
+        )}
       </p>
       <div className="tblock-strip mt-4">
         <div className="tblock-field">
           <span className="k">{t("service_provider.feed.deadline")}</span>
-          <span className="v">{formatDeadline(project.bid_deadline)}</span>
-        </div>
-        <div className="tblock-field">
-          <span className="k">{t("service_provider.feed.offersSoFar")}</span>
-          <span className="v">{project.offer_count}</span>
+          <span className="v">{deadlineText(project.bid_deadline, language)}</span>
         </div>
         <div className="tblock-field">
           <span className="k">{t("service_provider.feed.trade")}</span>
@@ -46,13 +84,22 @@ export function OpportunityCard({ project, locked = false }: { project: Project;
         {project.pricing_basis && (
           <div className="tblock-field">
             <span className="k">{t("feed.pricing")}</span>
-            <span className="v">
-              {t(`feed.${project.pricing_basis}`)}
-              {project.pricing_basis === "per_item" && project.item_count ? ` · ${t("feed.items").replace("{n}", String(project.item_count))}` : ""}
-            </span>
+            <span className="v">{t(`feed.${project.pricing_basis}`)}</span>
           </div>
         )}
+        <div className="tblock-field">
+          <span className="k">{t("service_provider.feed.offersSoFar")}</span>
+          <span className="v">{project.offer_count}</span>
+        </div>
       </div>
+
+      {/* Who may respond, when the owner narrowed it -- the conditions in one line. */}
+      {project.conditions && (
+        <p className="text-[11.5px] text-steel mt-2.5 mb-3" data-testid="card-conditions">
+          <span className="font-semibold text-navy">{t("feed.whoCanRespond")}</span> {eligibilitySummary(t, project.conditions)}
+          {project.eligible === true && <span className="text-green"> · {t("feed.youQualify")}</span>}
+        </p>
+      )}
 
       {project.eligible === false && (
         <div className="mt-3 mb-4">
