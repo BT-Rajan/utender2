@@ -1,14 +1,12 @@
 import { useState } from "react";
-import { IneligibleNotice } from "@/components/ProviderEligibility";
+import { OpportunityCard } from "@/components/OpportunityCard";
 import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/api/client";
 import type { ServiceProviderProfile, Project } from "@/api/types";
-import { formatDeadline, timeRemaining } from "@/lib/format";
 import { QueryError } from "@/components/QueryError";
 import { useI18n } from "@/i18n/I18nContext";
-import { formatWorkTiming } from "@/lib/dates";
-import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
+import { KUWAIT_GOVERNORATES } from "@/lib/location";
 
 export function ServiceProviderFeedPage() {
   const { t } = useI18n();
@@ -125,53 +123,7 @@ export function ServiceProviderFeedPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {projects?.map((p) => {
-          const card = (
-            <div className="tblock rounded px-5 pt-4 relative overflow-hidden h-full">
-              <div className="flex justify-between items-start gap-2">
-                <div>
-                  <h3 className="font-display font-semibold text-[16.5px] mb-0.5">{p.title}</h3>
-                  <p className="text-[12.5px] text-steel mb-3">
-                    {formatArea(t, p.governorate, p.area)}
-                    {formatWorkTiming(t, p) && <span className="block text-[11.5px]">{formatWorkTiming(t, p)}</span>}
-                  </p>
-                </div>
-                {p.my_offer_status && (
-                  <span className="font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-green-tint text-green whitespace-nowrap">
-                    {p.my_offer_status === "submitted" ? t("service_provider.feed.bidPlaced") : p.my_offer_status}
-                  </span>
-                )}
-              </div>
-              <p className="font-mono text-xs text-blue">{timeRemaining(p.bid_deadline)}</p>
-              <div className="tblock-strip mt-4">
-                <div className="tblock-field">
-                  <span className="k">{t("service_provider.feed.deadline")}</span>
-                  <span className="v">{formatDeadline(p.bid_deadline)}</span>
-                </div>
-                <div className="tblock-field">
-                  <span className="k">{t("service_provider.feed.offersSoFar")}</span>
-                  <span className="v">{p.offer_count}</span>
-                </div>
-                <div className="tblock-field">
-                  <span className="k">{t("service_provider.feed.trade")}</span>
-                  <span className="v">{p.trade || "—"}</span>
-                </div>
-              </div>
-
-              {p.eligible === false && (
-                <div className="mt-3 mb-4">
-                  <IneligibleNotice reasons={p.ineligible_reasons ?? []} />
-                </div>
-              )}
-
-              {!isSubscribed && (
-                <div className="absolute inset-0 bg-navy/90 flex flex-col items-center justify-center text-center gap-2.5 px-4">
-                  <div className="text-xl">🔒</div>
-                  <strong className="font-display text-white text-sm">{t("service_provider.feed.lockedTitle")}</strong>
-                  <p className="text-[11.5px] text-white/70 max-w-[220px]">{t("service_provider.feed.lockedDescription")}</p>
-                </div>
-              )}
-            </div>
-          );
+          const card = <OpportunityCard project={p} locked={!isSubscribed} />;
 
           // Stage 3.9: an ineligible provider sees why, not a link the server would refuse.
           return isSubscribed && (p.eligible !== false || p.my_offer_status) ? (

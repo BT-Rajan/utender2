@@ -144,6 +144,18 @@ export interface Dictionary {
     invalid: string;
     acceptError: string;
   };
+  preview: {
+    heading: string;
+    draftNote: string;
+    liveNote: string;
+    back: string;
+    inList: string;
+    inListHint: string;
+    opened: string;
+    openedHint: string;
+    thenForm: string;
+    open: string;
+  };
   eligibility: {
     heading: string;
     hint: string;
@@ -1052,6 +1064,18 @@ export const en: Dictionary = {
     wrongAccount: "You're signed in with a different account. Log out and sign in as {email} to accept.",
     invalid: "This invitation link is invalid, has expired or was withdrawn. Ask for a new one.",
     acceptError: "Could not accept the invitation.",
+  },
+  preview: {
+    heading: "Provider preview",
+    draftNote: "This is how verified providers who may respond will see your requirement once you publish it. It is not published: only you and your organization can see it.",
+    liveNote: "This is how providers who may respond see your requirement.",
+    back: "Back to the draft",
+    inList: "In the list of opportunities",
+    inListHint: "Before opening it, providers see only this: not the exact address, scope or documents.",
+    opened: "When a provider opens it",
+    openedHint: "What an eligible provider sees, with the exact address, scope, items, documents and rules.",
+    thenForm: "Below this, providers fill in their offer: the price (per item if you asked for it) and everything listed under \"What your offer must include\".",
+    open: "Preview as a provider",
   },
   eligibility: {
     heading: "Who can respond",
@@ -1986,6 +2010,18 @@ export const ar: Dictionary = {
     wrongAccount: "أنت مسجل الدخول بحساب مختلف. سجّل الخروج وادخل باسم {email} لقبول الدعوة.",
     invalid: "رابط الدعوة غير صالح أو منتهي أو تم سحبه. اطلب رابطًا جديدًا.",
     acceptError: "تعذر قبول الدعوة.",
+  },
+  preview: {
+    heading: "معاينة مقدم الخدمة",
+    draftNote: "هكذا سيرى مقدمو الخدمة الموثقون المؤهلون طلبك بعد نشره. الطلب غير منشور: لا يراه إلا أنت وجهتك.",
+    liveNote: "هكذا يرى مقدمو الخدمة المؤهلون طلبك.",
+    back: "العودة إلى المسودة",
+    inList: "في قائمة الفرص",
+    inListHint: "قبل فتحه، يرى مقدمو الخدمة هذا فقط: دون العنوان الدقيق أو نطاق العمل أو المستندات.",
+    opened: "عندما يفتحه مقدم الخدمة",
+    openedHint: "ما يراه مقدم الخدمة المؤهل، مع العنوان الدقيق ونطاق العمل والبنود والمستندات والقواعد.",
+    thenForm: "أسفل ذلك يملأ مقدمو الخدمة عرضهم: السعر (حسب البنود إذا طلبت ذلك) وكل ما هو مدرج تحت \"ما يجب أن يتضمنه عرضك\".",
+    open: "معاينة كمقدم خدمة",
   },
   eligibility: {
     heading: "من يمكنه تقديم عرض",

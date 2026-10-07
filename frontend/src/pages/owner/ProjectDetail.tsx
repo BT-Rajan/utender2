@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError, API_URL, draftVersion } from "@/api/client";
 import type { Drawing, Offer, ProjectDetail } from "@/api/types";
@@ -432,6 +432,14 @@ export function OwnerProjectDetailPage() {
       {editableDraft && <ProviderEligibilityEditor project={project} />}
 
       {editableDraft && <QualityCheck report={quality} />}
+      {editableDraft && (
+        <Link
+          to={`/owner/projects/${project.id}/preview`}
+          className="inline-block mb-4 border border-navy text-navy hover:bg-navy hover:text-white text-xs font-semibold rounded px-4 py-2"
+        >
+          {t("preview.open")}
+        </Link>
+      )}
 
       {(editableDraft ||
         project.status === "open" ||

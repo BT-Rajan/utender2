@@ -25,6 +25,7 @@ import { AdminLayout } from "@/pages/admin/AdminLayout";
 import { AdminRequirementsPage } from "@/pages/admin/Requirements";
 import { AdminCategoriesPage } from "@/pages/admin/Categories";
 import { InvitePage } from "@/pages/Invite";
+import { OwnerProjectPreviewPage } from "@/pages/owner/ProjectPreview";
 import { AdminReviewPage } from "@/pages/admin/Review";
 import { AdminServiceProvidersPage } from "@/pages/admin/ServiceProviders";
 import { AdminServiceProviderDetailPage } from "@/pages/admin/ServiceProviderDetail";
@@ -86,6 +87,7 @@ export function App() {
           <Route path="dashboard" element={<OwnerDashboardPage />} />
           <Route path="projects/new" element={<OwnerProjectNewPage />} />
           <Route path="projects/:id" element={<OwnerProjectDetailPage />} />
+          <Route path="projects/:id/preview" element={<OwnerProjectPreviewPage />} />
         </Route>
 
         <Route

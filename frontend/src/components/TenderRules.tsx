@@ -245,9 +245,12 @@ export function ParticipationRules({ project }: { project: ProjectDetail }) {
   const { t } = useI18n();
   const rules = project.tender_rules;
   const declarations = project.response_requirements.declarations.length;
+  // Stage 3.13: for a draft (the owner's preview) state the rule as it will
+  // apply once published; offers aren't open yet, so "open now" is false.
+  const questionsWillBeOpen = project.status === "draft" ? rules.questions_allowed && !!rules.questions_close_at : rules.questions_open;
   const questions = !rules.questions_allowed
     ? t("tenderRules.pNoQuestions")
-    : rules.questions_open && rules.questions_close_at
+    : questionsWillBeOpen && rules.questions_close_at
       ? t("tenderRules.pQuestionsUntil").replace("{date}", formatDeadline(rules.questions_close_at))
       : t("tenderRules.pQuestionsClosed");
   return (
