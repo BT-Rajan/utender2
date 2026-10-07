@@ -115,7 +115,7 @@ def test_deadline_lifecycle_and_amendment(db):
     for pid in pids.values():
         _submitted(sp, pid)
     db.get(Project, pids["near"]).bid_deadline = datetime.utcnow() + timedelta(seconds=30)
-    db.get(Project, pids["at"]).bid_deadline = datetime.utcnow()
+    db.get(Project, pids["at"]).bid_deadline = datetime.utcnow().replace(microsecond=0)  # whole seconds, as MySQL stores it
     db.get(Project, pids["after"]).bid_deadline = datetime.utcnow() - timedelta(minutes=1)
     db.commit()
     owner.post(f"/owner/projects/{pids['closed_early']}/close")

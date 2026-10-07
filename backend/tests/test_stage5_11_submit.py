@@ -128,7 +128,9 @@ def test_lifecycle_and_amendment_block_submission(db):
     owner.post(f"/owner/projects/{closed}/close")  # 4. closed early by the owner
     admin.post(f"/admin/projects/{suspended}/suspend", json={"suspended": True})  # 5
     db.get(Project, expired).bid_deadline = datetime.utcnow() - timedelta(minutes=1)  # 6/7. deadline passed (server clock)
-    db.get(Project, at_deadline).bid_deadline = datetime.utcnow()  # exactly at the deadline: too late
+    # Exactly at the deadline: too late. Whole seconds, as the column stores them
+    # (MySQL DATETIME rounds fractions to the nearest second -- possibly forward).
+    db.get(Project, at_deadline).bid_deadline = datetime.utcnow().replace(microsecond=0)
     db.commit()
     owner.post(f"/owner/projects/{canceled}/cancel", json={"reason": "not_needed"})
     for pid in (closed, suspended, expired, at_deadline, canceled):
