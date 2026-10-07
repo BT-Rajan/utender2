@@ -170,6 +170,88 @@ def check_complete(
     return list(reqs.declarations)
 
 
+def readiness(db: Session, project: Project, profile, offer) -> list:
+    """Stage 5.8: the quality gate. Everything that stands between this
+    provider's saved offer and submission, against the requirement as it is
+    now (state, deadline by the server's clock, version), the provider's
+    standing now (verification, access, the requirement's eligibility rules)
+    and the requirement's own response rules (Stage 3.8) -- only what this
+    requirement asks for, by the same rules submission enforces. Every issue
+    is listed, not just the first, each with the part of the offer it
+    concerns. Empty = ready to submit. It decides nothing: submission makes
+    its own checks again, under the requirement's lock."""
+    from app.models.enums import VerificationStatus
+    from app.schemas.offer import ReadinessIssue
+    from app.services.eligibility import availability, ineligibility_reasons
+
+    issues: list[ReadinessIssue] = []
+
+    def add(section: str, message: str) -> None:
+        issues.append(ReadinessIssue(section=section, message=message))
+
+    state = availability(project)
+    if state == "unavailable":
+        add("requirement", "This requirement is temporarily unavailable.")
+    elif state == "paused":
+        add("requirement", "This requirement is paused by its owner; you can take part once it resumes.")
+    elif state == "ended":
+        from app.routers.projects import _deadline_ended
+
+        add("requirement", "This requirement is no longer accepting offers." + (" Its response deadline has passed." if _deadline_ended(project) else ""))
+    if profile is None or profile.is_suspended:
+        add("account", "Your account is suspended, so you can't take part in opportunities. Contact support." if profile else "Complete your verification to take part in opportunities.")
+    elif profile.verification_status != VerificationStatus.approved:
+        add("account", "Complete your verification to take part in opportunities.")
+    else:
+        for reason in ineligibility_reasons(db, project, profile):
+            add("eligibility", reason.message)
+        if not profile.is_verified_active:
+            add("account", "Activate your marketplace access to take part.")
+    if offer is None:
+        add("offer", "Start preparing your offer first.")
+        return issues
+    if offer.based_on_material_revision < project.material_revision:
+        add("requirement", "The requirement changed after you started this offer. Review the current requirement first.")
+
+    # Price, on the requirement's pricing basis (Stage 3.4 / 5.3).
+    if project.pricing_basis == PricingBasis.per_item:
+        items = {i.id for i in project.items}
+        priced = {line["item_id"] for line in offer.item_prices or []}
+        if priced - items:
+            add("price", "That item isn't part of this requirement.")
+        if items - priced:
+            add("price", "Give a rate for every item listed in the requirement, once each.")
+        elif offer.amount is None or not (Decimal(0) < offer.amount < AMOUNT_LIMIT):
+            add("price", "Enter a valid bid amount.")
+    elif offer.amount is None or not (Decimal(0) < offer.amount < AMOUNT_LIMIT):
+        add("price", "Enter a valid bid amount.")
+
+    reqs = requirements_for(project)
+    # Technical response (Stage 3.8 / 5.4), when the requirement requires it.
+    if reqs.approach == "required" and not (offer.message or "").strip():
+        add("technical", "Your offer is missing your technical approach.")
+    # Execution commitment (Stage 3.7 / 5.5): valid as it stands now (the
+    # deadline may have moved), and a completion period where required.
+    try:
+        check_commitment(project, offer.proposed_start_date, offer.proposed_completion_date, offer.proposed_duration_days)
+    except HTTPException as error:
+        add("timing", error.detail)
+    if reqs.completion_period == "required" and not (
+        (offer.timeline_estimate or "").strip() or offer.proposed_completion_date or offer.proposed_duration_days
+    ):
+        add("timing", "Your offer is missing a completion period.")
+    # Documents (Stage 3.8 / 5.6): every required one attached.
+    required_docs = {d.name for d in reqs.documents if d.required}
+    if required_docs:
+        attached = {d.label for d in _side_documents(db, project.id, offer.organization_id, offer.service_provider_id)}
+        for name in sorted(required_docs - attached):
+            add("documents", f'Your offer is missing the "{name}" document.')
+    # Declarations: every one, as now worded.
+    if reqs.declarations and set(offer.declarations_accepted or []) != set(reqs.declarations):
+        add("declarations", "Your offer is missing acceptance of every declaration.")
+    return issues
+
+
 def documents_out(db: Session, project_id: str, organization_id: str | None, provider_id: str) -> list[OfferDocumentOut]:
     storage = get_storage()
     rows = _side_documents(db, project_id, organization_id, provider_id).order_by(OfferDocument.label.asc()).all()

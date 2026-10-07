@@ -185,6 +185,21 @@ export interface Dictionary {
     draftStatus: string;
     draftStarted: string;
   };
+  readiness: {
+    ready: string;
+    notReady: string;
+    recheck: string;
+    savedOnly: string;
+    section_requirement: string;
+    section_account: string;
+    section_eligibility: string;
+    section_price: string;
+    section_technical: string;
+    section_timing: string;
+    section_documents: string;
+    section_declarations: string;
+    section_offer: string;
+  };
   timing: {
     heading: string;
     ownerExpects: string;
@@ -1320,6 +1335,21 @@ export const en: Dictionary = {
     reviewFirst: "Confirm you’ve reviewed the current requirement to continue preparing your offer.",
     draftStatus: "Draft — not submitted. Nothing is sent to the owner until you submit it.",
     draftStarted: "started",
+  },
+  readiness: {
+    ready: "Ready to submit",
+    notReady: "Cannot submit yet",
+    recheck: "Check again",
+    savedOnly: "This checks your saved draft — save first. Submitting checks everything again.",
+    section_requirement: "Requirement",
+    section_account: "Your account",
+    section_eligibility: "Eligibility",
+    section_price: "Price",
+    section_technical: "Technical approach",
+    section_timing: "Timing",
+    section_documents: "Documents",
+    section_declarations: "Declarations",
+    section_offer: "Offer",
   },
   timing: {
     heading: "Your start and completion commitment",
@@ -2481,6 +2511,21 @@ export const ar: Dictionary = {
     reviewFirst: "أكّد أنك راجعت الطلب الحالي لمتابعة إعداد عرضك.",
     draftStatus: "مسودة — لم تُقدَّم. لا يُرسل شيء إلى المالك حتى تقدّمها.",
     draftStarted: "بدأت في",
+  },
+  readiness: {
+    ready: "جاهز للتقديم",
+    notReady: "لا يمكن التقديم بعد",
+    recheck: "تحقّق مجددًا",
+    savedOnly: "يتحقق هذا من المسودة المحفوظة — احفظ أولًا. يُعاد التحقق من كل شيء عند التقديم.",
+    section_requirement: "الطلب",
+    section_account: "حسابك",
+    section_eligibility: "الأهلية",
+    section_price: "السعر",
+    section_technical: "المنهجية",
+    section_timing: "التوقيت",
+    section_documents: "المستندات",
+    section_declarations: "الإقرارات",
+    section_offer: "العرض",
   },
   timing: {
     heading: "التزامك بموعد البدء والإنجاز",

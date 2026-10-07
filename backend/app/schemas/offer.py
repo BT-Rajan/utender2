@@ -55,6 +55,31 @@ class OfferAssumptionsDraft(BaseModel):
     assumptions: str | None = Field(default=None, max_length=10_000)
 
 
+class OfferDeclarationsDraft(BaseModel):
+    """Stage 5.8: the requirement's declarations the provider accepts, as
+    worded on the requirement, saved on the draft so the quality gate can see
+    them. (Submission still takes them with the offer, as before.)"""
+
+    accepted_declarations: list[str] = Field(default_factory=list, max_length=10)
+
+
+class ReadinessIssue(BaseModel):
+    """One thing standing between the draft and submission: the part of the
+    offer (or of the provider's standing) it concerns, and what to do."""
+
+    section: str  # requirement | account | eligibility | price | technical | timing | documents | declarations | offer
+    message: str
+
+
+class OfferReadiness(BaseModel):
+    """Stage 5.8: the quality gate -- is this offer complete and valid enough
+    to submit, against the requirement as it is now? Not an evaluation:
+    nothing here says whether the offer is good."""
+
+    ready: bool
+    issues: list[ReadinessIssue] = []
+
+
 class OfferTimingDraft(BaseModel):
     """Stage 5.5: when the provider commits to start and finish, in the terms
     the requirement uses (Stage 3.7): a start date, and a completion date or a

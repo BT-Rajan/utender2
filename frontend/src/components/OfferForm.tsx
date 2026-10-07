@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
-import type { Offer, OfferDocument, ProjectDetail } from "@/api/types";
+import type { Offer, OfferDocument, OfferReadiness, ProjectDetail } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { OutdatedOfferNotice } from "@/components/PostPublication";
 import { useI18n } from "@/i18n/I18nContext";
@@ -47,6 +47,7 @@ export function OfferForm({
       setMessage(draft.message ?? "");
       setTimeline(draft.timeline_estimate ?? "");
       setAssumptions(draft.assumptions ?? "");
+      setAccepted(draft.declarations_accepted ?? []);
       setStartDate(draft.proposed_start_date ?? "");
       setCompletionDate(draft.proposed_completion_date ?? "");
       setDurationDays(draft.proposed_duration_days == null ? "" : String(draft.proposed_duration_days));
@@ -151,9 +152,14 @@ export function OfferForm({
         headers: { "If-Match": String(technical.draft_version ?? 0) },
         body: { assumptions: assumptions || null },
       });
-      return apiFetch<Offer>(`/projects/${project.id}/offers/draft/timing`, {
+      const declared = await apiFetch<Offer>(`/projects/${project.id}/offers/draft/declarations`, {
         method: "PUT",
         headers: { "If-Match": String(conditions.draft_version ?? 0) },
+        body: { accepted_declarations: accepted },
+      });
+      return apiFetch<Offer>(`/projects/${project.id}/offers/draft/timing`, {
+        method: "PUT",
+        headers: { "If-Match": String(declared.draft_version ?? 0) },
         body: {
           proposed_start_date: startDate || null,
           proposed_completion_date: completionDate || null,
@@ -166,6 +172,7 @@ export function OfferForm({
       setError(null);
       setSavedNotice(true);
       queryClient.setQueryData(["my-offer", project.id], saved);
+      queryClient.invalidateQueries({ queryKey: ["offer-check", project.id] });
     },
     onError: (err) => {
       setSavedNotice(false);
@@ -199,6 +206,7 @@ export function OfferForm({
   return (
     <>
       <ErrorBanner message={error} />
+      {draft && !existingOffer && !preview && <ReadinessPanel projectId={project.id} />}
       {existingOffer && !preview && <OutdatedOfferNotice project={project} offer={existingOffer} />}
       <fieldset disabled={preview} className={preview ? "opacity-80" : undefined}>
         <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6 items-start">
@@ -444,5 +452,41 @@ export function OfferForm({
         </div>
       </fieldset>
     </>
+  );
+}
+
+// Stage 5.8: the server's quality gate for the saved draft -- ready to
+// submit, or everything still to do, by part of the offer. It checks the
+// saved draft (save first), and decides nothing: submitting checks again.
+function ReadinessPanel({ projectId }: { projectId: string }) {
+  const { t } = useI18n();
+  const { data: check, refetch, isFetching } = useQuery({
+    queryKey: ["offer-check", projectId],
+    queryFn: () => apiFetch<OfferReadiness>(`/projects/${projectId}/offers/draft/check`),
+  });
+  if (!check) return null;
+  return (
+    <div
+      className={`rounded px-4 py-3 mb-4 text-sm border ${check.ready ? "border-green bg-green/5" : "border-amber-dark/40 bg-amber/10"}`}
+      data-testid="offer-readiness"
+    >
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <strong className="font-display text-navy">{check.ready ? t("readiness.ready") : t("readiness.notReady")}</strong>
+        <button type="button" onClick={() => refetch()} disabled={isFetching} className="text-xs text-blue underline disabled:opacity-60">
+          {t("readiness.recheck")}
+        </button>
+      </div>
+      {!check.ready && (
+        <ul className="mt-2 grid gap-1">
+          {check.issues.map((issue, i) => (
+            <li key={i} className="text-steel">
+              <span className="font-mono text-[10px] uppercase text-navy me-2">{t(`readiness.section_${issue.section}`)}</span>
+              {issue.message}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-xs text-steel-light mt-2">{t("readiness.savedOnly")}</p>
+    </div>
   );
 }

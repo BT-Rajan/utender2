@@ -188,6 +188,12 @@ export interface OfferDocument {
   url: string;
 }
 
+// Stage 5.8: the quality gate's answer for the saved draft.
+export interface OfferReadiness {
+  ready: boolean;
+  issues: { section: "requirement" | "account" | "eligibility" | "price" | "technical" | "timing" | "documents" | "declarations" | "offer"; message: string }[];
+}
+
 export interface Offer {
   id: string;
   project_id: string;

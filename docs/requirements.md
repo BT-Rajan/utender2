@@ -274,4 +274,20 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - Separate from requirement questions (Stage 4.7 Q&A): nothing entered here becomes a question or a message, and the form says where to ask about the requirement.
   - Saving has the same checks as 5.3–5.6 (own side's draft only, up-to-date page, open requirement, amendment reviewed first). No requirement field can be changed through it.
 
-_Further steps (5.8 onwards) are added as they are implemented._
+- **5.8 Offer validation / quality gate:**
+  - `GET /projects/{id}/offers/draft/check` answers "Ready to submit" or "Cannot submit yet", listing every issue by part of the offer: requirement, account, eligibility, price, technical, timing, documents, declarations. Messages are in the provider's language.
+  - It checks only what this requirement asks for (Stage 3.8), by the same rules submission enforces:
+    - the price on the requirement's basis (a valid total, or a rate for every item);
+    - the technical approach, a completion period and documents, each only when the requirement makes it required;
+    - every declaration accepted;
+    - the saved start/completion commitment still valid now.
+  - Optional parts never block.
+  - It is re-judged every time, as things stand now:
+    - the requirement is open, not paused or suspended, and before its deadline (by the server's clock);
+    - the offer is on the current requirement version (after a material amendment, it must be reviewed first);
+    - the provider is verified, not suspended, has active access, and still meets the requirement's eligibility rules.
+  - Read-only and private to the provider's side. Drafts can always be saved incomplete. Declarations can now be saved on the draft too.
+  - It grants nothing: submission repeats its own checks under the requirement's lock, now including the saved timing. A stale "ready" or a direct API call can't get round it.
+  - Not an evaluation: no scoring, ranking or judgement of quality.
+
+_Further steps (5.9 onwards) are added as they are implemented._

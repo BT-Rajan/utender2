@@ -4,12 +4,13 @@ from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Uploa
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import get_service_provider_profile, require_approved_service_provider, require_marketplace_active_service_provider
+from app.i18n_server import translate
+from app.deps import get_service_provider_profile, require_approved_service_provider, require_marketplace_active_service_provider, require_service_provider
 from app.models.enums import NotificationType, OfferStatus, ProjectStatus, TenderType
 from app.models.offer import Offer, OfferDocument, OfferRevision
 from app.models.project import Project
 from app.models.user import User
-from app.schemas.offer import OfferAssumptionsDraft, OfferCommercialDraft, OfferCreate, OfferTechnicalDraft, OfferTimingDraft, OfferDocumentOut, OfferOut, OfferRevisionOut
+from app.schemas.offer import OfferAssumptionsDraft, OfferCommercialDraft, OfferDeclarationsDraft, OfferReadiness, OfferCreate, OfferTechnicalDraft, OfferTimingDraft, OfferDocumentOut, OfferOut, OfferRevisionOut
 from app.services.audit import log_action
 from app.services.eligibility import assert_eligible
 from app.services.email import notify_owner_new_offer
@@ -17,10 +18,11 @@ from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowe
 from app.services.notify import notify, notify_team
 from app.services.team import acting_id, acting_profile, can_access, mine, org_of
 from app.services.offer_response import (
-    AMOUNT_LIMIT, OFFER_DOCUMENTS_BUCKET, check_commitment, check_complete, documents_out, draft_pricing, priced_total, requirements_for, timing_conflicts,
+    AMOUNT_LIMIT, OFFER_DOCUMENTS_BUCKET, check_commitment, check_complete, documents_out, draft_pricing, priced_total, readiness, requirements_for,
+    timing_conflicts,
 )
 from app.services.storage import get_storage
-from app.services.tender_lifecycle import bidding_is_open, lock_project
+from app.services.tender_lifecycle import bidding_is_open, lock_project, sync_expired_projects
 
 router = APIRouter(prefix="/projects/{project_id}/offers", tags=["offers"])
 
@@ -132,6 +134,46 @@ def save_assumptions_draft(
     _, offer = _draft_for_edit(db, user, project_id, if_match)
     offer.assumptions = (payload.assumptions or "").strip() or None
     return _saved(db, user, offer)
+
+
+@router.put("/draft/declarations", response_model=OfferOut)
+def save_declarations_draft(
+    project_id: str,
+    payload: OfferDeclarationsDraft,
+    if_match: str | None = Header(None, alias="If-Match"),
+    user: User = Depends(require_marketplace_active_service_provider),
+    db: Session = Depends(get_db),
+):
+    """Stage 5.8: save which of the requirement's declarations the provider
+    accepts on their draft -- only the requirement's own, as worded -- so
+    the quality gate can say whether they're all accepted. Only that field
+    changes."""
+    project, offer = _draft_for_edit(db, user, project_id, if_match)
+    declared = requirements_for(project).declarations
+    if set(payload.accepted_declarations) - set(declared):
+        raise HTTPException(status_code=400, detail="That declaration isn't part of this requirement.")
+    offer.declarations_accepted = [d for d in declared if d in set(payload.accepted_declarations)] or None
+    return _saved(db, user, offer)
+
+
+@router.get("/draft/check", response_model=OfferReadiness)
+def check_offer(project_id: str, user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
+    """Stage 5.8: the quality gate -- can this provider's saved offer be
+    submitted now, and if not, everything still to do, by part of the
+    offer? Judged on the server, against the requirement as it is now (state,
+    deadline, version), the provider's standing now and the requirement's own
+    response rules. Read-only: it grants nothing -- submission makes its own
+    checks again, under the requirement's lock. Only the provider's own
+    side's offer; a requirement they can't see is not found."""
+    sync_expired_projects(db)
+    project = db.get(Project, project_id)
+    if not project or project.status == ProjectStatus.draft:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
+    issues = readiness(db, project, acting_profile(db, user), offer)
+    for issue in issues:  # in the viewer's language, like every server message
+        issue.message = translate(issue.message)
+    return OfferReadiness(ready=not issues, issues=issues)
 
 
 @router.put("/draft/timing", response_model=OfferOut)
@@ -351,6 +393,11 @@ def submit_offer(
     # browser can't skip it by submitting directly.
     if offer and offer.status == OfferStatus.draft and offer.based_on_material_revision < project.material_revision:
         raise HTTPException(status_code=409, detail="The requirement changed after you started this offer. Review the current requirement first.")
+    # Stage 5.8: the saved start/completion commitment must still be valid
+    # now (the deadline may have moved since it was saved) -- the same rule
+    # the quality gate applies; a submission can't skip it.
+    if offer:
+        check_commitment(project, offer.proposed_start_date, offer.proposed_completion_date, offer.proposed_duration_days)
     if offer:
         # upsert on the (project_id, service_provider_id) unique constraint — a
         # service provider revising their bid before the deadline updates the
