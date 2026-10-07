@@ -210,6 +210,32 @@ def check_offer(project_id: str, user: User = Depends(require_service_provider),
     return OfferReadiness(ready=not issues, issues=issues)
 
 
+def preview_requirement(db: Session, project: Project) -> PreviewRequirement:
+    """Stage 5.9 (and 6.4, for the owner): enough of the requirement, as it is
+    now, to read an offer against -- its items, the declarations and
+    documents it asked for, its current version."""
+    from app.models.project_amendment import ProjectAmendment
+    from app.schemas.project import ProjectItemOut
+
+    latest = (
+        db.query(ProjectAmendment.amendment_number)
+        .filter(ProjectAmendment.project_id == project.id)
+        .order_by(ProjectAmendment.amendment_number.desc())
+        .first()
+    )
+    reqs = requirements_for(project)
+    return PreviewRequirement(
+        id=project.id, title=project.title, trade=project.trade, governorate=project.governorate, area=project.area,
+        description=project.description, pricing_basis=project.pricing_basis.value, currency=get_settings().marketplace_currency,
+        tender_type=project.tender_type.value, bid_deadline=project.bid_deadline,
+        expected_start_date=project.expected_start_date, expected_completion_date=project.expected_completion_date,
+        expected_duration_days=project.expected_duration_days, material_revision=project.material_revision,
+        amendment_number=latest[0] if latest else None,
+        items=[ProjectItemOut.model_validate(i) for i in sorted(project.items, key=lambda i: i.position)],
+        declarations=list(reqs.declarations), requested_documents=[{"name": d.name, "required": d.required} for d in reqs.documents],
+    )
+
+
 @router.get("/draft/preview", response_model=OfferPreviewOut)
 def preview_offer(project_id: str, user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
     """Stage 5.9: what this provider's side would submit, exactly as stored --
@@ -219,9 +245,7 @@ def preview_offer(project_id: str, user: User = Depends(require_service_provider
     Only the provider's own side's offer, on a requirement they may open;
     anything else is not found. Read-only: it submits, seals and locks
     nothing."""
-    from app.models.project_amendment import ProjectAmendment
     from app.routers.projects import _can_view_project
-    from app.schemas.project import ProjectItemOut
 
     sync_expired_projects(db)
     project = db.get(Project, project_id)
@@ -232,23 +256,7 @@ def preview_offer(project_id: str, user: User = Depends(require_service_provider
     issues = readiness(db, project, profile, offer)
     for issue in issues:
         issue.message = translate(issue.message)
-    latest = (
-        db.query(ProjectAmendment.amendment_number)
-        .filter(ProjectAmendment.project_id == project.id)
-        .order_by(ProjectAmendment.amendment_number.desc())
-        .first()
-    )
-    reqs = requirements_for(project)
-    requirement = PreviewRequirement(
-        id=project.id, title=project.title, trade=project.trade, governorate=project.governorate, area=project.area,
-        description=project.description, pricing_basis=project.pricing_basis.value, currency=get_settings().marketplace_currency,
-        tender_type=project.tender_type.value, bid_deadline=project.bid_deadline,
-        expected_start_date=project.expected_start_date, expected_completion_date=project.expected_completion_date,
-        expected_duration_days=project.expected_duration_days, material_revision=project.material_revision,
-        amendment_number=latest[0] if latest else None,
-        items=[ProjectItemOut.model_validate(i) for i in sorted(project.items, key=lambda i: i.position)],
-        declarations=list(reqs.declarations), requested_documents=[{"name": d.name, "required": d.required} for d in reqs.documents],
-    )
+    requirement = preview_requirement(db, project)
     return OfferPreviewOut(
         requirement=requirement, provider_name=profile.company_name if profile else None, offer=_with_documents(db, offer),
         readiness=OfferReadiness(ready=not issues, issues=issues),

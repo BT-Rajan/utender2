@@ -233,3 +233,15 @@ class OfferPreviewOut(BaseModel):
     offer: OfferOut
     readiness: OfferReadiness
     on_current_version: bool
+
+
+class OwnerOfferOut(BaseModel):
+    """Stage 6.4: one offer as its requirement's owner reviews it -- exactly as
+    submitted (the stored record; nothing recalculated), from whom, and the
+    requirement it answers: as it is now, and which version the offer was
+    made against (on_current_version False: an earlier one)."""
+
+    requirement: PreviewRequirement
+    provider_name: str | None
+    offer: OfferOut
+    on_current_version: bool

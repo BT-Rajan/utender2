@@ -186,6 +186,18 @@ export interface Dictionary {
     draftStarted: string;
     lastSaved: string;
   };
+  ownerOffer: {
+    open: string;
+    back: string;
+    heading: string;
+    revision: string;
+    lastChanged: string;
+    readOnly: string;
+    answered: string;
+    viewAnswered: string;
+    unavailable: string;
+    loadError: string;
+  };
   offerHistory: {
     yourOffer: string;
     readOnlyNote: string;
@@ -1390,6 +1402,18 @@ export const en: Dictionary = {
     draftStatus: "Draft — not submitted. Nothing is sent to the owner until you submit it.",
     draftStarted: "started",
     lastSaved: "last saved",
+  },
+  ownerOffer: {
+    open: "View offer",
+    back: "Back to the requirement",
+    heading: "Offer from {provider}",
+    revision: "version {n}",
+    lastChanged: "last changed",
+    readOnly: "Exactly as the provider submitted it. Nothing here changes the offer.",
+    answered: "This offer was made against version {n} of the requirement.",
+    viewAnswered: "See the requirement as it was at version {n}",
+    unavailable: "This offer isn't available to view. It may have been withdrawn, it may still be sealed until the deadline, or it may not belong to this requirement.",
+    loadError: "Could not load the offer. Refresh the page to try again.",
   },
   offerHistory: {
     yourOffer: "Your offer",
@@ -2620,6 +2644,18 @@ export const ar: Dictionary = {
     draftStatus: "مسودة — لم تُقدَّم. لا يُرسل شيء إلى المالك حتى تقدّمها.",
     draftStarted: "بدأت في",
     lastSaved: "آخر حفظ",
+  },
+  ownerOffer: {
+    open: "عرض العرض",
+    back: "العودة إلى المتطلب",
+    heading: "عرض من {provider}",
+    revision: "الإصدار {n}",
+    lastChanged: "آخر تعديل",
+    readOnly: "كما قدّمه مزوّد الخدمة تمامًا. لا شيء هنا يغيّر العرض.",
+    answered: "قُدّم هذا العرض على الإصدار {n} من المتطلب.",
+    viewAnswered: "اعرض المتطلب كما كان في الإصدار {n}",
+    unavailable: "هذا العرض غير متاح للعرض. ربما سُحب، أو لا يزال مختومًا حتى الموعد النهائي، أو لا يخص هذا المتطلب.",
+    loadError: "تعذر تحميل العرض. حدّث الصفحة للمحاولة مجددًا.",
   },
   offerHistory: {
     yourOffer: "عرضك",

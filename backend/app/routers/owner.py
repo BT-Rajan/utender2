@@ -18,7 +18,7 @@ from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.review import Review
 from app.models.user import User
 from app.schemas.document import DocumentRequirementOut, OwnerDocumentOut
-from app.schemas.offer import OfferOut, OfferRevisionOut
+from app.schemas.offer import OfferOut, OfferRevisionOut, OwnerOfferOut
 from app.schemas.owner import OwnerProfileOut
 from app.schemas.project import EligibilityQualification, ProjectOut
 from app.schemas.review import ReviewCreate, ReviewOut
@@ -89,6 +89,36 @@ def dashboard(user: User = Depends(require_owner), db: Session = Depends(get_db)
         offer_count = db.query(Offer).filter(Offer.project_id == p.id, tendered(), Offer.is_suspended.is_(False)).count()
         out.append(ProjectOut(**_project_fields(p), offer_count=offer_count))
     return out
+
+
+def _owner_offer_out(db: Session, project: Project, o: Offer, cp: ServiceProviderProfile | None) -> OfferOut:
+    """A live (not withdrawn) offer, in full, as the owner receives it once unsealed."""
+    return OfferOut(
+        id=o.id,
+        project_id=o.project_id,
+        service_provider_id=o.service_provider_id,
+        amount=o.amount,
+        timeline_estimate=o.timeline_estimate,
+        # Stage 5.5: the commitment, and where it differs from what the owner expects (sealed: withheld above).
+        proposed_start_date=o.proposed_start_date,
+        proposed_completion_date=o.proposed_completion_date,
+        proposed_duration_days=o.proposed_duration_days,
+        timing_conflicts=timing_conflicts(project, o),
+        message=o.message,
+        item_prices=o.item_prices,
+        assumptions=o.assumptions,
+        declarations_accepted=o.declarations_accepted,
+        documents=submitted_documents_out(db, o),  # Stage 5.13: as submitted, not mid-revision
+        status=o.status,
+        revision=o.revision,
+        based_on_material_revision=o.based_on_material_revision,
+        submitted_at=o.submitted_at,
+        created_at=o.created_at,
+        updated_at=o.updated_at,
+        service_provider_company_name=cp.company_name if cp else None,
+        service_provider_avg_rating=cp.avg_rating if cp else None,
+        service_provider_review_count=cp.review_count if cp else None,
+    )
 
 
 @router.get("/projects/{project_id}/offers", response_model=list[OfferOut])
@@ -170,32 +200,7 @@ def list_offers(
             service_provider_review_count=cp.review_count,
         )
         if o.status == OfferStatus.withdrawn
-        else OfferOut(
-            id=o.id,
-            project_id=o.project_id,
-            service_provider_id=o.service_provider_id,
-            amount=o.amount,
-            timeline_estimate=o.timeline_estimate,
-            # Stage 5.5: the commitment, and where it differs from what the owner expects (sealed: withheld above).
-            proposed_start_date=o.proposed_start_date,
-            proposed_completion_date=o.proposed_completion_date,
-            proposed_duration_days=o.proposed_duration_days,
-            timing_conflicts=timing_conflicts(project, o),
-            message=o.message,
-            item_prices=o.item_prices,
-            assumptions=o.assumptions,
-            declarations_accepted=o.declarations_accepted,
-            documents=submitted_documents_out(db, o),  # Stage 5.13: as submitted, not mid-revision
-            status=o.status,
-            revision=o.revision,
-            based_on_material_revision=o.based_on_material_revision,
-            submitted_at=o.submitted_at,
-            created_at=o.created_at,
-            updated_at=o.updated_at,
-            service_provider_company_name=cp.company_name,
-            service_provider_avg_rating=cp.avg_rating,
-            service_provider_review_count=cp.review_count,
-        )
+        else _owner_offer_out(db, project, o, cp)
         for o, cp in offers
     ]
 
@@ -222,6 +227,25 @@ def _readable_offer(project_id: str, offer_id: str, user: User, db: Session) -> 
 def offer_history(project_id: str, offer_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     _readable_offer(project_id, offer_id, user, db)
     return history_out(db, db.query(OfferRevision).filter(OfferRevision.offer_id == offer_id).order_by(OfferRevision.revision_number.asc()), "owner", project_id)
+
+
+@router.get("/projects/{project_id}/offers/{offer_id}", response_model=OwnerOfferOut)
+def offer_detail(project_id: str, offer_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 6.4: one offer, for its requirement's owner to review -- the same
+    stored record and the same access rules as the inbox (unsealed, live, not
+    suspended, the owner's own requirement), beside the requirement it
+    answers. Read-only."""
+    from app.routers.offers import preview_requirement
+
+    offer = _readable_offer(project_id, offer_id, user, db)
+    project = db.get(Project, project_id)
+    cp = db.get(ServiceProviderProfile, offer.service_provider_id)
+    return OwnerOfferOut(
+        requirement=preview_requirement(db, project),
+        provider_name=cp.company_name if cp else None,
+        offer=_owner_offer_out(db, project, offer, cp),
+        on_current_version=offer.based_on_material_revision >= project.material_revision,
+    )
 
 
 @router.get("/projects/{project_id}/offers/{offer_id}/documents/file")

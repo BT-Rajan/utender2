@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/api/client";
 import type { OfferPreview as OfferPreviewData, OfferReadiness, OfferRevisionEntry } from "@/api/types";
@@ -44,11 +45,6 @@ export function OfferPreview({
   if (isError) return <p className="text-sm text-red">{t("offerPreview.unavailable")}</p>;
   if (!data) return <p className="text-sm text-steel">{t("offerPreview.loading")}</p>;
   const { requirement: req, offer, readiness } = data;
-  const items = new Map(req.items.map((i) => [i.id, i]));
-  const attached = new Map((offer.documents ?? []).map((d) => [d.label, d]));
-  const accepted = new Set(offer.declarations_accepted ?? []);
-  const none = <span className="text-steel-light">{t("offerPreview.notProvided")}</span>;
-  const heading = "font-mono text-[11px] uppercase tracking-wide text-navy mb-1";
 
   return (
     <div className="grid gap-4" data-testid="offer-preview">
@@ -82,6 +78,36 @@ export function OfferPreview({
         )}
       </div>}
 
+      <OfferRecord requirement={req} offer={offer} providerName={data.provider_name} onCurrentVersion={data.on_current_version} />
+    </div>
+  );
+}
+
+// Stage 5.9 / 6.4: an offer exactly as stored, beside the requirement it
+// answers -- the provider's own preview and the owner's review show the same
+// record the same way. Display only: nothing is recalculated or editable.
+export function OfferRecord({
+  requirement: req,
+  offer,
+  providerName,
+  onCurrentVersion,
+  versionNote,
+}: {
+  requirement: OfferPreviewData["requirement"];
+  offer: OfferPreviewData["offer"];
+  providerName: string | null;
+  onCurrentVersion: boolean;
+  versionNote?: ReactNode;
+}) {
+  const { t, language } = useI18n();
+  const items = new Map(req.items.map((i) => [i.id, i]));
+  const attached = new Map((offer.documents ?? []).map((d) => [d.label, d]));
+  const accepted = new Set(offer.declarations_accepted ?? []);
+  const none = <span className="text-steel-light">{t("offerPreview.notProvided")}</span>;
+  const heading = "font-mono text-[11px] uppercase tracking-wide text-navy mb-1";
+  const data = { provider_name: providerName, on_current_version: onCurrentVersion };
+  return (
+    <>
       <section className="border border-border rounded px-4 py-3" data-testid="preview-requirement">
         <div className={heading}>{t("offerPreview.requirement")}</div>
         <div dir="auto" className="font-display font-semibold text-navy">{req.title}</div>
@@ -97,6 +123,7 @@ export function OfferPreview({
           {req.tender_type === "sealed" && ` · ${t("feed.sealed")}`}
         </div>
         {!data.on_current_version && <p className="text-xs text-amber-dark mt-1" data-testid="preview-outdated">⚠ {t("offerPreview.outdated")}</p>}
+        {versionNote}
         {req.description && (
           <details className="mt-2 text-xs text-steel">
             <summary className="cursor-pointer text-blue">{t("offerPreview.scope")}</summary>
@@ -196,18 +223,20 @@ export function OfferPreview({
           </ul>
         </section>
       )}
-    </div>
+    </>
   );
 }
 
 // Stage 5.16: the provider's earlier versions of this offer, as submitted
 // (Stage 5.13 history) -- what changed, when, and the requirement version
 // each answered. Their own offer only; nothing of anyone else's.
-export function OfferHistory({ projectId, currency }: { projectId: string; currency: string }) {
+export function OfferHistory({ projectId, currency, offerId }: { projectId: string; currency: string; offerId?: string }) {
   const { t, language } = useI18n();
+  // Stage 6.4: the owner reads the same history of an offer on their requirement.
+  const url = offerId ? `/owner/projects/${projectId}/offers/${offerId}/history` : `/projects/${projectId}/offers/mine/history`;
   const { data: history } = useQuery({
-    queryKey: ["my-offer-history", projectId],
-    queryFn: () => apiFetch<OfferRevisionEntry[]>(`/projects/${projectId}/offers/mine/history`),
+    queryKey: offerId ? ["owner-offer-history", projectId, offerId] : ["my-offer-history", projectId],
+    queryFn: () => apiFetch<OfferRevisionEntry[]>(url),
   });
   if (!history?.length) return null;
   return (

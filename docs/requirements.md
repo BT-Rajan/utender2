@@ -426,4 +426,17 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - The owner's dashboard, the requirement page and providers' cards count the same offers as the inbox: an admin-suspended offer is left out of all of them.
   - The inbox and requirement state refresh every minute and when the owner returns to the page. A refused action (for example, approving an offer that has just been withdrawn) reloads both, so the page never acts on stale data.
 
+- **6.4 Offer detail review:** `GET /owner/projects/{id}/offers/{offer}`, at `/owner/projects/{id}/offers/{offer}` ("View offer" from the inbox).
+  - Same access as the inbox: the requirement's owner side only, the offer on that requirement, unsealed, not withdrawn, not suspended. Anything else is not found; providers are refused.
+  - Shows the stored record exactly as submitted, with nothing recalculated: provider, status, when it was submitted, its version and when it last changed.
+    - Price: the total and the item lines (rate, quantity and line total as the provider priced them; items can't change after publishing).
+    - Technical response, start, completion or duration, and the completion period.
+    - Timing flags: where the offer's dates are later or longer than the owner expects.
+    - Assumptions; each declaration asked for, with whether it was accepted.
+    - Each requested document with the file attached, opened through the owner's authorised download route.
+  - Beside it, the requirement it answers. It says which version the offer was made against; if the requirement has since been amended, it says so and links to that version as it stood (Stage 3.17).
+  - The offer's earlier versions, each with its own requirement version and files.
+  - Same display as the provider's own preview (shared component).
+  - Read-only: the route only reads; awarding stays on the requirement page. Refreshes every minute and on returning to the page. Withdrawn, sealed or unavailable offers say so instead of showing stale content.
+
 _Later Stage 6 steps are added as they are implemented._

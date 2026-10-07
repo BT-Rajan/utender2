@@ -236,6 +236,14 @@ export interface OfferPreview {
   on_current_version: boolean;
 }
 
+// Stage 6.4: one offer as the requirement's owner reviews it.
+export interface OwnerOffer {
+  requirement: OfferPreview["requirement"];
+  provider_name: string | null;
+  offer: Offer;
+  on_current_version: boolean;
+}
+
 export interface Offer {
   id: string;
   project_id: string;

@@ -789,6 +789,12 @@ export function OwnerProjectDetailPage() {
                         </div>
                       )}
                       {o.message && <div className="text-xs text-steel-light mt-0.5 max-w-xs">{o.message}</div>}
+                      {/* Stage 6.4: the whole offer, as submitted, on its own page. */}
+                      {o.status !== "withdrawn" && (
+                        <Link to={`/owner/projects/${project.id}/offers/${o.id}`} className="inline-block mt-1 font-mono text-[11px] text-blue underline" data-testid="owner-offer-open">
+                          {t("ownerOffer.open")}
+                        </Link>
+                      )}
                       <OfferResponseDetails offer={o} project={project} />
                     </td>
                     <td className="py-3 px-2.5">
