@@ -1,29 +1,61 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { OpportunityCard } from "@/components/OpportunityCard";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/api/client";
 import type { FeedPage, ServiceProviderProfile } from "@/api/types";
 import { QueryError } from "@/components/QueryError";
 import { useI18n } from "@/i18n/I18nContext";
 import { KUWAIT_GOVERNORATES } from "@/lib/location";
+import { useCategories } from "@/components/CategoryField";
+
+type Sort = "deadline" | "deadline_latest" | "newest";
+const FILTER_KEYS = ["search", "category_id", "governorate", "min_days", "my_services", "my_areas", "accepting"] as const;
 
 export function ServiceProviderFeedPage() {
   const { t } = useI18n();
   const location = useLocation() as { state?: { notice?: string } };
-  const [search, setSearch] = useState("");
-  const [trade, setTrade] = useState("");
-  const [governorate, setGovernorate] = useState("");
-  const [sort, setSort] = useState<"deadline" | "newest">("deadline");
+  // Stage 4.2: the query lives in the address, so it survives opening an
+  // opportunity and coming back, a reload, or a shared link.
+  const [params, setParams] = useSearchParams();
+  const search = params.get("search") ?? "";
+  const category = params.get("category_id") ?? "";
+  const governorate = params.get("governorate") ?? "";
+  const minDays = params.get("min_days") ?? "";
+  const myServices = params.get("my_services") === "1";
+  const myAreas = params.get("my_areas") === "1";
+  const accepting = params.get("accepting") === "1";
+  const sort = (params.get("sort") as Sort | null) ?? "deadline";
+  const [searchInput, setSearchInput] = useState(search);
+  const { data: categories } = useCategories();
+
+  function update(changes: Record<string, string | boolean>) {
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        for (const [k, v] of Object.entries(changes)) {
+          const value = v === true ? "1" : v === false ? "" : v;
+          if (value) next.set(k, value);
+          else next.delete(k);
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  }
+
+  // Typing settles before the query runs.
+  useEffect(() => {
+    if (searchInput.trim() === search) return;
+    const timer = setTimeout(() => update({ search: searchInput.trim() }), 350);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
+  useEffect(() => setSearchInput(search), [search]);
 
   const { data: profile } = useQuery({
     queryKey: ["service-provider-profile"],
     queryFn: () => apiFetch<ServiceProviderProfile>("/service-provider/profile"),
-  });
-
-  const { data: trades } = useQuery({
-    queryKey: ["service-provider-feed-trades"],
-    queryFn: () => apiFetch<string[]>("/service-provider/feed/trades"),
   });
 
   // Stage 4.1: a page at a time; the server decides what is available.
@@ -36,16 +68,17 @@ export function ServiceProviderFeedPage() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ["service-provider-feed", search, trade, governorate, sort],
+    queryKey: ["service-provider-feed", params.toString()],
     initialPageParam: 0,
     queryFn: ({ pageParam }) => {
-      const params = new URLSearchParams();
-      if (search.trim()) params.set("search", search.trim());
-      if (trade) params.set("trade", trade);
-      if (governorate) params.set("governorate", governorate);
-      params.set("sort", sort);
-      params.set("offset", String(pageParam));
-      return apiFetch<FeedPage>(`/service-provider/feed?${params.toString()}`);
+      // Every page is the same query: the controls travel with each request.
+      const query = new URLSearchParams();
+      for (const k of [...FILTER_KEYS, "sort"]) {
+        const v = params.get(k);
+        if (v) query.set(k, v === "1" && k !== "min_days" ? "true" : v);
+      }
+      query.set("offset", String(pageParam));
+      return apiFetch<FeedPage>(`/service-provider/feed?${query.toString()}`);
     },
     getNextPageParam: (last) => last.next_offset ?? undefined,
   });
@@ -58,14 +91,14 @@ export function ServiceProviderFeedPage() {
   // an admin-granted payment override has no Stripe subscription at all,
   // but is fully active.
   const isSubscribed = profile?.marketplace_status === "verified_active";
-  const filtersActive = !!search.trim() || !!trade || !!governorate;
+  const filtersActive = FILTER_KEYS.some((k) => !!params.get(k));
 
   return (
     <main className="max-w-5xl mx-auto px-5 py-8">
       <div className="mb-6">
         <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">{t("service_provider.feed.eyebrow")}</span>
         <h1 className="font-display text-2xl font-semibold text-navy mb-1">{t("service_provider.feed.heading")}</h1>
-        <p className="text-[13.5px] text-steel">{sort === "newest" ? t("service_provider.feed.sortedNewest") : t("service_provider.feed.sortedClosest")}</p>
+        <p className="text-[13.5px] text-steel">{sort === "newest" ? t("service_provider.feed.sortedNewest") : sort === "deadline_latest" ? t("feed.sortedLatest") : t("service_provider.feed.sortedClosest")}</p>
       </div>
 
       {location.state?.notice && (
@@ -81,46 +114,66 @@ export function ServiceProviderFeedPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2.5 mb-5">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t("service_provider.feed.searchPlaceholder")}
-          className="border border-border rounded px-3 py-2 text-sm flex-1 min-w-[200px]"
-        />
-        <select
-          value={trade}
-          onChange={(e) => setTrade(e.target.value)}
-          className="border border-border rounded px-3 py-2 text-sm font-mono"
-        >
-          <option value="">{t("service_provider.feed.allTrades")}</option>
-          {trades?.map((tr) => (
-            <option key={tr} value={tr}>
-              {tr}
-            </option>
-          ))}
-        </select>
-        <select
-          value={governorate}
-          onChange={(e) => setGovernorate(e.target.value)}
-          aria-label={t("location.governorate")}
-          className="border border-border rounded px-3 py-2 text-sm font-mono"
-        >
-          <option value="">{t("location.allGovernorates")}</option>
-          {KUWAIT_GOVERNORATES.map((g) => (
-            <option key={g} value={g}>
-              {t(`location.${g}`)}
-            </option>
-          ))}
-        </select>
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as "deadline" | "newest")}
-          className="border border-border rounded px-3 py-2 text-sm font-mono"
-        >
-          <option value="deadline">{t("service_provider.feed.sortClosest")}</option>
-          <option value="newest">{t("service_provider.feed.sortNewest")}</option>
-        </select>
+      <div className="grid gap-2.5 mb-5" data-testid="feed-controls">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder={t("service_provider.feed.searchPlaceholder")}
+            aria-label={t("service_provider.feed.searchPlaceholder")}
+            maxLength={200}
+            className="border border-border rounded px-3 py-2 text-sm flex-1 min-w-[200px]"
+          />
+          <select value={category} onChange={(e) => update({ category_id: e.target.value })} aria-label={t("service_provider.feed.trade")} className="border border-border rounded px-3 py-2 text-sm font-mono">
+            <option value="">{t("service_provider.feed.allTrades")}</option>
+            {categories?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <select value={governorate} onChange={(e) => update({ governorate: e.target.value })} aria-label={t("location.governorate")} className="border border-border rounded px-3 py-2 text-sm font-mono">
+            <option value="">{t("location.allGovernorates")}</option>
+            {KUWAIT_GOVERNORATES.map((g) => (
+              <option key={g} value={g}>
+                {t(`location.${g}`)}
+              </option>
+            ))}
+          </select>
+          <select value={minDays} onChange={(e) => update({ min_days: e.target.value })} aria-label={t("feed.timeLeft")} className="border border-border rounded px-3 py-2 text-sm font-mono">
+            <option value="">{t("feed.anyTimeLeft")}</option>
+            {["3", "7", "14"].map((d) => (
+              <option key={d} value={d}>
+                {t("feed.atLeastDays").replace("{n}", d)}
+              </option>
+            ))}
+          </select>
+          <select value={sort} onChange={(e) => update({ sort: e.target.value === "deadline" ? "" : e.target.value })} aria-label={t("feed.sortBy")} className="border border-border rounded px-3 py-2 text-sm font-mono">
+            <option value="deadline">{t("service_provider.feed.sortClosest")}</option>
+            <option value="deadline_latest">{t("feed.sortLatest")}</option>
+            <option value="newest">{t("service_provider.feed.sortNewest")}</option>
+          </select>
+        </div>
+        <div className="flex flex-wrap items-center gap-4 text-[13px] text-navy">
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={myServices} onChange={(e) => update({ my_services: e.target.checked })} />
+            {t("feed.myServices")}
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={myAreas} onChange={(e) => update({ my_areas: e.target.checked })} />
+            {t("feed.myAreas")}
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={accepting} onChange={(e) => update({ accepting: e.target.checked })} />
+            {t("feed.acceptingNow")}
+          </label>
+          {filtersActive && (
+            <button type="button" onClick={() => { setSearchInput(""); setParams(sort === "deadline" ? {} : { sort }, { replace: true }); }} className="text-blue underline">
+              {t("feed.clear")}
+            </button>
+          )}
+        </div>
       </div>
 
       {isError && <QueryError onRetry={() => refetch()} />}
@@ -128,6 +181,11 @@ export function ServiceProviderFeedPage() {
       {!isError && !isPending && !projects?.length && (
         <div className="border border-dashed border-border rounded p-10 text-center text-sm text-steel" data-testid="feed-empty">
           {filtersActive ? t("service_provider.feed.noMatch") : t("service_provider.feed.noOpenProjects")}
+          {filtersActive && (
+            <button type="button" onClick={() => { setSearchInput(""); setParams(sort === "deadline" ? {} : { sort }, { replace: true }); }} className="block mx-auto mt-2 text-blue underline">
+              {t("feed.clear")}
+            </button>
+          )}
           {hiddenIneligible > 0 && (
             <p className="mt-2 text-xs">
               {t("feed.hiddenIneligible").replace("{n}", String(hiddenIneligible))}{" "}

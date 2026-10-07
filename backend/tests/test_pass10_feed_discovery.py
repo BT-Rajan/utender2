@@ -77,8 +77,12 @@ def test_pass10_feed_discovery():
     r = service_provider_client.get("/service-provider/feed", params={"search": "Maple"})
     check("search matches title (never the exact address)", len(r.json()["items"]) == 1)
 
+    # Stage 4.2: the scope is searched only for providers who can read it --
+    # this one has no paid access yet, so it can't probe the scope's wording.
     r = service_provider_client.get("/service-provider/feed", params={"search": "cedar fence"})
-    check("search matches description", len(r.json()["items"]) == 1 and r.json()["items"][0]["title"] == "Fence repair")
+    check("search skips the scope for a provider who can't read it", len(r.json()["items"]) == 0)
+    r = service_provider_client.get("/service-provider/feed", params={"search": "fence"})
+    check("search matches title", len(r.json()["items"]) == 1 and r.json()["items"][0]["title"] == "Fence repair")
 
     r = service_provider_client.get("/service-provider/feed", params={"search": "nonexistent keyword xyz"})
     check("search with no matches returns empty list", len(r.json()["items"]) == 0)

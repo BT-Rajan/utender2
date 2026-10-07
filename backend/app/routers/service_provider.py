@@ -1,7 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from sqlalchemy import func, or_
+from sqlalchemy import false, func, or_
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -18,7 +19,7 @@ from app.schemas.project import FeedPage, ProjectOut
 from app.schemas.category import ProviderServices
 from app.services.categories import clean_services
 from app.services.eligibility import ineligibility_reasons
-from app.services.team import acting_profile, mine
+from app.services.team import acting_profile, mine, team_ids
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.locations import clean_governorate
 from app.services.stakeholder import require_established
@@ -66,8 +67,16 @@ SUMMARY_CHARS = 240
 def feed(
     trade: str | None = None,
     governorate: str | None = None,
-    search: str | None = None,
-    sort: str = "deadline",  # "deadline" (closing soonest, default) | "newest"
+    search: str | None = Query(None, max_length=200),
+    # "deadline" (closing soonest, default) | "deadline_latest" | "newest" (published)
+    sort: Literal["deadline", "deadline_latest", "newest"] = "deadline",
+    # Stage 4.2: the platform's type of work; the provider's own declared
+    # services/areas; time left to respond; only those accepting offers now.
+    category_id: str | None = None,
+    my_services: bool = False,
+    my_areas: bool = False,
+    min_days: int = Query(0, ge=0, le=365),
+    accepting: bool = False,
     offset: int = Query(0, ge=0),
     limit: int = Query(FEED_PAGE, ge=1, le=FEED_PAGE_MAX),
     user: User = Depends(require_approved_service_provider),
@@ -89,24 +98,53 @@ def feed(
         Project.bid_deadline > now,  # authoritative even for a row the sync skipped
     )
 
+    profile = acting_profile(db, user)
+    full_access = bool(profile and profile.is_verified_active)
+
+    # Every condition below is part of the database query, applied before
+    # the page is cut -- and only ever narrows what this provider may see.
     if trade and trade.strip():
-        query = query.filter(Project.trade.ilike(f"%{trade.strip()}%"))
+        query = query.filter(Project.trade.ilike(f"%{_like(trade.strip())}%", escape="/"))
+    if category_id:
+        query = query.filter(Project.category_id == category_id)
     if governorate and governorate.strip():
         query = query.filter(Project.governorate == clean_governorate(governorate))
+    if my_services or my_areas:
+        # What the provider (an organization: any of its members) declared.
+        team = db.query(ServiceProviderProfile).filter(ServiceProviderProfile.user_id.in_(team_ids(db, user.id))).all()
+        if my_services:
+            offered = sorted({c for p in team for c in (p.service_categories or [])})
+            query = query.filter(Project.category_id.in_(offered)) if offered else query.filter(false())
+        if my_areas:
+            served = sorted({g for p in team for g in (p.service_governorates or [])})
+            if served:  # none declared = all of Kuwait
+                query = query.filter(or_(Project.governorate.in_(served), Project.governorate.is_(None)))
+    if min_days:
+        query = query.filter(Project.bid_deadline >= now + timedelta(days=min_days))
+    if accepting:
+        query = query.filter(Project.paused_at.is_(None))
     if search and search.strip():
-        # Never matched against the exact address: a search must not let a
-        # listing-level viewer probe for a specific property.
-        term = f"%{search.strip()}%"
-        query = query.filter(or_(Project.title.ilike(term), Project.area.ilike(term), Project.description.ilike(term)))
+        # Every word must appear somewhere the provider can see: title, area,
+        # type of work -- and the scope only for providers who can read it.
+        # Never the exact address: a search must not let a listing-level
+        # viewer probe for a specific property.
+        fields = [Project.title, Project.area, Project.trade] + ([Project.description] if full_access else [])
+        for word in search.split()[:8]:
+            term = f"%{_like(word)}%"
+            query = query.filter(or_(*(f.ilike(term, escape="/") for f in fields)))
 
     # "Newest" means newest on the marketplace: by publication (Stage 3.14),
     # not by when the owner started the draft. The id breaks ties so pages
     # never overlap or skip.
-    newest = func.coalesce(Project.published_at, Project.created_at).desc()
-    query = query.order_by(newest, Project.id) if sort == "newest" else query.order_by(Project.bid_deadline.asc(), Project.id)
+    if sort == "newest":
+        query = query.order_by(func.coalesce(Project.published_at, Project.created_at).desc(), Project.id)
+    elif sort == "deadline_latest":
+        query = query.order_by(Project.bid_deadline.desc(), Project.id)
+    else:
+        query = query.order_by(Project.bid_deadline.asc(), Project.id)
+    narrowed = bool(trade or category_id or governorate or my_services or my_areas or min_days or accepting or (search and search.strip()))
 
     my_offers = {o.project_id: o.status.value for o in db.query(Offer).filter(mine(db, user, Offer, Offer.service_provider_id)).all()}
-    profile = acting_profile(db, user)
 
     # Walk the matches in order, keeping those this provider may respond to,
     # until the page (plus one, to know whether there is more) is filled.
@@ -133,7 +171,6 @@ def feed(
     ids = [p.id for p in page]
     offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(Offer.project_id.in_(ids)).group_by(Offer.project_id).all()) if ids else {}
     item_counts = dict(db.query(ProjectItem.project_id, func.count(ProjectItem.id)).filter(ProjectItem.project_id.in_(ids)).group_by(ProjectItem.project_id).all()) if ids else {}
-    full_access = bool(profile and profile.is_verified_active)
 
     out = []
     for p in page:
@@ -175,8 +212,15 @@ def feed(
         items=out,
         next_offset=offset + len(out) if more else None,
         # Only free to know when everything was scanned: an empty first page.
-        hidden_ineligible=hidden if not out and offset == 0 else None,
+        # Never for a narrowed query, which would tell how many restricted
+        # requirements match a given search.
+        hidden_ineligible=hidden if not out and offset == 0 and not narrowed else None,
     )
+
+
+def _like(text: str) -> str:
+    """Literal text inside a LIKE pattern (a typed % or _ matches itself)."""
+    return text.replace("/", "//").replace("%", "/%").replace("_", "/_")
 
 
 def _summary(text: str | None) -> str | None:

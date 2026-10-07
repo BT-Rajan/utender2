@@ -178,6 +178,16 @@ export interface Dictionary {
     checkServices: string;
     lump_sum: string;
     per_item: string;
+    timeLeft: string;
+    anyTimeLeft: string;
+    atLeastDays: string;
+    sortBy: string;
+    sortLatest: string;
+    sortedLatest: string;
+    myServices: string;
+    myAreas: string;
+    acceptingNow: string;
+    clear: string;
   };
   versions: {
     version: string;
@@ -1225,6 +1235,16 @@ export const en: Dictionary = {
     checkServices: "Check the services and areas you declared",
     lump_sum: "One total",
     per_item: "Per item",
+    timeLeft: "Time left to respond",
+    anyTimeLeft: "Any time left",
+    atLeastDays: "At least {n} days left",
+    sortBy: "Sort",
+    sortLatest: "Closing latest",
+    sortedLatest: "Open opportunities, closing latest first",
+    myServices: "My types of work",
+    myAreas: "My service areas",
+    acceptingNow: "Accepting offers now",
+    clear: "Clear search and filters",
   },
   versions: {
     version: "Version {n}",
@@ -1706,11 +1726,11 @@ export const en: Dictionary = {
       sortedClosest: "Sorted by closing soonest.",
       subscribeBanner: "You're approved, but drawings and offers stay locked until you subscribe.",
       viewPlans: "View plans",
-      searchPlaceholder: "Search title, address, or scope…",
+      searchPlaceholder: "Search title, area, type of work or scope…",
       allTrades: "All trades",
       sortClosest: "Closing soonest",
       sortNewest: "Newest first",
-      noMatch: "No projects match your filters.",
+      noMatch: "No open opportunities match your search and filters.",
       noOpenProjects: "No opportunities you can respond to right now. New ones appear here as soon as they are published.",
       deadline: "Deadline",
       offersSoFar: "Offers so far",
@@ -2297,6 +2317,16 @@ export const ar: Dictionary = {
     checkServices: "راجع الخدمات والمناطق التي أعلنتها",
     lump_sum: "مبلغ إجمالي",
     per_item: "لكل بند",
+    timeLeft: "الوقت المتبقي للرد",
+    anyTimeLeft: "أي وقت متبقٍ",
+    atLeastDays: "{n} أيام على الأقل",
+    sortBy: "الترتيب",
+    sortLatest: "الأبعد إغلاقًا",
+    sortedLatest: "الفرص المفتوحة، الأبعد إغلاقًا أولًا",
+    myServices: "أنواع العمل الخاصة بي",
+    myAreas: "مناطق خدمتي",
+    acceptingNow: "تقبل العروض الآن",
+    clear: "مسح البحث والفلاتر",
   },
   versions: {
     version: "النسخة {n}",
@@ -2778,11 +2808,11 @@ export const ar: Dictionary = {
       sortedClosest: "مرتبة حسب الأقرب إغلاقًا.",
       subscribeBanner: "تمت الموافقة عليك، لكن المخططات والعروض تبقى مقفلة حتى تشترك.",
       viewPlans: "عرض الباقات",
-      searchPlaceholder: "ابحث بالعنوان أو الموقع أو نطاق العمل…",
+      searchPlaceholder: "ابحث بالعنوان أو المنطقة أو نوع العمل أو نطاق العمل…",
       allTrades: "كل التخصصات",
       sortClosest: "الأقرب إغلاقًا",
       sortNewest: "الأحدث أولاً",
-      noMatch: "لا توجد مشاريع مطابقة لعوامل التصفية.",
+      noMatch: "لا توجد فرص مفتوحة تطابق البحث والفلاتر.",
       noOpenProjects: "لا توجد فرص يمكنك الاستجابة لها حاليًا. تظهر الفرص الجديدة هنا فور نشرها.",
       deadline: "الموعد النهائي",
       offersSoFar: "العروض حتى الآن",
