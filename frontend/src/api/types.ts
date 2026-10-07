@@ -63,6 +63,9 @@ export interface Project {
   conditions?: ProviderEligibility | null;
   // Stage 4.5, providers only.
   participation?: Participation | null;
+  // Stage 4.8, provider views: saved by this provider; in the saved list, where it stands now.
+  saved?: boolean | null;
+  availability?: "open" | "paused" | "ended" | "unavailable" | null;
 }
 
 export interface Drawing {

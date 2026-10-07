@@ -8,6 +8,7 @@ import { ClarificationsPanel } from "@/components/ClarificationsPanel";
 import { IneligibleNotice } from "@/components/ProviderEligibility";
 import { ProviderRequirementView } from "@/components/ProviderRequirementView";
 import { OfferForm } from "@/components/OfferForm";
+import { SaveButton } from "@/components/SaveOpportunity";
 import { useI18n } from "@/i18n/I18nContext";
 import { outcomeText } from "@/components/ClosureOutcome";
 import { money } from "@/lib/money";
@@ -141,6 +142,12 @@ export function ServiceProviderOfferPage() {
 
   return (
     <main className="max-w-4xl mx-auto px-5 py-8">
+      {/* Stage 4.8: save it to come back to (only while it can be discovered). */}
+      {(project.saved || project.participation?.availability === "open") && (
+        <div className="flex justify-end mb-3">
+          <SaveButton projectId={project.id} saved={!!project.saved} />
+        </div>
+      )}
       <ProviderRequirementView project={project} closed={biddingClosed} />
 
       <div className="mb-6">

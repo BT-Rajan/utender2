@@ -169,6 +169,18 @@ export interface Dictionary {
     cancel: string;
     remove: string;
   };
+  saved: {
+    save: string;
+    saved: string;
+    unsave: string;
+    saveForLater: string;
+    heading: string;
+    intro: string;
+    backToFeed: string;
+    empty: string;
+    unavailable: string;
+    remove: string;
+  };
   detail: {
     addedAfter: string;
     needsAccess: string;
@@ -1257,6 +1269,18 @@ export const en: Dictionary = {
   },
   confirm: {
     cancel: "Cancel",
+    remove: "Remove",
+  },
+  saved: {
+    save: "Save",
+    saved: "Saved",
+    unsave: "Remove from saved",
+    saveForLater: "Save for later",
+    heading: "Saved opportunities",
+    intro: "Opportunities you marked to come back to, as they stand now. Still open first.",
+    backToFeed: "Back to all opportunities",
+    empty: "Nothing saved yet. Use Save on an opportunity to keep it here.",
+    unavailable: "An opportunity you saved is temporarily unavailable.",
     remove: "Remove",
   },
   detail: {
@@ -2372,6 +2396,18 @@ export const ar: Dictionary = {
   },
   confirm: {
     cancel: "إلغاء",
+    remove: "إزالة",
+  },
+  saved: {
+    save: "حفظ",
+    saved: "محفوظ",
+    unsave: "إزالة من المحفوظات",
+    saveForLater: "احفظ لوقت لاحق",
+    heading: "الفرص المحفوظة",
+    intro: "الفرص التي حفظتها للرجوع إليها، بحالتها الحالية. المفتوحة أولًا.",
+    backToFeed: "العودة إلى جميع الفرص",
+    empty: "لا شيء محفوظ بعد. استخدم «حفظ» على أي فرصة لتظهر هنا.",
+    unavailable: "فرصة حفظتها غير متاحة مؤقتًا.",
     remove: "إزالة",
   },
   detail: {

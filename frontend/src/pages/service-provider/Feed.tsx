@@ -8,6 +8,7 @@ import { QueryError } from "@/components/QueryError";
 import { useI18n } from "@/i18n/I18nContext";
 import { KUWAIT_GOVERNORATES } from "@/lib/location";
 import { useCategories } from "@/components/CategoryField";
+import { useSaveToggle } from "@/components/SaveOpportunity";
 
 type Sort = "deadline" | "deadline_latest" | "newest" | "relevance";
 const FILTER_KEYS = ["search", "category_id", "governorate", "min_days", "my_services", "my_areas", "accepting"] as const;
@@ -54,6 +55,7 @@ export function ServiceProviderFeedPage() {
   }, [searchInput]);
   useEffect(() => setSearchInput(search), [search]);
 
+  const toggleSave = useSaveToggle();
   const { data: profile } = useQuery({
     queryKey: ["service-provider-profile"],
     queryFn: () => apiFetch<ServiceProviderProfile>("/service-provider/profile"),
@@ -99,7 +101,10 @@ export function ServiceProviderFeedPage() {
     <main className="max-w-5xl mx-auto px-5 py-8">
       <div className="mb-6">
         <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">{t("service_provider.feed.eyebrow")}</span>
-        <h1 className="font-display text-2xl font-semibold text-navy mb-1">{t("service_provider.feed.heading")}</h1>
+        <div className="flex items-baseline justify-between flex-wrap gap-2">
+          <h1 className="font-display text-2xl font-semibold text-navy mb-1">{t("service_provider.feed.heading")}</h1>
+          <Link to="/service-provider/saved" className="text-sm text-blue underline" data-testid="saved-link">★ {t("saved.heading")}</Link>
+        </div>
         <p className="text-[13.5px] text-steel">{sort === "newest" ? t("service_provider.feed.sortedNewest") : sort === "deadline_latest" ? t("feed.sortedLatest") : sort === "relevance" ? t("feed.sortedRelevance") : t("service_provider.feed.sortedClosest")}</p>
       </div>
 
@@ -200,7 +205,7 @@ export function ServiceProviderFeedPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {projects?.map((p) => {
-          const card = <OpportunityCard project={p} locked={!isSubscribed} />;
+          const card = <OpportunityCard project={p} locked={!isSubscribed} onToggleSave={() => toggleSave.mutate({ projectId: p.id, save: !p.saved })} />;
 
           // Stage 3.9: an ineligible provider sees why, not a link the server would refuse.
           return isSubscribed && (p.eligible !== false || p.my_offer_status) ? (

@@ -1,8 +1,10 @@
 from datetime import datetime, timedelta
 from typing import Literal
 
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy import and_, case, false, func, not_, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -12,16 +14,17 @@ from app.models.document import DocumentRequirement
 from app.models.enums import DocumentStatus, ProjectStatus, UserRole
 from app.models.offer import Offer
 from app.models.project import Project, ProjectDrawing, ProjectItem
+from app.models.saved_opportunity import SavedOpportunity
 from app.models.user import User
 from app.schemas.service_provider import ServiceProviderProfileOut, MyBidOut, SubmitForReview
 from app.schemas.document import ServiceProviderDocumentOut, DocumentRequirementOut
 from app.schemas.project import FeedPage, ProjectOut
 from app.schemas.category import ProviderServices
 from app.services.categories import clean_services
-from app.services.eligibility import feed_condition, ineligibility_reasons, rules_out
+from app.services.eligibility import availability, feed_condition, ineligibility_reasons, rules_out
 from app.services.search_text import arabic_root, expand, normalize, search_words
 from app.models.category import ServiceCategory
-from app.services.team import acting_profile, mine, team_ids
+from app.services.team import acting_id, acting_profile, mine, org_of, team_ids
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.locations import clean_governorate
 from app.services.stakeholder import require_established
@@ -190,53 +193,8 @@ def feed(
     if not page and offset == 0 and not narrowed:
         hidden = query.filter(not_(available)).count()
 
-    ids = [p.id for p in page]
-    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(Offer.project_id.in_(ids)).group_by(Offer.project_id).all()) if ids else {}
-    item_counts = dict(db.query(ProjectItem.project_id, func.count(ProjectItem.id)).filter(ProjectItem.project_id.in_(ids)).group_by(ProjectItem.project_id).all()) if ids else {}
-    document_counts = dict(
-        db.query(ProjectDrawing.project_id, func.count(ProjectDrawing.id))
-        .filter(ProjectDrawing.project_id.in_(ids), ProjectDrawing.is_current.is_(True))
-        .group_by(ProjectDrawing.project_id).all()
-    ) if ids else {}
-
-    out = []
-    for p in page:
-        out.append(
-            ProjectOut(
-                id=p.id,
-                owner_id=p.owner_id,
-                title=p.title,
-                # Listing level: where (governorate/area) and what (title,
-                # trade, the opening of the scope) only. The exact address and
-                # the full scope -- which holds site and access notes -- are
-                # on the requirement itself.
-                address=None,
-                governorate=p.governorate,
-                area=p.area,
-                description=None,
-                summary=_summary(p.description) if full_access else None,
-                trade=p.trade,
-                category_id=p.category_id,
-                paused_at=p.paused_at,
-                pause_reason=p.pause_reason,
-                bid_deadline=p.bid_deadline,
-                published_at=p.published_at,
-                expected_start_date=p.expected_start_date,
-                expected_completion_date=p.expected_completion_date,
-                expected_duration_days=p.expected_duration_days,
-                status=p.status,
-                tender_type=p.tender_type,
-                tender_type_locked=p.tender_type_locked,
-                pricing_basis=p.pricing_basis.value,
-                item_count=item_counts.get(p.id, 0),
-                document_count=document_counts.get(p.id, 0),
-                conditions=rules_out(db, p) if (p.elig_org_only or p.elig_quals or p.elig_match_category or p.elig_match_governorate) else None,
-                created_at=p.created_at,
-                offer_count=offer_counts.get(p.id, 0),
-                my_offer_status=my_offers.get(p.id),
-                **_eligibility_fields(db, p, profile),
-            )
-        )
+    saved_ids = _saved_ids(db, user)
+    out = _cards(db, page, profile, my_offers, full_access, saved_ids)
     return FeedPage(
         items=out,
         next_offset=offset + len(out) if more else None,
@@ -245,6 +203,62 @@ def feed(
         # requirements match a given search.
         hidden_ineligible=hidden if not out and offset == 0 and not narrowed else None,
     )
+
+
+def _cards(db: Session, page: list[Project], profile, my_offers: dict, full_access: bool, saved_ids: set[str]) -> list[ProjectOut]:
+    """The opportunity summary (Stage 4.3) for a list of requirements -- the
+    feed's and the saved list's one representation."""
+    ids = [p.id for p in page]
+    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(Offer.project_id.in_(ids)).group_by(Offer.project_id).all()) if ids else {}
+    item_counts = dict(db.query(ProjectItem.project_id, func.count(ProjectItem.id)).filter(ProjectItem.project_id.in_(ids)).group_by(ProjectItem.project_id).all()) if ids else {}
+    document_counts = dict(
+        db.query(ProjectDrawing.project_id, func.count(ProjectDrawing.id))
+        .filter(ProjectDrawing.project_id.in_(ids), ProjectDrawing.is_current.is_(True))
+        .group_by(ProjectDrawing.project_id).all()
+    ) if ids else {}
+    return [
+        ProjectOut(
+            id=p.id,
+            owner_id=p.owner_id,
+            title=p.title,
+            # Listing level: where (governorate/area) and what (title,
+            # trade, the opening of the scope) only. The exact address and
+            # the full scope -- which holds site and access notes -- are
+            # on the requirement itself.
+            address=None,
+            governorate=p.governorate,
+            area=p.area,
+            description=None,
+            summary=_summary(p.description) if full_access else None,
+            trade=p.trade,
+            category_id=p.category_id,
+            paused_at=p.paused_at,
+            pause_reason=p.pause_reason,
+            bid_deadline=p.bid_deadline,
+            published_at=p.published_at,
+            expected_start_date=p.expected_start_date,
+            expected_completion_date=p.expected_completion_date,
+            expected_duration_days=p.expected_duration_days,
+            status=p.status,
+            closure_reason=p.closure_reason,
+            tender_type=p.tender_type,
+            tender_type_locked=p.tender_type_locked,
+            pricing_basis=p.pricing_basis.value,
+            item_count=item_counts.get(p.id, 0),
+            document_count=document_counts.get(p.id, 0),
+            conditions=rules_out(db, p) if (p.elig_org_only or p.elig_quals or p.elig_match_category or p.elig_match_governorate) else None,
+            created_at=p.created_at,
+            offer_count=offer_counts.get(p.id, 0),
+            my_offer_status=my_offers.get(p.id),
+            saved=p.id in saved_ids,
+            **_eligibility_fields(db, p, profile),
+        )
+        for p in page
+    ]
+
+
+def _saved_ids(db: Session, user: User) -> set[str]:
+    return {pid for (pid,) in db.query(SavedOpportunity.project_id).filter(mine(db, user, SavedOpportunity, SavedOpportunity.service_provider_id))}
 
 
 def _contains(column, term: str):
@@ -265,6 +279,82 @@ def _summary(text: str | None) -> str | None:
         return None
     text = " ".join(text.split())
     return text if len(text) <= SUMMARY_CHARS else text[: SUMMARY_CHARS].rsplit(" ", 1)[0] + "…"
+
+
+# ---------- Stage 4.8: saved opportunities ----------
+
+class SavedState(BaseModel):
+    project_id: str
+    saved: bool
+
+
+@router.put("/saved/{project_id}", response_model=SavedState)
+def save_opportunity(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """Mark an opportunity to come back to. Only one this provider can
+    discover now -- open, not hidden, before its deadline, and theirs to
+    respond to (or already bid on) -- so saving never reaches past the feed.
+    Saving again changes nothing."""
+    sync_expired_projects(db)
+    project = db.get(Project, project_id)
+    profile = acting_profile(db, user)
+    has_bid = project is not None and db.query(Offer.id).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first() is not None
+    if (
+        not project or project.status != ProjectStatus.open or project.is_suspended or project.bid_deadline <= datetime.utcnow()
+        or not (has_bid or not ineligibility_reasons(db, project, profile))
+    ):
+        raise HTTPException(status_code=404, detail="Project not found.")
+    if project_id not in _saved_ids(db, user):
+        db.add(SavedOpportunity(project_id=project_id, service_provider_id=acting_id(db, user), organization_id=org_of(db, user.id), saved_by=user.id))
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()  # saved at the same moment by another request: it's saved
+    return SavedState(project_id=project_id, saved=True)
+
+
+@router.delete("/saved/{project_id}", response_model=SavedState)
+def unsave_opportunity(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """Take it off the list -- whatever has become of the requirement since.
+    Removing what isn't there changes nothing."""
+    db.query(SavedOpportunity).filter(
+        SavedOpportunity.project_id == project_id, mine(db, user, SavedOpportunity, SavedOpportunity.service_provider_id)
+    ).delete(synchronize_session=False)
+    db.commit()
+    return SavedState(project_id=project_id, saved=False)
+
+
+@router.get("/saved", response_model=list[ProjectOut])
+def saved_opportunities(user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """The saved list, each as the feed's card with where it stands NOW
+    (availability): still open first, closing soonest; then those that have
+    ended. A saved item never makes anything look available that isn't, and
+    shows no more than the provider may see: once a requirement has ended,
+    the listing only (its scope only for a provider who took part); hidden by
+    U-Tender, nothing about it."""
+    sync_expired_projects(db)
+    rows = (
+        db.query(Project)
+        .join(SavedOpportunity, SavedOpportunity.project_id == Project.id)
+        .filter(mine(db, user, SavedOpportunity, SavedOpportunity.service_provider_id))
+        .limit(500)
+        .all()
+    )
+    profile = acting_profile(db, user)
+    my_offers = {o.project_id: o.status.value for o in db.query(Offer).filter(mine(db, user, Offer, Offer.service_provider_id)).all()}
+    full_access = bool(profile and profile.is_verified_active)
+    state = {p.id: availability(p) for p in rows}
+    rank = {"open": 0, "paused": 0, "ended": 1, "unavailable": 2}
+    rows.sort(key=lambda p: (rank[state[p.id]], p.bid_deadline if rank[state[p.id]] == 0 else -p.bid_deadline.timestamp(), p.id))
+    cards = _cards(db, rows, profile, my_offers, full_access, {p.id for p in rows})
+    for card in cards:
+        card.availability = state[card.id]
+        if card.availability == "unavailable":
+            # Hidden by U-Tender: that it's unavailable, and nothing else.
+            card.title, card.area, card.governorate, card.trade, card.summary, card.conditions = "", None, None, None, None, None
+            card.pause_reason, card.offer_count, card.item_count, card.document_count = None, 0, None, None
+        elif card.availability == "ended" and card.id not in my_offers:
+            card.summary, card.pause_reason = None, None
+    return cards
 
 
 @router.get("/my-bids", response_model=list[MyBidOut])

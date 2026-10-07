@@ -770,6 +770,9 @@ def delete_service_provider(service_provider_id: str, db: Session = Depends(get_
     user = db.get(User, service_provider_id)
     if not user:
         raise HTTPException(status_code=404, detail="Service provider not found.")
+    from app.models.saved_opportunity import SavedOpportunity
+
+    db.query(SavedOpportunity).filter(SavedOpportunity.service_provider_id == service_provider_id).delete(synchronize_session=False)  # Stage 4.8
     db.delete(user)  # cascades to service_provider_profiles -> service_provider_documents/offers
     db.commit()
     return None
@@ -1261,6 +1264,11 @@ def delete_project(project_id: str, admin: User = Depends(require_admin), db: Se
     snapshot = json.dumps(
         {"title": project.title, "owner_id": project.owner_id, "status": project.status.value}, default=str
     )
+    from app.models.saved_opportunity import SavedOpportunity
+
+    # Stage 4.8: providers' saved marks go with it (explicitly, as well as by
+    # the foreign key, so every database behaves the same).
+    db.query(SavedOpportunity).filter(SavedOpportunity.project_id == project_id).delete(synchronize_session=False)
     db.delete(project)  # cascades to project_drawings/project_amendments; offers already guarded to zero above
     # log_action commits, so the delete and its audit row land in one transaction.
     log_action(

@@ -45,3 +45,4 @@ __all__ = [
     "AuditLog",
     "CmsContent",
 ]
+from app.models.saved_opportunity import SavedOpportunity  # noqa: E402,F401

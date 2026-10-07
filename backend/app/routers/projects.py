@@ -290,6 +290,11 @@ def get_project(project_id: str, user: User = Depends(get_current_user), db: Ses
         reasons = ineligibility_reasons(db, project, profile)
         detail.eligible, detail.ineligible_reasons = not reasons, reasons
         detail.participation = participation(db, project, profile, reasons)  # Stage 4.5
+        from app.models.saved_opportunity import SavedOpportunity
+
+        detail.saved = db.query(SavedOpportunity.id).filter(  # Stage 4.8
+            SavedOpportunity.project_id == project.id, mine(db, user, SavedOpportunity, SavedOpportunity.service_provider_id)
+        ).first() is not None
     return detail
 
 
