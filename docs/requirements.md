@@ -575,4 +575,15 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - four simultaneous identical awards make one award;
     - retries and stale requests after an award change nothing.
 
+- **6.16 Provider notification & decision visibility:**
+  - **Already working:** providers read the outcome from the authoritative record, not from notifications.
+    - **Offer statuses:** approved ("Awarded") for the winner; rejected ("Not selected") for other live offers. Withdrawn stays withdrawn.
+    - **Requirement outcome:** shown with its reason on "My bids", the requirement page and the offer page.
+    - **Notifications:** the existing in-app and email notifications are sent after the decision is committed: award won and award lost; no award, cancelled or ended to live bidders. While unread they are de-duplicated per page, and withdrawn bidders aren't told they lost.
+    - **Private:** the owner's closure note, evaluation notes and shortlist never reach providers. Only bidders can open an ended requirement and its award.
+  - **Fixed:**
+    - **Winner's price:** `GET /projects/{id}/award` gave every losing bidder the winning offer's price, id and provider id. Other bidders now see only that it was awarded and to whom. The winner sees `mine: true` with their amount ("Your offer was awarded, at …"); the owner side and admins see everything.
+    - **Ended requirements:** an offer still "submitted" on a requirement that ended without an award (no suitable offer, ended outside U-Tender, cancelled, expired) showed "Offer placed" on the dashboard and offer page. It now shows the requirement's outcome, in neutral styling.
+    - **Notification failures:** notifications after an award or ending are best-effort. A failure is logged and rolled back, and never fails the owner's request or undoes the decision (previously a server error after a committed decision).
+
 _Later Stage 6 steps are added as they are implemented._

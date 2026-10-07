@@ -10,6 +10,7 @@ import { ProviderRequirementView } from "@/components/ProviderRequirementView";
 import { OfferForm } from "@/components/OfferForm";
 import { OfferHistory, OfferPreview } from "@/components/OfferPreview";
 import { OfferClarifications } from "@/components/OfferClarifications";
+import { offerStatusLabel } from "@/components/ClosureOutcome";
 import { SaveButton } from "@/components/SaveOpportunity";
 import { useI18n } from "@/i18n/I18nContext";
 import { outcomeText } from "@/components/ClosureOutcome";
@@ -18,11 +19,15 @@ import { fullDate, timeLeft } from "@/lib/format";
 import { formatArea } from "@/lib/location";
 
 interface AwardRecord {
-  amount: string;
+  amount: string | null; // Stage 6.16: the winner's own side only
   service_provider_company_name: string | null;
   created_at: string;
+  mine: boolean;
 }
 
+// Stage 6.16: the outcome as the award record holds it. The winner sees that
+// their offer was awarded, and at what; every other bidder sees only that the
+// requirement was awarded and to whom -- never the winning offer's price.
 function AwardOutcome({ projectId }: { projectId: string }) {
   const { t } = useI18n();
   const { data: award } = useQuery({
@@ -33,9 +38,10 @@ function AwardOutcome({ projectId }: { projectId: string }) {
   if (!award) return null;
 
   return (
-    <p className="mt-3 font-mono text-xs text-navy">
-      {t("service_provider.offer.awardedTo")} {award.service_provider_company_name ?? t("service_provider.offer.anotherServiceProvider")} at{" "}
-      {money(award.amount)}
+    <p className="mt-3 font-mono text-xs text-navy" data-testid="award-outcome">
+      {award.mine
+        ? `${t("service_provider.offer.yourOfferAwarded")} ${money(award.amount)}`
+        : `${t("service_provider.offer.awardedTo")} ${award.service_provider_company_name ?? t("service_provider.offer.anotherServiceProvider")}`}
     </p>
   );
 }
@@ -176,7 +182,7 @@ export function ServiceProviderOfferPage() {
           {existingOffer && (
             <div className="mt-3 font-mono text-xs text-navy">
               {t("service_provider.offer.yourFinalOffer")} {money(existingOffer.amount, project.currency)} —{" "}
-              {existingOffer.status === "submitted" ? t("service_provider.feed.bidPlaced") : t(`feed.offer_${existingOffer.status}`)}
+              {offerStatusLabel(t, existingOffer.status, project.status, project.closure_reason)}
             </div>
           )}
           {project.status === "awarded" && <AwardOutcome projectId={project.id} />}

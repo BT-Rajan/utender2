@@ -18,6 +18,18 @@ export function outcomeLabel(t: T, status: ProjectStatus, reason?: ClosureReason
   return status.replace(/_/g, " ");
 }
 
+// Stage 6.16: a provider's own offer, as its status reads once the requirement
+// has an outcome. An offer still "submitted" on a requirement that ended
+// without an award (no suitable offer, outside U-Tender, cancelled, expired)
+// is shown with that outcome -- never as an offer still in play.
+export function offerStatusLabel(t: T, offerStatus: string, projectStatus: ProjectStatus, reason?: ClosureReason | null): string {
+  if (offerStatus === "submitted") {
+    if (projectStatus === "no_award" || projectStatus === "canceled" || projectStatus === "expired") return outcomeLabel(t, projectStatus, reason);
+    return t("service_provider.feed.bidPlaced");
+  }
+  return t(`feed.offer_${offerStatus}`);
+}
+
 // The fuller sentence shown on the requirement itself, to owner and providers alike.
 export function outcomeText(t: T, status: ProjectStatus, reason?: ClosureReason | null): string | null {
   if (status === "no_award") return reason === "closed_externally" ? t("closure.textExternal") : t("closure.textNoSuitable");

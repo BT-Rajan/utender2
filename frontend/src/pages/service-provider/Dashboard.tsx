@@ -7,7 +7,7 @@ import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
 import { money } from "@/lib/money";
 import { timeLeft, fullDate } from "@/lib/format";
-import { outcomeLabel } from "@/components/ClosureOutcome";
+import { offerStatusLabel, outcomeLabel } from "@/components/ClosureOutcome";
 
 interface Preparing {
   project_id: string;
@@ -92,7 +92,9 @@ function bannerClasses(tone: "green" | "blue" | "amber" | "red") {
   }
 }
 
-function offerStatusBadge(status: OfferStatus) {
+function offerStatusBadge(status: OfferStatus, projectStatus?: string) {
+  // Stage 6.16: an offer on a requirement that ended without an award isn't "in play".
+  if (status === "submitted" && (projectStatus === "no_award" || projectStatus === "canceled" || projectStatus === "expired")) return "bg-border text-steel";
   switch (status) {
     case "approved":
       return "bg-green-tint text-green";
@@ -223,8 +225,8 @@ export function ServiceProviderDashboardPage() {
                       <h3 className="font-display font-semibold text-[15px] mb-0.5">{b.project_title}</h3>
                       <p className="text-[12px] text-steel mb-2">{b.project_address}</p>
                     </div>
-                    <span className={`font-mono text-[10px] uppercase px-2 py-0.5 rounded-full whitespace-nowrap ${offerStatusBadge(b.offer_status)}`}>
-                      {b.offer_status === "submitted" ? t("service_provider.feed.bidPlaced") : t(`feed.offer_${b.offer_status}`)}
+                    <span className={`font-mono text-[10px] uppercase px-2 py-0.5 rounded-full whitespace-nowrap ${offerStatusBadge(b.offer_status, b.project_status)}`}>
+                      {offerStatusLabel(t, b.offer_status, b.project_status, b.closure_reason)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between font-mono text-xs">

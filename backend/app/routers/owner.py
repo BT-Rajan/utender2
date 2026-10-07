@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 
 from pydantic import BaseModel, Field
@@ -47,6 +48,8 @@ from app.services.verification import (
 )
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import interested_providers, is_sealed_and_open, lock_project, publish, sync_expired_projects
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/owner", tags=["owner"])
 
@@ -614,16 +617,21 @@ def approve_offer(
         new_value=f"offer:{winning_offer.id} service_provider:{winning_offer.service_provider_id} amount:{winning_offer.amount}",
     )
 
-    # Best-effort — notification failures never roll back the award itself.
-    winner_user = db.get(User, winning_offer.service_provider_id)
-    if winner_user:
-        notify_service_provider_offer_decision(winner_user.email, project.title, approved=True)
-        notify_team(db, winner_user, NotificationType.award_won, link=f"/service-provider/projects/{project_id}/offer", organization_id=winning_offer.organization_id, project_title=project.title)
-    for o in other_offers:
-        loser_user = db.get(User, o.service_provider_id)
-        if loser_user:
-            notify_service_provider_offer_decision(loser_user.email, project.title, approved=False)
-            notify_team(db, loser_user, NotificationType.award_lost, link=f"/service-provider/projects/{project_id}/offer", organization_id=o.organization_id, project_title=project.title)
+    # Best-effort -- the award is committed above; notifying is not part of
+    # it. Stage 6.16: a failure to notify never fails the owner's request
+    # (the award stands, and every page reads it from the record).
+    def tell():
+        winner_user = db.get(User, winning_offer.service_provider_id)
+        if winner_user:
+            notify_service_provider_offer_decision(winner_user.email, project.title, approved=True)
+            notify_team(db, winner_user, NotificationType.award_won, link=f"/service-provider/projects/{project_id}/offer", organization_id=winning_offer.organization_id, project_title=project.title)
+        for o in other_offers:
+            loser_user = db.get(User, o.service_provider_id)
+            if loser_user:
+                notify_service_provider_offer_decision(loser_user.email, project.title, approved=False)
+                notify_team(db, loser_user, NotificationType.award_lost, link=f"/service-provider/projects/{project_id}/offer", organization_id=o.organization_id, project_title=project.title)
+
+    _best_effort(db, tell, f"award notifications for {project_id}")
 
     db.refresh(project)
     offer_count = db.query(Offer).filter(Offer.project_id == project_id, tendered()).count()
@@ -732,6 +740,16 @@ def start_evaluation(project_id: str, user: User = Depends(require_owner), db: S
     return _project_response(project, db)
 
 
+def _best_effort(db: Session, send, what: str) -> None:
+    """Runs notifications after a committed decision; a failure is logged and
+    rolled back (whatever of it wasn't committed) -- the decision stands."""
+    try:
+        send()
+    except Exception:  # noqa: BLE001 -- notifying must never undo or fail a decision
+        db.rollback()
+        logger.exception("Could not send %s", what)
+
+
 def _notify_bidders(db: Session, project: Project, notification_type: NotificationType, **details) -> None:
     bidders = (
         db.query(Offer.service_provider_id, Offer.organization_id)
@@ -799,9 +817,14 @@ def _end(db: Session, user: User, project: Project, status: ProjectStatus, reaso
         db, actor_id=user.id, action=action, target_type="project", target_id=project.id,
         previous_value=previous, new_value=f"{status.value}:{reason}", reason=project.closure_note,
     )
-    _notify_bidders(db, project, kind)
-    if previous == ProjectStatus.open.value:
-        _notify_watchers(db, project)
+    # Stage 6.16: the outcome is committed above; telling people about it is
+    # best-effort and never fails the owner's request.
+    def tell():
+        _notify_bidders(db, project, kind)
+        if previous == ProjectStatus.open.value:
+            _notify_watchers(db, project)
+
+    _best_effort(db, tell, f"{action} notifications for {project.id}")
     db.refresh(project)
     return _project_response(project, db)
 

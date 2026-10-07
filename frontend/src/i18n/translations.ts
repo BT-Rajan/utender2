@@ -953,6 +953,7 @@ export interface Dictionary {
       biddingClosedNotice: string;
       yourFinalOffer: string;
       awardedTo: string;
+      yourOfferAwarded: string;
       anotherServiceProvider: string;
       noAwardNotice: string;
       bidAmount: string;
@@ -2259,6 +2260,7 @@ export const en: Dictionary = {
       biddingClosedNotice: "Bidding on this project has closed.",
       yourFinalOffer: "Your final offer:",
       awardedTo: "Awarded to",
+      yourOfferAwarded: "Your offer was awarded, at",
       anotherServiceProvider: "another service provider",
       noAwardNotice: "The owner decided not to award this project.",
       bidAmount: "Your bid amount",
@@ -3571,6 +3573,7 @@ export const ar: Dictionary = {
       biddingClosedNotice: "أُغلق تقديم العروض على هذا المشروع.",
       yourFinalOffer: "عرضك النهائي:",
       awardedTo: "تم الترسية على",
+      yourOfferAwarded: "تمت ترسية عرضك، بقيمة",
       anotherServiceProvider: "مزوّد خدمة آخر",
       noAwardNotice: "قرر المالك عدم ترسية هذا المشروع.",
       bidAmount: "قيمة عرضك",

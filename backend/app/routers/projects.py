@@ -46,7 +46,7 @@ from app.services.locations import clean_area, clean_governorate
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name
 from app.services.email import notify_service_provider_tender_amended
 from app.services.notify import notify, notify_team
-from app.services.team import acting_id, acting_profile, mine, org_of, owns
+from app.services.team import acting_id, acting_profile, can_access, mine, org_of, owns
 from app.services import requirement_quality
 from app.services.storage import drawing_url_expiry_seconds, get_storage
 from app.services.tender_lifecycle import interested_providers, is_sealed_and_open, lock_project, now_for, publish, sync_expired_projects
@@ -954,7 +954,9 @@ def get_award(project_id: str, user: User = Depends(get_current_user), db: Sessi
         raise HTTPException(status_code=404, detail="This project has not been awarded.")
 
     cp = db.get(ServiceProviderProfile, record.service_provider_id)
-    return AwardRecordOut(
+    winner = db.get(Offer, record.offer_id)
+    mine = winner is not None and can_access(db, user, winner.organization_id, winner.service_provider_id)
+    out = AwardRecordOut(
         id=record.id,
         project_id=record.project_id,
         offer_id=record.offer_id,
@@ -965,7 +967,13 @@ def get_award(project_id: str, user: User = Depends(get_current_user), db: Sessi
         awarded_by=record.awarded_by,
         created_at=record.created_at,
         service_provider_company_name=cp.company_name if cp else None,
+        mine=mine,
     )
+    # Stage 6.16: another bidder learns that the requirement was awarded and
+    # to whom -- never the winning offer's price, id or anything else of it.
+    if user.role != UserRole.admin and not owns(db, user, project) and not mine:
+        out.offer_id = out.service_provider_id = out.amount = out.offer_revision = out.awarded_by = None
+    return out
 
 
 @router.post("/{project_id}/drawings", response_model=ProjectDetailOut)
