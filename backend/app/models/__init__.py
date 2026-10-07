@@ -4,6 +4,7 @@ from app.models.award_record import AwardRecord
 from app.models.category import ServiceCategory
 from app.models.clarification import Clarification, ClarificationAttachment
 from app.models.evaluation_note import EvaluationNote
+from app.models.offer_shortlist import OfferShortlist
 from app.models.cms_content import CmsContent
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import ServiceProviderDocument, DocumentRequirement, OwnerDocument
@@ -35,6 +36,7 @@ __all__ = [
     "ProjectAmendment",
     "Clarification",
     "EvaluationNote",
+    "OfferShortlist",
     "Offer",
     "OfferRevision",
     "OfferDocument",

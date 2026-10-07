@@ -72,6 +72,8 @@ export function OwnerCompareOffersPage() {
       ),
       value: (o) => String(o.based_on_material_revision ?? 0),
     },
+    // Stage 6.12: the owner's own marker -- not a ranking.
+    { key: "shortlisted", label: t("shortlist.row"), cell: (o) => (o.shortlisted ? `★ ${t("shortlist.badge")}` : "—"), value: () => "" },
     { key: "submitted", label: t("owner.projectDetail.submittedOn"), cell: (o) => (o.submitted_at ? fullDate(o.submitted_at, language) : "—"), value: () => "" },
     { key: "total", label: t(`${c}.total`), cell: (o) => <span className="font-mono font-semibold text-navy">{money(o.amount, req.currency)}</span>, value: (o) => String(o.amount) },
     ...(req.pricing_basis === "per_item"
@@ -141,7 +143,7 @@ export function OwnerCompareOffersPage() {
           </thead>
           <tbody>
             {rows.map((row) => {
-              const differs = offers.length > 1 && new Set(offers.map(row.value)).size > 1 && row.key !== "submitted";
+              const differs = offers.length > 1 && new Set(offers.map(row.value)).size > 1;
               return (
                 <tr key={row.key} className="border-b border-border align-top" data-testid={`compare-row-${row.key}`}>
                   <th scope="row" className="text-start py-2 px-2.5 font-normal text-steel max-w-[14rem]">

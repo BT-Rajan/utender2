@@ -232,6 +232,14 @@ export interface Dictionary {
     add: string;
     placeholder: string;
   };
+  shortlist: {
+    badge: string;
+    add: string;
+    remove: string;
+    note: string;
+    count: string;
+    row: string;
+  };
   ownerOffer: {
     open: string;
     back: string;
@@ -1504,6 +1512,14 @@ export const en: Dictionary = {
     remove: "Remove",
     add: "Add note",
     placeholder: "An observation for your own evaluation",
+  },
+  shortlist: {
+    badge: "Shortlisted",
+    add: "Add to shortlist",
+    remove: "Remove from shortlist",
+    note: "A private marker for your evaluation. It isn't an award, nothing is sent to the provider, and the offer stays exactly as submitted.",
+    count: "{n} shortlisted",
+    row: "On your shortlist",
   },
   ownerOffer: {
     open: "View offer",
@@ -2802,6 +2818,14 @@ export const ar: Dictionary = {
     remove: "حذف",
     add: "أضف ملاحظة",
     placeholder: "ملاحظة لتقييمك الخاص",
+  },
+  shortlist: {
+    badge: "في القائمة المختصرة",
+    add: "أضف إلى القائمة المختصرة",
+    remove: "أزل من القائمة المختصرة",
+    note: "علامة خاصة لتقييمك. ليست ترسية، ولا يُرسل شيء إلى المزوّد، ويبقى العرض كما قُدّم تمامًا.",
+    count: "{n} في القائمة المختصرة",
+    row: "في قائمتك المختصرة",
   },
   ownerOffer: {
     open: "عرض العرض",

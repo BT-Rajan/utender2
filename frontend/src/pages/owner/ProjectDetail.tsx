@@ -44,11 +44,13 @@ function InboxCounts({ offers, t }: { offers: Offer[]; t: (key: string) => strin
   const active = count((o) => o.status === "submitted");
   const withdrawn = count((o) => o.status === "withdrawn");
   const revised = count((o) => o.status !== "withdrawn" && o.revision > 1);
+  const shortlisted = count((o) => !!o.shortlisted);
   const parts = [
     t("owner.projectDetail.inboxReceived").replace("{n}", String(offers.length)),
     active > 0 && t("owner.projectDetail.inboxActive").replace("{n}", String(active)),
     withdrawn > 0 && t("owner.projectDetail.withdrawnCount").replace("{n}", String(withdrawn)),
     revised > 0 && t("owner.projectDetail.inboxRevised").replace("{n}", String(revised)),
+    shortlisted > 0 && t("shortlist.count").replace("{n}", String(shortlisted)),
   ].filter(Boolean);
   // Stage 6.5: live offers made against different versions of the requirement
   // don't answer the same thing -- said plainly before any figures across them.
@@ -855,6 +857,9 @@ export function OwnerProjectDetailPage() {
                       >
                         {o.status === "submitted" ? t("owner.projectDetail.offerReceived") : t(`feed.offer_${o.status}`)}
                       </span>
+                      {o.shortlisted && (
+                        <span className="block mt-1 font-mono text-[10px] text-amber-dark whitespace-nowrap" data-testid="owner-offer-shortlisted">★ {t("shortlist.badge")}</span>
+                      )}
                     </td>
                     <td className="py-3 px-2.5">
                       {o.status !== "submitted" ? null : project.status === "closed" || project.status === "under_evaluation" ? (

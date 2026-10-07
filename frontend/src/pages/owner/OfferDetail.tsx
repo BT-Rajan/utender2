@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import type { OwnerOffer } from "@/api/types";
 import { PageLoading } from "@/components/PageLoading";
@@ -25,6 +25,15 @@ export function OwnerOfferDetailPage() {
     // The offer as the server now holds it: the provider may revise or withdraw it meanwhile.
     refetchInterval: 60 * 1000,
     refetchOnWindowFocus: true,
+  });
+  const queryClient = useQueryClient();
+  // Stage 6.12: the owner side's private shortlist -- not an award.
+  const shortlist = useMutation({
+    mutationFn: (on: boolean) => apiFetch(`/owner/projects/${id}/offers/${offerId}/shortlist`, { method: on ? "PUT" : "DELETE" }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["owner-offer", id, offerId] });
+      queryClient.invalidateQueries({ queryKey: ["owner-offers", id] });
+    },
   });
   const back = (
     <Link to={`/owner/projects/${id}`} className="font-mono text-xs text-blue underline">
@@ -67,6 +76,23 @@ export function OwnerOfferDetailPage() {
         {offer.revision > 1 && ` · ${t("ownerOffer.revision").replace("{n}", String(offer.revision))} · ${t("ownerOffer.lastChanged")} ${fullDate(offer.updated_at, language)}`}
       </p>
       <p className="text-xs text-steel">{t("ownerOffer.readOnly")}</p>
+      {(offer.shortlisted || (offer.status === "submitted" && (requirement.status === "closed" || requirement.status === "under_evaluation"))) && (
+        <div className="border border-border rounded px-4 py-3 text-sm flex flex-wrap items-center gap-3" data-testid="owner-offer-shortlist">
+          {offer.shortlisted && <span className="font-mono text-[10px] uppercase px-2 py-1 rounded-full bg-amber/10 text-amber-dark">★ {t("shortlist.badge")}</span>}
+          {offer.status === "submitted" && (requirement.status === "closed" || requirement.status === "under_evaluation") && (
+            <button
+              type="button"
+              disabled={shortlist.isPending}
+              onClick={() => shortlist.mutate(!offer.shortlisted)}
+              className="border border-navy text-navy text-xs font-semibold rounded px-3 py-1.5 disabled:opacity-60"
+            >
+              {offer.shortlisted ? t("shortlist.remove") : t("shortlist.add")}
+            </button>
+          )}
+          <span className="text-xs text-steel basis-full">{t("shortlist.note")}</span>
+          {shortlist.error && <span role="alert" className="text-xs text-red basis-full">{(shortlist.error as Error).message}</span>}
+        </div>
+      )}
 
       <OfferRecord
         requirement={requirement}

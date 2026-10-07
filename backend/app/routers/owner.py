@@ -10,6 +10,7 @@ from app.deps import get_owner_profile, require_owner
 from app.models.award_record import AwardRecord
 from app.models.clarification import Clarification
 from app.models.evaluation_note import EvaluationNote
+from app.models.offer_shortlist import OfferShortlist
 from app.models.notification import Notification
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import DocumentRequirement
@@ -21,7 +22,7 @@ from app.models.review import Review
 from app.models.user import User
 from app.schemas.clarification import OfferClarificationAsk, OfferClarificationOut
 from app.schemas.document import DocumentRequirementOut, OwnerDocumentOut
-from app.schemas.offer import EvaluationNoteEdit, EvaluationNoteIn, EvaluationNoteOut, OfferComparisonOut, OfferOut, OfferRevisionOut, OwnerOfferOut
+from app.schemas.offer import ShortlistOut, EvaluationNoteEdit, EvaluationNoteIn, EvaluationNoteOut, OfferComparisonOut, OfferOut, OfferRevisionOut, OwnerOfferOut
 from app.schemas.owner import OwnerProfileOut
 from app.schemas.project import EligibilityQualification, ProjectOut
 from app.schemas.review import ReviewCreate, ReviewOut
@@ -123,6 +124,7 @@ def _owner_offer_out(db: Session, project: Project, o: Offer, cp: ServiceProvide
         service_provider_company_name=cp.company_name if cp else None,
         service_provider_avg_rating=cp.avg_rating if cp else None,
         service_provider_review_count=cp.review_count if cp else None,
+        shortlisted=db.query(OfferShortlist.id).filter(OfferShortlist.offer_id == o.id).first() is not None,  # Stage 6.12
     )
 
 
@@ -440,6 +442,78 @@ def delete_note(
     _, note = _own_note(db, project_id, note_id, user, if_match)
     db.delete(note)
     log_action(db, actor_id=user.id, action="evaluation_note.delete", target_type="evaluation_note", target_id=note_id)
+
+
+# ---------- Stage 6.12: the owner side's shortlist ----------
+
+
+def _shortlist_out(db: Session, offer_id: str, row: OfferShortlist | None) -> ShortlistOut:
+    if not row:
+        return ShortlistOut(offer_id=offer_id, shortlisted=False)
+    who = db.get(User, row.added_by) if row.added_by else None
+    return ShortlistOut(
+        offer_id=offer_id, shortlisted=True, offer_revision=row.offer_revision, material_revision=row.material_revision,
+        added_by_name=(who.full_name or who.email) if who else None, created_at=row.created_at,
+    )
+
+
+def _shortlist_target(project_id: str, offer_id: str, user: User, db: Session) -> tuple[Project, Offer]:
+    """An offer the owner's side may shortlist (or take off the shortlist) now:
+    their own requirement's live offer, while offers are being evaluated --
+    after they close, when neither the offers nor the requirement can change
+    any more, and before the outcome. Under the requirement's lock, so it
+    can't race the close, the award or another member's change."""
+    project = _get_owned_project(project_id, user, db, lock=True)
+    offer = _readable_offer(project_id, offer_id, user, db)
+    if project.is_suspended:
+        raise HTTPException(status_code=400, detail="This requirement has been suspended by an admin.")
+    if project.status not in (ProjectStatus.closed, ProjectStatus.under_evaluation):
+        raise HTTPException(status_code=400, detail="Offers can be shortlisted only while they are being evaluated: after offers close and before the requirement's outcome.")
+    if offer.status != OfferStatus.submitted:
+        raise HTTPException(status_code=400, detail="This offer is no longer live.")
+    return project, offer
+
+
+@router.get("/projects/{project_id}/offers/{offer_id}/shortlist", response_model=ShortlistOut)
+def get_shortlist(project_id: str, offer_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    offer = _readable_offer(project_id, offer_id, user, db)
+    return _shortlist_out(db, offer.id, db.query(OfferShortlist).filter(OfferShortlist.offer_id == offer.id).first())
+
+
+@router.put("/projects/{project_id}/offers/{offer_id}/shortlist", response_model=ShortlistOut)
+def shortlist_offer(project_id: str, offer_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 6.12: put the offer on the shortlist -- promising, NOT an award:
+    nothing is decided, sent, changed on the offer, or told to anyone outside
+    the owner's side. Several offers may be shortlisted. Repeating it (a
+    retry, a second tab) changes nothing."""
+    project, offer = _shortlist_target(project_id, offer_id, user, db)
+    row = db.query(OfferShortlist).filter(OfferShortlist.offer_id == offer.id).first()
+    if row is None:
+        row = OfferShortlist(
+            project_id=project_id, offer_id=offer.id, offer_revision=offer.revision,
+            material_revision=offer.based_on_material_revision, added_by=user.id,
+        )
+        db.add(row)
+        db.flush()
+        # log_action commits: the shortlisting and its audit entry land together.
+        log_action(db, actor_id=user.id, action="offer.shortlisted", target_type="offer", target_id=offer.id, new_value=f"offer revision {offer.revision}")
+        db.refresh(row)
+    else:
+        db.rollback()  # already shortlisted; release the lock
+    return _shortlist_out(db, offer.id, row)
+
+
+@router.delete("/projects/{project_id}/offers/{offer_id}/shortlist", response_model=ShortlistOut)
+def unshortlist_offer(project_id: str, offer_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 6.12: take the offer off the shortlist. Repeating it changes nothing."""
+    _, offer = _shortlist_target(project_id, offer_id, user, db)
+    row = db.query(OfferShortlist).filter(OfferShortlist.offer_id == offer.id).first()
+    if row is not None:
+        db.delete(row)
+        log_action(db, actor_id=user.id, action="offer.unshortlisted", target_type="offer", target_id=offer.id)
+    else:
+        db.rollback()
+    return _shortlist_out(db, offer.id, None)
 
 
 @router.get("/projects/{project_id}/offers/{offer_id}/documents/file")

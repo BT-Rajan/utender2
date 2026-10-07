@@ -527,4 +527,17 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - **No judgement:** nothing scores, ranks or interprets.
   - **Rollback guard:** a downgrade below 0046 is refused while any note exists, unless `ALLOW_NOTE_LOSS=1` is set.
 
+- **6.12 Shortlist:**
+  - **Before:** there was no shortlist or preferred-offer state. Offer statuses are draft, submitted, approved (awarded), rejected and withdrawn; the requirement has an under-evaluation status but no preference marker. The nearest things were the 6.6 comparison's selection (temporary, in the page) and 6.11 notes (free text).
+  - **Now:** an owner-private marker in its own table, `offer_shortlist` (migration 0047), so the provider's offer row is never touched. Endpoints: `GET/PUT/DELETE /owner/projects/{id}/offers/{offer}/shortlist`.
+  - **Several at once:** any number of offers can be shortlisted; there's no single winner.
+  - **Which offers:** only the owner side's own requirement, and only a live, unsealed, not-suspended offer on it (ids checked together). Withdrawn offers, other requirements' offers and other owners are refused; providers are refused.
+  - **When:** only while offers are being evaluated (closed or under evaluation). By then offers can't be revised or withdrawn and the requirement can't be amended, so a shortlisting can't race those or point at the wrong version. Each records the offer version and requirement version.
+  - **Concurrency:** changes take the requirement's lock, so they're serialized with closing and award. Add and remove are idempotent: retries, two tabs and colleagues converge, and the last request wins.
+  - **After the outcome:** once the requirement is awarded, ends without an award, or is cancelled or expired, the shortlist is frozen and kept.
+  - **Not an award:** the requirement and offers stay exactly as they were, nothing is sent to anyone, and providers never see it (the field is empty in every provider-facing response).
+  - **Audit:** add and remove are recorded in the audit log. Notes (6.11) stay separate.
+  - **Pages:** a shortlist button and badge on the owner's offer page, a badge and count in the inbox, and a row in the comparison.
+  - **Rollback guard:** a downgrade below 0047 is refused while any offer is shortlisted, unless `ALLOW_SHORTLIST_LOSS=1` is set.
+
 _Later Stage 6 steps are added as they are implemented._

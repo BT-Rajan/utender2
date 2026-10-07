@@ -302,6 +302,7 @@ export interface Offer {
   created_at: string;
   updated_at: string;
   service_provider_company_name?: string | null;
+  shortlisted?: boolean | null; // Stage 6.12: the owner's side only
   service_provider_avg_rating?: string | null;
   service_provider_review_count?: number | null;
   sealed: boolean;

@@ -165,6 +165,9 @@ class OfferOut(BaseModel):
     service_provider_company_name: str | None = None
     service_provider_avg_rating: Decimal | None = None
     service_provider_review_count: int | None = None
+    # Stage 6.12: on the owner's shortlist -- set for the owner's side only
+    # (None everywhere else, providers included).
+    shortlisted: bool | None = None
     sealed: bool = False
 
 
@@ -289,3 +292,15 @@ class EvaluationNoteOut(BaseModel):
     version: int
     created_at: UTCDateTime | None
     updated_at: UTCDateTime | None
+
+
+class ShortlistOut(BaseModel):
+    """Stage 6.12: whether the owner's side has shortlisted this offer -- and,
+    if so, against which offer and requirement versions, by whom, when."""
+
+    offer_id: str
+    shortlisted: bool
+    offer_revision: int | None = None
+    material_revision: int | None = None
+    added_by_name: str | None = None
+    created_at: UTCDateTime | None = None
