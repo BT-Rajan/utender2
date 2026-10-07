@@ -242,4 +242,18 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - Saving has the same checks as 5.3: the provider's own side's draft only, found on the server; refused from an out-of-date page; refused while the requirement is paused, suspended, closed, past its deadline or materially amended and not yet reviewed. No requirement field can be changed through it.
   - The form points the provider to the item specifications and instructions to bidders when the requirement has them.
 
-_Further steps (5.5 onwards) are added as they are implemented._
+- **5.5 Delivery / completion commitment:**
+  - The provider commits in the requirement's own terms (Stage 3.7): a proposed start date, and either a completion date or a duration in days. The free-text "completion period" (Stage 3.8) stays for anything else.
+  - It is saved on the same offer draft ("Save draft" saves price, technical response and timing together), and the provider can leave, return and edit. Nothing is submitted, and the price and technical response are untouched.
+  - Validated by the same rules as the owner's timing:
+    - real dates;
+    - a completion date or a duration, not both;
+    - a duration of 1–3,650 days;
+    - completion not before start;
+    - no start or finish before offers close, measured from the server's response deadline.
+  - Where it differs from the owner's expected timing (starts later, finishes later, takes longer), it is kept exactly as entered and flagged to the provider. Once submitted, the owner sees it too, but not while a sealed tender is still open.
+  - A required completion period is met by the free text or by a committed completion date or duration.
+  - Earlier commitments stay in the offer's revision history.
+  - Saving has the same checks as 5.3/5.4 (own side's draft only, up-to-date page, open requirement, amended timing reviewed first). The owner's timing can't be changed through the offer API.
+
+_Further steps (5.6 onwards) are added as they are implemented._

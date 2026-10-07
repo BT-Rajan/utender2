@@ -200,6 +200,11 @@ export interface Offer {
   revision: number;
   based_on_material_revision?: number;
   draft_version?: number; // Stage 5.3: sent back as If-Match when saving the draft
+  // Stage 5.5: the execution commitment, and where it differs from the owner's expected timing.
+  proposed_start_date?: string | null;
+  proposed_completion_date?: string | null;
+  proposed_duration_days?: number | null;
+  timing_conflicts?: ("starts_later" | "finishes_later" | "takes_longer")[];
   created_at: string;
   updated_at: string;
   service_provider_company_name?: string | null;

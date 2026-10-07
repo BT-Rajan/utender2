@@ -185,6 +185,19 @@ export interface Dictionary {
     draftStatus: string;
     draftStarted: string;
   };
+  timing: {
+    heading: string;
+    ownerExpects: string;
+    start: string;
+    completion: string;
+    duration: string;
+    durationDays: string;
+    days: string;
+    hint: string;
+    conflict_starts_later: string;
+    conflict_finishes_later: string;
+    conflict_takes_longer: string;
+  };
   saved: {
     save: string;
     saved: string;
@@ -1306,6 +1319,19 @@ export const en: Dictionary = {
     reviewFirst: "Confirm you’ve reviewed the current requirement to continue preparing your offer.",
     draftStatus: "Draft — not submitted. Nothing is sent to the owner until you submit it.",
     draftStarted: "started",
+  },
+  timing: {
+    heading: "Your start and completion commitment",
+    ownerExpects: "The owner expects:",
+    start: "Start",
+    completion: "Completion",
+    duration: "Duration",
+    durationDays: "Or duration (days)",
+    days: "days",
+    hint: "Give a completion date or a duration, not both. Work can’t start or finish before offers close.",
+    conflict_starts_later: "You propose to start after the owner’s expected start date.",
+    conflict_finishes_later: "You propose to finish after the owner’s expected completion.",
+    conflict_takes_longer: "You propose more days than the owner’s expected duration.",
   },
   saved: {
     save: "Save",
@@ -2453,6 +2479,19 @@ export const ar: Dictionary = {
     reviewFirst: "أكّد أنك راجعت الطلب الحالي لمتابعة إعداد عرضك.",
     draftStatus: "مسودة — لم تُقدَّم. لا يُرسل شيء إلى المالك حتى تقدّمها.",
     draftStarted: "بدأت في",
+  },
+  timing: {
+    heading: "التزامك بموعد البدء والإنجاز",
+    ownerExpects: "يتوقع المالك:",
+    start: "البدء",
+    completion: "الإنجاز",
+    duration: "المدة",
+    durationDays: "أو المدة (بالأيام)",
+    days: "يومًا",
+    hint: "أدخل تاريخ الإنجاز أو المدة، وليس كليهما. لا يمكن أن يبدأ العمل أو ينتهي قبل إغلاق العروض.",
+    conflict_starts_later: "تقترح البدء بعد تاريخ البدء الذي يتوقعه المالك.",
+    conflict_finishes_later: "تقترح الإنجاز بعد موعد الإنجاز الذي يتوقعه المالك.",
+    conflict_takes_longer: "تقترح مدة أطول من المدة التي يتوقعها المالك.",
   },
   saved: {
     save: "حفظ",

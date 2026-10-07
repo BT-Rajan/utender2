@@ -5,6 +5,7 @@ import type { Offer, OfferDocument, ProjectDetail } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { OutdatedOfferNotice } from "@/components/PostPublication";
 import { useI18n } from "@/i18n/I18nContext";
+import { fullDate } from "@/lib/format";
 import { money } from "@/lib/money";
 
 // The provider's offer form. Shared by the provider's page and the owner's
@@ -23,7 +24,7 @@ export function OfferForm({
   draft?: Offer | null;
   preview?: boolean;
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
@@ -33,6 +34,10 @@ export function OfferForm({
   const [rates, setRates] = useState<Record<string, string>>({});
   const [accepted, setAccepted] = useState<string[]>([]);
   const [savedNotice, setSavedNotice] = useState(false);
+  // Stage 5.5: the execution commitment, in the requirement's terms.
+  const [startDate, setStartDate] = useState("");
+  const [completionDate, setCompletionDate] = useState("");
+  const [durationDays, setDurationDays] = useState("");
 
   // Stage 5.3/5.4: the price and technical response saved on the draft, when returning to it.
   useEffect(() => {
@@ -40,6 +45,10 @@ export function OfferForm({
       setAmount(draft.amount === null ? "" : String(Number(draft.amount)));
       setRates(Object.fromEntries((draft.item_prices ?? []).map((l) => [l.item_id, String(Number(l.rate))])));
       setMessage(draft.message ?? "");
+      setTimeline(draft.timeline_estimate ?? "");
+      setStartDate(draft.proposed_start_date ?? "");
+      setCompletionDate(draft.proposed_completion_date ?? "");
+      setDurationDays(draft.proposed_duration_days == null ? "" : String(draft.proposed_duration_days));
     }
     // Only when a different draft (or a newer save of it) arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -49,6 +58,9 @@ export function OfferForm({
     if (existingOffer) {
       setAmount(existingOffer.amount === null ? "" : String(Number(existingOffer.amount)));
       setTimeline(existingOffer.timeline_estimate ?? "");
+      setStartDate(existingOffer.proposed_start_date ?? "");
+      setCompletionDate(existingOffer.proposed_completion_date ?? "");
+      setDurationDays(existingOffer.proposed_duration_days == null ? "" : String(existingOffer.proposed_duration_days));
       setMessage(existingOffer.message ?? "");
       setAssumptions(existingOffer.assumptions ?? "");
       setRates(Object.fromEntries((existingOffer.item_prices ?? []).map((l) => [l.item_id, String(Number(l.rate))])));
@@ -126,10 +138,20 @@ export function OfferForm({
             : null,
         },
       });
-      return apiFetch<Offer>(`/projects/${project.id}/offers/draft/technical`, {
+      const technical = await apiFetch<Offer>(`/projects/${project.id}/offers/draft/technical`, {
         method: "PUT",
         headers: { "If-Match": String(commercial.draft_version ?? 0) },
         body: { message: message || null },
+      });
+      return apiFetch<Offer>(`/projects/${project.id}/offers/draft/timing`, {
+        method: "PUT",
+        headers: { "If-Match": String(technical.draft_version ?? 0) },
+        body: {
+          proposed_start_date: startDate || null,
+          proposed_completion_date: completionDate || null,
+          proposed_duration_days: durationDays ? Number(durationDays) : null,
+          timeline_estimate: timeline || null,
+        },
       });
     },
     onSuccess: (saved) => {
@@ -238,11 +260,41 @@ export function OfferForm({
                 id="offer-timeline"
                 value={timeline}
                 onChange={(e) => setTimeline(e.target.value)}
-                required={rules.completion_period === "required"}
+                required={rules.completion_period === "required" && !completionDate && !durationDays}
                 placeholder={t("service_provider.offer.timelinePlaceholder")}
                 className="w-full border border-border rounded px-3 py-2.5 text-sm"
               />
             </div>
+            {/* Stage 5.5: when the provider commits to start and finish, beside what the owner expects (Stage 3.7). */}
+            <fieldset className="grid gap-2" data-testid="timing-commitment">
+              <legend className="font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("timing.heading")}</legend>
+              {(project.expected_start_date || project.expected_completion_date || project.expected_duration_days) && (
+                <p className="text-xs text-steel" data-testid="owner-timing">
+                  {t("timing.ownerExpects")}
+                  {project.expected_start_date && ` ${t("timing.start")} ${fullDate(project.expected_start_date, language, false)}`}
+                  {project.expected_completion_date && ` · ${t("timing.completion")} ${fullDate(project.expected_completion_date, language, false)}`}
+                  {project.expected_duration_days && ` · ${t("timing.duration")} ${project.expected_duration_days} ${t("timing.days")}`}
+                </p>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <label className="text-xs text-steel">
+                  {t("timing.start")}
+                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="mt-1 w-full border border-border rounded px-3 py-2 text-sm" />
+                </label>
+                <label className="text-xs text-steel">
+                  {t("timing.completion")}
+                  <input type="date" value={completionDate} min={startDate || undefined} disabled={!!durationDays} onChange={(e) => setCompletionDate(e.target.value)} className="mt-1 w-full border border-border rounded px-3 py-2 text-sm disabled:opacity-50" />
+                </label>
+                <label className="text-xs text-steel">
+                  {t("timing.durationDays")}
+                  <input type="number" min={1} max={3650} step={1} value={durationDays} disabled={!!completionDate} onChange={(e) => setDurationDays(e.target.value.replace(/[^0-9]/g, ""))} className="mt-1 w-full border border-border rounded px-3 py-2 text-sm disabled:opacity-50" />
+                </label>
+              </div>
+              <p className="text-xs text-steel-light">{t("timing.hint")}</p>
+              {(draft ?? existingOffer)?.timing_conflicts?.map((code) => (
+                <p key={code} className="text-xs text-amber-dark" data-testid="timing-conflict">⚠ {t(`timing.conflict_${code}`)}</p>
+              ))}
+            </fieldset>
             <div>
               <label htmlFor="offer-message" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">
                 {t("response.approach")}

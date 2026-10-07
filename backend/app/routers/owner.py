@@ -27,7 +27,7 @@ from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allow
 from app.services.notify import notify, notify_team
 from app.services.team import acting_profile, mine, owns
 from app.services.eligibility import qualification_options
-from app.services.offer_response import documents_out
+from app.services.offer_response import documents_out, timing_conflicts
 from app.services.stakeholder import require_established
 from app.services.verification import (
     applicable_requirements,
@@ -139,6 +139,11 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
             service_provider_id=o.service_provider_id,
             amount=o.amount,
             timeline_estimate=o.timeline_estimate,
+            # Stage 5.5: the commitment, and where it differs from what the owner expects (sealed: withheld above).
+            proposed_start_date=o.proposed_start_date,
+            proposed_completion_date=o.proposed_completion_date,
+            proposed_duration_days=o.proposed_duration_days,
+            timing_conflicts=timing_conflicts(project, o),
             message=o.message,
             item_prices=o.item_prices,
             assumptions=o.assumptions,

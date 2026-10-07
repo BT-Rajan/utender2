@@ -2,6 +2,7 @@
 requirement's response rules (Project.response_requirements) and its pricing
 basis (Stage 3.4). Used by the existing offer submission -- there is one offer
 system; this only decides whether a submission is complete."""
+from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import HTTPException
@@ -81,6 +82,53 @@ def draft_pricing(project: Project, amount: Decimal | None, item_prices: list | 
     return (total if set(rates) == items and total > 0 else None), lines
 
 
+def check_commitment(project: Project, start: date | None, completion: date | None, duration: int | None) -> None:
+    """Stage 5.5: the provider's execution commitment must make sense on its
+    own, by the same rules as the owner's expected timing (Stage 3.7): a
+    completion date or a duration, not both; a duration of 1 day to 10
+    years; completion not before start; and no work before offers close
+    (the response deadline, the server's own record). Raises 400."""
+    from app.routers.projects import MAX_DURATION_DAYS
+
+    if completion and duration:
+        raise HTTPException(status_code=400, detail="Give either a completion date or a duration, not both.")
+    if duration is not None and not 1 <= duration <= MAX_DURATION_DAYS:
+        raise HTTPException(status_code=400, detail=f"Duration must be between 1 and {MAX_DURATION_DAYS} days.")
+    if start and completion and completion < start:
+        raise HTTPException(status_code=400, detail="The completion date can't be before the start date.")
+    response_closes = project.bid_deadline.date()
+    if start and start < response_closes:
+        raise HTTPException(status_code=400, detail="Work can't start before the response deadline.")
+    if completion and completion < response_closes:
+        raise HTTPException(status_code=400, detail="Work can't finish before the response deadline.")
+
+
+def timing_conflicts(project: Project, offer) -> list[str]:
+    """Stage 5.5: where the provider's commitment differs from what the owner
+    expects (Stage 3.7), against the requirement as it now is -- flagged for
+    the provider to see, never changed:
+      starts_later    proposed start after the expected start
+      finishes_later  finishing after the expected completion (a completion
+                      date, or start + duration on either side)
+      takes_longer    more days than the expected duration"""
+    def finish(start, completion, duration):
+        return completion or (start + timedelta(days=duration) if start and duration else None)
+
+    def span(start, completion, duration):
+        return duration or ((completion - start).days if start and completion else None)
+
+    mine = (offer.proposed_start_date, offer.proposed_completion_date, offer.proposed_duration_days)
+    theirs = (project.expected_start_date, project.expected_completion_date, project.expected_duration_days)
+    conflicts = []
+    if mine[0] and theirs[0] and mine[0] > theirs[0]:
+        conflicts.append("starts_later")
+    if (f := finish(*mine)) and (g := finish(*theirs)) and f > g:
+        conflicts.append("finishes_later")
+    if theirs[2] and (s := span(*mine)) is not None and s > theirs[2]:
+        conflicts.append("takes_longer")
+    return conflicts
+
+
 def _side_documents(db: Session, project_id: str, organization_id: str | None, provider_id: str):
     """The attachments of one side's response: its organization's (whichever
     member uploaded them), or an individual's own."""
@@ -90,13 +138,25 @@ def _side_documents(db: Session, project_id: str, organization_id: str | None, p
     return query.filter(OfferDocument.organization_id.is_(None), OfferDocument.service_provider_id == provider_id)
 
 
+def _committed(db: Session, project_id: str, organization_id: str | None, provider_id: str) -> bool:
+    """Stage 5.5: the side's offer states when it will finish -- a completion
+    date or a duration (saved on the draft) -- which answers a required
+    completion period as well as the free text does."""
+    from app.models.offer import Offer
+
+    query = db.query(Offer).filter(Offer.project_id == project_id)
+    query = query.filter(Offer.organization_id == organization_id) if organization_id else query.filter(Offer.organization_id.is_(None), Offer.service_provider_id == provider_id)
+    offer = query.first()
+    return bool(offer and (offer.proposed_completion_date or offer.proposed_duration_days))
+
+
 def check_complete(
     db: Session, project: Project, organization_id: str | None, provider_id: str, payload: OfferCreate
 ) -> list[str]:
     """Raises 400 naming what's missing; returns the declarations accepted."""
     reqs = requirements_for(project)
     missing = []
-    if reqs.completion_period == "required" and not (payload.timeline_estimate or "").strip():
+    if reqs.completion_period == "required" and not (payload.timeline_estimate or "").strip() and not _committed(db, project.id, organization_id, provider_id):
         missing.append("a completion period")
     if reqs.approach == "required" and not (payload.message or "").strip():
         missing.append("your technical approach")

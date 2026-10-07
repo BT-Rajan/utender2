@@ -9,14 +9,16 @@ from app.models.enums import NotificationType, OfferStatus, ProjectStatus, Tende
 from app.models.offer import Offer, OfferDocument, OfferRevision
 from app.models.project import Project
 from app.models.user import User
-from app.schemas.offer import OfferCommercialDraft, OfferCreate, OfferTechnicalDraft, OfferDocumentOut, OfferOut, OfferRevisionOut
+from app.schemas.offer import OfferCommercialDraft, OfferCreate, OfferTechnicalDraft, OfferTimingDraft, OfferDocumentOut, OfferOut, OfferRevisionOut
 from app.services.audit import log_action
 from app.services.eligibility import assert_eligible
 from app.services.email import notify_owner_new_offer
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name, sanitize_path_segment
 from app.services.notify import notify, notify_team
 from app.services.team import acting_id, acting_profile, can_access, mine, org_of
-from app.services.offer_response import AMOUNT_LIMIT, OFFER_DOCUMENTS_BUCKET, check_complete, documents_out, draft_pricing, priced_total, requirements_for
+from app.services.offer_response import (
+    AMOUNT_LIMIT, OFFER_DOCUMENTS_BUCKET, check_commitment, check_complete, documents_out, draft_pricing, priced_total, requirements_for, timing_conflicts,
+)
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import bidding_is_open, lock_project
 
@@ -35,6 +37,8 @@ def my_offer(project_id: str, user: User = Depends(require_approved_service_prov
 def _with_documents(db: Session, offer: Offer) -> OfferOut:
     out = OfferOut.model_validate(offer)
     out.documents = documents_out(db, offer.project_id, offer.organization_id, offer.service_provider_id)
+    project = db.get(Project, offer.project_id)
+    out.timing_conflicts = timing_conflicts(project, offer) if project else []  # Stage 5.5
     return out
 
 
@@ -109,6 +113,31 @@ def save_technical_draft(
     requirement makes it mandatory is checked when the offer is submitted."""
     _, offer = _draft_for_edit(db, user, project_id, if_match)
     offer.message = (payload.message or "").strip() or None
+    return _saved(db, user, offer)
+
+
+@router.put("/draft/timing", response_model=OfferOut)
+def save_timing_draft(
+    project_id: str,
+    payload: OfferTimingDraft,
+    if_match: str | None = Header(None, alias="If-Match"),
+    user: User = Depends(require_marketplace_active_service_provider),
+    db: Session = Depends(get_db),
+):
+    """Stage 5.5: save when the provider commits to start and finish -- a
+    start date, a completion date or a duration, and the free-text
+    completion period -- on their offer draft, without submitting it.
+    Checked to make sense on its own (dates real and in order, no work
+    before offers close, a duration of 1 day to 10 years); where it differs
+    from the owner's expected timing it is kept as entered and flagged
+    (timing_conflicts). Only these fields change; the requirement's own
+    timing is never touched."""
+    project, offer = _draft_for_edit(db, user, project_id, if_match)
+    check_commitment(project, payload.proposed_start_date, payload.proposed_completion_date, payload.proposed_duration_days)
+    offer.proposed_start_date = payload.proposed_start_date
+    offer.proposed_completion_date = payload.proposed_completion_date
+    offer.proposed_duration_days = payload.proposed_duration_days
+    offer.timeline_estimate = (payload.timeline_estimate or "").strip() or None
     return _saved(db, user, offer)
 
 
@@ -211,6 +240,9 @@ def _snapshot_revision(db: Session, offer: Offer) -> None:
             revision_number=offer.revision,
             amount=offer.amount,
             timeline_estimate=offer.timeline_estimate,
+            proposed_start_date=offer.proposed_start_date,
+            proposed_completion_date=offer.proposed_completion_date,
+            proposed_duration_days=offer.proposed_duration_days,
             message=offer.message,
             item_prices=offer.item_prices,
             assumptions=offer.assumptions,

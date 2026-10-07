@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -45,6 +45,18 @@ class OfferTechnicalDraft(BaseModel):
     message: str | None = Field(default=None, max_length=10_000)
 
 
+class OfferTimingDraft(BaseModel):
+    """Stage 5.5: when the provider commits to start and finish, in the terms
+    the requirement uses (Stage 3.7): a start date, and a completion date or a
+    duration in days; plus the free-text completion period (Stage 3.8).
+    Any may be empty while a draft."""
+
+    proposed_start_date: date | None = None
+    proposed_completion_date: date | None = None
+    proposed_duration_days: int | None = None
+    timeline_estimate: str | None = Field(default=None, max_length=255)
+
+
 class OfferDocumentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -68,6 +80,13 @@ class OfferOut(BaseModel):
     service_provider_id: str | None
     amount: Decimal | None
     timeline_estimate: str | None
+    proposed_start_date: date | None = None
+    proposed_completion_date: date | None = None
+    proposed_duration_days: int | None = None
+    # Stage 5.5: where the commitment differs from the owner's expected timing
+    # (starts_later | finishes_later | takes_longer), against the requirement
+    # as it now is. Flagged, never changed.
+    timing_conflicts: list[str] = []
     message: str | None
     item_prices: list[dict] | None = None
     assumptions: str | None = None
@@ -96,6 +115,9 @@ class OfferRevisionOut(BaseModel):
     revision_number: int
     amount: Decimal
     timeline_estimate: str | None
+    proposed_start_date: date | None = None
+    proposed_completion_date: date | None = None
+    proposed_duration_days: int | None = None
     message: str | None
     item_prices: list[dict] | None = None
     assumptions: str | None = None
