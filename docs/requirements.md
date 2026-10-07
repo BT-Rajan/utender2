@@ -551,4 +551,15 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - An offer made against an earlier requirement version, not confirmed by its provider since, is awarded only when the owner says so explicitly (`acknowledge_earlier_version`). Otherwise the server returns 409 and nothing changes.
     - The owner's Approve button now asks for confirmation. The dialog states the provider, the amount, that the decision is final (not a contract or payment) and, where it applies, the earlier-version warning.
 
+- **6.14 No-award / reject / close decision:**
+  - **Already working:** the Stage 3.16 lifecycle already concludes a requirement without an award, with no new state needed:
+    - **No suitable offer:** `POST …/no-award` after offers close; status `no_award`, reason `no_suitable_offer`. This covers prices or technical responses that aren't acceptable, explained in the owner's note.
+    - **Ended outside U-Tender:** `…/close-externally`; status `no_award`, reason `closed_externally`.
+    - **Cancelled:** `…/cancel`, with the reasons not needed, postponed or other; status `canceled`.
+    - **Expired:** reached automatically at the deadline with no live offers. Awarded stays distinct.
+  - **How each ending is recorded:** the owner side only, an active account, under the requirement's lock (serialized with the award, another member, another tab or the expiry sweep). It stores the owner's optional note and an audit entry (who, what, why), and notifies bidders and watchers through the existing notifications. The owner's page confirms before each ending.
+  - **What stays:** nobody is awarded; offers keep their status and content, and the shortlist and notes stay as they were. The owner still reads the offers.
+  - **What's refused afterwards:** new or changed offers, an award, a shortlist change, or another ending. A retry or stale page gets a refusal, never a second outcome.
+  - **Fixed:** no ending is recorded while an admin has the requirement suspended, the same rule as the award (6.13).
+
 _Later Stage 6 steps are added as they are implemented._

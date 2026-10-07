@@ -783,6 +783,10 @@ class ClosureRequest(BaseModel):
 
 
 def _end(db: Session, user: User, project: Project, status: ProjectStatus, reason: str, note: str | None, action: str, kind: NotificationType):
+    # Stage 6.14: like the award (6.13), no final outcome is recorded while an
+    # admin has the requirement suspended -- it waits for the admin's decision.
+    if project.is_suspended:
+        raise HTTPException(status_code=400, detail="This requirement has been suspended by an admin.")
     previous = project.status.value
     now = datetime.utcnow().replace(microsecond=0)
     if project.status == ProjectStatus.open:
