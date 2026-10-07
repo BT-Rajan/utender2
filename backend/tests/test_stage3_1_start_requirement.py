@@ -74,7 +74,7 @@ def test_owner_starts_a_draft_that_only_they_can_see(db, stakeholder):
     assert project["id"] in [p["id"] for p in owner.get("/owner/projects").json()]
 
     # Service providers can't see or reach it.
-    assert project["id"] not in [p["id"] for p in sp.get("/service-provider/feed").json()]
+    assert project["id"] not in [p["id"] for p in sp.get("/service-provider/feed").json()["items"]]
     assert sp.get(f"/projects/{project['id']}").status_code == 404
 
     # Nor can any other owner.

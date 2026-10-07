@@ -26,6 +26,7 @@ export function OpportunityCard({ project, locked = false }: { project: Project;
           </span>
         )}
       </div>
+      {project.summary && <p className="text-[13px] text-navy mb-2 line-clamp-3">{project.summary}</p>}
       <p className="font-mono text-xs text-blue">
         {project.paused_at ? <span className="text-amber-dark uppercase">{t("postPub.pausedProvider").replace("{date}", formatDeadline(project.paused_at))}</span> : timeRemaining(project.bid_deadline)}
       </p>
@@ -42,6 +43,15 @@ export function OpportunityCard({ project, locked = false }: { project: Project;
           <span className="k">{t("service_provider.feed.trade")}</span>
           <span className="v">{project.trade || "—"}</span>
         </div>
+        {project.pricing_basis && (
+          <div className="tblock-field">
+            <span className="k">{t("feed.pricing")}</span>
+            <span className="v">
+              {t(`feed.${project.pricing_basis}`)}
+              {project.pricing_basis === "per_item" && project.item_count ? ` · ${t("feed.items").replace("{n}", String(project.item_count))}` : ""}
+            </span>
+          </div>
+        )}
       </div>
 
       {project.eligible === false && (

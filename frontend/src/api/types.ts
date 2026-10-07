@@ -54,6 +54,10 @@ export interface Project {
   eligible?: boolean | null;
   ineligible_reasons?: EligibilityReason[];
   category_id?: string | null;
+  // Stage 4.1, provider feed only.
+  summary?: string | null;
+  pricing_basis?: "lump_sum" | "per_item" | null;
+  item_count?: number | null;
 }
 
 export interface Drawing {
@@ -411,4 +415,11 @@ export interface RequirementItem {
   quantity: string | null;
   unit: string | null;
   specification: string | null;
+}
+
+// Stage 4.1: one page of the provider opportunity feed.
+export interface FeedPage {
+  items: Project[];
+  next_offset: number | null;
+  hidden_ineligible: number | null;
 }

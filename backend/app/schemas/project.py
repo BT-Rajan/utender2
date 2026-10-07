@@ -79,6 +79,11 @@ class ProjectOut(BaseModel):
     documents_required: bool = False
     offer_count: int = 0
     my_offer_status: str | None = None  # only populated on the service provider feed
+    # Stage 4.1, feed only: enough to decide whether to open it. summary is the
+    # opening of the scope, for providers with full access who may respond.
+    summary: str | None = None
+    pricing_basis: str | None = None
+    item_count: int | None = None
     # Stage 3.9, service provider feed only: whether this provider may respond,
     # and if not, why.
     eligible: bool | None = None
@@ -270,3 +275,13 @@ class RequirementVersionOut(BaseModel):
     amendment_number: int | None  # the amendment that started it; None = as published
     fields: dict
     documents: list[DrawingOut]
+
+
+class FeedPage(BaseModel):
+    """Stage 4.1: one page of the provider opportunity feed."""
+
+    items: list[ProjectOut]
+    next_offset: int | None  # pass back as offset for the next page; None = no more
+    # Only when nothing at all is available: how many open requirements were
+    # left out because their conditions don't match this provider.
+    hidden_ineligible: int | None = None

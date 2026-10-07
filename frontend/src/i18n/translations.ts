@@ -169,6 +169,16 @@ export interface Dictionary {
     cancel: string;
     remove: string;
   };
+  feed: {
+    pricing: string;
+    items: string;
+    loadMore: string;
+    loading: string;
+    hiddenIneligible: string;
+    checkServices: string;
+    lump_sum: string;
+    per_item: string;
+  };
   versions: {
     version: string;
     before: string;
@@ -1206,6 +1216,16 @@ export const en: Dictionary = {
     cancel: "Cancel",
     remove: "Remove",
   },
+  feed: {
+    pricing: "Priced as",
+    items: "{n} items",
+    loadMore: "Show more opportunities",
+    loading: "Loading…",
+    hiddenIneligible: "{n} open requirement(s) aren’t shown because their conditions (provider type, qualifications, type of work or area) don’t match your account.",
+    checkServices: "Check the services and areas you declared",
+    lump_sum: "One total",
+    per_item: "Per item",
+  },
   versions: {
     version: "Version {n}",
     before: "See the requirement as it was before (version {n})",
@@ -1691,7 +1711,7 @@ export const en: Dictionary = {
       sortClosest: "Closing soonest",
       sortNewest: "Newest first",
       noMatch: "No projects match your filters.",
-      noOpenProjects: "No open projects right now. Check back soon.",
+      noOpenProjects: "No opportunities you can respond to right now. New ones appear here as soon as they are published.",
       deadline: "Deadline",
       offersSoFar: "Offers so far",
       trade: "Trade",
@@ -2268,6 +2288,16 @@ export const ar: Dictionary = {
     cancel: "إلغاء",
     remove: "إزالة",
   },
+  feed: {
+    pricing: "طريقة التسعير",
+    items: "{n} بنود",
+    loadMore: "عرض المزيد من الفرص",
+    loading: "جارٍ التحميل…",
+    hiddenIneligible: "لا تظهر {n} من الطلبات المفتوحة لأن شروطها (نوع مقدّم الخدمة أو المؤهلات أو نوع العمل أو المنطقة) لا تطابق حسابك.",
+    checkServices: "راجع الخدمات والمناطق التي أعلنتها",
+    lump_sum: "مبلغ إجمالي",
+    per_item: "لكل بند",
+  },
   versions: {
     version: "النسخة {n}",
     before: "اطّلع على الطلب كما كان قبل التغيير (النسخة {n})",
@@ -2753,7 +2783,7 @@ export const ar: Dictionary = {
       sortClosest: "الأقرب إغلاقًا",
       sortNewest: "الأحدث أولاً",
       noMatch: "لا توجد مشاريع مطابقة لعوامل التصفية.",
-      noOpenProjects: "لا توجد مشاريع مفتوحة حاليًا. تحقق مرة أخرى قريبًا.",
+      noOpenProjects: "لا توجد فرص يمكنك الاستجابة لها حاليًا. تظهر الفرص الجديدة هنا فور نشرها.",
       deadline: "الموعد النهائي",
       offersSoFar: "العروض حتى الآن",
       trade: "التخصص",

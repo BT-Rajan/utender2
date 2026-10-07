@@ -101,16 +101,15 @@ def test_eligible_provider_responds_and_ineligible_one_cannot_bypass_the_api(db)
     expired = _provider(db, "gulf@example.com", organization=True, licence=(licence, date.today() - timedelta(days=1)))
 
     # 1. A verified, suitable provider sees it, opens it and responds.
-    card = next(p for p in suitable.get("/service-provider/feed").json() if p["id"] == pid)
+    card = next(p for p in suitable.get("/service-provider/feed").json()["items"] if p["id"] == pid)
     assert card["eligible"] is True and card["ineligible_reasons"] == []
     assert suitable.get(f"/projects/{pid}").status_code == 200
     assert suitable.post(f"/projects/{pid}/offers", json={"amount": "2450.500"}).status_code == 200
 
-    # 2. The listing stays visible with the reasons; everything past it is refused server-side.
-    card = next(p for p in individual.get("/service-provider/feed").json() if p["id"] == pid)
-    assert card["eligible"] is False and card["address"] is None
+    # 2. Stage 4.1: not offered in their feed; asked directly, the reasons; everything past it refused server-side.
+    assert all(p["id"] != pid for p in individual.get("/service-provider/feed").json()["items"])
     # Codes the interface translates (EN/AR), with the details to fill in.
-    assert [(r["code"], r["name"]) for r in card["ineligible_reasons"]] == [
+    assert [(r["code"], r["name"]) for r in individual.get(f"/projects/{pid}/eligibility").json()["reasons"]] == [
         ("organization_only", None),
         ("qualification_missing", "Electrical works licence"),
     ]
@@ -136,7 +135,7 @@ def test_no_restriction_means_no_one_is_blocked_and_lapses_stop_only_new_offers(
     # 3. Without restrictions, an individual with no extra documents responds.
     open_pid = _publish(owner, None)
     individual = _provider(db, "sami@example.com", organization=False)
-    card = next(p for p in individual.get("/service-provider/feed").json() if p["id"] == open_pid)
+    card = next(p for p in individual.get("/service-provider/feed").json()["items"] if p["id"] == open_pid)
     assert card["eligible"] is True
     assert individual.post(f"/projects/{open_pid}/offers", json={"amount": "800"}).status_code == 200
 

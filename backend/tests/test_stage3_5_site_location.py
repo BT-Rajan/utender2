@@ -57,15 +57,15 @@ def test_listing_shows_area_not_exact_address(db):
     owner.post("/projects", data={"title": "Shop fit-out", "address": "Fahaheel", "governorate": "ahmadi", "area": "Fahaheel", "bid_deadline": DEADLINE, "status": "open"})
 
     browsing = _verified(db, "service_provider", "browsing@example.com", active=False)  # verified, no active access
-    listing = browsing.get("/service-provider/feed").json()
+    listing = browsing.get("/service-provider/feed").json()["items"]
     card = next(p for p in listing if p["id"] == published["id"])
     assert (card["governorate"], card["area"]) == ("mubarak_al_kabeer", "Mishref")
     assert card["address"] is None and card["description"] is None  # exact address and site notes withheld
 
     # Filter by governorate to see what's in my service area; search never probes the address.
-    assert [p["title"] for p in browsing.get("/service-provider/feed", params={"governorate": "ahmadi"}).json()] == ["Shop fit-out"]
-    assert browsing.get("/service-provider/feed", params={"search": "House 7"}).json() == []
-    assert len(browsing.get("/service-provider/feed", params={"search": "Mishref"}).json()) == 1  # area is searchable
+    assert [p["title"] for p in browsing.get("/service-provider/feed", params={"governorate": "ahmadi"}).json()["items"]] == ["Shop fit-out"]
+    assert browsing.get("/service-provider/feed", params={"search": "House 7"}).json()["items"] == []
+    assert len(browsing.get("/service-provider/feed", params={"search": "Mishref"}).json()["items"]) == 1  # area is searchable
     assert browsing.get(f"/projects/{published['id']}").status_code == 404  # full requirement needs active access
 
     # A provider with active access opens the full requirement, exact address included.
@@ -78,6 +78,6 @@ def test_draft_location_stays_private(db):
     draft = owner.post("/projects", data={"title": "Majlis extension", "bid_deadline": DEADLINE, **SITE}).json()
     sp = _verified(db, "service_provider", "sp@example.com")
     assert sp.get(f"/projects/{draft['id']}").status_code == 404
-    assert draft["id"] not in [p["id"] for p in sp.get("/service-provider/feed").json()]
+    assert draft["id"] not in [p["id"] for p in sp.get("/service-provider/feed").json()["items"]]
     other = _verified(db, "owner", "other@example.com")
     assert other.patch(f"/projects/{draft['id']}", json={"area": "x"}).status_code == 404

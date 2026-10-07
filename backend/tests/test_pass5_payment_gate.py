@@ -111,7 +111,7 @@ def test_pass5_payment_gate():
 
     # Feed now visible (verification-only gate) with the paywall banner logic
     r = service_provider_client.get("/service-provider/feed")
-    check("stage2: feed visible after verification approval", r.status_code == 200 and len(r.json()) == 1)
+    check("stage2: feed visible after verification approval", r.status_code == 200 and len(r.json()["items"]) == 1)
 
     # But full project detail / drawings / bidding still blocked — this is the
     # P0 rule: verification alone is not enough.

@@ -145,7 +145,7 @@ def test_drafts_and_their_documents_are_private(db):
     ).json()["id"]
     drawing_id = owner.get(f"/projects/{pid}").json()["drawings"][0]["id"]
 
-    assert all(p["id"] != pid for p in sp.get("/service-provider/feed").json())
+    assert all(p["id"] != pid for p in sp.get("/service-provider/feed").json()["items"])
     for path in (f"/projects/{pid}", f"/projects/{pid}/drawings-zip", f"/projects/{pid}/drawings/history", f"/projects/{pid}/clarifications", f"/projects/{pid}/eligibility"):
         assert sp.get(path).status_code in (403, 404), path
     assert sp.post(f"/projects/{pid}/offers", json={"amount": "100"}).status_code == 400

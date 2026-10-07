@@ -74,7 +74,7 @@ def test_the_stage3_journey(db):
     start = {"title": "Kitchen refit", "address": "Salwa, block 5", "bid_deadline": _when(10), "creation_token": "start-1"}
     pid = owner.post("/projects", data=start).json()["id"]
     assert owner.post("/projects", data=start).json()["id"] == pid
-    assert alpha.get(f"/projects/{pid}").status_code == 404 and all(p["id"] != pid for p in alpha.get("/service-provider/feed").json())
+    assert alpha.get(f"/projects/{pid}").status_code == 404 and all(p["id"] != pid for p in alpha.get("/service-provider/feed").json()["items"])
     assert alpha.post(f"/projects/{pid}/offers", json={"amount": "900"}).status_code == 400
     assert _patch(owner, pid, {"description": "Strip out and refit a 12 m² kitchen."}).status_code == 200
     assert _status(owner, pid) == "draft"
@@ -82,7 +82,7 @@ def test_the_stage3_journey(db):
     # 3-4. Publish; providers discover and respond.
     assert owner.post(f"/owner/projects/{pid}/publish").status_code == 200
     assert owner.post(f"/owner/projects/{pid}/publish").status_code == 400  # once
-    assert any(p["id"] == pid for p in alpha.get("/service-provider/feed").json())
+    assert any(p["id"] == pid for p in alpha.get("/service-provider/feed").json()["items"])
     assert alpha.post(f"/projects/{pid}/offers", json={"amount": "900"}).status_code == 200
 
     # 5-6. Pause: nothing accepted, nothing lost; resume.

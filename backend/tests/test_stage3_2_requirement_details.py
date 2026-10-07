@@ -64,7 +64,7 @@ def test_draft_details_stay_private(db):
 
     sp = _verified(db, "service_provider", "sp@example.com")
     assert sp.get(f"/projects/{draft['id']}").status_code == 404
-    assert draft["id"] not in [p["id"] for p in sp.get("/service-provider/feed").json()]
+    assert draft["id"] not in [p["id"] for p in sp.get("/service-provider/feed").json()["items"]]
 
     other = _verified(db, "owner", "other@example.com")
     assert other.patch(f"/projects/{draft['id']}", json={"title": "Hijacked"}).status_code == 404

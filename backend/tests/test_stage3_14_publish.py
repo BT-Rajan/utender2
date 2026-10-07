@@ -42,7 +42,7 @@ def test_draft_to_published_opportunity(db):
     # Before: checked, previewed, still invisible.
     assert owner.get(f"/projects/{pid}/quality").json()["ready"] is True
     assert owner.get(f"/projects/{pid}").json()["published_at"] is None
-    assert sp.get(f"/projects/{pid}").status_code == 404 and all(p["id"] != pid for p in sp.get("/service-provider/feed").json())
+    assert sp.get(f"/projects/{pid}").status_code == 404 and all(p["id"] != pid for p in sp.get("/service-provider/feed").json()["items"])
     assert sp.post(f"/projects/{pid}/offers", json={"amount": "5000"}).status_code == 400
 
     before = datetime.utcnow().replace(microsecond=0)
@@ -53,7 +53,7 @@ def test_draft_to_published_opportunity(db):
     assert db.query(AuditLog).filter(AuditLog.action == "project.publish", AuditLog.target_id == pid).count() == 1
 
     # The provider: discovers it, opens it, reaches its documents, sees the deadline and rules, responds.
-    assert any(p["id"] == pid for p in sp.get("/service-provider/feed", params={"sort": "newest"}).json())
+    assert any(p["id"] == pid for p in sp.get("/service-provider/feed", params={"sort": "newest"}).json()["items"])
     opened = sp.get(f"/projects/{pid}").json()
     assert opened["bid_deadline"] == DEADLINE and opened["response_requirements"] and opened["tender_rules"]["questions_open"] is True
     document = opened["drawings"][0]

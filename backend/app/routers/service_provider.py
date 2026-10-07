@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -10,11 +10,11 @@ from app.models.service_provider import ServiceProviderProfile
 from app.models.document import DocumentRequirement
 from app.models.enums import DocumentStatus, ProjectStatus, UserRole
 from app.models.offer import Offer
-from app.models.project import Project
+from app.models.project import Project, ProjectItem
 from app.models.user import User
 from app.schemas.service_provider import ServiceProviderProfileOut, MyBidOut, SubmitForReview
 from app.schemas.document import ServiceProviderDocumentOut, DocumentRequirementOut
-from app.schemas.project import ProjectOut
+from app.schemas.project import FeedPage, ProjectOut
 from app.schemas.category import ProviderServices
 from app.services.categories import clean_services
 from app.services.eligibility import ineligibility_reasons
@@ -50,26 +50,44 @@ def active_requirements(user: User = Depends(require_service_provider), db: Sess
 
 
 def _eligibility_fields(db: Session, project: Project, profile) -> dict:
-    # Stage 3.9: the listing stays visible to every verified provider (so an
-    # ineligible one can see the work exists and why they can't respond).
+    # Stage 3.9 / 4.1: the feed holds only what this provider may respond to
+    # (or already bid on, whose conditions may since have lapsed: then why).
     reasons = ineligibility_reasons(db, project, profile)
     return {"eligible": not reasons, "ineligible_reasons": reasons}
 
 
-@router.get("/feed", response_model=list[ProjectOut])
+FEED_PAGE = 20
+FEED_PAGE_MAX = 50
+_FEED_BATCH = 100
+SUMMARY_CHARS = 240
+
+
+@router.get("/feed", response_model=FeedPage)
 def feed(
     trade: str | None = None,
     governorate: str | None = None,
     search: str | None = None,
     sort: str = "deadline",  # "deadline" (closing soonest, default) | "newest"
+    offset: int = Query(0, ge=0),
+    limit: int = Query(FEED_PAGE, ge=1, le=FEED_PAGE_MAX),
     user: User = Depends(require_approved_service_provider),
     db: Session = Depends(get_db),
 ):
+    """Stage 4.1: the opportunities this provider can actually take part in --
+    published, open, not suspended, before their deadline, and (Stage 3.9)
+    whose conditions they meet; or that they already bid on. A page at a
+    time: the database is read in bounded batches, in a stable order, only as
+    far as the page needs."""
     # The feed itself requires verification approval (mirrors middleware.ts's
     # serviceProviderGatedPaths) — subscription is a separate, softer gate applied
     # only to drawings and offer submission below, not to seeing the feed.
     sync_expired_projects(db)
-    query = db.query(Project).filter(Project.status == ProjectStatus.open, Project.is_suspended.is_(False))
+    now = datetime.utcnow()
+    query = db.query(Project).filter(
+        Project.status == ProjectStatus.open,
+        Project.is_suspended.is_(False),
+        Project.bid_deadline > now,  # authoritative even for a row the sync skipped
+    )
 
     if trade and trade.strip():
         query = query.filter(Project.trade.ilike(f"%{trade.strip()}%"))
@@ -82,47 +100,90 @@ def feed(
         query = query.filter(or_(Project.title.ilike(term), Project.area.ilike(term), Project.description.ilike(term)))
 
     # "Newest" means newest on the marketplace: by publication (Stage 3.14),
-    # not by when the owner started the draft.
+    # not by when the owner started the draft. The id breaks ties so pages
+    # never overlap or skip.
     newest = func.coalesce(Project.published_at, Project.created_at).desc()
-    query = query.order_by(newest) if sort == "newest" else query.order_by(Project.bid_deadline.asc())
-    projects = query.all()
+    query = query.order_by(newest, Project.id) if sort == "newest" else query.order_by(Project.bid_deadline.asc(), Project.id)
+
     my_offers = {o.project_id: o.status.value for o in db.query(Offer).filter(mine(db, user, Offer, Offer.service_provider_id)).all()}
     profile = acting_profile(db, user)
 
+    # Walk the matches in order, keeping those this provider may respond to,
+    # until the page (plus one, to know whether there is more) is filled.
+    page: list[Project] = []
+    seen_available, hidden, scanned, more = 0, 0, 0, False
+    while not more:
+        batch = query.offset(scanned).limit(_FEED_BATCH).all()
+        scanned += len(batch)
+        for p in batch:
+            if p.id not in my_offers and ineligibility_reasons(db, p, profile):
+                hidden += 1
+                continue
+            seen_available += 1
+            if seen_available <= offset:
+                continue
+            if len(page) < limit:
+                page.append(p)
+            else:
+                more = True
+                break
+        if len(batch) < _FEED_BATCH:
+            break
+
+    ids = [p.id for p in page]
+    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(Offer.project_id.in_(ids)).group_by(Offer.project_id).all()) if ids else {}
+    item_counts = dict(db.query(ProjectItem.project_id, func.count(ProjectItem.id)).filter(ProjectItem.project_id.in_(ids)).group_by(ProjectItem.project_id).all()) if ids else {}
+    full_access = bool(profile and profile.is_verified_active)
+
     out = []
-    for p in projects:
-        offer_count = db.query(Offer).filter(Offer.project_id == p.id).count()
+    for p in page:
         out.append(
             ProjectOut(
                 id=p.id,
                 owner_id=p.owner_id,
                 title=p.title,
                 # Listing level: where (governorate/area) and what (title,
-                # trade) only. The exact address and the scope -- which holds
-                # site and access notes -- are on the full requirement,
-                # available to providers with active access.
+                # trade, the opening of the scope) only. The exact address and
+                # the full scope -- which holds site and access notes -- are
+                # on the requirement itself.
                 address=None,
                 governorate=p.governorate,
                 area=p.area,
                 description=None,
+                summary=_summary(p.description) if full_access else None,
                 trade=p.trade,
                 category_id=p.category_id,
                 paused_at=p.paused_at,
                 pause_reason=p.pause_reason,
                 bid_deadline=p.bid_deadline,
+                published_at=p.published_at,
                 expected_start_date=p.expected_start_date,
                 expected_completion_date=p.expected_completion_date,
                 expected_duration_days=p.expected_duration_days,
                 status=p.status,
                 tender_type=p.tender_type,
                 tender_type_locked=p.tender_type_locked,
+                pricing_basis=p.pricing_basis.value,
+                item_count=item_counts.get(p.id, 0),
                 created_at=p.created_at,
-                offer_count=offer_count,
+                offer_count=offer_counts.get(p.id, 0),
                 my_offer_status=my_offers.get(p.id),
                 **_eligibility_fields(db, p, profile),
             )
         )
-    return out
+    return FeedPage(
+        items=out,
+        next_offset=offset + len(out) if more else None,
+        # Only free to know when everything was scanned: an empty first page.
+        hidden_ineligible=hidden if not out and offset == 0 else None,
+    )
+
+
+def _summary(text: str | None) -> str | None:
+    if not text:
+        return None
+    text = " ".join(text.split())
+    return text if len(text) <= SUMMARY_CHARS else text[: SUMMARY_CHARS].rsplit(" ", 1)[0] + "…"
 
 
 @router.get("/feed/trades", response_model=list[str])
@@ -132,7 +193,7 @@ def feed_trades(user: User = Depends(require_approved_service_provider), db: Ses
     sync_expired_projects(db)
     rows = (
         db.query(Project.trade)
-        .filter(Project.status == ProjectStatus.open, Project.trade.isnot(None))
+        .filter(Project.status == ProjectStatus.open, Project.is_suspended.is_(False), Project.bid_deadline > datetime.utcnow(), Project.trade.isnot(None))
         .distinct()
         .order_by(Project.trade.asc())
         .all()
