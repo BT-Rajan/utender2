@@ -268,3 +268,21 @@ def documents_out(db: Session, project_id: str, organization_id: str | None, pro
         )
         for d in rows
     ]
+
+
+def submitted_documents_out(db: Session, offer) -> list[OfferDocumentOut]:
+    """Stage 5.13: the documents that went with the offer's current
+    submitted version -- what the owner receives -- with fresh short-lived
+    links (Stage 4.6). An offer submitted before these were recorded falls
+    back to its current documents."""
+    if offer.submitted_documents is None:
+        return documents_out(db, offer.project_id, offer.organization_id, offer.service_provider_id)
+    storage = get_storage()
+    return [
+        OfferDocumentOut(
+            id=f"{offer.id}:{d['label']}", label=d["label"], file_name=d["file_name"], uploaded_at=offer.updated_at,
+            url=storage.signed_url(OFFER_DOCUMENTS_BUCKET, d["file_path"], DOCUMENT_LINK_SECONDS, d["file_name"]),
+            material_revision=offer.based_on_material_revision,
+        )
+        for d in offer.submitted_documents
+    ]

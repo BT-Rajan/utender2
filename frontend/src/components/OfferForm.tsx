@@ -143,9 +143,13 @@ export function OfferForm({
   const itemTotal = project.items.reduce((sum, item) => sum + (lineTotal(rates[item.id] ?? "", item.quantity) ?? 0), 0) ?? 0;
 
   const submitMutation = useMutation({
+    // Stage 5.13: a revision sends the revision it was made from (If-Match),
+    // so a newer one from another tab or a colleague is never overwritten,
+    // and carries the whole offer, timing included.
     mutationFn: () =>
       apiFetch(`/projects/${project.id}/offers`, {
         method: "POST",
+        headers: existingOffer ? { "If-Match": String(existingOffer.revision) } : undefined,
         body: {
           amount: perItem ? null : clean(amount),
           item_prices: perItem ? project.items.map((item) => ({ item_id: item.id, rate: clean(rates[item.id] ?? "") })) : null,
@@ -153,6 +157,9 @@ export function OfferForm({
           message: message || null,
           assumptions: assumptions || null,
           accepted_declarations: accepted,
+          proposed_start_date: startDate || null,
+          proposed_completion_date: completionDate || null,
+          proposed_duration_days: durationDays ? Number(durationDays) : null,
         },
       }),
     onSuccess: () => {
@@ -245,6 +252,14 @@ export function OfferForm({
         title: t("submitOffer.confirmTitle"),
         body: t("submitOffer.confirmBody"),
         confirmLabel: t("service_provider.offer.submitOffer"),
+      });
+      if (!ok) return;
+    } else if (existingOffer) {
+      // Stage 5.13: revising a submitted (or withdrawn) offer replaces the current version.
+      const ok = await confirm({
+        title: t("submitOffer.reviseTitle"),
+        body: t("submitOffer.reviseBody"),
+        confirmLabel: t("service_provider.offer.updateOffer"),
       });
       if (!ok) return;
     }
@@ -406,6 +421,7 @@ export function OfferForm({
             {rules.documents.length > 0 && (
               <fieldset id="offer-section-documents">
                 <legend className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("response.attachments")}</legend>
+                {existingOffer && !preview && <p className="text-xs text-steel mb-1.5" data-testid="docs-on-update">{t("submitOffer.docsOnUpdate")}</p>}
                 <ul className="grid gap-2">
                   {rules.documents.map((doc) => {
                     const attached = myDocuments.find((d) => d.label === doc.name);

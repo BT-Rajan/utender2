@@ -27,7 +27,7 @@ from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allow
 from app.services.notify import notify, notify_team
 from app.services.team import acting_profile, mine, owns
 from app.services.eligibility import qualification_options
-from app.services.offer_response import documents_out, timing_conflicts
+from app.services.offer_response import submitted_documents_out, timing_conflicts
 from app.services.stakeholder import require_established
 from app.services.verification import (
     applicable_requirements,
@@ -149,7 +149,7 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
             item_prices=o.item_prices,
             assumptions=o.assumptions,
             declarations_accepted=o.declarations_accepted,
-            documents=documents_out(db, project_id, o.organization_id, o.service_provider_id),
+            documents=submitted_documents_out(db, o),  # Stage 5.13: as submitted, not mid-revision
             status=o.status,
             revision=o.revision,
             based_on_material_revision=o.based_on_material_revision,

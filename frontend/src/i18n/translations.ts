@@ -195,6 +195,9 @@ export interface Dictionary {
     sealedNote: string;
     visibleNote: string;
     canStill: string;
+    reviseTitle: string;
+    reviseBody: string;
+    docsOnUpdate: string;
   };
   offerPreview: {
     open: string;
@@ -1378,6 +1381,9 @@ export const en: Dictionary = {
     sealedNote: "This tender is sealed: the owner sees your offer's content only after the deadline.",
     visibleNote: "The owner can see your offer now.",
     canStill: "Until offers close you can update or withdraw it.",
+    reviseTitle: "Update your submitted offer?",
+    reviseBody: "This version replaces your current offer for the owner. The previous version stays in your offer’s history, as submitted.",
+    docsOnUpdate: "Document changes go to the owner when you update your offer; until then the owner has the documents you submitted.",
   },
   offerPreview: {
     open: "Preview offer",
@@ -2586,6 +2592,9 @@ export const ar: Dictionary = {
     sealedNote: "هذه مناقصة مختومة: لا يرى المالك محتوى عرضك إلا بعد الموعد النهائي.",
     visibleNote: "يمكن للمالك رؤية عرضك الآن.",
     canStill: "حتى إغلاق العروض يمكنك تحديثه أو سحبه.",
+    reviseTitle: "تحديث عرضك المقدَّم؟",
+    reviseBody: "يحلّ هذا الإصدار محل عرضك الحالي لدى المالك. يبقى الإصدار السابق في سجل عرضك كما قُدِّم.",
+    docsOnUpdate: "تصل تغييرات المستندات إلى المالك عند تحديث عرضك؛ وحتى ذلك الحين لدى المالك المستندات التي قدّمتها.",
   },
   offerPreview: {
     open: "معاينة العرض",

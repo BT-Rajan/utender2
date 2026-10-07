@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.enums import OfferStatus
 from app.schemas.common import UTCDateTime
@@ -26,6 +26,11 @@ class OfferCreate(BaseModel):
     # invalid input instead.
     timeline_estimate: str | None = Field(default=None, max_length=255)
     message: str | None = Field(default=None, max_length=10_000)
+    # Stage 5.13: a revision can change the start/completion commitment too.
+    # Applied only when sent (an older client's revision keeps what's stored).
+    proposed_start_date: date | None = None
+    proposed_completion_date: date | None = None
+    proposed_duration_days: int | None = None
 
 
 class OfferCommercialDraft(BaseModel):
@@ -179,7 +184,17 @@ class OfferRevisionOut(BaseModel):
     assumptions: str | None = None
     status: OfferStatus
     based_on_material_revision: int = 0  # Stage 3.17: the requirement version it was made against
-    recorded_at: datetime
+    # Stage 5.13: what else that version said, and when/by whom it was submitted.
+    declarations_accepted: list[str] | None = None
+    documents: list[dict] = []  # [{"label", "file_name"}] -- names only, no storage paths
+    submitted_at: UTCDateTime | None = None
+    submitted_by: str | None = None
+    recorded_at: UTCDateTime
+
+    @field_validator("documents", mode="before")
+    @classmethod
+    def _names_only(cls, value):
+        return [{"label": d.get("label"), "file_name": d.get("file_name")} for d in value or []]
 
 
 class PreviewRequirement(BaseModel):

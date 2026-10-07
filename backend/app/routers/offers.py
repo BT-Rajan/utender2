@@ -19,7 +19,7 @@ from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowe
 from app.services.notify import notify, notify_team
 from app.services.team import acting_id, acting_profile, can_access, mine, org_of
 from app.services.offer_response import (
-    AMOUNT_LIMIT, OFFER_DOCUMENTS_BUCKET, check_commitment, check_complete, documents_out, draft_pricing, priced_total, readiness, requirements_for,
+    AMOUNT_LIMIT, OFFER_DOCUMENTS_BUCKET, _side_documents, check_commitment, check_complete, documents_out, draft_pricing, priced_total, readiness, requirements_for,
     timing_conflicts,
 )
 from app.services.storage import get_storage
@@ -361,7 +361,9 @@ async def upload_offer_document(
         except Exception:
             pass
         raise
-    if replaced:
+    # Stage 5.13: a file that went with a submitted version stays on record
+    # (that version's history refers to it); only a draft's is discarded.
+    if replaced and offer.submitted_at is None:
         try:
             storage.delete(OFFER_DOCUMENTS_BUCKET, [replaced])
         except Exception:
@@ -381,14 +383,15 @@ def remove_offer_document(
     if not bidding_is_open(project):
         raise HTTPException(status_code=400, detail="Bidding on this project has closed.")
     assert_eligible(db, project, acting_profile(db, user))
-    _offer_for_documents(db, user, project)
+    offer = _offer_for_documents(db, user, project)
     path = doc.file_path
     db.delete(doc)
     db.commit()
-    try:
-        get_storage().delete(OFFER_DOCUMENTS_BUCKET, [path])
-    except Exception:
-        pass
+    if offer.submitted_at is None:  # Stage 5.13: a submitted version's file stays on record
+        try:
+            get_storage().delete(OFFER_DOCUMENTS_BUCKET, [path])
+        except Exception:
+            pass
     return documents_out(db, project_id, org_of(db, user.id), acting_id(db, user))
 
 
@@ -425,6 +428,12 @@ def _snapshot_revision(db: Session, offer: Offer) -> None:
             assumptions=offer.assumptions,
             status=offer.status,
             based_on_material_revision=offer.based_on_material_revision,
+            # Stage 5.13: the version's declarations and documents as submitted,
+            # and when and by whom it was put forward.
+            declarations_accepted=offer.declarations_accepted,
+            documents=offer.submitted_documents,
+            submitted_at=offer.updated_at,
+            submitted_by=offer.updated_by,
         )
     )
     offer.revision += 1
@@ -434,6 +443,7 @@ def _snapshot_revision(db: Session, offer: Offer) -> None:
 def submit_offer(
     project_id: str,
     payload: OfferCreate,
+    if_match: str | None = Header(None, alias="If-Match"),
     user: User = Depends(require_marketplace_active_service_provider),
     db: Session = Depends(get_db),
 ):
@@ -473,12 +483,23 @@ def submit_offer(
     # browser can't skip it by submitting directly.
     if offer and offer.status == OfferStatus.draft and offer.based_on_material_revision < project.material_revision:
         raise HTTPException(status_code=409, detail="The requirement changed after you started this offer. Review the current requirement first.")
-    # Stage 5.8: the saved start/completion commitment must still be valid
-    # now (the deadline may have moved since it was saved) -- the same rule
-    # the quality gate applies; a submission can't skip it.
-    if offer:
-        check_commitment(project, offer.proposed_start_date, offer.proposed_completion_date, offer.proposed_duration_days)
+    # Stage 5.8: the start/completion commitment must be valid now (the
+    # deadline may have moved since it was saved) -- the same rule the quality
+    # gate applies; a submission can't skip it. Stage 5.13: as revised, when
+    # the revision changes it.
+    timing_fields = ("proposed_start_date", "proposed_completion_date", "proposed_duration_days")
+    revised_timing = {f: getattr(payload, f) for f in timing_fields if f in payload.model_fields_set}
+    commitment = {f: revised_timing.get(f, getattr(offer, f) if offer else None) for f in timing_fields}
+    check_commitment(project, commitment["proposed_start_date"], commitment["proposed_completion_date"], commitment["proposed_duration_days"])
     first = offer is None or offer.status == OfferStatus.draft  # Stage 5.11: put forward for the first time
+    # Stage 5.13: revising a submitted (or withdrawn) offer from a page showing
+    # an earlier revision -- another tab, a colleague, a retried request -- is
+    # refused rather than overwriting the newer one (If-Match: revision).
+    if offer and not first and if_match is not None and if_match.strip('"') != str(offer.revision):
+        raise HTTPException(
+            status_code=409,
+            detail="Your offer was changed somewhere else (another tab, device or team member) since you opened it. Reload to see the latest, then make your change again.",
+        )
     if offer:
         # upsert on the (project_id, service_provider_id) unique constraint — a
         # service provider revising their bid before the deadline updates the
@@ -515,6 +536,8 @@ def submit_offer(
             updated_by=user.id,
         )
         db.add(offer)
+    for field, value in revised_timing.items():
+        setattr(offer, field, value)
     return _put_forward(db, user, project, offer, profile, first)
 
 
@@ -537,6 +560,12 @@ def _put_forward(db: Session, user: User, project: Project, offer: Offer, profil
     now = datetime.utcnow()
     if first or offer.submitted_at is None:
         offer.submitted_at = now
+    # Stage 5.13: the documents that go with this version, as they stand now.
+    db.flush()
+    offer.submitted_documents = [
+        {"label": d.label, "file_name": d.file_name, "file_path": d.file_path}
+        for d in _side_documents(db, offer.project_id, offer.organization_id, offer.service_provider_id).order_by(OfferDocument.label.asc())
+    ] or None
     offer.updated_at, offer.updated_by = now, user.id
     # The tender type is a material term of the tender — once at least one
     # bid exists, the owner can no longer switch sealed <-> owner-visible

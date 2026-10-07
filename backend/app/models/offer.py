@@ -69,6 +69,11 @@ class Offer(Base):
     # showing an older draft (another tab, another member) is refused
     # instead of overwriting newer work (If-Match, as for requirement drafts).
     draft_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    # Stage 5.13: the supporting documents as they stood when this version was
+    # submitted -- [{"label", "file_name", "file_path"}]. Documents can be
+    # replaced while preparing a revision; what the owner receives is what was
+    # submitted, until the next submission.
+    submitted_documents: Mapped[list | None] = mapped_column(JSON, nullable=True)
     # Stage 5.11: when it was first put forward (submitted); NULL while a draft.
     # created_at is when the draft was started.
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -111,6 +116,12 @@ class OfferRevision(Base):
     status: Mapped[OfferStatus] = mapped_column(Enum(OfferStatus, native_enum=True), nullable=False)
     # Stage 3.17: the requirement version this earlier submission was made against.
     based_on_material_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    # Stage 5.13: the rest of what that version said, and when and by whom it
+    # was put forward (the offer's last change before it was superseded).
+    declarations_accepted: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    documents: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    submitted_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
     recorded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 

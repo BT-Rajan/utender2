@@ -344,4 +344,13 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - A permanent regression test sweeps every read route with every known ID as a competitor, an unrelated owner and an unverified account, so a future route can't leak an offer unnoticed. It checks itself against the routes that should show the data.
   - The opportunity card's "offers so far" count (including for sealed tenders) is an existing design choice and was left as is.
 
-_Further steps (5.13 onwards) are added as they are implemented._
+- **5.13 Edit / replace / resubmit before deadline:**
+  - Existing rule kept: until offers close, a submitted offer can be revised, or withdrawn and resubmitted. It's always the same offer row, so there's one current offer per provider (organisation) and requirement. Each revision is recorded.
+  - Revising goes through the existing route (`POST /projects/{id}/offers`) with the same server checks as submission: the lock, the server deadline (exactly at the deadline is too late), open and not paused or suspended, eligibility, the Stage 5.8 gate on exactly what would be committed, and the review step after a material amendment. On failure, the current submission is untouched.
+  - The whole offer can be revised, including the start/completion commitment (applied only when sent).
+  - Each earlier version is kept in full in the offer's history (seen by the provider, and by the owner once unsealed): price, items, method, timing, assumptions, declarations, the documents that went with it (names; the files are never deleted), the requirement version it answered, and when and by whom it was submitted.
+  - Documents replaced while preparing a revision don't reach the owner until the revision is submitted. The owner sees the documents of the current submitted version.
+  - A revision from a page showing an earlier revision (another tab, a colleague, a retried request) is refused (If-Match on the revision number), never overwritten. Simultaneous revisions: one wins.
+  - "Update offer" asks for confirmation and says the previous version stays in the history. Competitors and sealed rules are unaffected.
+
+_Further steps (5.14 onwards) are added as they are implemented._
