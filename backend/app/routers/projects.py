@@ -34,7 +34,7 @@ from app.schemas.project import (
 )
 from app.services.tender_rules import questions_close_at, questions_open
 from app.services.categories import resolve_trade
-from app.services.eligibility import ineligibility_reasons, rules_for, rules_out, validate_rules
+from app.services.eligibility import audience, ineligibility_reasons, rules_for, rules_out, validate_rules
 from app.services.drawings import DOCUMENT_CATEGORIES, upload_drawings_for_project
 from app.services.locations import clean_area, clean_governorate
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name
@@ -533,6 +533,16 @@ def _to_naive_utc(value: datetime | None, label: str) -> datetime | None:
         return value.astimezone(timezone.utc).replace(tzinfo=None)
     except OverflowError:
         raise HTTPException(status_code=400, detail=f"Invalid {label}.")
+
+
+@router.get("/{project_id}/audience")
+def requirement_audience(project_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Stage 3.13: how many verified providers this requirement's eligibility
+    rules would reach (counts only). The owner's side only."""
+    project = db.get(Project, project_id)
+    if not project or not owns(db, user, project):
+        raise HTTPException(status_code=404, detail="Project not found.")
+    return audience(db, project)
 
 
 @router.get("/{project_id}/quality")

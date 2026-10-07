@@ -155,6 +155,15 @@ export interface Dictionary {
     openedHint: string;
     thenForm: string;
     open: string;
+    audienceHeading: string;
+    audienceCount: string;
+    excluded_organization_only: string;
+    excluded_qualification_missing: string;
+    excluded_qualification_expired: string;
+    excluded_category_not_offered: string;
+    excluded_governorate_not_served: string;
+    audienceNone: string;
+    audienceNote: string;
   };
   eligibility: {
     heading: string;
@@ -1076,6 +1085,15 @@ export const en: Dictionary = {
     openedHint: "What an eligible provider sees, with the exact address, scope, items, documents and rules.",
     thenForm: "Below this, providers fill in their offer: the price (per item if you asked for it) and everything listed under \"What your offer must include\".",
     open: "Preview as a provider",
+    audienceHeading: "Who this reaches",
+    audienceCount: "{eligible} of the {total} verified providers on U-Tender meet your \"who can respond\" rules today.",
+    excluded_organization_only: "{count} are registered as individuals (you asked for organizations only)",
+    excluded_qualification_missing: "{count} don't hold a required qualification",
+    excluded_qualification_expired: "{count} hold a required qualification that has expired",
+    excluded_category_not_offered: "{count} don't list this type of work among their services",
+    excluded_governorate_not_served: "{count} don't serve this governorate",
+    audienceNone: "No provider meets these rules right now. Consider relaxing them under Who can respond.",
+    audienceNote: "Counts only; providers who qualify later will be able to respond too.",
   },
   eligibility: {
     heading: "Who can respond",
@@ -2022,6 +2040,15 @@ export const ar: Dictionary = {
     openedHint: "ما يراه مقدم الخدمة المؤهل، مع العنوان الدقيق ونطاق العمل والبنود والمستندات والقواعد.",
     thenForm: "أسفل ذلك يملأ مقدمو الخدمة عرضهم: السعر (حسب البنود إذا طلبت ذلك) وكل ما هو مدرج تحت \"ما يجب أن يتضمنه عرضك\".",
     open: "معاينة كمقدم خدمة",
+    audienceHeading: "من سيصله الطلب",
+    audienceCount: "{eligible} من أصل {total} من مقدمي الخدمة الموثقين على U-Tender يستوفون شروط \"من يمكنه تقديم عرض\" اليوم.",
+    excluded_organization_only: "{count} مسجلون كأفراد (طلبت الجهات فقط)",
+    excluded_qualification_missing: "{count} لا يحملون مؤهلًا مطلوبًا",
+    excluded_qualification_expired: "{count} يحملون مؤهلًا مطلوبًا منتهي الصلاحية",
+    excluded_category_not_offered: "{count} لا يدرجون هذا النوع من العمل ضمن خدماتهم",
+    excluded_governorate_not_served: "{count} لا يخدمون هذه المحافظة",
+    audienceNone: "لا يستوفي أي مقدم خدمة هذه الشروط حاليًا. فكر في تخفيفها في من يمكنه تقديم عرض.",
+    audienceNote: "أعداد فقط؛ من يستوفي الشروط لاحقًا سيتمكن من تقديم عرض أيضًا.",
   },
   eligibility: {
     heading: "من يمكنه تقديم عرض",

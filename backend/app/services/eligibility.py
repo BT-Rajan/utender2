@@ -150,3 +150,25 @@ def assert_eligible(db: Session, project: Project, profile: ServiceProviderProfi
         raise HTTPException(
             status_code=403, detail="You aren't eligible to respond to this requirement. " + " ".join(r.message for r in reasons)
         )
+
+
+def audience(db: Session, project: Project) -> dict:
+    """Stage 3.13: who this requirement would reach, for the owner's preview --
+    counts only, never who. Among providers who can currently take part
+    (verified, active access), how many meet its rules, and how many each
+    rule leaves out. Uses the same check providers are held to."""
+    profiles = (
+        db.query(ServiceProviderProfile)
+        .filter(ServiceProviderProfile.verification_status == "approved", ServiceProviderProfile.is_suspended.is_(False))
+        .all()
+    )
+    active = [p for p in profiles if p.is_verified_active]
+    excluded: dict[str, int] = {}
+    eligible = 0
+    for profile in active:
+        reasons = ineligibility_reasons(db, project, profile)
+        if not reasons:
+            eligible += 1
+        for code in {r.code for r in reasons}:
+            excluded[code] = excluded.get(code, 0) + 1
+    return {"active_providers": len(active), "eligible": eligible, "excluded_by": excluded}

@@ -91,3 +91,30 @@ def test_only_the_owner_side_can_preview(db):
     assert other_owner.get(f"/projects/{pid}").status_code == 404
     assert TestClient(app).get(f"/projects/{pid}").status_code in (401, 403)
     assert owner.get(f"/projects/{pid}").json()["status"] == "draft"  # still a draft
+
+
+def test_preview_shows_who_the_rules_reach(db):
+    from app.models.document import DocumentRequirement, ServiceProviderDocument
+    from app.models.enums import DocumentStatus, UserRole
+
+    licence = DocumentRequirement(name="Electrical works licence", is_required=False, applies_to=UserRole.service_provider)
+    db.add(licence)
+    db.commit()
+    owner = _verified(db, "owner", "owner@example.com")
+    holder = _verified(db, "service_provider", "holder@example.com")
+    _verified(db, "service_provider", "other@example.com")
+    holder_id = holder.get("/auth/me").json()["id"]
+    doc = db.query(ServiceProviderDocument).filter_by(service_provider_id=holder_id, requirement_id=licence.id).first() or ServiceProviderDocument(
+        service_provider_id=holder_id, requirement_id=licence.id
+    )
+    doc.status = DocumentStatus.approved
+    db.add(doc)
+    db.commit()
+    pid = owner.post("/projects", data={"title": "Rewiring", "address": "Salwa", "bid_deadline": DEADLINE}).json()["id"]
+    assert owner.get(f"/projects/{pid}/audience").json() == {"active_providers": 2, "eligible": 2, "excluded_by": {}}
+    owner.put(f"/projects/{pid}/eligibility", json={"provider_type": "organization", "qualifications": [licence.id]})
+    reach = owner.get(f"/projects/{pid}/audience").json()
+    # Counts only -- and a rule that shuts everyone out is visible before publishing.
+    assert reach == {"active_providers": 2, "eligible": 0, "excluded_by": {"organization_only": 2, "qualification_missing": 1}}
+    assert TestClient(app).get(f"/projects/{pid}/audience").status_code in (401, 403)
+    assert holder.get(f"/projects/{pid}/audience").status_code == 404

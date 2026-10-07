@@ -6,6 +6,7 @@ import { PageLoading } from "@/components/PageLoading";
 import { OpportunityCard } from "@/components/OpportunityCard";
 import { ProviderRequirementView } from "@/components/ProviderRequirementView";
 import { QualityCheck, type QualityReport } from "@/components/QualityCheck";
+import { OfferForm } from "@/components/OfferForm";
 import { useI18n } from "@/i18n/I18nContext";
 
 // Stage 3.13: the owner sees the requirement as a provider who may respond
@@ -13,6 +14,37 @@ import { useI18n } from "@/i18n/I18nContext";
 // opened. Built from the same requirement record and the same components the
 // providers' pages use; nothing is published, and the draft stays visible
 // only to the owner's side (GET /projects/{id} keeps refusing everyone else).
+interface Audience {
+  active_providers: number;
+  eligible: number;
+  excluded_by: Record<string, number>;
+}
+
+// Who the requirement's "who can respond" rules reach today -- counts only,
+// from the same check providers are held to -- so an owner sees whether a
+// condition shuts out more than intended before publishing.
+function AudienceSummary({ audience }: { audience: Audience }) {
+  const { t } = useI18n();
+  const none = audience.eligible === 0;
+  return (
+    <section className={`border rounded px-4 py-3 mb-6 text-sm ${none ? "border-red/40 bg-red-tint/30" : "border-border bg-white"}`}>
+      <h2 className="font-display font-semibold text-navy mb-1">{t("preview.audienceHeading")}</h2>
+      <p className="text-navy">
+        {t("preview.audienceCount").replace("{eligible}", String(audience.eligible)).replace("{total}", String(audience.active_providers))}
+      </p>
+      {Object.keys(audience.excluded_by).length > 0 && (
+        <ul className="list-disc ps-5 text-[13px] text-steel mt-1">
+          {Object.entries(audience.excluded_by).map(([code, n]) => (
+            <li key={code}>{t(`preview.excluded_${code}`).replace("{count}", String(n))}</li>
+          ))}
+        </ul>
+      )}
+      {none && <p className="text-[13px] text-red mt-1">{t("preview.audienceNone")}</p>}
+      <p className="text-[11px] text-steel-light mt-1">{t("preview.audienceNote")}</p>
+    </section>
+  );
+}
+
 export function OwnerProjectPreviewPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useI18n();
@@ -25,6 +57,11 @@ export function OwnerProjectPreviewPage() {
     queryKey: ["quality", id, project?.version],
     queryFn: () => apiFetch<QualityReport>(`/projects/${id}/quality`),
     enabled: !!project && project.status === "draft",
+  });
+  const { data: audience } = useQuery({
+    queryKey: ["audience", id, project?.version],
+    queryFn: () => apiFetch<Audience>(`/projects/${id}/audience`),
+    enabled: !!project,
   });
   if (!project) return <PageLoading />;
 
@@ -43,6 +80,8 @@ export function OwnerProjectPreviewPage() {
 
       {project.status === "draft" && quality && !quality.ready && <QualityCheck report={quality} />}
 
+      {audience && <AudienceSummary audience={audience} />}
+
       <h2 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-2">{t("preview.inList")}</h2>
       <p className="text-xs text-steel-light mb-2">{t("preview.inListHint")}</p>
       <div className="max-w-md mb-8 pointer-events-none">
@@ -54,7 +93,9 @@ export function OwnerProjectPreviewPage() {
       <p className="text-xs text-steel-light mb-3">{t("preview.openedHint")}</p>
       <div className="border border-border rounded px-4 py-4 bg-white/50">
         <ProviderRequirementView project={project} closed={false} />
-        <p className="text-xs text-steel-light border-t border-border pt-3">{t("preview.thenForm")}</p>
+        <p className="text-xs text-steel-light border-t border-border pt-3 mb-3">{t("preview.thenForm")}</p>
+        {/* The real form, read-only: what a provider fills in. Nothing can be sent. */}
+        <OfferForm project={project} existingOffer={null} preview />
       </div>
 
       <div className="mt-6">
