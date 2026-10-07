@@ -7,7 +7,7 @@ import { eligibilitySummary, IneligibleNotice } from "@/components/ProviderEligi
 import { outcomeLabel } from "@/components/ClosureOutcome";
 import { AmendmentsList } from "@/components/PostPublication";
 import { useI18n } from "@/i18n/I18nContext";
-import { formatDeadline, fullDate, timeLeft } from "@/lib/format";
+import { formatDeadline, formatSize, fullDate, timeLeft } from "@/lib/format";
 import { formatWorkTiming } from "@/lib/dates";
 import { sortDocuments } from "@/lib/documents";
 import { formatArea } from "@/lib/location";
@@ -95,6 +95,7 @@ export function ProviderRequirementView({ project, closed }: { project: ProjectD
                   <a href={d.url} target="_blank" rel="noreferrer" className="font-mono text-xs text-blue underline bg-blue-tint px-3 py-1.5 rounded">
                     {d.file_name}
                     {d.revision > 1 && <span className="text-blue/60"> · v{d.revision}</span>}
+                    {formatSize(d.size_bytes) && <span className="text-blue/60"> · {formatSize(d.size_bytes)}</span>}
                   </a>
                 ) : (
                   <span className="font-mono text-xs text-steel">{d.file_name}</span>

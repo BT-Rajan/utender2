@@ -145,3 +145,32 @@ def test_nothing_reaches_who_isnt_entitled(db):
     assert unqualified.get(f"/projects/{open_pid}").status_code == 200
     owner.post(f"/owner/projects/{open_pid}/cancel", json={"reason": "not_needed"})
     assert unqualified.get(f"/projects/{open_pid}").status_code == 404
+
+
+def test_documents_say_how_large_they_are(db):
+    owner = _verified(db, "owner", "owner@example.com")
+    sp = _verified(db, "service_provider", "sami@example.com")
+    pid = owner.post("/projects", data={"title": "Fence", "address": "x", "description": "Paint a fence.", "bid_deadline": _when(9), "status": "open"}, files=[("drawings", ("plan.pdf", b"%PDF" + b"0" * 2044, "application/pdf"))]).json()["id"]
+    assert sp.get(f"/projects/{pid}").json()["drawings"][0]["size_bytes"] == 2048
+    owner.post(f"/projects/{pid}/drawings", files=[("drawings", ("plan.pdf", b"%PDF-2", "application/pdf"))])  # a replacement, measured too
+    assert [(d["revision"], d["size_bytes"]) for d in sp.get(f"/projects/{pid}/drawings/history").json()] == [(1, 2048), (2, 6)]
+
+
+def test_who_cant_open_it_still_learns_what_it_is_and_why(db):
+    owner = _verified(db, "owner", "owner@example.com")
+    unqualified = _verified(db, "service_provider", "sami@example.com")
+    unpaid = _verified(db, "service_provider", "free@example.com", paid=False)
+    pid, licence, _ = _full_requirement(db, owner)
+    _hold(db, unpaid, licence)
+
+    # Not qualified: the listing (never the address or scope) and the reasons.
+    r = unqualified.get(f"/projects/{pid}/eligibility").json()
+    assert r["eligible"] is False and r["listing"]["title"] == "Villa rewiring" and r["listing"]["governorate"] == "capital"
+    assert "address" not in r["listing"] and "description" not in r["listing"] and "Kaifan, block 4" not in str(r)
+    # Qualified but without full access yet: the listing, so the page can say how to open it.
+    r = unpaid.get(f"/projects/{pid}/eligibility").json()
+    assert r["eligible"] is True and r["listing"]["title"] == "Villa rewiring"
+    assert unpaid.get(f"/projects/{pid}").status_code == 404  # the requirement itself still needs access
+    # Once it has ended, no listing for those who didn't take part.
+    owner.post(f"/owner/projects/{pid}/cancel", json={"reason": "not_needed"})
+    assert unqualified.get(f"/projects/{pid}/eligibility").json()["listing"] is None

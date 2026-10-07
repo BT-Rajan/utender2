@@ -72,6 +72,7 @@ export interface Drawing {
   // Stage 3.6: what the file is, and whether providers need it to price.
   category: DocumentCategory;
   is_required: boolean;
+  size_bytes?: number | null;
   url: string | null;
 }
 
@@ -134,6 +135,8 @@ export interface EligibilityCheck {
   eligible: boolean;
   reasons: EligibilityReason[];
   rules: ProviderEligibility;
+  // Stage 4.4 follow-up: what the opportunity is, at listing level, while it is open.
+  listing?: OpportunityListing | null;
 }
 
 export interface ServiceCategory {
@@ -425,4 +428,15 @@ export interface FeedPage {
   items: Project[];
   next_offset: number | null;
   hidden_ineligible: number | null;
+}
+
+export interface OpportunityListing {
+  title: string;
+  trade: string | null;
+  governorate: string | null;
+  area: string | null;
+  bid_deadline: string;
+  tender_type: TenderType;
+  published_at: string | null;
+  paused: boolean;
 }

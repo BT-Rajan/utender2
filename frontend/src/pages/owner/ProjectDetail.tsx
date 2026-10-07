@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError, API_URL, draftVersion } from "@/api/client";
 import type { Drawing, Offer, ProjectDetail } from "@/api/types";
-import { formatDeadline, timeRemaining, stars } from "@/lib/format";
+import { formatDeadline, formatSize, timeRemaining, stars } from "@/lib/format";
 import { RatingInput } from "@/components/RatingInput";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { RequirementItemsEditor, RequirementItemsView } from "@/components/RequirementItems";
@@ -556,6 +556,7 @@ export function OwnerProjectDetailPage() {
                       <span>{d.file_name}</span>
                     )}
                     {d.revision > 1 && <span className="text-white/50"> · v{d.revision}</span>}
+                    {formatSize(d.size_bytes) && <span className="text-white/50"> · {formatSize(d.size_bytes)}</span>}
                     <span className="text-white/60">
                       {" "}
                       · {t(`documents.${d.category}`)} · {d.is_required ? t("documents.essential") : t("documents.supplementary")}

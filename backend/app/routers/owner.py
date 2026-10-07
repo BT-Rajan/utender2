@@ -530,7 +530,7 @@ def restart_project(project_id: str, payload: RestartRequest | None = None, user
             continue
         path = f"{copy.id}/{drawing.file_path.split('/', 1)[-1]}"
         storage.save("project-drawings", path, content, "application/octet-stream")
-        db.add(ProjectDrawing(project_id=copy.id, file_path=path, file_name=drawing.file_name, category=drawing.category, is_required=drawing.is_required))
+        db.add(ProjectDrawing(project_id=copy.id, file_path=path, file_name=drawing.file_name, category=drawing.category, is_required=drawing.is_required, size_bytes=len(content)))
     log_action(db, actor_id=user.id, action="project.restart", target_type="project", target_id=copy.id, previous_value=source.id, new_value="draft")
     db.refresh(copy)
     return _project_response(copy, db)

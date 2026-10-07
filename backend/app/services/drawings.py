@@ -26,7 +26,7 @@ DOCUMENT_CATEGORIES = ("drawing", "boq", "specification", "photo", "site", "othe
 
 
 def _record_drawing(
-    db: Session, project_id: str, file_path: str, file_name: str, category: str = "drawing", is_required: bool = True
+    db: Session, project_id: str, file_path: str, file_name: str, category: str = "drawing", is_required: bool = True, size_bytes: int | None = None
 ) -> None:
     current = (
         db.query(ProjectDrawing)
@@ -50,6 +50,7 @@ def _record_drawing(
             is_current=True,
             category=category,
             is_required=is_required,
+            size_bytes=size_bytes,
         )
     )
     # Autoflush is off on this session (see db.py) — flush explicitly so a
@@ -107,7 +108,7 @@ async def upload_drawings_for_project(
                 except Exception:
                     failed += 1
                     continue
-                _record_drawing(db, project_id, path, name, category, is_required)
+                _record_drawing(db, project_id, path, name, category, is_required, len(entry.content))
                 uploaded += 1
             continue
 
@@ -117,7 +118,7 @@ async def upload_drawings_for_project(
         except Exception:
             failed += 1
             continue
-        _record_drawing(db, project_id, path, safe_relative_name(file.filename), category, is_required)
+        _record_drawing(db, project_id, path, safe_relative_name(file.filename), category, is_required, len(content))
         uploaded += 1
 
     db.commit()

@@ -31,6 +31,7 @@ class DrawingOut(BaseModel):
     is_current: bool
     category: str = "drawing"
     is_required: bool = True
+    size_bytes: int | None = None
     url: str | None = None
 
 
@@ -186,6 +187,17 @@ class EligibilityReason(BaseModel):
     message: str
 
 
+class OpportunityListing(BaseModel):
+    title: str
+    trade: str | None
+    governorate: str | None
+    area: str | None
+    bid_deadline: UTCDateTime
+    tender_type: TenderType
+    published_at: UTCDateTime | None
+    paused: bool
+
+
 class EligibilityCheckOut(BaseModel):
     """A provider's own standing against one requirement, with the reasons
     when they can't respond -- never an unexplained refusal."""
@@ -193,6 +205,9 @@ class EligibilityCheckOut(BaseModel):
     eligible: bool
     reasons: list[EligibilityReason] = Field(default_factory=list)
     rules: ProviderEligibilityOut
+    # Stage 4.4 follow-up: what the opportunity is, at listing level (no
+    # address, no scope) -- only while it is open, as in the feed.
+    listing: OpportunityListing | None = None
 
 
 class PaymentStage(BaseModel):

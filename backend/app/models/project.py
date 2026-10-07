@@ -211,6 +211,9 @@ class ProjectDrawing(Base):
     # in (0 = as published). With the revision chain, it says which documents
     # an offer made against a given version was priced on.
     material_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    # Stage 4.4 follow-up: the file's size, so a provider knows what they're
+    # downloading. NULL only for a file whose size couldn't be read back.
+    size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     project = relationship("Project", back_populates="drawings")
 

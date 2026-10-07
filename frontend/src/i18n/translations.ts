@@ -171,6 +171,7 @@ export interface Dictionary {
   };
   detail: {
     addedAfter: string;
+    needsAccess: string;
   };
   feed: {
     pricing: string;
@@ -1245,6 +1246,7 @@ export const en: Dictionary = {
   },
   detail: {
     addedAfter: "Added after publishing · {date}",
+    needsAccess: "You meet this opportunity’s conditions. Activate your marketplace access to read the full requirement, open its documents and send an offer.",
   },
   feed: {
     pricing: "Priced as",
@@ -2344,6 +2346,7 @@ export const ar: Dictionary = {
   },
   detail: {
     addedAfter: "أُضيف بعد النشر · {date}",
+    needsAccess: "أنت تستوفي شروط هذه الفرصة. فعّل وصولك إلى السوق لقراءة الطلب كاملًا وفتح مستنداته وتقديم عرض.",
   },
   feed: {
     pricing: "طريقة التسعير",

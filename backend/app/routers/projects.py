@@ -20,6 +20,7 @@ from app.schemas.amendment import ProjectAmendmentOut, ProjectAmendmentRequest
 from app.schemas.award import AwardRecordOut
 from app.config import get_settings
 from app.schemas.project import (
+    OpportunityListing,
     RequirementVersionOut,
     DrawingOut,
     EligibilityCheckOut,
@@ -716,7 +717,14 @@ def my_eligibility(project_id: str, user: User = Depends(require_approved_servic
     if not project or project.status == ProjectStatus.draft or project.is_suspended:
         raise HTTPException(status_code=404, detail="Project not found.")
     reasons = ineligibility_reasons(db, project, acting_profile(db, user))
-    return EligibilityCheckOut(eligible=not reasons, reasons=reasons, rules=rules_out(db, project))
+    listing = None
+    if project.status == ProjectStatus.open and project.bid_deadline > datetime.utcnow():  # open (paused or not), as the feed shows it
+        listing = OpportunityListing(
+            title=project.title, trade=project.trade, governorate=project.governorate, area=project.area,
+            bid_deadline=project.bid_deadline, tender_type=project.tender_type, published_at=project.published_at,
+            paused=project.paused_at is not None,
+        )
+    return EligibilityCheckOut(eligible=not reasons, reasons=reasons, rules=rules_out(db, project), listing=listing)
 
 
 @router.get("/{project_id}/amendments", response_model=list[ProjectAmendmentOut])
@@ -779,7 +787,7 @@ def get_version(project_id: str, number: int, user: User = Depends(get_current_u
         documents=[
             DrawingOut(
                 id=d.id, file_name=d.file_name, uploaded_at=d.uploaded_at, revision=d.revision, is_current=d.is_current,
-                category=d.category, is_required=d.is_required, url=storage.signed_url("project-drawings", d.file_path, expiry),
+                category=d.category, is_required=d.is_required, size_bytes=d.size_bytes, url=storage.signed_url("project-drawings", d.file_path, expiry),
             )
             for d in sorted(current.values(), key=lambda d: d.file_name.lower())
         ],
@@ -993,6 +1001,7 @@ def drawing_history(project_id: str, user: User = Depends(get_current_user), db:
             is_current=d.is_current,
             category=d.category,
             is_required=d.is_required,
+            size_bytes=d.size_bytes,
             url=storage.signed_url("project-drawings", d.file_path, expiry),
         )
         for d in rows
@@ -1019,6 +1028,7 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
             is_current=d.is_current,
             category=d.category,
             is_required=d.is_required,
+            size_bytes=d.size_bytes,
             url=storage.signed_url("project-drawings", d.file_path, expiry),
         )
         for d in drawing_rows

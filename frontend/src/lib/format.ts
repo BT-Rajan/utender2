@@ -1,18 +1,37 @@
-export function timeRemaining(deadlineIso: string): string {
-  const diffMs = new Date(deadlineIso).getTime() - Date.now();
-  if (diffMs <= 0) return "Deadline passed";
-  const days = Math.floor(diffMs / 86_400_000);
-  const hours = Math.floor((diffMs % 86_400_000) / 3_600_000);
-  return `${days}d ${hours}h remaining`;
+// The interface language, as I18nContext sets it on <html lang>. Lets the
+// plain helpers below follow the language without a hook.
+function uiLanguage(): string {
+  return typeof document !== "undefined" && document.documentElement.lang === "ar" ? "ar" : "en";
 }
 
+export function timeRemaining(deadlineIso: string): string {
+  const diffMs = new Date(deadlineIso).getTime() - Date.now();
+  const ar = uiLanguage() === "ar";
+  if (diffMs <= 0) return ar ? "انتهى الموعد" : "Deadline passed";
+  const days = Math.floor(diffMs / 86_400_000);
+  const hours = Math.floor((diffMs % 86_400_000) / 3_600_000);
+  return ar ? `متبقٍ ${days} يوم و${hours} ساعة` : `${days}d ${hours}h remaining`;
+}
+
+// Short date and time in the interface language; the year is added when it
+// isn't this year.
 export function formatDeadline(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
+  const d = new Date(iso);
+  return d.toLocaleString(uiLanguage() === "ar" ? "ar-KW" : "en-US", {
     month: "short",
     day: "numeric",
+    ...(d.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}),
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+// A file size for people: 820 KB, 4.2 MB.
+export function formatSize(bytes: number | null | undefined): string | null {
+  if (bytes == null) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function stars(rating: number): string {
