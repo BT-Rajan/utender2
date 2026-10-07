@@ -18,7 +18,7 @@ from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.review import Review
 from app.models.user import User
 from app.schemas.document import DocumentRequirementOut, OwnerDocumentOut
-from app.schemas.offer import OfferOut, OfferRevisionOut, OwnerOfferOut
+from app.schemas.offer import OfferComparisonOut, OfferOut, OfferRevisionOut, OwnerOfferOut
 from app.schemas.owner import OwnerProfileOut
 from app.schemas.project import EligibilityQualification, ProjectOut
 from app.schemas.review import ReviewCreate, ReviewOut
@@ -221,6 +221,46 @@ def _readable_offer(project_id: str, offer_id: str, user: User, db: Session) -> 
     if not offer or offer.project_id != project_id or offer.status in (OfferStatus.draft, OfferStatus.withdrawn) or offer.is_suspended:
         raise HTTPException(status_code=404, detail="Offer not found.")
     return offer
+
+
+# Stage 6.6: how many offers one comparison takes -- enough to weigh them,
+# bounded so a comparison never loads a whole inbox (each signs its links).
+COMPARE_MAX = 10
+
+
+@router.get("/projects/{project_id}/offers/compare", response_model=OfferComparisonOut)
+def compare_offers(
+    project_id: str,
+    ids: list[str] = Query(..., min_length=1),
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    """Stage 6.6: chosen offers on the owner's own requirement, side by side,
+    each exactly as submitted (nothing recalculated, normalised or scored).
+    The same access rules as reviewing one offer: the owner side, this
+    requirement, unsealed, live (not withdrawn), not suspended. Read-only."""
+    from app.routers.offers import preview_requirement
+
+    wanted = list(dict.fromkeys(ids))  # the order chosen, each once
+    if len(wanted) > COMPARE_MAX:
+        raise HTTPException(status_code=400, detail=f"Compare up to {COMPARE_MAX} offers at a time.")
+    project = _get_owned_project(project_id, user, db)
+    if is_sealed_and_open(project):
+        raise HTTPException(status_code=404, detail="Not available while this tender is sealed and still open.")
+    rows = {
+        o.id: (o, cp)
+        for o, cp in db.query(Offer, ServiceProviderProfile)
+        .outerjoin(ServiceProviderProfile, Offer.service_provider_id == ServiceProviderProfile.user_id)
+        .filter(
+            Offer.id.in_(wanted), Offer.project_id == project_id, Offer.is_suspended.is_(False),
+            Offer.status.notin_([OfferStatus.draft, OfferStatus.withdrawn]),
+        )
+    }
+    return OfferComparisonOut(
+        requirement=preview_requirement(db, project),
+        offers=[_owner_offer_out(db, project, *rows[i]) for i in wanted if i in rows],
+        unavailable=[i for i in wanted if i not in rows],
+    )
 
 
 @router.get("/projects/{project_id}/offers/{offer_id}/history", response_model=list[OfferRevisionOut])

@@ -245,3 +245,15 @@ class OwnerOfferOut(BaseModel):
     provider_name: str | None
     offer: OfferOut
     on_current_version: bool
+
+
+class OfferComparisonOut(BaseModel):
+    """Stage 6.6: the owner's chosen offers on one requirement, side by side --
+    each exactly as stored, in the order chosen (no ranking), beside the
+    requirement as it is now. `unavailable`: ids asked for that aren't
+    offers the owner may review on this requirement now (withdrawn,
+    suspended, another requirement's...) -- left out, never shown."""
+
+    requirement: PreviewRequirement
+    offers: list[OfferOut]
+    unavailable: list[str] = []

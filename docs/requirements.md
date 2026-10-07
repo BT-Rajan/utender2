@@ -447,4 +447,19 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - **Document integrity (fixed):** adding or replacing a requirement document after publishing now commits the file together with its amendment, in one transaction under the requirement's lock. Before, the file was committed first and only tied to the new version in a second step. Until that second step (or if it failed), a replacement file would count as part of the earlier version, so earlier offers would appear to have priced it, and the lock was released early.
   - **Over the requirement's life:** each offer's version stays the same through suspend, resume, extension, closing and ending without an award.
 
+- **6.6 Offer comparison:** `GET /owner/projects/{id}/offers/compare?ids=…`, at `/owner/projects/{id}/compare`. The owner ticks offers in the inbox, then chooses "Compare selected".
+  - **What can be compared:** only live offers the owner may review on that requirement: the owner side, unsealed, not withdrawn, not suspended. Any other id (another requirement's offer, a withdrawn or suspended one) is left out and only counted as "no longer comparable", never shown. Providers are refused.
+  - **Limits:** 2–10 offers, each once, in the order chosen.
+  - **What it shows:** each offer exactly as stored, its current version only (earlier versions stay in each offer's history). Side by side:
+    - status and the requirement version answered (flagged if earlier), plus a note when the offers answer different versions;
+    - submission time and total in the requirement's currency;
+    - for per-item pricing, each item's rate and line total;
+    - start, completion or duration, completion period and timing flags;
+    - technical response and assumptions, word for word;
+    - each requested document, opened through the authorised route;
+    - each declaration accepted or not.
+  - **Differences:** rows where the offers differ are marked ≠, without saying which is better.
+  - **No scoring:** nothing is recalculated, normalised, scored, ranked or recommended.
+  - **Freshness:** read-only; refreshes every minute and on returning to the page, so a withdrawal or revision appears as it happens.
+
 _Later Stage 6 steps are added as they are implemented._

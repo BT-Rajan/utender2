@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError, API_URL, draftVersion } from "@/api/client";
 import type { Drawing, Offer, ProjectDetail } from "@/api/types";
@@ -327,6 +327,9 @@ export function OwnerProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const [rating, setRating] = useState(0);
+  // Stage 6.6: offers chosen for side-by-side comparison (live ones only).
+  const [compare, setCompare] = useState<string[]>([]);
+  const navigate = useNavigate();
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -757,6 +760,21 @@ export function OwnerProjectDetailPage() {
           ) : (
             <>
               <InboxCounts offers={offers} t={t} />
+              {(() => {
+                // Only offers still live in the server's list stay selected.
+                const chosen = compare.filter((cid) => offers.some((o) => o.id === cid && o.status !== "withdrawn"));
+                return (
+                  <button
+                    type="button"
+                    disabled={chosen.length < 2}
+                    onClick={() => navigate(`/owner/projects/${project.id}/compare?${chosen.map((cid) => `ids=${encodeURIComponent(cid)}`).join("&")}`)}
+                    className="mb-3 border border-navy text-navy disabled:opacity-50 text-xs font-semibold rounded px-3 py-1.5"
+                    data-testid="compare-selected"
+                  >
+                    {t("compareOffers.compareSelected").replace("{n}", String(chosen.length))}
+                  </button>
+                );
+              })()}
               <EvaluationSummary offers={offers} t={t} />
               <div className="overflow-x-auto">
               <table className="w-full border-collapse">
@@ -799,6 +817,17 @@ export function OwnerProjectDetailPage() {
                         </div>
                       )}
                       {o.message && <div className="text-xs text-steel-light mt-0.5 max-w-xs">{o.message}</div>}
+                      {o.status !== "withdrawn" && (
+                        <label className="flex items-center gap-1 mt-1 font-mono text-[11px] text-steel">
+                          <input
+                            type="checkbox"
+                            checked={compare.includes(o.id)}
+                            onChange={(e) => setCompare((prev) => (e.target.checked ? [...prev, o.id] : prev.filter((x) => x !== o.id)))}
+                            data-testid="compare-select"
+                          />
+                          {t("compareOffers.select")}
+                        </label>
+                      )}
                       {/* Stage 6.4: the whole offer, as submitted, on its own page. */}
                       {o.status !== "withdrawn" && (
                         <Link to={`/owner/projects/${project.id}/offers/${o.id}`} className="inline-block mt-1 font-mono text-[11px] text-blue underline" data-testid="owner-offer-open">

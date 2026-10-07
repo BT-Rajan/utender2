@@ -244,6 +244,13 @@ export interface OwnerOffer {
   on_current_version: boolean;
 }
 
+// Stage 6.6: chosen offers side by side, as stored, in the order chosen.
+export interface OfferComparison {
+  requirement: OfferPreview["requirement"];
+  offers: Offer[];
+  unavailable: string[];
+}
+
 export interface Offer {
   id: string;
   project_id: string;

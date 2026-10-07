@@ -186,6 +186,28 @@ export interface Dictionary {
     draftStarted: string;
     lastSaved: string;
   };
+  compareOffers: {
+    select: string;
+    compareSelected: string;
+    heading: string;
+    intro: string;
+    noScore: string;
+    provider: string;
+    status: string;
+    answered: string;
+    total: string;
+    items: string;
+    timing: string;
+    approach: string;
+    assumptions: string;
+    documents: string;
+    declarations: string;
+    differs: string;
+    unavailable: string;
+    loadError: string;
+    needTwo: string;
+    sealed: string;
+  };
   ownerOffer: {
     open: string;
     back: string;
@@ -1403,6 +1425,28 @@ export const en: Dictionary = {
     draftStatus: "Draft — not submitted. Nothing is sent to the owner until you submit it.",
     draftStarted: "started",
     lastSaved: "last saved",
+  },
+  compareOffers: {
+    select: "Compare",
+    compareSelected: "Compare selected ({n})",
+    heading: "Compare offers",
+    intro: "The selected offers side by side, exactly as each provider submitted them, in the order you chose.",
+    noScore: "Nothing here is scored or ranked. Rows marked ≠ differ between the offers.",
+    provider: "Provider",
+    status: "Status",
+    answered: "Requirement version answered",
+    total: "Total price",
+    items: "Item prices",
+    timing: "Start / completion",
+    approach: "Technical response",
+    assumptions: "Assumptions & exclusions",
+    documents: "Documents",
+    declarations: "Declarations",
+    differs: "Differs",
+    unavailable: "{n} of the selected offers can no longer be compared (withdrawn, suspended or not on this requirement) and are left out.",
+    loadError: "Could not load the comparison. Refresh the page to try again.",
+    needTwo: "Select at least two offers to compare.",
+    sealed: "These offers can't be compared yet: the tender is sealed until its deadline.",
   },
   ownerOffer: {
     open: "View offer",
@@ -2646,6 +2690,28 @@ export const ar: Dictionary = {
     draftStatus: "مسودة — لم تُقدَّم. لا يُرسل شيء إلى المالك حتى تقدّمها.",
     draftStarted: "بدأت في",
     lastSaved: "آخر حفظ",
+  },
+  compareOffers: {
+    select: "قارن",
+    compareSelected: "قارن المحدد ({n})",
+    heading: "مقارنة العروض",
+    intro: "العروض المحددة جنبًا إلى جنب، كما قدّمها كل مزوّد تمامًا، بالترتيب الذي اخترته.",
+    noScore: "لا شيء هنا مُقيّم أو مُرتّب. الصفوف المعلّمة بـ ≠ تختلف بين العروض.",
+    provider: "المزوّد",
+    status: "الحالة",
+    answered: "إصدار المتطلب المجاب عليه",
+    total: "السعر الإجمالي",
+    items: "أسعار البنود",
+    timing: "البدء / الإنجاز",
+    approach: "الرد الفني",
+    assumptions: "الافتراضات والاستثناءات",
+    documents: "المستندات",
+    declarations: "الإقرارات",
+    differs: "يختلف",
+    unavailable: "{n} من العروض المحددة لم تعد قابلة للمقارنة (مسحوبة أو موقوفة أو لا تخص هذا المتطلب) وتم استبعادها.",
+    loadError: "تعذر تحميل المقارنة. حدّث الصفحة للمحاولة مجددًا.",
+    needTwo: "حدّد عرضين على الأقل للمقارنة.",
+    sealed: "لا يمكن مقارنة هذه العروض بعد: المناقصة مختومة حتى موعدها النهائي.",
   },
   ownerOffer: {
     open: "عرض العرض",
