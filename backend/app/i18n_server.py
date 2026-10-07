@@ -251,6 +251,7 @@ AR: dict[str, str] = {
     "This requirement is priced as one total, not per item.": "يُسعَّر هذا الطلب بمبلغ إجمالي واحد، وليس لكل بند.",
     "That item isn't part of this requirement.": "هذا البند ليس جزءًا من هذا الطلب.",
     "Start preparing your offer first.": "ابدأ إعداد عرضك أولًا.",
+    "No offer to preview.": "لا يوجد عرض لمعاينته.",
     "That declaration isn't part of this requirement.": "هذا الإقرار ليس جزءًا من هذا الطلب.",
     "Give either a completion date or a duration, not both.": "أدخل إما تاريخ الإنجاز أو المدة، وليس كليهما.",
     "The completion date can't be before the start date.": "لا يمكن أن يكون تاريخ الإنجاز قبل تاريخ البدء.",

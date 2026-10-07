@@ -290,4 +290,20 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - It grants nothing: submission repeats its own checks under the requirement's lock, now including the saved timing. A stale "ready" or a direct API call can't get round it.
   - Not an evaluation: no scoring, ranking or judgement of quality.
 
-_Further steps (5.9 onwards) are added as they are implemented._
+- **5.9 Offer preview:**
+  - "Preview offer" shows the provider's saved draft exactly as submitting would send it:
+    - the requirement it answers (title, area, deadline, version and latest amendment, pricing basis, scope on demand);
+    - who it's from;
+    - the price (each item as quantity × rate with its line total, and the total, in the requirement's currency);
+    - the technical approach;
+    - the start/completion commitment with any conflicts against the owner's timing;
+    - the assumptions;
+    - each requested document with the file attached, or "not provided";
+    - each declaration, accepted or not.
+  - Built on the server from the one stored offer on every request (`GET /projects/{id}/offers/draft/preview`); there's no separate preview copy. Edit → Save → Preview → Back to edit → change → Save → Preview always shows the latest saved values. The form stays open behind the preview, so nothing typed is lost.
+  - Carries the Stage 5.8 verdict: "Passed the current checks — ready to submit", or "Cannot submit yet" with each issue and a "Go to section" link back to that part of the form. It never implies ready when the offer isn't.
+  - After a material amendment, it shows the current requirement and flags that the offer predates it (not ready until reviewed).
+  - Only the provider's own side's offer, on a requirement they may open; anything else is not found. Documents are listed through the usual short-lived signed links, never storage paths.
+  - Previewing submits, seals and locks nothing.
+
+_Further steps (5.10 onwards) are added as they are implemented._

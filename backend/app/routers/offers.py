@@ -3,6 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.db import get_db
 from app.i18n_server import translate
 from app.deps import get_service_provider_profile, require_approved_service_provider, require_marketplace_active_service_provider, require_service_provider
@@ -10,7 +11,7 @@ from app.models.enums import NotificationType, OfferStatus, ProjectStatus, Tende
 from app.models.offer import Offer, OfferDocument, OfferRevision
 from app.models.project import Project
 from app.models.user import User
-from app.schemas.offer import OfferAssumptionsDraft, OfferCommercialDraft, OfferDeclarationsDraft, OfferReadiness, OfferCreate, OfferTechnicalDraft, OfferTimingDraft, OfferDocumentOut, OfferOut, OfferRevisionOut
+from app.schemas.offer import OfferAssumptionsDraft, OfferCommercialDraft, OfferDeclarationsDraft, OfferPreviewOut, OfferReadiness, PreviewRequirement, OfferCreate, OfferTechnicalDraft, OfferTimingDraft, OfferDocumentOut, OfferOut, OfferRevisionOut
 from app.services.audit import log_action
 from app.services.eligibility import assert_eligible
 from app.services.email import notify_owner_new_offer
@@ -174,6 +175,52 @@ def check_offer(project_id: str, user: User = Depends(require_service_provider),
     for issue in issues:  # in the viewer's language, like every server message
         issue.message = translate(issue.message)
     return OfferReadiness(ready=not issues, issues=issues)
+
+
+@router.get("/draft/preview", response_model=OfferPreviewOut)
+def preview_offer(project_id: str, user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
+    """Stage 5.9: what this provider's side would submit, exactly as stored --
+    price, technical response, timing, documents, assumptions, declarations
+    -- read fresh from the one offer row on every request (no preview copy),
+    beside the requirement as it is now and the quality gate's verdict.
+    Only the provider's own side's offer, on a requirement they may open;
+    anything else is not found. Read-only: it submits, seals and locks
+    nothing."""
+    from app.models.project_amendment import ProjectAmendment
+    from app.routers.projects import _can_view_project
+    from app.schemas.project import ProjectItemOut
+
+    sync_expired_projects(db)
+    project = db.get(Project, project_id)
+    offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first() if project else None
+    if not project or project.status == ProjectStatus.draft or not offer or not _can_view_project(user, project, db):
+        raise HTTPException(status_code=404, detail="No offer to preview.")
+    profile = acting_profile(db, user)
+    issues = readiness(db, project, profile, offer)
+    for issue in issues:
+        issue.message = translate(issue.message)
+    latest = (
+        db.query(ProjectAmendment.amendment_number)
+        .filter(ProjectAmendment.project_id == project.id)
+        .order_by(ProjectAmendment.amendment_number.desc())
+        .first()
+    )
+    reqs = requirements_for(project)
+    requirement = PreviewRequirement(
+        id=project.id, title=project.title, trade=project.trade, governorate=project.governorate, area=project.area,
+        description=project.description, pricing_basis=project.pricing_basis.value, currency=get_settings().marketplace_currency,
+        tender_type=project.tender_type.value, bid_deadline=project.bid_deadline,
+        expected_start_date=project.expected_start_date, expected_completion_date=project.expected_completion_date,
+        expected_duration_days=project.expected_duration_days, material_revision=project.material_revision,
+        amendment_number=latest[0] if latest else None,
+        items=[ProjectItemOut.model_validate(i) for i in sorted(project.items, key=lambda i: i.position)],
+        declarations=list(reqs.declarations), requested_documents=[{"name": d.name, "required": d.required} for d in reqs.documents],
+    )
+    return OfferPreviewOut(
+        requirement=requirement, provider_name=profile.company_name if profile else None, offer=_with_documents(db, offer),
+        readiness=OfferReadiness(ready=not issues, issues=issues),
+        on_current_version=offer.based_on_material_revision >= project.material_revision,
+    )
 
 
 @router.put("/draft/timing", response_model=OfferOut)

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import type { Offer, OfferDocument, OfferReadiness, ProjectDetail } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { OfferPreview, SECTION_ANCHORS } from "@/components/OfferPreview";
 import { OutdatedOfferNotice } from "@/components/PostPublication";
 import { useI18n } from "@/i18n/I18nContext";
 import { fullDate } from "@/lib/format";
@@ -34,6 +35,12 @@ export function OfferForm({
   const [rates, setRates] = useState<Record<string, string>>({});
   const [accepted, setAccepted] = useState<string[]>([]);
   const [savedNotice, setSavedNotice] = useState(false);
+  // Stage 5.9: preview the saved draft; the form stays mounted (hidden) so nothing typed is lost.
+  const [previewing, setPreviewing] = useState(false);
+  const backToEdit = (anchor?: string | null) => {
+    setPreviewing(false);
+    if (anchor) setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
+  };
   // Stage 5.5: the execution commitment, in the requirement's terms.
   const [startDate, setStartDate] = useState("");
   const [completionDate, setCompletionDate] = useState("");
@@ -173,6 +180,7 @@ export function OfferForm({
       setSavedNotice(true);
       queryClient.setQueryData(["my-offer", project.id], saved);
       queryClient.invalidateQueries({ queryKey: ["offer-check", project.id] });
+      queryClient.invalidateQueries({ queryKey: ["offer-preview", project.id] });
     },
     onError: (err) => {
       setSavedNotice(false);
@@ -206,13 +214,15 @@ export function OfferForm({
   return (
     <>
       <ErrorBanner message={error} />
-      {draft && !existingOffer && !preview && <ReadinessPanel projectId={project.id} />}
+      {previewing && draft && <OfferPreview projectId={project.id} onEdit={backToEdit} />}
+      <div className={previewing ? "hidden" : undefined}>
+      {draft && !existingOffer && !preview && <ReadinessPanel projectId={project.id} onGoTo={backToEdit} />}
       {existingOffer && !preview && <OutdatedOfferNotice project={project} offer={existingOffer} />}
       <fieldset disabled={preview} className={preview ? "opacity-80" : undefined}>
         <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6 items-start">
           <form onSubmit={handleSubmit} className="grid gap-[18px]">
             {perItem ? (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" id="offer-section-price">
                 <table className="w-full border-collapse text-sm">
                   <thead>
                     <tr className="font-mono text-[10px] uppercase text-steel">
@@ -252,7 +262,7 @@ export function OfferForm({
                 </table>
               </div>
             ) : (
-              <div>
+              <div id="offer-section-price">
                 <label htmlFor="offer-amount" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">
                   {t("response.amount").replace("{currency}", project.currency)}
                 </label>
@@ -282,7 +292,7 @@ export function OfferForm({
               />
             </div>
             {/* Stage 5.5: when the provider commits to start and finish, beside what the owner expects (Stage 3.7). */}
-            <fieldset className="grid gap-2" data-testid="timing-commitment">
+            <fieldset className="grid gap-2" data-testid="timing-commitment" id="offer-section-timing">
               <legend className="font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("timing.heading")}</legend>
               {(project.expected_start_date || project.expected_completion_date || project.expected_duration_days) && (
                 <p className="text-xs text-steel" data-testid="owner-timing">
@@ -346,7 +356,7 @@ export function OfferForm({
               <p className="text-xs text-steel mt-1" data-testid="assumptions-guide">{t("response.assumptionsGuide")}</p>
             </div>
             {rules.documents.length > 0 && (
-              <fieldset>
+              <fieldset id="offer-section-documents">
                 <legend className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("response.attachments")}</legend>
                 <ul className="grid gap-2">
                   {rules.documents.map((doc) => {
@@ -388,7 +398,7 @@ export function OfferForm({
               </fieldset>
             )}
             {rules.declarations.length > 0 && (
-              <fieldset>
+              <fieldset id="offer-section-declarations">
                 <legend className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("response.declarations")}</legend>
                 <div className="grid gap-1.5">
                   {rules.declarations.map((text) => (
@@ -425,6 +435,11 @@ export function OfferForm({
                   {t("response.saveDraft")}
                 </button>
               )}
+              {draft && !existingOffer && !preview && (
+                <button type="button" onClick={() => setPreviewing(true)} className="text-sm text-blue underline" data-testid="preview-offer">
+                  {t("offerPreview.open")}
+                </button>
+              )}
               {savedNotice && !saveDraftMutation.isPending && (
                 <span className="text-xs text-green" data-testid="draft-saved">{t("response.draftSaved")}</span>
               )}
@@ -451,6 +466,7 @@ export function OfferForm({
           </div>
         </div>
       </fieldset>
+      </div>
     </>
   );
 }
@@ -458,7 +474,7 @@ export function OfferForm({
 // Stage 5.8: the server's quality gate for the saved draft -- ready to
 // submit, or everything still to do, by part of the offer. It checks the
 // saved draft (save first), and decides nothing: submitting checks again.
-function ReadinessPanel({ projectId }: { projectId: string }) {
+function ReadinessPanel({ projectId, onGoTo }: { projectId: string; onGoTo: (anchor?: string | null) => void }) {
   const { t } = useI18n();
   const { data: check, refetch, isFetching } = useQuery({
     queryKey: ["offer-check", projectId],
@@ -482,6 +498,11 @@ function ReadinessPanel({ projectId }: { projectId: string }) {
             <li key={i} className="text-steel">
               <span className="font-mono text-[10px] uppercase text-navy me-2">{t(`readiness.section_${issue.section}`)}</span>
               {issue.message}
+              {SECTION_ANCHORS[issue.section] && (
+                <button type="button" onClick={() => onGoTo(SECTION_ANCHORS[issue.section])} className="ms-2 text-xs text-blue underline">
+                  {t("offerPreview.fix")}
+                </button>
+              )}
             </li>
           ))}
         </ul>

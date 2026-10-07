@@ -185,6 +185,25 @@ export interface Dictionary {
     draftStatus: string;
     draftStarted: string;
   };
+  offerPreview: {
+    open: string;
+    heading: string;
+    backToEdit: string;
+    notSubmitted: string;
+    passed: string;
+    fix: string;
+    requirement: string;
+    version: string;
+    amendment: string;
+    outdated: string;
+    scope: string;
+    from: string;
+    total: string;
+    unknownItems: string;
+    notProvided: string;
+    loading: string;
+    unavailable: string;
+  };
   readiness: {
     ready: string;
     notReady: string;
@@ -1335,6 +1354,25 @@ export const en: Dictionary = {
     reviewFirst: "Confirm you’ve reviewed the current requirement to continue preparing your offer.",
     draftStatus: "Draft — not submitted. Nothing is sent to the owner until you submit it.",
     draftStarted: "started",
+  },
+  offerPreview: {
+    open: "Preview offer",
+    heading: "Preview of your offer",
+    backToEdit: "Back to edit",
+    notSubmitted: "This is your saved draft, exactly as it would be sent to the owner. It has not been submitted. Save any changes first to see them here.",
+    passed: "Passed the current checks — ready to submit",
+    fix: "Go to section",
+    requirement: "Responding to",
+    version: "Requirement version",
+    amendment: "amendment",
+    outdated: "The requirement changed after you started this offer. Review the current requirement before submitting.",
+    scope: "Scope of work",
+    from: "From",
+    total: "Total price:",
+    unknownItems: "Some prices refer to items no longer in this requirement.",
+    notProvided: "Not provided",
+    loading: "Loading preview…",
+    unavailable: "This offer can’t be previewed right now.",
   },
   readiness: {
     ready: "Ready to submit",
@@ -2511,6 +2549,25 @@ export const ar: Dictionary = {
     reviewFirst: "أكّد أنك راجعت الطلب الحالي لمتابعة إعداد عرضك.",
     draftStatus: "مسودة — لم تُقدَّم. لا يُرسل شيء إلى المالك حتى تقدّمها.",
     draftStarted: "بدأت في",
+  },
+  offerPreview: {
+    open: "معاينة العرض",
+    heading: "معاينة عرضك",
+    backToEdit: "العودة إلى التعديل",
+    notSubmitted: "هذه مسودتك المحفوظة كما ستُرسل إلى المالك تمامًا. لم تُقدَّم بعد. احفظ أي تعديلات أولًا لتظهر هنا.",
+    passed: "اجتاز الفحوصات الحالية — جاهز للتقديم",
+    fix: "الانتقال إلى القسم",
+    requirement: "الرد على",
+    version: "إصدار الطلب",
+    amendment: "تعديل",
+    outdated: "تغيّر الطلب بعد أن بدأت هذا العرض. راجع الطلب الحالي قبل التقديم.",
+    scope: "نطاق العمل",
+    from: "من",
+    total: "السعر الإجمالي:",
+    unknownItems: "بعض الأسعار تشير إلى بنود لم تعد في هذا الطلب.",
+    notProvided: "غير مُدخل",
+    loading: "جارٍ تحميل المعاينة…",
+    unavailable: "لا يمكن معاينة هذا العرض الآن.",
   },
   readiness: {
     ready: "جاهز للتقديم",

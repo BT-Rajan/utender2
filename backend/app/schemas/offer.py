@@ -4,6 +4,8 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import OfferStatus
+from app.schemas.common import UTCDateTime
+from app.schemas.project import ProjectItemOut
 
 
 class OfferItemPrice(BaseModel):
@@ -161,3 +163,41 @@ class OfferRevisionOut(BaseModel):
     status: OfferStatus
     based_on_material_revision: int = 0  # Stage 3.17: the requirement version it was made against
     recorded_at: datetime
+
+
+class PreviewRequirement(BaseModel):
+    """Stage 5.9: enough of the requirement, as it is now, for the provider to
+    check the offer is for the right opportunity and version -- not the whole
+    requirement."""
+
+    id: str
+    title: str
+    trade: str | None
+    governorate: str | None
+    area: str | None
+    description: str | None
+    pricing_basis: str
+    currency: str
+    tender_type: str
+    bid_deadline: UTCDateTime
+    expected_start_date: date | None
+    expected_completion_date: date | None
+    expected_duration_days: int | None
+    material_revision: int  # the current version
+    amendment_number: int | None  # the latest amendment, if any
+    items: list[ProjectItemOut] = []
+    declarations: list[str] = []
+    requested_documents: list[dict] = []  # [{"name", "required"}]
+
+
+class OfferPreviewOut(BaseModel):
+    """Stage 5.9: the provider's offer exactly as stored -- what submission
+    would send -- with who it is from, the requirement it answers (as it is
+    now), and the quality gate's verdict (Stage 5.8). Built on every request
+    from the stored offer; there is no separate preview copy."""
+
+    requirement: PreviewRequirement
+    provider_name: str | None
+    offer: OfferOut
+    readiness: OfferReadiness
+    on_current_version: bool

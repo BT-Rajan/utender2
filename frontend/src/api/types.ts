@@ -194,6 +194,34 @@ export interface OfferReadiness {
   issues: { section: "requirement" | "account" | "eligibility" | "price" | "technical" | "timing" | "documents" | "declarations" | "offer"; message: string }[];
 }
 
+// Stage 5.9: the stored offer as submission would send it, the requirement as it now is, and the gate's verdict.
+export interface OfferPreview {
+  requirement: {
+    id: string;
+    title: string;
+    trade: string | null;
+    governorate: string | null;
+    area: string | null;
+    description: string | null;
+    pricing_basis: "lump_sum" | "per_item";
+    currency: string;
+    tender_type: "sealed" | "owner_visible";
+    bid_deadline: string;
+    expected_start_date: string | null;
+    expected_completion_date: string | null;
+    expected_duration_days: number | null;
+    material_revision: number;
+    amendment_number: number | null;
+    items: { id: string; position: number; description: string; quantity: string | null; unit: string | null; specification: string | null }[];
+    declarations: string[];
+    requested_documents: { name: string; required: boolean }[];
+  };
+  provider_name: string | null;
+  offer: Offer;
+  readiness: OfferReadiness;
+  on_current_version: boolean;
+}
+
 export interface Offer {
   id: string;
   project_id: string;
