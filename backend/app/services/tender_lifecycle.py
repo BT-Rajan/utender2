@@ -23,7 +23,10 @@ from app.models.project import Project
 def is_sealed_and_open(project: Project) -> bool:
     return (
         project.tender_type == TenderType.sealed
-        and project.status in (ProjectStatus.open, ProjectStatus.canceled)
+        # Ended before its deadline (canceled, or closed outside U-Tender):
+        # sealed bids stay sealed until the deadline all the same, so ending
+        # a tender early is never a way to read competitors' sealed prices.
+        and project.status in (ProjectStatus.open, ProjectStatus.canceled, ProjectStatus.no_award)
         and project.bid_deadline > datetime.utcnow()
     )
 

@@ -382,18 +382,79 @@ def _notify_bidders(db: Session, project: Project, notification_type: Notificati
             )
 
 
+# Stage 3.16: how a requirement ends without a U-Tender award. The status
+# says what happened (canceled / no_award / expired); closure_reason says
+# why, so outcomes with different meanings stay distinguishable without new
+# states. A note, if given, goes to the audit trail only -- it may be
+# commercially sensitive, so providers never see it.
+CANCEL_REASONS = ("not_needed", "postponed", "other")
+NO_AWARD_REASONS = ("no_suitable_offer", "closed_externally")
+
+
+class ClosureRequest(BaseModel):
+    reason: str | None = None
+    note: str | None = Field(default=None, max_length=1000)
+
+
+def _end(db: Session, user: User, project: Project, status: ProjectStatus, reason: str, note: str | None, action: str, kind: NotificationType):
+    previous = project.status.value
+    now = datetime.utcnow().replace(microsecond=0)
+    if project.status == ProjectStatus.open:
+        project.closed_at = now  # offers stop now
+    project.status = status
+    project.closure_reason = reason
+    project.paused_at = None
+    log_action(
+        db, actor_id=user.id, action=action, target_type="project", target_id=project.id,
+        previous_value=previous, new_value=f"{status.value}:{reason}", reason=(note or "").strip() or None,
+    )
+    _notify_bidders(db, project, kind)
+    db.refresh(project)
+    return _project_response(project, db)
+
+
 @router.post("/projects/{project_id}/no-award", response_model=ProjectOut)
-def mark_no_award(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+def mark_no_award(project_id: str, payload: ClosureRequest | None = None, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Offers have closed and none of them is suitable: no award."""
     sync_expired_projects(db)
     project = _get_owned_project(project_id, user, db, lock=True)
     if project.status not in (ProjectStatus.closed, ProjectStatus.under_evaluation):
         raise HTTPException(status_code=400, detail="Only a closed or under-evaluation project can be marked no-award.")
-    previous = project.status.value
-    project.status = ProjectStatus.no_award
-    log_action(db, actor_id=user.id, action="project.no_award", target_type="project", target_id=project_id, previous_value=previous, new_value="no_award")
-    _notify_bidders(db, project, NotificationType.tender_no_award)
-    db.refresh(project)
-    return _project_response(project, db)
+    note = payload.note if payload else None
+    return _end(db, user, project, ProjectStatus.no_award, "no_suitable_offer", note, "project.no_award", NotificationType.tender_no_award)
+
+
+@router.post("/projects/{project_id}/close-externally", response_model=ProjectOut)
+def close_externally(project_id: str, payload: ClosureRequest | None = None, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """The owner will handle the work outside U-Tender. Recorded as ending
+    without a U-Tender award -- nobody is awarded, nothing about the outside
+    arrangement is asked for or tracked. Possible while offers are open
+    (they stop now) or after they close."""
+    sync_expired_projects(db)
+    project = _get_owned_project(project_id, user, db, lock=True)
+    if project.status not in (ProjectStatus.open, ProjectStatus.closed, ProjectStatus.under_evaluation):
+        raise HTTPException(status_code=400, detail="This project can no longer be closed.")
+    note = payload.note if payload else None
+    return _end(db, user, project, ProjectStatus.no_award, "closed_externally", note, "project.closed_externally", NotificationType.tender_no_award)
+
+
+@router.post("/projects/{project_id}/cancel", response_model=ProjectOut)
+def cancel_project(project_id: str, payload: ClosureRequest | None = None, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """The requirement won't proceed in its current form (no longer needed,
+    postponed indefinitely, or another reason). Offers and history stay."""
+    sync_expired_projects(db)
+    project = _get_owned_project(project_id, user, db, lock=True)
+    if project.status == ProjectStatus.draft:
+        # A draft was never published: "cancelling" it is discarding it. It
+        # must not become a canceled tender, which providers can open.
+        db.rollback()
+        return discard_draft(project_id, user, db)
+    if project.status not in (ProjectStatus.open, ProjectStatus.closed, ProjectStatus.under_evaluation):
+        raise HTTPException(status_code=400, detail="This project can no longer be canceled.")
+    reason = (payload.reason if payload and payload.reason else "other")
+    if reason not in CANCEL_REASONS:
+        raise HTTPException(status_code=400, detail="Choose why the requirement is being canceled.")
+    return _end(db, user, project, ProjectStatus.canceled, reason, payload.note if payload else None, "project.cancel", NotificationType.tender_cancelled)
 
 
 @router.post("/projects/{project_id}/discard", response_model=ProjectOut)
@@ -409,25 +470,6 @@ def discard_draft(project_id: str, user: User = Depends(require_owner), db: Sess
         raise HTTPException(status_code=400, detail="This draft has already been discarded.")
     project.discarded_at = datetime.utcnow().replace(microsecond=0)
     log_action(db, actor_id=user.id, action="project.discard_draft", target_type="project", target_id=project_id, previous_value="draft", new_value="discarded")
-    db.refresh(project)
-    return _project_response(project, db)
-
-
-@router.post("/projects/{project_id}/cancel", response_model=ProjectOut)
-def cancel_project(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
-    sync_expired_projects(db)
-    project = _get_owned_project(project_id, user, db, lock=True)
-    if project.status == ProjectStatus.draft:
-        # A draft was never published: "cancelling" it is discarding it. It
-        # must not become a canceled tender, which providers can open.
-        db.rollback()
-        return discard_draft(project_id, user, db)
-    if project.status not in (ProjectStatus.draft, ProjectStatus.open, ProjectStatus.closed, ProjectStatus.under_evaluation):
-        raise HTTPException(status_code=400, detail="This project can no longer be canceled.")
-    previous = project.status.value
-    project.status = ProjectStatus.canceled
-    log_action(db, actor_id=user.id, action="project.cancel", target_type="project", target_id=project_id, previous_value=previous, new_value="canceled")
-    _notify_bidders(db, project, NotificationType.tender_cancelled)
     db.refresh(project)
     return _project_response(project, db)
 
@@ -599,4 +641,5 @@ def _project_fields(p: Project) -> dict:
         pause_reason=p.pause_reason,
         closed_at=p.closed_at,
         material_revision=p.material_revision,
+        closure_reason=p.closure_reason,
     )

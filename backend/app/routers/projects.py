@@ -936,6 +936,7 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
         pause_reason=project.pause_reason,
         closed_at=project.closed_at,
         material_revision=project.material_revision,
+        closure_reason=project.closure_reason,
         version=project.version,
         documents_required=project.documents_required,
         offer_count=offer_count,

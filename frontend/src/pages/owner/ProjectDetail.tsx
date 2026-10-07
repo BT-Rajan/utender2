@@ -19,6 +19,7 @@ import { CategoryField } from "@/components/CategoryField";
 import { TenderRulesEditor } from "@/components/TenderRules";
 import { QualityCheck, type QualityReport } from "@/components/QualityCheck";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { ClosureOutcome, EndRequirement, outcomeLabel } from "@/components/ClosureOutcome";
 import { AmendPublishedForm, AmendmentsList, PauseControl } from "@/components/PostPublication";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
 import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
@@ -367,7 +368,7 @@ export function OwnerProjectDetailPage() {
 
   const confirm = useConfirm();
   const lifecycleMutation = useMutation({
-    mutationFn: (action: "publish" | "close" | "start-evaluation" | "no-award" | "cancel" | "discard") =>
+    mutationFn: (action: "publish" | "close" | "start-evaluation" | "discard") =>
       apiFetch(`/owner/projects/${id}/${action}`, { method: "POST" }),
     onSuccess: () => {
       setError(null);
@@ -405,7 +406,7 @@ export function OwnerProjectDetailPage() {
             {project.tender_type === "sealed" ? t("owner.projectDetail.sealedBadge") : t("owner.projectDetail.ownerVisibleBadge")}
           </span>
           <span className={`font-mono text-[10px] uppercase tracking-wide px-2.5 py-1 rounded-full ${statusBadgeClasses(project.status)}`}>
-            {project.status.replace(/_/g, " ")}
+            {outcomeLabel(t, project.status, project.closure_reason)}
           </span>
         </div>
       </div>
@@ -504,17 +505,7 @@ export function OwnerProjectDetailPage() {
               {t("owner.projectDetail.startEvaluation")}
             </button>
           )}
-          {(project.status === "closed" || project.status === "under_evaluation") && (
-            <button
-              type="button"
-              onClick={() => lifecycleMutation.mutate("no-award")}
-              disabled={lifecycleMutation.isPending}
-              className="bg-red-tint text-red text-xs font-semibold rounded px-4 py-2"
-            >
-              {t("owner.projectDetail.markNoAward")}
-            </button>
-          )}
-          {editableDraft ? (
+          {editableDraft && (
             <button
               type="button"
               onClick={() => {
@@ -527,18 +518,13 @@ export function OwnerProjectDetailPage() {
             >
               {t("draftDetails.discard")}
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => lifecycleMutation.mutate("cancel")}
-              disabled={lifecycleMutation.isPending}
-              className="text-xs text-red underline disabled:opacity-60"
-            >
-              {t("owner.projectDetail.cancelProject")}
-            </button>
           )}
         </div>
       )}
+
+      {/* Stage 3.16: ending it without a U-Tender award -- and saying how it ended. */}
+      {(project.status === "open" || project.status === "closed" || project.status === "under_evaluation") && <EndRequirement project={project} />}
+      {(project.status === "canceled" || project.status === "no_award") && <ClosureOutcome project={project} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-6 items-start">
         <div>

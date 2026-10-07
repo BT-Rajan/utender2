@@ -9,6 +9,7 @@ import { IneligibleNotice } from "@/components/ProviderEligibility";
 import { ProviderRequirementView } from "@/components/ProviderRequirementView";
 import { OfferForm } from "@/components/OfferForm";
 import { useI18n } from "@/i18n/I18nContext";
+import { outcomeText } from "@/components/ClosureOutcome";
 import { money } from "@/lib/money";
 
 interface AwardRecord {
@@ -106,15 +107,15 @@ export function ServiceProviderOfferPage() {
 
       {biddingClosed ? (
         <div className="border border-dashed border-border rounded p-6 text-sm text-steel">
-          {project.paused_at ? t("postPub.pausedProviderBody") : t("service_provider.offer.biddingClosedNotice")}
+          {project.paused_at ? t("postPub.pausedProviderBody") : outcomeText(t, project.status, project.closure_reason) ?? t("service_provider.offer.biddingClosedNotice")}
           {existingOffer && (
             <div className="mt-3 font-mono text-xs text-navy">
               {t("service_provider.offer.yourFinalOffer")} {money(existingOffer.amount, project.currency)} — status: {existingOffer.status}
             </div>
           )}
           {project.status === "awarded" && <AwardOutcome projectId={project.id} />}
-          {project.status === "no_award" && (
-            <p className="mt-3 font-mono text-xs text-steel-light">{t("service_provider.offer.noAwardNotice")}</p>
+          {(project.status === "no_award" || project.status === "canceled" || project.status === "expired") && (
+            <p className="mt-3 font-mono text-xs text-steel-light">{t("closure.offersKept")}</p>
           )}
         </div>
       ) : (

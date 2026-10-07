@@ -112,6 +112,11 @@ class Project(Base):
     pause_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     # When offers stopped being accepted (closed early, or at the deadline).
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Stage 3.16: why a requirement ended without a U-Tender award, within
+    # its terminal status (no new states): canceled -> not_needed |
+    # postponed | other; no_award -> no_suitable_offer | closed_externally.
+    # Expired needs no reason (the deadline passed with no live offer).
+    closure_reason: Mapped[str | None] = mapped_column(String(30), nullable=True)
     # How many material amendments (changes to what providers price) have been
     # made since publication; an offer made against an earlier one is flagged.
     material_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")

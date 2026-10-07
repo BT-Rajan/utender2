@@ -62,6 +62,7 @@ class MyBidOut(BaseModel):
     project_title: str
     project_address: str
     project_status: ProjectStatus
+    closure_reason: str | None = None
     bid_deadline: UTCDateTime
     offer_id: str
     amount: Decimal

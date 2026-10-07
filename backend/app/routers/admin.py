@@ -1033,6 +1033,8 @@ def _project_admin_fields(p: Project, owner: User | None) -> dict:
         "trade": p.trade,
         "bid_deadline": utc_iso(p.bid_deadline),
         "status": p.status,
+        "closure_reason": p.closure_reason,  # Stage 3.16: why it ended, if without an award
+        "closed_at": p.closed_at,
         "tender_type": p.tender_type,
         "tender_type_locked": p.tender_type_locked,
         "is_suspended": p.is_suspended,

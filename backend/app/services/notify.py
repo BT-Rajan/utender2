@@ -89,12 +89,12 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.ar: ("تم رفض التحقق", "تم رفض طلب التحقق الخاص بك. السبب: {note}"),
     },
     NotificationType.tender_no_award: {
-        Language.en: ("No award on {project_title}", "The owner decided not to award {project_title}."),
-        Language.ar: ("لم يتم الترسية على {project_title}", "قرر المالك عدم الترسية على {project_title}."),
+        Language.en: ("No award on {project_title}", "The owner closed {project_title} without awarding it through U-Tender. Your offer is kept on record."),
+        Language.ar: ("لم يتم الترسية على {project_title}", "أغلق المالك {project_title} دون ترسيته عبر U-Tender. يبقى عرضك محفوظًا في السجل."),
     },
     NotificationType.tender_cancelled: {
-        Language.en: ("{project_title} was canceled", "The owner canceled this project."),
-        Language.ar: ("تم إلغاء {project_title}", "قام المالك بإلغاء هذا المشروع."),
+        Language.en: ("{project_title} was canceled", "The owner canceled this project. It won't go ahead in its current form; your offer is kept on record."),
+        Language.ar: ("تم إلغاء {project_title}", "قام المالك بإلغاء هذا المشروع. لن يمضي بصيغته الحالية؛ يبقى عرضك محفوظًا في السجل."),
     },
     NotificationType.deadline_approaching: {
         Language.en: ("Bidding closes soon — {project_title}", "{project_title} stops accepting offers within 24 hours."),

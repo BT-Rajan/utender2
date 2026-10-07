@@ -2,16 +2,18 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ProviderServicesPanel } from "@/components/ProviderServices";
 import { apiFetch } from "@/api/client";
-import type { ServiceProviderProfile, OfferStatus, ProjectStatus } from "@/api/types";
+import type { ClosureReason, ServiceProviderProfile, OfferStatus, ProjectStatus } from "@/api/types";
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
 import { money } from "@/lib/money";
+import { outcomeLabel } from "@/components/ClosureOutcome";
 
 interface MyBid {
   project_id: string;
   project_title: string;
   project_address: string;
   project_status: ProjectStatus;
+  closure_reason?: ClosureReason | null;
   bid_deadline: string;
   offer_id: string;
   amount: string;
@@ -182,7 +184,7 @@ export function ServiceProviderDashboardPage() {
                   </div>
                   <div className="flex items-center justify-between font-mono text-xs">
                     <span className="text-navy font-semibold">{money(b.amount)}</span>
-                    <span className="text-steel-light">{b.project_status.replace(/_/g, " ")}</span>
+                    <span className="text-steel-light">{outcomeLabel(t, b.project_status, b.closure_reason)}</span>
                   </div>
                 </Link>
               ))}

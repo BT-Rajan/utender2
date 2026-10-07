@@ -42,6 +42,8 @@ export interface Project {
   paused_at?: string | null;
   pause_reason?: string | null;
   closed_at?: string | null;
+  // Stage 3.16: why it ended without a U-Tender award (canceled / no_award only).
+  closure_reason?: ClosureReason | null;
   material_revision?: number;
   documents_required?: boolean;
   offer_count: number;
@@ -289,6 +291,8 @@ export interface OwnerDocument {
   requirement_requires_expiry?: boolean | null;
   url?: string | null; // admin views only: a signed, time-limited link
 }
+
+export type ClosureReason = "not_needed" | "postponed" | "other" | "no_suitable_offer" | "closed_externally";
 
 export interface AdminOffer {
   id: string;

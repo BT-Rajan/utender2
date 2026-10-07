@@ -241,6 +241,8 @@ AR: dict[str, str] = {
     "The offer deadline has passed, so this requirement can't reopen.": "انتهى موعد إغلاق العروض، لذا لا يمكن إعادة فتح هذا الطلب.",
     "This requirement is already paused.": "هذا الطلب موقوف مؤقتًا بالفعل.",
     "Your offer is already up to date with the requirement.": "عرضك محدّث بالفعل وفق الطلب.",
+    "Choose why the requirement is being canceled.": "اختر سبب إلغاء الطلب.",
+    "This project can no longer be closed.": "لم يعد من الممكن إغلاق هذا المشروع.",
     # --- billing, misc ---
     "No billing account yet — subscribe first.": "لا يوجد حساب فوترة بعد — اشترك أولًا.",
     "Could not start checkout.": "تعذر بدء الدفع.",

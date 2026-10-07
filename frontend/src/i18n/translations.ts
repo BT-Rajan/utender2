@@ -169,6 +169,41 @@ export interface Dictionary {
     cancel: string;
     remove: string;
   };
+  closure: {
+    open: string;
+    heading: string;
+    hint: string;
+    note: string;
+    noteHint: string;
+    cancelHeading: string;
+    reason_not_needed: string;
+    reason_postponed: string;
+    reason_other: string;
+    cancel: string;
+    cancelConfirm: string;
+    cancelConfirmBody: string;
+    externalHeading: string;
+    externalHint: string;
+    external: string;
+    externalConfirm: string;
+    externalConfirmBody: string;
+    noSuitableHeading: string;
+    noSuitableHint: string;
+    noSuitable: string;
+    noSuitableConfirm: string;
+    noSuitableConfirmBody: string;
+    error: string;
+    labelCanceled: string;
+    labelExpired: string;
+    labelExternal: string;
+    labelNoSuitable: string;
+    textCanceled: string;
+    textExpired: string;
+    textExternal: string;
+    textNoSuitable: string;
+    offersKept: string;
+    dismiss: string;
+  };
   postPub: {
     pause: string;
     pauseReason: string;
@@ -1135,6 +1170,41 @@ export const en: Dictionary = {
   confirm: {
     cancel: "Cancel",
     remove: "Remove",
+  },
+  closure: {
+    open: "End this requirement…",
+    heading: "End this requirement",
+    hint: "Each of these ends the requirement for good: no new offers, and it can't be reopened. Offers already submitted stay on record. Nothing here awards the work.",
+    note: "Private note (optional)",
+    noteHint: "Kept in your records only; providers don't see it.",
+    cancelHeading: "Cancel — it won't go ahead in this form",
+    reason_not_needed: "The work is no longer needed.",
+    reason_postponed: "The work is postponed.",
+    reason_other: "Other reason.",
+    cancel: "Cancel requirement",
+    cancelConfirm: "Cancel this requirement?",
+    cancelConfirmBody: "Providers who responded are told it was canceled and why (the reason above, not your note). It can't be reopened.",
+    externalHeading: "Closed outside U-Tender",
+    externalHint: "You've arranged the work another way. Nothing is awarded on U-Tender, and no provider is recorded as having won.",
+    external: "Close — handled outside U-Tender",
+    externalConfirm: "Close this requirement as handled outside U-Tender?",
+    externalConfirmBody: "No offer is accepted. Providers who responded are told it was closed without an award through U-Tender. It can't be reopened.",
+    noSuitableHeading: "None of the offers is suitable",
+    noSuitableHint: "End it without accepting any offer.",
+    noSuitable: "End — no suitable offer",
+    noSuitableConfirm: "End without accepting any offer?",
+    noSuitableConfirmBody: "No offer is accepted and nothing is awarded. Providers who responded are told. It can't be reopened.",
+    error: "Couldn't end the requirement.",
+    labelCanceled: "Canceled",
+    labelExpired: "Expired",
+    labelExternal: "Closed outside U-Tender",
+    labelNoSuitable: "No award",
+    textCanceled: "The owner canceled this requirement; it won't go ahead in this form.",
+    textExpired: "The response period ended without any offers.",
+    textExternal: "The owner closed this requirement and arranged the work outside U-Tender. No offer was accepted through U-Tender.",
+    textNoSuitable: "The owner ended this requirement without accepting any offer.",
+    offersKept: "Offers submitted stay on record. This requirement has ended and won't reopen.",
+    dismiss: "Keep it as it is",
   },
   postPub: {
     pause: "Pause this requirement",
@@ -2127,6 +2197,41 @@ export const ar: Dictionary = {
   confirm: {
     cancel: "إلغاء",
     remove: "إزالة",
+  },
+  closure: {
+    open: "إنهاء هذا الطلب…",
+    heading: "إنهاء هذا الطلب",
+    hint: "كلٌّ من هذه الخيارات ينهي الطلب نهائياً: لا عروض جديدة ولا يمكن إعادة فتحه. تبقى العروض المقدَّمة محفوظة. لا شيء هنا يُرسي العمل.",
+    note: "ملاحظة خاصة (اختيارية)",
+    noteHint: "تُحفظ في سجلاتك فقط؛ لا يراها مقدّمو الخدمة.",
+    cancelHeading: "إلغاء — لن يُنفَّذ بهذه الصيغة",
+    reason_not_needed: "لم يعد العمل مطلوباً.",
+    reason_postponed: "تم تأجيل العمل.",
+    reason_other: "سبب آخر.",
+    cancel: "إلغاء الطلب",
+    cancelConfirm: "إلغاء هذا الطلب؟",
+    cancelConfirmBody: "سيُبلَّغ مقدّمو الخدمة الذين قدّموا عروضاً بالإلغاء وسببه (السبب أعلاه، لا ملاحظتك). لا يمكن إعادة فتحه.",
+    externalHeading: "أُغلق خارج U-Tender",
+    externalHint: "رتّبت تنفيذ العمل بطريقة أخرى. لا تتم أي ترسية على U-Tender ولا يُسجَّل أي مقدّم خدمة فائزاً.",
+    external: "إغلاق — تمّت المعالجة خارج U-Tender",
+    externalConfirm: "إغلاق هذا الطلب على أنه عولج خارج U-Tender؟",
+    externalConfirmBody: "لن يُقبل أي عرض. سيُبلَّغ مقدّمو الخدمة بأنه أُغلق دون ترسية عبر U-Tender. لا يمكن إعادة فتحه.",
+    noSuitableHeading: "لا يوجد عرض مناسب",
+    noSuitableHint: "أنهِ الطلب دون قبول أي عرض.",
+    noSuitable: "إنهاء — لا عرض مناسب",
+    noSuitableConfirm: "إنهاء دون قبول أي عرض؟",
+    noSuitableConfirmBody: "لن يُقبل أي عرض ولن تتم ترسية. سيُبلَّغ مقدّمو الخدمة. لا يمكن إعادة فتحه.",
+    error: "تعذّر إنهاء الطلب.",
+    labelCanceled: "ملغى",
+    labelExpired: "منتهي الصلاحية",
+    labelExternal: "أُغلق خارج U-Tender",
+    labelNoSuitable: "بلا ترسية",
+    textCanceled: "ألغى المالك هذا الطلب؛ لن يُنفَّذ بهذه الصيغة.",
+    textExpired: "انتهت فترة تقديم العروض دون أي عرض.",
+    textExternal: "أغلق المالك هذا الطلب ورتّب تنفيذ العمل خارج U-Tender. لم يُقبل أي عرض عبر U-Tender.",
+    textNoSuitable: "أنهى المالك هذا الطلب دون قبول أي عرض.",
+    offersKept: "تبقى العروض المقدَّمة محفوظة. انتهى هذا الطلب ولن يُعاد فتحه.",
+    dismiss: "إبقاؤه كما هو",
   },
   postPub: {
     pause: "إيقاف الطلب مؤقتًا",
