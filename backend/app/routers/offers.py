@@ -19,7 +19,7 @@ from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowe
 from app.services.notify import notify, notify_team
 from app.services.team import acting_id, acting_profile, can_access, mine, org_of
 from app.services.offer_response import (
-    AMOUNT_LIMIT, OFFER_DOCUMENTS_BUCKET, _side_documents, check_commitment, check_complete, documents_out, draft_pricing, priced_total, readiness, requirements_for,
+    AMOUNT_LIMIT, OFFER_DOCUMENTS_BUCKET, _side_documents, check_commitment, history_out, check_complete, documents_out, draft_pricing, priced_total, readiness, requirements_for,
     timing_conflicts,
 )
 from app.services.storage import get_storage
@@ -400,12 +400,7 @@ def my_offer_history(project_id: str, user: User = Depends(require_approved_serv
     offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
     if not offer:
         return []
-    return (
-        db.query(OfferRevision)
-        .filter(OfferRevision.offer_id == offer.id)
-        .order_by(OfferRevision.revision_number.asc())
-        .all()
-    )
+    return history_out(db, db.query(OfferRevision).filter(OfferRevision.offer_id == offer.id).order_by(OfferRevision.revision_number.asc()))
 
 
 def _snapshot_revision(db: Session, offer: Offer) -> None:
@@ -694,4 +689,14 @@ def withdraw_offer(project_id: str, user: User = Depends(require_approved_servic
     offer.updated_at, offer.updated_by = datetime.utcnow(), user.id
     db.commit()
     db.refresh(offer)
+    # The owner's team is told an offer they may be weighing is gone -- after
+    # the commit, and without the provider's name while the tender is sealed.
+    owner = db.get(User, project.owner_id)
+    if owner:
+        sealed = project.tender_type == TenderType.sealed and project.status == ProjectStatus.open
+        profile = acting_profile(db, user)
+        notify_team(
+            db, owner, NotificationType.bid_withdrawn, organization_id=project.organization_id, link=f"/owner/projects/{project.id}",
+            project_title=project.title, service_provider_name="A service provider" if sealed or not profile else profile.company_name,
+        )
     return _with_documents(db, offer)  # Stage 5.14: the same shape as every other offer response

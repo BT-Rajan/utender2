@@ -13,9 +13,10 @@ Create Date: 2026-10-07
 
 """
 import json
+import os
 
 import sqlalchemy as sa
-from alembic import op
+from alembic import context, op
 
 revision = "0044"
 down_revision = "0043"
@@ -42,7 +43,36 @@ def upgrade() -> None:
             )
 
 
+def _target_below_drafts() -> bool:
+    """Whether this downgrade goes on below 0039 (where draft offers are
+    removed): an explicit revision under 0039, base, or a relative step that
+    far down from here."""
+    target = context.get_revision_argument()
+    if target is None:  # `alembic downgrade base` passes no revision
+        return True
+    target = str(target).strip()
+    if target in ("base", "0"):
+        return True
+    if target.startswith("-") and target[1:].isdigit():
+        return int(revision) - int(target[1:]) < 39
+    return target.isdigit() and int(target) < 39
+
+
 def downgrade() -> None:
+    # Checked here, before anything is dropped: MySQL can't roll back schema
+    # changes, so refusing only at 0039 would leave the database half
+    # downgraded (the steps above it already run). Same rule as 0039.
+    if _target_below_drafts() and os.environ.get("ALLOW_DRAFT_LOSS") != "1":
+        with_work = op.get_bind().execute(sa.text(
+            "SELECT COUNT(*) FROM offers WHERE status = 'draft' AND (amount IS NOT NULL OR message IS NOT NULL"
+            " OR assumptions IS NOT NULL OR timeline_estimate IS NOT NULL OR item_prices IS NOT NULL OR declarations_accepted IS NOT NULL"
+            " OR proposed_start_date IS NOT NULL OR proposed_completion_date IS NOT NULL OR proposed_duration_days IS NOT NULL)"
+        )).scalar() or 0
+        if with_work:
+            raise RuntimeError(
+                f"{with_work} offer draft(s) hold providers' unsubmitted work, which a downgrade below 0039 would delete. "
+                "Nothing has been changed. Export them first, or set ALLOW_DRAFT_LOSS=1 to proceed."
+            )
     op.drop_column("offer_revisions", "submitted_by")
     op.drop_column("offer_revisions", "submitted_at")
     op.drop_column("offer_revisions", "documents")

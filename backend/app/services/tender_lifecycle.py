@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.models.enums import OfferStatus, ProjectStatus, TenderType
@@ -20,6 +21,21 @@ from app.models.project import Project
 # isn't "open". So the seal holds for open AND canceled tenders until the
 # deadline, and the deadline itself (not the lazily-synced status) is what
 # lifts it. (The name predates this; it means "bids are still sealed".)
+def db_now(db: Session) -> datetime:
+    """The database's current UTC time -- one clock for every app server, so
+    deadline decisions don't depend on which server took the request. (SQLite,
+    used by most tests, has no separate server: the app clock is the same.)"""
+    if db.get_bind().dialect.name == "mysql":
+        return db.execute(text("SELECT UTC_TIMESTAMP(6)")).scalar()
+    return datetime.utcnow()
+
+
+def now_for(project: Project) -> datetime:
+    """The time a requirement is judged at: the database's clock as read when
+    it was locked (lock_project), else the app clock (a plain read)."""
+    return getattr(project, "_judged_at", None) or datetime.utcnow()
+
+
 def is_sealed_and_open(project: Project) -> bool:
     return (
         project.tender_type == TenderType.sealed
@@ -27,7 +43,7 @@ def is_sealed_and_open(project: Project) -> bool:
         # sealed bids stay sealed until the deadline all the same, so ending
         # a tender early is never a way to read competitors' sealed prices.
         and project.status in (ProjectStatus.open, ProjectStatus.canceled, ProjectStatus.no_award)
-        and project.bid_deadline > datetime.utcnow()
+        and project.bid_deadline > now_for(project)
     )
 
 
@@ -44,7 +60,7 @@ def bidding_is_open(project: Project) -> bool:
         project.status == ProjectStatus.open
         and project.paused_at is None
         and not project.is_suspended
-        and project.bid_deadline > datetime.utcnow()
+        and project.bid_deadline > now_for(project)
     )
 
 
@@ -57,7 +73,12 @@ def bidding_is_open(project: Project) -> bool:
 # check. populate_existing so an already-loaded copy is refreshed, not reused.
 # (SQLite, used by most tests, ignores FOR UPDATE; the guarantee is MySQL's.)
 def lock_project(db: Session, project_id: str) -> Project | None:
-    return db.query(Project).filter(Project.id == project_id).populate_existing().with_for_update().first()
+    project = db.query(Project).filter(Project.id == project_id).populate_existing().with_for_update().first()
+    if project is not None:
+        # Judged by the database's clock, read under the lock: every app
+        # server decides "before the deadline?" by the same time.
+        project._judged_at = db_now(db)
+    return project
 
 
 # Bidding isn't cron-driven — a project's deadline passing is detected
@@ -68,7 +89,7 @@ def lock_project(db: Session, project_id: str) -> Project | None:
 # canceled, expired itself) is already terminal/owner-driven, so this never
 # fights a manual lifecycle action.
 def sync_expired_projects(db: Session) -> None:
-    now = datetime.utcnow()
+    now = db_now(db)
     # skip_locked: a row another request is transitioning right now (owner
     # cancel/award, say) is left alone instead of overwritten with a stale
     # closed/expired — the next read picks it up if it's still open.
@@ -130,7 +151,7 @@ def publish(db: Session, project: Project, actor_id: str) -> None:
 
     if project.status != ProjectStatus.draft or project.discarded_at is not None:
         raise HTTPException(status_code=400, detail="Only a draft project can be published.")
-    now = datetime.utcnow()
+    now = db_now(db)
     if project.bid_deadline is None or project.bid_deadline <= now:
         raise HTTPException(status_code=400, detail="Set a bid deadline in the future before publishing.")
     requirement_quality.assert_publishable(db, project)  # Stage 3.12, authoritative

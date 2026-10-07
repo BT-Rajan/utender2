@@ -13,6 +13,7 @@ Revises: 0038
 Create Date: 2026-10-07
 
 """
+import os
 import uuid
 
 import sqlalchemy as sa
@@ -62,6 +63,21 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # The schema before this revision has no draft offers, so going back
+    # removes them. Refuse while any draft holds a provider's work (a price,
+    # a method, assumptions, a completion period, accepted declarations)
+    # unless the operator says that loss is intended -- a rollback must never
+    # silently discard work. Submitted offers are never touched.
+    bind = op.get_bind()
+    with_work = bind.execute(sa.text(
+        "SELECT COUNT(*) FROM offers WHERE status = 'draft' AND (amount IS NOT NULL OR message IS NOT NULL"
+        " OR assumptions IS NOT NULL OR timeline_estimate IS NOT NULL OR item_prices IS NOT NULL OR declarations_accepted IS NOT NULL)"
+    )).scalar() or 0
+    if with_work and os.environ.get("ALLOW_DRAFT_LOSS") != "1":
+        raise RuntimeError(
+            f"{with_work} offer draft(s) hold providers' unsubmitted work, which this downgrade would delete. "
+            "Export them first, or set ALLOW_DRAFT_LOSS=1 to proceed."
+        )
     op.execute("DELETE FROM offers WHERE status = 'draft'")
     op.drop_constraint("fk_offers_updated_by", "offers", type_="foreignkey")
     op.drop_constraint("fk_offers_created_by", "offers", type_="foreignkey")

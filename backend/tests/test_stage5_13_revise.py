@@ -79,7 +79,9 @@ def test_revise_keeps_one_current_offer_and_the_previous_version_in_full(db):
         h = history[0]
         assert (h["revision_number"], h["amount"], h["message"], h["assumptions"], h["declarations_accepted"], h["proposed_duration_days"], h["submitted_by"]) == (
             1, "1000.000", "Method v1", "A1", [DECL], 30, me)
-        assert h["documents"] == [{"label": "Method statement", "file_name": "method-v1.pdf"}] and h["submitted_at"]
+        doc = h["documents"][0]
+        assert (len(h["documents"]), doc["label"], doc["file_name"], "file_path" in doc) == (1, "Method statement", "method-v1.pdf", False) and h["submitted_at"]
+        assert _get(client, doc["url"]).content == b"%PDF-v1"  # the earlier version's file, by a short-lived link
     # The file that went with version 1 is kept, not deleted by the replacement.
     v1_path = db.query(OfferRevision).one().documents[0]["file_path"]
     from app.services.storage import get_storage

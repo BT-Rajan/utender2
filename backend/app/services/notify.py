@@ -21,6 +21,11 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.en: ("Offer revised on {project_title}", "{service_provider_name} revised their offer on {project_title}."),
         Language.ar: ("تعديل عرض على {project_title}", "عدّل {service_provider_name} عرضه على {project_title}."),
     },
+    # A provider withdrew an offer (anonymous while the tender is sealed).
+    NotificationType.bid_withdrawn: {
+        Language.en: ("Offer withdrawn on {project_title}", "{service_provider_name} withdrew their offer on {project_title}."),
+        Language.ar: ("سحب عرض على {project_title}", "سحب {service_provider_name} عرضه على {project_title}."),
+    },
     NotificationType.award_won: {
         Language.en: ("You won {project_title}", "Your offer on {project_title} was accepted."),
         Language.ar: ("لقد فزت بـ {project_title}", "تم قبول عرضك على {project_title}."),

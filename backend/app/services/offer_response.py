@@ -286,3 +286,23 @@ def submitted_documents_out(db: Session, offer) -> list[OfferDocumentOut]:
         )
         for d in offer.submitted_documents
     ]
+
+
+def history_out(db: Session, revisions) -> list:
+    """Stage 5.13/5.16: an offer's earlier versions, each with short-lived
+    links to the files that went with it (kept on record) -- for whoever may
+    already read that history (the provider's side; the owner once unsealed).
+    Paths are signed into links, never returned."""
+    from app.schemas.offer import OfferRevisionOut
+
+    storage = get_storage()
+    out = []
+    for r in revisions:
+        item = OfferRevisionOut.model_validate(r)
+        item.documents = [
+            {"label": d["label"], "file_name": d["file_name"],
+             "url": storage.signed_url(OFFER_DOCUMENTS_BUCKET, d["file_path"], DOCUMENT_LINK_SECONDS, d["file_name"])}
+            for d in (r.documents or []) if d.get("file_path")
+        ]
+        out.append(item)
+    return out

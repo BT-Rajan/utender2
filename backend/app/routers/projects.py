@@ -49,7 +49,7 @@ from app.services.notify import notify, notify_team
 from app.services.team import acting_id, acting_profile, mine, org_of, owns
 from app.services import requirement_quality
 from app.services.storage import drawing_url_expiry_seconds, get_storage
-from app.services.tender_lifecycle import interested_providers, lock_project, publish, sync_expired_projects
+from app.services.tender_lifecycle import interested_providers, is_sealed_and_open, lock_project, now_for, publish, sync_expired_projects
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -286,6 +286,8 @@ def get_project(project_id: str, user: User = Depends(get_current_user), db: Ses
         detail.closure_note = project.closure_note  # Stage 3.16: the owner's private note, never a provider's to see
         detail.restarted_from_id = project.restarted_from_id
     elif user.role == UserRole.service_provider:
+        if is_sealed_and_open(project):
+            detail.offer_count = None  # a sealed tender doesn't tell competitors how many offers are in
         # Stage 4.4: whether this provider may respond, and if not why -- the
         # same check the offer endpoints enforce. (Only ever their own.)
         profile = acting_profile(db, user)
@@ -893,7 +895,7 @@ _NOT_NOW = {
 def _deadline_ended(project: Project) -> bool:
     """Stage 5.1: offers stopped because the response deadline passed (by the
     server's clock) -- as opposed to the owner ending it early."""
-    if project.bid_deadline > datetime.utcnow():
+    if project.bid_deadline > now_for(project):
         return False
     if project.status == ProjectStatus.open:
         return True

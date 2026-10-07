@@ -186,7 +186,7 @@ class OfferRevisionOut(BaseModel):
     based_on_material_revision: int = 0  # Stage 3.17: the requirement version it was made against
     # Stage 5.13: what else that version said, and when/by whom it was submitted.
     declarations_accepted: list[str] | None = None
-    documents: list[dict] = []  # [{"label", "file_name"}] -- names only, no storage paths
+    documents: list[dict] = []  # [{"label", "file_name", "url"?}] -- never a storage path
     submitted_at: UTCDateTime | None = None
     submitted_by: str | None = None
     recorded_at: UTCDateTime
@@ -194,7 +194,7 @@ class OfferRevisionOut(BaseModel):
     @field_validator("documents", mode="before")
     @classmethod
     def _names_only(cls, value):
-        return [{"label": d.get("label"), "file_name": d.get("file_name")} for d in value or []]
+        return [{k: d.get(k) for k in ("label", "file_name", "url") if d.get(k) is not None} for d in value or []]
 
 
 class PreviewRequirement(BaseModel):

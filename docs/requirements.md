@@ -384,4 +384,13 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - After offers close, the provider can still open their own offer in full, read-only (the same stored record as the preview), with its earlier versions as submitted.
   - Only their own side's offers; organisation members share them; never another provider's.
 
-_Further steps (5.17 onwards) are added as they are implemented._
+- **5.17 Final integrity audit:** all of 5.1–5.16 verified end to end (authorization, confidentiality, lifecycle, deadline/concurrency, version history) on SQLite and MySQL. Stage 5 ready. Follow-ups on the audit's limitations:
+  - **Withdrawal notice:** the owner's team is notified when an offer is withdrawn, anonymously while the tender is sealed.
+  - **Sealed offer count:** while a tender is sealed and open, competitors aren't told how many offers are in. Cards and requirement details show "sealed"; the owner still sees the count.
+  - **Dashboard totals:** active, won and total offers come from `/service-provider/my-bids/summary`, counted by the database over all offers, so they stay right however many pages the list has.
+  - **Earlier-version files:** each version in an offer's history links to the files that went with it (short-lived signed links, never storage paths), for whoever may read that history.
+  - **One clock:** deadlines are judged by the database's clock (`UTC_TIMESTAMP` on MySQL), read under the requirement's lock, along with the expiry sweep and publishing. Every app server agrees.
+  - **Safe rollback:** a downgrade below 0039 is refused before anything changes while any draft holds a provider's work, unless `ALLOW_DRAFT_LOSS=1` is set.
+  - **By design:** platform admins see all offers for oversight.
+
+_Stage 6 onwards is added as it is implemented._

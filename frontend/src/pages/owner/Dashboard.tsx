@@ -71,7 +71,7 @@ export function OwnerDashboardPage() {
       awaitingReview: list.filter((p) => p.status === "closed").length,
       underEvaluation: list.filter((p) => p.status === "under_evaluation").length,
       awarded: list.filter((p) => p.status === "awarded").length,
-      totalOffers: list.reduce((sum, p) => sum + p.offer_count, 0),
+      totalOffers: list.reduce((sum, p) => sum + (p.offer_count ?? 0), 0),
     };
   }, [projects]);
 

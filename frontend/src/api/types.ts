@@ -48,7 +48,7 @@ export interface Project {
   restarted_from_id?: string | null; // the owner side only
   material_revision?: number;
   documents_required?: boolean;
-  offer_count: number;
+  offer_count: number | null; // null for a provider while the tender is sealed and open
   my_offer_status: OfferStatus | null;
   // Stage 3.9, provider feed only.
   eligible?: boolean | null;
@@ -417,7 +417,7 @@ export interface AdminProject {
   tender_type_locked: boolean;
   is_suspended: boolean;
   created_at: string;
-  offer_count: number;
+  offer_count: number | null; // null for a provider while the tender is sealed and open
 }
 
 export interface AdminProjectDetail {

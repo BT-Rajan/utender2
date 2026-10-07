@@ -40,7 +40,7 @@ from app.services.verification import (
     profile_state_fields,
 )
 from app.services.storage import get_storage
-from app.services.tender_lifecycle import sync_expired_projects
+from app.services.tender_lifecycle import is_sealed_and_open, sync_expired_projects
 
 router = APIRouter(prefix="/service-provider", tags=["service_provider"])
 
@@ -258,7 +258,8 @@ def _cards(db: Session, page: list[Project], profile, my_offers: dict, full_acce
             document_count=document_counts.get(p.id, 0),
             conditions=rules_out(db, p) if (p.elig_org_only or p.elig_quals or p.elig_match_category or p.elig_match_governorate) else None,
             created_at=p.created_at,
-            offer_count=offer_counts.get(p.id, 0),
+            # Sealed and open: competitors aren't told how many offers are in.
+            offer_count=None if is_sealed_and_open(p) else offer_counts.get(p.id, 0),
             my_offer_status=my_offers.get(p.id),
             saved=p.id in saved_ids,
             **_eligibility_fields(db, p, profile),
@@ -408,6 +409,26 @@ def preparing(user: User = Depends(require_approved_service_provider), db: Sessi
         for r, p in rows
         if p.id not in offered and availability(p) in ("open", "paused")
     ]
+
+
+class MyBidsSummary(BaseModel):
+    total: int  # every offer put forward
+    active: int  # submitted, on a requirement still open
+    won: int  # awarded
+
+
+@router.get("/my-bids/summary", response_model=MyBidsSummary)
+def my_bids_summary(user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
+    """The dashboard's counts over all of this side's offers, counted by the
+    database -- so they stay right however many there are (the list itself
+    is paged)."""
+    sync_expired_projects(db)
+    base = db.query(func.count(Offer.id)).join(Project, Offer.project_id == Project.id).filter(mine(db, user, Offer, Offer.service_provider_id), tendered())
+    return MyBidsSummary(
+        total=base.scalar() or 0,
+        active=base.filter(Offer.status == OfferStatus.submitted, Project.status == ProjectStatus.open).scalar() or 0,
+        won=base.filter(Offer.status == OfferStatus.approved).scalar() or 0,
+    )
 
 
 @router.get("/my-bids", response_model=list[MyBidOut])

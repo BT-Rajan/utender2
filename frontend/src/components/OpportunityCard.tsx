@@ -101,7 +101,8 @@ export function OpportunityCard({
         )}
         <div className="tblock-field">
           <span className="k">{t("service_provider.feed.offersSoFar")}</span>
-          <span className="v">{project.offer_count}</span>
+          {/* A sealed tender doesn't tell competitors how many offers are in (the server sends none). */}
+          <span className="v">{project.offer_count ?? t("feed.sealed")}</span>
         </div>
       </div>
 

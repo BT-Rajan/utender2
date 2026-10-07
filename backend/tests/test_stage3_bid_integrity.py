@@ -320,6 +320,8 @@ def test_bid_exactly_at_the_deadline_is_rejected_and_one_instant_before_is_accep
 
     monkeypatch.setattr(offers_module, "datetime", _Clock)
     monkeypatch.setattr(lifecycle_module, "datetime", _Clock)  # where the boundary check lives
+    # The boundary is judged by the database's clock under the lock (on MySQL); freeze that too.
+    monkeypatch.setattr(lifecycle_module, "db_now", lambda db: _Clock.now_value)
 
     _Clock.now_value = deadline  # the very instant bidding ends: consistent with sync/publish, which use <=
     assert _bid(c1, pid).status_code == 400

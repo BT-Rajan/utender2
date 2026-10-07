@@ -127,9 +127,14 @@ export function ServiceProviderDashboardPage() {
 
   const banner = statusBanner(t)[profile.marketplace_status];
   const isActive = profile.marketplace_status === "verified_active";
-  const activeBids = bids?.filter((b) => b.offer_status === "submitted" && b.project_status === "open").length ?? 0;
-  const won = bids?.filter((b) => b.offer_status === "approved").length ?? 0;
-  const totalBids = bids?.length ?? 0;
+  // Counted by the server over every offer (the list itself is paged).
+  const { data: summary } = useQuery({
+    queryKey: ["service-provider-my-bids-summary"],
+    queryFn: () => apiFetch<{ total: number; active: number; won: number }>("/service-provider/my-bids/summary"),
+  });
+  const activeBids = summary?.active ?? 0;
+  const won = summary?.won ?? 0;
+  const totalBids = summary?.total ?? 0;
 
   return (
     <main className="max-w-5xl mx-auto px-5 py-8">

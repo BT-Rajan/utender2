@@ -197,7 +197,9 @@ def availability(project: Project) -> str:
 
     if project.is_suspended:
         return "unavailable"
-    if project.status == ProjectStatus.open and project.bid_deadline > datetime.utcnow():
+    from app.services.tender_lifecycle import now_for
+
+    if project.status == ProjectStatus.open and project.bid_deadline > now_for(project):
         return "paused" if project.paused_at is not None else "open"
     return "ended"
 

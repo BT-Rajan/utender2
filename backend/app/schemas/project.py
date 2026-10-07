@@ -78,7 +78,9 @@ class ProjectOut(BaseModel):
     restarted_from_id: str | None = None  # owner side only: the ended requirement this was started again from
     version: int = 1  # send back as If-Match when saving a draft
     documents_required: bool = False
-    offer_count: int = 0
+    # None for a provider while the tender is sealed and open: how many offers
+    # are in is part of what a sealed tender keeps from competitors.
+    offer_count: int | None = 0
     my_offer_status: str | None = None  # only populated on the service provider feed
     # Stage 4.1, feed only: enough to decide whether to open it. summary is the
     # opening of the scope, for providers with full access who may respond.
