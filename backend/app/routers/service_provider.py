@@ -19,7 +19,7 @@ from app.schemas.project import FeedPage, ProjectOut
 from app.schemas.category import ProviderServices
 from app.services.categories import clean_services
 from app.services.eligibility import feed_condition, ineligibility_reasons, rules_out
-from app.services.search_text import normalize, search_words
+from app.services.search_text import expand, normalize, search_words
 from app.models.category import ServiceCategory
 from app.services.team import acting_profile, mine, team_ids
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
@@ -98,6 +98,7 @@ def feed(
         Project.is_suspended.is_(False),
         Project.bid_deadline > now,  # authoritative even for a row the sync skipped
     )
+    base = query
 
     profile = acting_profile(db, user)
     full_access = bool(profile and profile.is_verified_active)
@@ -141,11 +142,18 @@ def feed(
         weighted = [(Project.search_title, 3), (Project.search_trade, 2), (Project.search_place, 1)]
         if full_access:
             weighted.append((Project.search_scope, 1))
+        # Each word also matches its synonyms and, for a likely typo, the
+        # nearest words open opportunities actually use (search_text.expand).
+        vocabulary: set[str] = set()
+        if any(len(w) >= 5 for w in words):
+            for row in base.with_entities(Project.search_title, Project.search_trade, Project.search_place):
+                vocabulary.update(w for text in row if text for w in text.split() if len(w) >= 4)
         score = []
         for word in words:
-            term = f"%{_like(word)}%"
-            query = query.filter(or_(*(col.like(term, escape="/") for col, _ in weighted)))
-            score += [case((col.like(term, escape="/"), weight), else_=0) for col, weight in weighted]
+            terms = expand(word, vocabulary)
+            found = [or_(*(_contains(col, t) for t in terms)) for col, _ in weighted]
+            query = query.filter(or_(*found))
+            score += [case((hit, weight), else_=0) for hit, (_, weight) in zip(found, weighted)]
         relevance = sum(score[1:], score[0])
 
     # "Newest" means newest on the marketplace: by publication (Stage 3.14),
@@ -228,6 +236,14 @@ def feed(
         # requirements match a given search.
         hidden_ineligible=hidden if not out and offset == 0 and not narrowed else None,
     )
+
+
+def _contains(column, term: str):
+    """The term inside the column's normalized text. A very short term (1-3
+    letters, e.g. "ac") must start a word, so it doesn't match inside others."""
+    if len(term) <= 3:
+        return or_(column.like(f"{_like(term)}%", escape="/"), column.like(f"% {_like(term)}%", escape="/"))
+    return column.like(f"%{_like(term)}%", escape="/")
 
 
 def _like(text: str) -> str:

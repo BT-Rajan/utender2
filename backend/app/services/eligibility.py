@@ -149,7 +149,10 @@ def feed_condition(db: Session, profile: ServiceProviderProfile):
     the derived Project.elig_* columns, so the provider feed filters and pages
     in the database. It must decide exactly as ineligibility_reasons() does
     (tests/test_stage4_2_followups.py checks the two agree); that function
-    stays the authority for everything a provider is told or refused."""
+    stays the authority for everything a provider is told or refused.
+    Changing the rules (schemas.project.ProviderEligibilityIn) means changing
+    this, models.project.sync_derived and ineligibility_reasons() together;
+    tests/test_stage4_2_followups.py fails until all three agree."""
     from sqlalchemy import and_, func, or_, true
 
     conditions = []

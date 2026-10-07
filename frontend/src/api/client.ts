@@ -44,6 +44,17 @@ async function tryRefresh(): Promise<boolean> {
 // serialized, and a single 401 triggers one silent refresh-and-retry
 // before giving up — mirrors the original app's reliance on
 // Supabase's auto-refreshing session cookie.
+// Stage 4.3 follow-up: the server's clock, from the time it sends with every
+// response, so "time left" is counted from the clock that enforces deadlines.
+let serverOffsetMs = 0;
+function noteServerTime(value: string | null) {
+  const server = Number(value);
+  if (value && Number.isFinite(server)) serverOffsetMs = server - Date.now();
+}
+export function serverNow(): number {
+  return Date.now() + serverOffsetMs;
+}
+
 export async function apiFetch<T>(
   path: string,
   options: { method?: string; body?: unknown; formData?: FormData; retry?: boolean; headers?: Record<string, string> } = {}
@@ -65,6 +76,7 @@ export async function apiFetch<T>(
   }
 
   const res = await fetch(`${API_URL}${path}`, init);
+  noteServerTime(res.headers.get("X-Server-Time"));
 
   if (res.status === 401 && retry) {
     const refreshed = await tryRefresh();

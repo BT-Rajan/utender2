@@ -172,6 +172,7 @@ export interface Dictionary {
   detail: {
     addedAfter: string;
     needsAccess: string;
+    kuwaitTime: string;
   };
   feed: {
     pricing: string;
@@ -1247,6 +1248,7 @@ export const en: Dictionary = {
   detail: {
     addedAfter: "Added after publishing · {date}",
     needsAccess: "You meet this opportunity’s conditions. Activate your marketplace access to read the full requirement, open its documents and send an offer.",
+    kuwaitTime: "Kuwait time",
   },
   feed: {
     pricing: "Priced as",
@@ -2347,6 +2349,7 @@ export const ar: Dictionary = {
   detail: {
     addedAfter: "أُضيف بعد النشر · {date}",
     needsAccess: "أنت تستوفي شروط هذه الفرصة. فعّل وصولك إلى السوق لقراءة الطلب كاملًا وفتح مستنداته وتقديم عرض.",
+    kuwaitTime: "بتوقيت الكويت",
   },
   feed: {
     pricing: "طريقة التسعير",

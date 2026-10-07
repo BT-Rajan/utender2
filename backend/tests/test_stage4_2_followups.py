@@ -56,11 +56,11 @@ def test_arabic_variants_word_endings_and_relevance(db):
     _publish(owner, "Office repaint", governorate="capital", description="Interior painting, two floors.", days=3)
 
     assert _titles(sp, search="كهرباء") == ["دهان شقة", "صيانة الكهربائية لمبنى"]  # hamza, ة/ه, ال
-    assert _titles(sp, search="الإنارة") == ["صيانة الكهربائية لمبنى"]  # إ/ا and the article
+    assert sorted(_titles(sp, search="الإنارة")) == sorted(["صيانة الكهربائية لمبنى", "Shop lighting"])  # same deadline: either order  # إ/ا, the article -- and "lighting" is the same work
     assert _titles(sp, search="حولي") == ["صيانة الكهربائية لمبنى"]  # governorate by its Arabic name
     assert _titles(sp, search="Kuwait City") == ["Office repaint", "دهان شقة"]
-    assert _titles(sp, search="paints") == ["Office repaint"]  # "paints" ~ "painting"
-    assert _titles(sp, search="LIGHTS") == ["Shop lighting"]
+    assert _titles(sp, search="paints") == ["Office repaint", "دهان شقة"]  # "paints" ~ "painting", and its Arabic synonym
+    assert sorted(_titles(sp, search="LIGHTS")) == sorted(["صيانة الكهربائية لمبنى", "Shop lighting"])  # case; and "إنارة" is lighting
     # Relevance: found in the title first, then by deadline.
     assert _titles(sp, search="كهرباء", sort="relevance") == ["صيانة الكهربائية لمبنى", "دهان شقة"]
     assert _titles(sp, sort="relevance") == _titles(sp)  # no search: the usual order
@@ -150,3 +150,34 @@ def test_the_feed_query_decides_eligibility_as_the_rules_do(db):
             assert (p.id in in_sql) == (not ineligibility_reasons(db, p, prof)), (p.provider_eligibility, p.category_id, p.governorate, prof.stakeholder_type, prof.service_categories, prof.service_governorates)
             checked += 1
     assert checked > 2000
+
+
+def test_synonyms_typos_and_short_words(db):
+    owner = _verified(db, "owner", "owner@example.com")
+    sp = _verified(db, "service_provider", "sami@example.com")
+    _publish(owner, "Electrical rewiring", description="Replace the DB board.", days=3)
+    _publish(owner, "تركيب مكيفات", description="ثلاثة مكيفات سبليت.", days=4)
+    _publish(owner, "Bathroom plumbing", description="New pipes and fittings.", days=5)
+    _publish(owner, "Facade paint", description="Paint the facade; scaffolding by the contractor.", days=6)
+    # Synonyms across languages, both ways.
+    assert _titles(sp, search="كهرباء") == ["Electrical rewiring"]
+    assert _titles(sp, search="سباكة") == ["Bathroom plumbing"]
+    assert _titles(sp, search="AC") == ["تركيب مكيفات"]
+    # Typos, against what open opportunities actually say.
+    assert _titles(sp, search="elecrtical") == ["Electrical rewiring"]
+    assert _titles(sp, search="plumbng") == ["Bathroom plumbing"]
+    # A short word must start a word: "ac" isn't found inside "facade" or "replace".
+    assert "Facade paint" not in _titles(sp, search="ac") and "Electrical rewiring" not in _titles(sp, search="ac")
+
+
+def test_the_eligibility_rules_and_the_feed_condition_change_together():
+    """A guard: the feed applies eligibility in SQL (eligibility.feed_condition
+    over the derived Project.elig_* columns kept by models.project.sync_derived),
+    mirroring ineligibility_reasons(). A new or renamed rule must be added in
+    all three places -- this fails first, saying so, before anything drifts."""
+    from app.schemas.project import ProviderEligibilityIn
+
+    assert set(ProviderEligibilityIn.model_fields) == {"provider_type", "qualifications", "match_category", "match_governorate"}, (
+        "The eligibility rules changed: update ineligibility_reasons(), feed_condition() and sync_derived() "
+        "(plus a migration for any new elig_* column) together, then extend the parity test above and this list."
+    )

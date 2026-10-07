@@ -1,7 +1,7 @@
 import type { Project } from "@/api/types";
 import { eligibilitySummary, IneligibleNotice } from "@/components/ProviderEligibility";
 import { useI18n } from "@/i18n/I18nContext";
-import { formatDeadline, fullDate, timeLeft } from "@/lib/format";
+import { deviceOutsideKuwait, formatDeadline, fullDate, timeLeft } from "@/lib/format";
 import { formatWorkTiming } from "@/lib/dates";
 import { formatArea } from "@/lib/location";
 
@@ -51,7 +51,10 @@ export function OpportunityCard({ project, locked = false }: { project: Project;
       <div className="tblock-strip mt-4">
         <div className="tblock-field">
           <span className="k">{t("service_provider.feed.deadline")}</span>
-          <span className="v">{fullDate(project.bid_deadline, language)}</span>
+          <span className="v">
+            {fullDate(project.bid_deadline, language)}
+            {deviceOutsideKuwait() && <span className="block text-[10px] text-steel-light">{t("detail.kuwaitTime")}</span>}
+          </span>
         </div>
         <div className="tblock-field">
           <span className="k">{t("service_provider.feed.trade")}</span>

@@ -62,3 +62,64 @@ GOVERNORATE_NAMES = {
     "ahmadi": "Ahmadi الأحمدي",
     "jahra": "Jahra الجهراء",
 }
+
+
+# Common types of work, English and Arabic, as normalized stems: a search for
+# one also finds the others ("electrical" finds "كهرباء", "AC" finds "تكييف").
+SYNONYMS = [
+    ["electric", "كهربا", "كهربايي"],
+    ["plumb", "سباك", "صحي"],
+    ["paint", "دهان", "صبغ"],
+    ["ac", "a/c", "air condition", "hvac", "تكييف", "مكيف"],
+    ["carpent", "joiner", "نجار"],
+    ["tile", "tiling", "بلاط", "سيراميك"],
+    ["roof", "سطح"],
+    ["clean", "تنظيف"],
+    ["landscap", "garden", "زراع", "حدايق", "حديقه"],
+    ["weld", "steel work", "لحام", "حداد"],
+    ["glass", "glaz", "زجاج"],
+    ["insulat", "waterproof", "عزل"],
+    ["demoli", "هدم"],
+    ["concret", "خرسان"],
+    ["gypsum", "plaster", "جبس"],
+    ["light", "انار", "اضاء"],
+    ["maint", "repair", "صيان", "تصليح"],
+]
+
+
+def _related(a: str, b: str) -> bool:
+    return a == b or (len(a) >= 3 and len(b) >= 3 and (a.startswith(b) or b.startswith(a)))
+
+
+def _distance(a: str, b: str, cap: int) -> int:
+    """Edit distance, giving up (returning cap + 1) once it exceeds cap."""
+    if abs(len(a) - len(b)) > cap:
+        return cap + 1
+    previous = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        current = [i]
+        for j, cb in enumerate(b, 1):
+            current.append(min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (ca != cb)))
+        if min(current) > cap:
+            return cap + 1
+        previous = current
+    return previous[-1]
+
+
+def expand(word: str, vocabulary: set[str] = frozenset()) -> list[str]:
+    """What a typed (normalized, stemmed) word may match: itself, its
+    synonyms, and -- for typos -- words from `vocabulary` (what open
+    opportunities actually say) within one edit (two for long words) of it,
+    compared over the word's own length so a stem matches a longer word."""
+    terms = {word}
+    for group in SYNONYMS:
+        if any(_related(word, member) for member in group):
+            terms.update(group)
+    if len(word) >= 5:
+        cap = 2 if len(word) >= 8 else 1
+        for candidate in vocabulary:
+            if candidate in terms or len(candidate) < len(word) - cap:
+                continue
+            if _distance(word, candidate[: len(word)], cap) <= cap or _distance(word, candidate, cap) <= cap:
+                terms.add(candidate[: len(word)] if len(candidate) > len(word) else candidate)
+    return sorted(terms)

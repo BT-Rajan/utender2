@@ -7,7 +7,7 @@ import { eligibilitySummary, IneligibleNotice } from "@/components/ProviderEligi
 import { outcomeLabel } from "@/components/ClosureOutcome";
 import { AmendmentsList } from "@/components/PostPublication";
 import { useI18n } from "@/i18n/I18nContext";
-import { formatDeadline, formatSize, fullDate, timeLeft } from "@/lib/format";
+import { deviceOutsideKuwait, formatDeadline, formatSize, fullDate, timeLeft } from "@/lib/format";
 import { formatWorkTiming } from "@/lib/dates";
 import { sortDocuments } from "@/lib/documents";
 import { formatArea } from "@/lib/location";
@@ -34,6 +34,7 @@ export function ProviderRequirementView({ project, closed }: { project: ProjectD
             {project.trade && `${project.trade} · `}
             {formatArea(t, project.governorate, project.area)}
             {project.address && ` — ${project.address}`} · {t("service_provider.offer.deadlineLabel")} {fullDate(project.bid_deadline, language)}
+            {deviceOutsideKuwait() && ` (${t("detail.kuwaitTime")})`}
             {formatWorkTiming(t, project) && ` · ${formatWorkTiming(t, project)}`}
           </div>
         </div>
