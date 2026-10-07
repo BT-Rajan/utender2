@@ -28,6 +28,37 @@ export interface Dictionary {
     choose: string;
     none: string;
   };
+  tenderRules: {
+    heading: string;
+    hint: string;
+    offersClose: string;
+    offersCloseHint: string;
+    visibility: string;
+    ownerVisible: string;
+    sealed: string;
+    questions: string;
+    questionsAllowed: string;
+    questionsUntil: string;
+    questionsUntilHint: string;
+    commercialTerms: string;
+    commercialTermsHint: string;
+    instructions: string;
+    instructionsHint: string;
+    save: string;
+    saved: string;
+    saveError: string;
+    providerHeading: string;
+    pOffersClose: string;
+    pRevise: string;
+    pSealed: string;
+    pOwnerVisible: string;
+    pQuestionsUntil: string;
+    pQuestionsClosed: string;
+    pNoQuestions: string;
+    pDeclarations: string;
+    pCommercial: string;
+    pInstructions: string;
+  };
   eligibility: {
     heading: string;
     hint: string;
@@ -806,6 +837,37 @@ export const en: Dictionary = {
   categoryPicker: {
     choose: "Choose a type of work",
     none: "Not specified",
+  },
+  tenderRules: {
+    heading: "Offer & question rules",
+    hint: "How this opportunity is run — kept apart from what you're asking for. Providers see these rules before they respond.",
+    offersClose: "Offers close",
+    offersCloseHint: "Set under Dates. Offers, changes and withdrawals are refused after this moment.",
+    visibility: "Who sees offers, and when",
+    ownerVisible: "I see each offer as it arrives",
+    sealed: "Sealed — I see offers only after offers close",
+    questions: "Questions from providers",
+    questionsAllowed: "Providers may ask questions",
+    questionsUntil: "Questions close at (optional)",
+    questionsUntilHint: "Leave blank to take questions until offers close. Must be before offers close. In your local time.",
+    commercialTerms: "Commercial conditions",
+    commercialTermsHint: "Only what applies, e.g. payment stages, retention, warranty, how long prices must stay valid.",
+    instructions: "Instructions for providers",
+    instructionsHint: "Anything providers must know or do before responding, e.g. site-visit arrangements.",
+    save: "Save rules",
+    saved: "Saved",
+    saveError: "Could not save the rules.",
+    providerHeading: "Rules for this opportunity",
+    pOffersClose: "Offers close {date}. After that, offers can't be submitted, changed or withdrawn.",
+    pRevise: "Until then you can revise or withdraw your offer. Every revision is recorded.",
+    pSealed: "Sealed: the owner sees offers only after offers close.",
+    pOwnerVisible: "The owner sees each offer as it arrives.",
+    pQuestionsUntil: "Questions are accepted until {date}.",
+    pQuestionsClosed: "Questions are closed.",
+    pNoQuestions: "This requirement doesn't accept questions.",
+    pDeclarations: "Before submitting, you must confirm the owner's declarations ({count}).",
+    pCommercial: "Commercial conditions",
+    pInstructions: "Instructions",
   },
   eligibility: {
     heading: "Who can respond",
@@ -1610,6 +1672,37 @@ export const ar: Dictionary = {
   categoryPicker: {
     choose: "اختر نوع العمل",
     none: "غير محدد",
+  },
+  tenderRules: {
+    heading: "قواعد العروض والأسئلة",
+    hint: "طريقة إدارة هذه الفرصة — منفصلة عما تطلبه. يرى مقدمو الخدمة هذه القواعد قبل تقديم عروضهم.",
+    offersClose: "موعد إغلاق العروض",
+    offersCloseHint: "يُحدد في قسم التواريخ. تُرفض العروض والتعديلات والسحب بعد هذا الموعد.",
+    visibility: "من يرى العروض ومتى",
+    ownerVisible: "أرى كل عرض فور وصوله",
+    sealed: "مختوم — أرى العروض بعد إغلاقها فقط",
+    questions: "أسئلة مقدمي الخدمة",
+    questionsAllowed: "يمكن لمقدمي الخدمة طرح الأسئلة",
+    questionsUntil: "موعد إغلاق الأسئلة (اختياري)",
+    questionsUntilHint: "اتركه فارغًا لاستقبال الأسئلة حتى إغلاق العروض. يجب أن يكون قبل إغلاق العروض. بتوقيتك المحلي.",
+    commercialTerms: "الشروط التجارية",
+    commercialTermsHint: "ما ينطبق فقط، مثل: مراحل الدفع، المحتجزات، الضمان، مدة صلاحية الأسعار.",
+    instructions: "تعليمات لمقدمي الخدمة",
+    instructionsHint: "أي شيء يجب أن يعرفه مقدم الخدمة أو يفعله قبل تقديم العرض، مثل ترتيبات زيارة الموقع.",
+    save: "حفظ القواعد",
+    saved: "تم الحفظ",
+    saveError: "تعذر حفظ القواعد.",
+    providerHeading: "قواعد هذه الفرصة",
+    pOffersClose: "تُغلق العروض في {date}. بعد ذلك لا يمكن تقديم العروض أو تعديلها أو سحبها.",
+    pRevise: "حتى ذلك الحين يمكنك تعديل عرضك أو سحبه. يُسجل كل تعديل.",
+    pSealed: "مختوم: لا يرى المالك العروض إلا بعد إغلاقها.",
+    pOwnerVisible: "يرى المالك كل عرض فور وصوله.",
+    pQuestionsUntil: "تُقبل الأسئلة حتى {date}.",
+    pQuestionsClosed: "باب الأسئلة مغلق.",
+    pNoQuestions: "هذا الطلب لا يقبل الأسئلة.",
+    pDeclarations: "قبل التقديم، يجب أن تؤكد إقرارات المالك ({count}).",
+    pCommercial: "الشروط التجارية",
+    pInstructions: "التعليمات",
   },
   eligibility: {
     heading: "من يمكنه تقديم عرض",

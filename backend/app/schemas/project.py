@@ -169,6 +169,28 @@ class EligibilityCheckOut(BaseModel):
     rules: ProviderEligibilityOut
 
 
+class TenderRulesIn(BaseModel):
+    """Stage 3.10: the rules of participation the owner sets on a draft. The
+    offer deadline itself is set with the dates (Stage 3.7)."""
+
+    tender_type: TenderType = TenderType.owner_visible
+    questions_allowed: bool = True
+    questions_deadline: datetime | None = None  # with an offset; None = until offers close
+    commercial_terms: str | None = Field(default=None, max_length=5000)
+    bidder_instructions: str | None = Field(default=None, max_length=5000)
+
+
+class TenderRulesOut(BaseModel):
+    questions_allowed: bool = True
+    questions_deadline: UTCDateTime | None = None
+    # Derived from the authoritative rules (services.tender_rules), so the
+    # page says exactly what the server will do.
+    questions_close_at: UTCDateTime | None = None
+    questions_open: bool = False
+    commercial_terms: str | None = None
+    bidder_instructions: str | None = None
+
+
 class ProjectItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -189,4 +211,5 @@ class ProjectDetailOut(ProjectOut):
     items: list[ProjectItemOut] = []
     provider_eligibility: ProviderEligibilityOut = Field(default_factory=ProviderEligibilityOut)
     response_requirements: ResponseRequirements = Field(default_factory=ResponseRequirements)
+    tender_rules: TenderRulesOut = Field(default_factory=TenderRulesOut)
     currency: str = "KWD"

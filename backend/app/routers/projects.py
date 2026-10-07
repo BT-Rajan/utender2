@@ -27,7 +27,10 @@ from app.schemas.project import (
     ProjectItemsUpdate,
     ProviderEligibilityIn,
     ResponseRequirements,
+    TenderRulesIn,
+    TenderRulesOut,
 )
+from app.services.tender_rules import questions_close_at, questions_open
 from app.services.categories import resolve_trade
 from app.services.eligibility import ineligibility_reasons, rules_for, rules_out, validate_rules
 from app.services.drawings import DOCUMENT_CATEGORIES, upload_drawings_for_project
@@ -326,6 +329,9 @@ def amend_project(
         # bidders who priced against the original window.
         if new_deadline < project.bid_deadline and project.tender_type_locked:
             raise HTTPException(status_code=400, detail="Cannot move the deadline earlier once bids have been submitted.")
+        # Stage 3.10: questions close before offers do.
+        if project.questions_deadline and new_deadline <= project.questions_deadline:
+            raise HTTPException(status_code=400, detail="The offer deadline must be after the question deadline.")
         deadline_extended = new_deadline > project.bid_deadline
         changed.append("bid_deadline")
         project.bid_deadline = new_deadline
@@ -444,6 +450,48 @@ def set_response_requirements(
     if project.status != ProjectStatus.draft:
         raise HTTPException(status_code=409, detail="Response requirements can only be changed while the requirement is a draft.")
     project.response_requirements = payload.model_dump()
+    db.commit()
+    db.refresh(project)
+    return _serialize_detail(project, db)
+
+
+def _to_naive_utc(value: datetime | None, label: str) -> datetime | None:
+    if value is None or value.tzinfo is None:
+        return value
+    try:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    except OverflowError:
+        raise HTTPException(status_code=400, detail=f"Invalid {label}.")
+
+
+@router.put("/{project_id}/tender-rules", response_model=ProjectDetailOut)
+def set_tender_rules(project_id: str, payload: TenderRulesIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Stage 3.10: how the opportunity is run -- who sees offers when,
+    whether and until when questions are taken, and the owner's commercial
+    conditions and instructions. Owner only, while a draft."""
+    project = lock_project(db, project_id)
+    if not project or project.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    _require_active_owner(user, db)
+    if project.status != ProjectStatus.draft:
+        raise HTTPException(status_code=409, detail="Tender rules can only be changed while the requirement is a draft.")
+    if payload.tender_type != project.tender_type and project.tender_type_locked:
+        raise HTTPException(status_code=409, detail="Offer visibility can't change once an offer exists.")
+
+    cutoff = _to_naive_utc(payload.questions_deadline, "question deadline") if payload.questions_allowed else None
+    if cutoff is not None:
+        if cutoff <= datetime.utcnow():
+            raise HTTPException(status_code=400, detail="The question deadline must be in the future.")
+        if cutoff >= project.bid_deadline:
+            raise HTTPException(status_code=400, detail="Questions must close before offers close.")
+    for text in (payload.commercial_terms, payload.bidder_instructions):
+        _check_scope_length(text)
+
+    project.tender_type = payload.tender_type
+    project.questions_allowed = payload.questions_allowed
+    project.questions_deadline = cutoff
+    project.commercial_terms = (payload.commercial_terms or "").strip() or None
+    project.bidder_instructions = (payload.bidder_instructions or "").strip() or None
     db.commit()
     db.refresh(project)
     return _serialize_detail(project, db)
@@ -724,6 +772,14 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
         pricing_basis=project.pricing_basis,
         items=[ProjectItemOut.model_validate(i) for i in project.items],
         provider_eligibility=rules_out(db, project),
+        tender_rules=TenderRulesOut(
+            questions_allowed=project.questions_allowed,
+            questions_deadline=project.questions_deadline,
+            questions_close_at=questions_close_at(project),
+            questions_open=questions_open(project),
+            commercial_terms=project.commercial_terms,
+            bidder_instructions=project.bidder_instructions,
+        ),
         response_requirements=ResponseRequirements(**(project.response_requirements or {})),
         currency=get_settings().marketplace_currency,
     )

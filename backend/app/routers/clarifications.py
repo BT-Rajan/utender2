@@ -7,10 +7,11 @@ from app.db import get_db
 from app.deps import get_current_user, require_owner
 from app.models.clarification import Clarification
 from app.models.service_provider import ServiceProviderProfile
-from app.models.enums import NotificationType, ProjectStatus, UserRole
+from app.models.enums import NotificationType, UserRole
 from app.models.project import Project
 from app.models.user import User
 from app.routers.projects import _can_view_project
+from app.services.tender_rules import questions_closed_reason, questions_open
 from app.schemas.clarification import ClarificationAnswer, ClarificationCreate, ClarificationOut
 from app.services.email import notify_clarification_answered, notify_owner_new_clarification
 from app.services.notify import notify
@@ -84,8 +85,10 @@ def ask_clarification(
     project = db.get(Project, project_id)
     if not project or not _can_view_project(user, project, db):
         raise HTTPException(status_code=404, detail="Project not found.")
-    if project.status != ProjectStatus.open:
-        raise HTTPException(status_code=400, detail="Questions can only be asked while bidding is open.")
+    # Stage 3.10: the requirement's own question rule (and, within it, the
+    # offer deadline) -- the same rule the provider's page shows.
+    if not questions_open(project):
+        raise HTTPException(status_code=400, detail=questions_closed_reason(project))
 
     question = payload.question.strip()
     if not question:

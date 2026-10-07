@@ -63,6 +63,20 @@ class Project(Base):
     # Stage 3.9: who may respond (see schemas.project.ProviderEligibilityIn).
     # NULL = every verified provider with active access.
     provider_eligibility: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Stage 3.10: the rules of participation, as distinct from what is being
+    # requested (title/scope/items above). The offer deadline (bid_deadline),
+    # the offer visibility (tender_type) and the declarations
+    # (response_requirements) already exist; these complete them.
+    # Questions: whether providers may ask, and until when (NULL = until
+    # offers close). Enforced by services.tender_rules.
+    questions_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
+    questions_deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Conditions the price is given under (payment stages, retention,
+    # warranty, offer validity...) and anything a provider must know or do
+    # before responding (site visit arrangements, access...). Free text, as
+    # the owner writes them; nothing is assumed.
+    commercial_terms: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bidder_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Admin moderation flag — independent of the owner-driven lifecycle
     # `status` above. Hides the project from the service provider feed and blocks
     # new bids while set, but leaves `status` untouched so un-suspending

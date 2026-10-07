@@ -64,6 +64,17 @@ export interface ProjectDetail extends Project {
   currency: string;
   response_requirements: ResponseRequirements;
   provider_eligibility: ProviderEligibility;
+  tender_rules: TenderRules;
+}
+
+// Stage 3.10: how the opportunity is run (separate from what is requested).
+export interface TenderRules {
+  questions_allowed: boolean;
+  questions_deadline: string | null;
+  questions_close_at: string | null;
+  questions_open: boolean;
+  commercial_terms: string | null;
+  bidder_instructions: string | null;
 }
 
 export interface EligibilityQualification {
