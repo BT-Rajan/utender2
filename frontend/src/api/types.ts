@@ -229,6 +229,8 @@ export interface OfferPreview {
     items: { id: string; position: number; description: string; quantity: string | null; unit: string | null; specification: string | null }[];
     declarations: string[];
     requested_documents: { name: string; required: boolean }[];
+    approach?: "required" | "optional"; // Stage 6.8
+    completion_period?: "required" | "optional";
   };
   provider_name: string | null;
   offer: Offer;

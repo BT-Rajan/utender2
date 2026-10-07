@@ -130,6 +130,22 @@ export function OfferRecord({
             <p dir="auto" className="whitespace-pre-wrap break-words mt-1">{req.description}</p>
           </details>
         )}
+        {/* Stage 6.8: a single-price requirement's items of work (quantities and
+            specifications) -- what the offer's technical response answers. */}
+        {req.pricing_basis !== "per_item" && req.items.length > 0 && (
+          <details className="mt-2 text-xs text-steel" data-testid="preview-scope-items">
+            <summary className="cursor-pointer text-blue">{t("offerPreview.scopeItems")} ({req.items.length})</summary>
+            <ol className="mt-1 grid gap-1">
+              {req.items.map((item) => (
+                <li key={item.id}>
+                  {item.position}. {item.description}
+                  {item.quantity != null && ` — ${Number(item.quantity)} ${item.unit ?? ""}`}
+                  {item.specification && <div dir="auto" className="whitespace-pre-wrap break-words">{item.specification}</div>}
+                </li>
+              ))}
+            </ol>
+          </details>
+        )}
       </section>
 
       {data.provider_name && (
@@ -148,7 +164,11 @@ export function OfferRecord({
                 const line = offer.item_prices?.find((l) => l.item_id === item.id);
                 return (
                   <tr key={item.id} className="border-b border-border">
-                    <td className="py-1 pe-2">{item.position}. {item.description}</td>
+                    <td className="py-1 pe-2">
+                      {item.position}. {item.description}
+                      {/* Stage 6.8: the item's specification, as the requirement states it. */}
+                      {item.specification && <div dir="auto" className="text-steel whitespace-pre-wrap break-words">{item.specification}</div>}
+                    </td>
                     <td className="py-1 pe-2 font-mono text-end whitespace-nowrap">
                       {line ? (item.quantity != null ? `${Number(item.quantity)} ${item.unit ?? ""} × ${line.rate}` : line.rate) : "—"}
                     </td>
@@ -167,7 +187,10 @@ export function OfferRecord({
       </section>
 
       <section className="border border-border rounded px-4 py-3" data-testid="preview-technical">
-        <div className={heading}>{t("response.approach")}</div>
+        <div className={heading}>
+          {t("response.approach")}
+          {req.approach && <span className="normal-case text-steel"> · {t(`response.${req.approach}`)}</span>}
+        </div>
         {offer.message ? <p dir="auto" className="text-sm whitespace-pre-wrap break-words">{offer.message}</p> : none}
       </section>
 
@@ -180,7 +203,12 @@ export function OfferRecord({
             ? `${t("timing.duration")}: ${offer.proposed_duration_days} ${t("timing.days")}`
             : <>{t("timing.completion")}: {offer.proposed_completion_date ? fullDate(offer.proposed_completion_date, language, false) : none}</>}
         </div>
-        {offer.timeline_estimate && <p dir="auto" className="text-sm mt-1">{t("response.completionPeriod")}: {offer.timeline_estimate}</p>}
+        {(offer.timeline_estimate || req.completion_period === "required") && (
+          <p dir="auto" className="text-sm mt-1">
+            {t("response.completionPeriod")}
+            {req.completion_period && <span className="text-steel"> ({t(`response.${req.completion_period}`)})</span>}: {offer.timeline_estimate || none}
+          </p>
+        )}
         {offer.timing_conflicts?.map((code) => (
           <p key={code} className="text-xs text-amber-dark">⚠ {t(`timing.conflict_${code}`)}</p>
         ))}

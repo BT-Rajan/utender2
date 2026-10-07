@@ -220,6 +220,10 @@ class PreviewRequirement(BaseModel):
     items: list[ProjectItemOut] = []
     declarations: list[str] = []
     requested_documents: list[dict] = []  # [{"name", "required"}]
+    # Stage 6.8: whether the requirement asked for a technical response and a
+    # completion period ("required" | "optional") -- fixed once published.
+    approach: str = "optional"
+    completion_period: str = "optional"
 
 
 class OfferPreviewOut(BaseModel):

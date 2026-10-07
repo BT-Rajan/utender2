@@ -233,6 +233,7 @@ def preview_requirement(db: Session, project: Project) -> PreviewRequirement:
         amendment_number=latest[0] if latest else None,
         items=[ProjectItemOut.model_validate(i) for i in sorted(project.items, key=lambda i: i.position)],
         declarations=list(reqs.declarations), requested_documents=[{"name": d.name, "required": d.required} for d in reqs.documents],
+        approach=reqs.approach, completion_period=reqs.completion_period,
     )
 
 

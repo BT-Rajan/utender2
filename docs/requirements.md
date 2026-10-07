@@ -477,4 +477,16 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - The summary's lowest / average / highest figures stay as plain facts; the lowest is no longer highlighted green.
   - **Not captured:** payment terms and offer validity aren't fields of the offer or the requirement, so they aren't shown. Adding them would be new fields, not evaluation. Providers can state such conditions in assumptions and exclusions.
 
+- **6.8 Technical evaluation:**
+  - **Already working:** the owner's offer page (6.4) and comparison (6.6) show each provider's technical response exactly as stored. Wording, line breaks and Arabic are kept; saving trims only outer whitespace.
+    - Also shown: completion period, start / completion / duration with timing flags, assumptions, declarations and each requested document. Documents open through the owner's authorised route.
+    - Required parts are enforced at submission; optional ones are never forced.
+    - Revised, withdrawn and amended offers and competitors behave as in 6.2–6.5.
+  - **Fixed, context beside the response:**
+    - each item's specification (per-item pricing);
+    - a single-price requirement's items of work, with quantities, units and specifications (previously not shown at all);
+    - whether the technical response and the completion period were required or optional;
+    - a link to the requirement exactly as the offer answered it (scope, dates, documents then), always, not only after an amendment.
+  - **No judgement:** nothing assesses, scores or passes/fails a technical response; the owner judges suitability.
+
 _Later Stage 6 steps are added as they are implemented._

@@ -217,6 +217,7 @@ export interface Dictionary {
     readOnly: string;
     answered: string;
     viewAnswered: string;
+    asAnswered: string;
     unavailable: string;
     loadError: string;
   };
@@ -255,6 +256,7 @@ export interface Dictionary {
     amendment: string;
     outdated: string;
     scope: string;
+    scopeItems: string;
     from: string;
     total: string;
     unknownItems: string;
@@ -1457,6 +1459,7 @@ export const en: Dictionary = {
     readOnly: "Exactly as the provider submitted it. Nothing here changes the offer.",
     answered: "This offer was made against version {n} of the requirement.",
     viewAnswered: "See the requirement as it was at version {n}",
+    asAnswered: "See the requirement this offer answered (version {n}): scope, dates and documents",
     unavailable: "This offer isn't available to view. It may have been withdrawn, it may still be sealed until the deadline, or it may not belong to this requirement.",
     loadError: "Could not load the offer. Refresh the page to try again.",
   },
@@ -1495,6 +1498,7 @@ export const en: Dictionary = {
     amendment: "amendment",
     outdated: "The requirement changed after you started this offer. Review the current requirement before submitting.",
     scope: "Scope of work",
+    scopeItems: "Items of work",
     from: "From",
     total: "Total price:",
     unknownItems: "Some prices refer to items no longer in this requirement.",
@@ -2722,6 +2726,7 @@ export const ar: Dictionary = {
     readOnly: "كما قدّمه مزوّد الخدمة تمامًا. لا شيء هنا يغيّر العرض.",
     answered: "قُدّم هذا العرض على الإصدار {n} من المتطلب.",
     viewAnswered: "اعرض المتطلب كما كان في الإصدار {n}",
+    asAnswered: "اعرض المتطلب الذي أجاب عنه هذا العرض (الإصدار {n}): النطاق والتواريخ والمستندات",
     unavailable: "هذا العرض غير متاح للعرض. ربما سُحب، أو لا يزال مختومًا حتى الموعد النهائي، أو لا يخص هذا المتطلب.",
     loadError: "تعذر تحميل العرض. حدّث الصفحة للمحاولة مجددًا.",
   },
@@ -2760,6 +2765,7 @@ export const ar: Dictionary = {
     amendment: "تعديل",
     outdated: "تغيّر الطلب بعد أن بدأت هذا العرض. راجع الطلب الحالي قبل التقديم.",
     scope: "نطاق العمل",
+    scopeItems: "بنود العمل",
     from: "من",
     total: "السعر الإجمالي:",
     unknownItems: "بعض الأسعار تشير إلى بنود لم تعد في هذا الطلب.",

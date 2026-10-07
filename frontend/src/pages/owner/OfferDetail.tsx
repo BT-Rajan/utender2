@@ -76,10 +76,14 @@ export function OwnerOfferDetailPage() {
             <p className="text-xs text-steel mt-1" data-testid="owner-offer-answered">
               {t("ownerOffer.answered").replace("{n}", String(answered))}
             </p>
-            {/* What the offer actually priced, when the requirement has moved on since. */}
-            {!data.on_current_version && (
-              <VersionView projectId={requirement.id} number={answered} label={t("ownerOffer.viewAnswered").replace("{n}", String(answered))} />
-            )}
+            {/* Stage 6.8: the requirement exactly as this offer answered it -- scope,
+                dates and the documents current then (Stage 3.17); after an
+                amendment, that earlier version, not today's. */}
+            <VersionView
+              projectId={requirement.id}
+              number={answered}
+              label={(data.on_current_version ? t("ownerOffer.asAnswered") : t("ownerOffer.viewAnswered")).replace("{n}", String(answered))}
+            />
           </>
         }
       />
