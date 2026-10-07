@@ -116,7 +116,8 @@ def test_deadline_lifecycle_and_amendment(db):
     pids = {s: _tender(owner, s) for s in ("near", "at", "after", "closed_early", "canceled", "suspended", "paused", "amended")}
     for pid in pids.values():
         _submitted(sp, pid)
-    db.get(Project, pids["near"]).bid_deadline = datetime.utcnow() + timedelta(seconds=30)
+    near_deadline = (datetime.utcnow() + timedelta(seconds=30)).replace(microsecond=0)  # whole seconds, as stored
+    db.get(Project, pids["near"]).bid_deadline = near_deadline
     db.get(Project, pids["at"]).bid_deadline = datetime.utcnow().replace(microsecond=0)  # whole seconds, as MySQL stores it
     db.get(Project, pids["after"]).bid_deadline = datetime.utcnow() - timedelta(minutes=1)
     db.commit()
@@ -134,7 +135,8 @@ def test_deadline_lifecycle_and_amendment(db):
         db.refresh(o)
         assert (o.revision, o.amount, o.message) == (1, Decimal("1000"), "Method v1"), state
     # A revision never moves the deadline.
-    assert db.get(Project, pids["near"]).bid_deadline <= datetime.utcnow() + timedelta(seconds=30)
+    db.expire_all()
+    assert db.get(Project, pids["near"]).bid_deadline == near_deadline
     # 6. A material amendment: the submitted offer keeps its version; revising makes the new version against the
     # current requirement, and the old one stays on record against the old one.
     pid = pids["amended"]
