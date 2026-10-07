@@ -31,8 +31,8 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.ar: ("لقد فزت بـ {project_title}", "تم قبول عرضك على {project_title}."),
     },
     NotificationType.award_lost: {
-        Language.en: ("Update on {project_title}", "The owner of {project_title} went with another offer."),
-        Language.ar: ("تحديث بخصوص {project_title}", "اختار مالك {project_title} عرضًا آخر."),
+        Language.en: ("Update on {project_title}", "{project_title} was awarded to a successful bidder. Best wishes for your future endeavours."),
+        Language.ar: ("تحديث بخصوص {project_title}", "تمت ترسية {project_title} على مقدّم عرض فائز. نتمنى لك التوفيق في مساعيك القادمة."),
     },
     NotificationType.clarification_asked: {
         Language.en: ("New question on {project_title}", "A service provider asked a question about {project_title}."),

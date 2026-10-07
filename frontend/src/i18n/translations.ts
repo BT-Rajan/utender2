@@ -954,6 +954,7 @@ export interface Dictionary {
       yourFinalOffer: string;
       awardedTo: string;
       yourOfferAwarded: string;
+      awardedToOther: string;
       anotherServiceProvider: string;
       noAwardNotice: string;
       bidAmount: string;
@@ -2261,6 +2262,7 @@ export const en: Dictionary = {
       yourFinalOffer: "Your final offer:",
       awardedTo: "Awarded to",
       yourOfferAwarded: "Your offer was awarded, at",
+      awardedToOther: "Awarded to a successful bidder. Best wishes for your future endeavours.",
       anotherServiceProvider: "another service provider",
       noAwardNotice: "The owner decided not to award this project.",
       bidAmount: "Your bid amount",
@@ -3574,6 +3576,7 @@ export const ar: Dictionary = {
       yourFinalOffer: "عرضك النهائي:",
       awardedTo: "تم الترسية على",
       yourOfferAwarded: "تمت ترسية عرضك، بقيمة",
+      awardedToOther: "تمت الترسية على مقدّم عرض فائز. نتمنى لك التوفيق في مساعيك القادمة.",
       anotherServiceProvider: "مزوّد خدمة آخر",
       noAwardNotice: "قرر المالك عدم ترسية هذا المشروع.",
       bidAmount: "قيمة عرضك",

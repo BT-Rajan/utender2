@@ -46,7 +46,7 @@ def test_award_outcome_for_the_winner_the_others_and_nobody_else(db):
     assert NotificationType.award_won in _mine_notes(db, a)
     # Another bidder: not selected, and who won -- never the winning price or offer.
     award = b.get(f"/projects/{pid}/award").json()
-    assert (award["mine"], award["amount"], award["offer_id"], award["service_provider_id"], award["service_provider_company_name"]) == (False, None, None, None, "amal")
+    assert (award["mine"], award["amount"], award["offer_id"], award["service_provider_id"], award["service_provider_company_name"]) == (False, None, None, None, None)
     bid = {x["project_id"]: x for x in b.get("/service-provider/my-bids").json()}[pid]
     assert (bid["offer_status"], bid["project_status"], bid["amount"]) == ("rejected", "awarded", "777.555")  # their own price, not the winner's
     assert NotificationType.award_lost in _mine_notes(db, b)

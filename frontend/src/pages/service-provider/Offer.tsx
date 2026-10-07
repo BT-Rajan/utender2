@@ -27,7 +27,7 @@ interface AwardRecord {
 
 // Stage 6.16: the outcome as the award record holds it. The winner sees that
 // their offer was awarded, and at what; every other bidder sees only that the
-// requirement was awarded and to whom -- never the winning offer's price.
+// requirement was awarded to a successful bidder -- not who, nor at what.
 function AwardOutcome({ projectId }: { projectId: string }) {
   const { t } = useI18n();
   const { data: award } = useQuery({
@@ -41,7 +41,7 @@ function AwardOutcome({ projectId }: { projectId: string }) {
     <p className="mt-3 font-mono text-xs text-navy" data-testid="award-outcome">
       {award.mine
         ? `${t("service_provider.offer.yourOfferAwarded")} ${money(award.amount)}`
-        : `${t("service_provider.offer.awardedTo")} ${award.service_provider_company_name ?? t("service_provider.offer.anotherServiceProvider")}`}
+        : t("service_provider.offer.awardedToOther")}
     </p>
   );
 }

@@ -48,7 +48,7 @@ def notify_service_provider_offer_decision(service_provider_email: str, project_
         body = f"<p>Good news — your offer on <strong>{project_title}</strong> was approved.</p>"
     else:
         subject = f"Update on your offer for {project_title}"
-        body = f"<p>The owner of <strong>{project_title}</strong> went with another offer this time.</p>"
+        body = f"<p><strong>{project_title}</strong> was awarded to a successful bidder. Best wishes for your future endeavours.</p>"
 
     _send(service_provider_email, subject, f'{body}<p><a href="{settings.app_url}/service-provider/feed">View open projects</a></p>')
 
