@@ -150,3 +150,49 @@ def assert_eligible(db: Session, project: Project, profile: ServiceProviderProfi
         raise HTTPException(
             status_code=403, detail="You aren't eligible to respond to this requirement. " + " ".join(r.message for r in reasons)
         )
+
+
+def audience(db: Session, project: Project) -> dict:
+    """Stage 3.13: who this requirement would reach, for the owner's preview --
+    counts only, never who. Among providers who can currently take part
+    (verified, active access), how many meet its rules, and how many each
+    rule leaves out. Uses the same check providers are held to."""
+    profiles = (
+        db.query(ServiceProviderProfile)
+        .filter(ServiceProviderProfile.verification_status == "approved", ServiceProviderProfile.is_suspended.is_(False))
+        .all()
+    )
+    active = [p for p in profiles if p.is_verified_active]
+    excluded: dict[str, int] = {}
+    eligible = 0
+    for profile in active:
+        reasons = ineligibility_reasons(db, project, profile)
+        if not reasons:
+            eligible += 1
+        for code in {r.code for r in reasons}:
+            excluded[code] = excluded.get(code, 0) + 1
+    return {"active_providers": len(active), "eligible": eligible, "excluded_by": excluded}
+
+
+def matching_providers(db: Session, project: Project) -> list[ServiceProviderProfile]:
+    """Stage 3.14: who to tell about a newly published requirement -- not every
+    provider, only those it is genuinely for: able to take part now (verified,
+    active access), meeting its "who can respond" rules, offering its type of
+    work, and serving its governorate (or not limited to any). A requirement
+    without a type of work from the platform's list notifies nobody, since
+    there is no way to tell who it is relevant to; providers still find it in
+    the list of opportunities."""
+    if not project.category_id:
+        return []
+    out = []
+    for profile in db.query(ServiceProviderProfile).filter(ServiceProviderProfile.verification_status == "approved").all():
+        if not profile.is_verified_active or ineligibility_reasons(db, project, profile):
+            continue
+        team = db.query(ServiceProviderProfile).filter(ServiceProviderProfile.user_id.in_(team_ids(db, profile.user_id))).all()
+        if project.category_id not in {c for p in team for c in (p.service_categories or [])}:
+            continue
+        served = {g for p in team for g in (p.service_governorates or [])}
+        if served and project.governorate and project.governorate not in served:
+            continue
+        out.append(profile)
+    return out

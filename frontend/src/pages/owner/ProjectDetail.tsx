@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError, API_URL, draftVersion } from "@/api/client";
 import type { Drawing, Offer, ProjectDetail } from "@/api/types";
@@ -18,6 +18,9 @@ import { ProviderEligibilityEditor } from "@/components/ProviderEligibility";
 import { CategoryField } from "@/components/CategoryField";
 import { TenderRulesEditor } from "@/components/TenderRules";
 import { QualityCheck, type QualityReport } from "@/components/QualityCheck";
+import { useConfirm } from "@/components/ConfirmDialog";
+import { ClosureOutcome, EndRequirement, StartAgain, outcomeLabel } from "@/components/ClosureOutcome";
+import { AmendPublishedForm, AmendmentsList, PauseControl } from "@/components/PostPublication";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
 import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
 
@@ -363,8 +366,9 @@ export function OwnerProjectDetailPage() {
     onError: (err) => setError(errorMessage(err, t("owner.projectDetail.reviewError"))),
   });
 
+  const confirm = useConfirm();
   const lifecycleMutation = useMutation({
-    mutationFn: (action: "publish" | "close" | "start-evaluation" | "no-award" | "cancel" | "discard") =>
+    mutationFn: (action: "publish" | "close" | "start-evaluation" | "discard") =>
       apiFetch(`/owner/projects/${id}/${action}`, { method: "POST" }),
     onSuccess: () => {
       setError(null);
@@ -402,7 +406,7 @@ export function OwnerProjectDetailPage() {
             {project.tender_type === "sealed" ? t("owner.projectDetail.sealedBadge") : t("owner.projectDetail.ownerVisibleBadge")}
           </span>
           <span className={`font-mono text-[10px] uppercase tracking-wide px-2.5 py-1 rounded-full ${statusBadgeClasses(project.status)}`}>
-            {project.status.replace(/_/g, " ")}
+            {outcomeLabel(t, project.status, project.closure_reason)}
           </span>
         </div>
       </div>
@@ -418,6 +422,25 @@ export function OwnerProjectDetailPage() {
           {t("draftDetails.expired").replace("{date}", formatDeadline(project.bid_deadline))}
         </div>
       )}
+      {project.published_at && project.status === "open" && (
+        <p className="text-[12.5px] text-steel mb-4">
+          {t("draftDetails.published").replace("{date}", formatDeadline(project.published_at)).replace("{deadline}", formatDeadline(project.bid_deadline))}
+        </p>
+      )}
+      {/* Stage 3.18: an admin suspension overrides everything providers see. */}
+      {project.is_suspended && (
+        <div className="border border-red bg-red-tint rounded px-4 py-3 mb-6 text-sm text-red max-w-2xl" data-testid="admin-suspended">
+          {t("closure.adminSuspended")}
+        </div>
+      )}
+      {project.restarted_from_id && (
+        <p className="text-[12.5px] text-steel mb-4" data-testid="restarted-from">
+          {t("closure.restartedFrom")}{" "}
+          <Link to={`/owner/projects/${project.restarted_from_id}`} className="text-blue underline">
+            {t("closure.restartedFromLink")}
+          </Link>
+        </p>
+      )}
       {project.discarded_at && (
         <div className="border border-border bg-border/30 rounded px-4 py-3 mb-6 text-sm text-steel max-w-2xl">
           {t("draftDetails.discarded").replace("{date}", formatDeadline(project.discarded_at))}
@@ -431,7 +454,22 @@ export function OwnerProjectDetailPage() {
       {editableDraft && <ResponseRequirementsEditor project={project} />}
       {editableDraft && <ProviderEligibilityEditor project={project} />}
 
+      {/* Stage 3.15: controlling the published requirement. */}
+      {project.status === "open" && <PauseControl project={project} />}
+      {project.status === "open" && <AmendPublishedForm project={project} />}
+      {project.closed_at && project.status !== "open" && (
+        <p className="text-[12.5px] text-steel mb-4">{t("postPub.closedEarly").replace("{date}", formatDeadline(project.closed_at))}</p>
+      )}
+      {project.published_at && <div className="max-w-2xl"><AmendmentsList projectId={project.id} /></div>}
       {editableDraft && <QualityCheck report={quality} />}
+      {editableDraft && (
+        <Link
+          to={`/owner/projects/${project.id}/preview`}
+          className="inline-block mb-4 border border-navy text-navy hover:bg-navy hover:text-white text-xs font-semibold rounded px-4 py-2"
+        >
+          {t("preview.open")}
+        </Link>
+      )}
 
       {(editableDraft ||
         project.status === "open" ||
@@ -441,7 +479,14 @@ export function OwnerProjectDetailPage() {
           {editableDraft && (
             <button
               type="button"
-              onClick={() => lifecycleMutation.mutate("publish")}
+              onClick={() => {
+                // Stage 3.14: publishing is a deliberate step, never a stray click.
+                const text = t("draftDetails.publishConfirm").replace("{title}", project.title).replace("{deadline}", formatDeadline(project.bid_deadline));
+                const [title, ...body] = text.split("\n\n");
+                void confirm({ title, body: body.join("\n\n"), confirmLabel: t("owner.projectDetail.publish") }).then(
+                  (ok) => ok && lifecycleMutation.mutate("publish"),
+                );
+              }}
               // The server refuses anyway; this just says so up front.
               disabled={lifecycleMutation.isPending || !quality?.ready}
               title={quality && !quality.ready ? t("quality.publishBlocked") : undefined}
@@ -453,7 +498,11 @@ export function OwnerProjectDetailPage() {
           {project.status === "open" && (
             <button
               type="button"
-              onClick={() => lifecycleMutation.mutate("close")}
+              onClick={() =>
+                void confirm({ title: t("postPub.closeConfirm"), body: t("postPub.closeConfirmBody"), confirmLabel: t("owner.projectDetail.closeEarly") }).then(
+                  (ok) => ok && lifecycleMutation.mutate("close"),
+                )
+              }
               disabled={lifecycleMutation.isPending}
               className="border border-navy text-navy hover:bg-navy hover:text-white disabled:opacity-60 text-xs font-semibold rounded px-4 py-2"
             >
@@ -470,39 +519,27 @@ export function OwnerProjectDetailPage() {
               {t("owner.projectDetail.startEvaluation")}
             </button>
           )}
-          {(project.status === "closed" || project.status === "under_evaluation") && (
-            <button
-              type="button"
-              onClick={() => lifecycleMutation.mutate("no-award")}
-              disabled={lifecycleMutation.isPending}
-              className="bg-red-tint text-red text-xs font-semibold rounded px-4 py-2"
-            >
-              {t("owner.projectDetail.markNoAward")}
-            </button>
-          )}
-          {editableDraft ? (
+          {editableDraft && (
             <button
               type="button"
               onClick={() => {
-                if (window.confirm(t("draftDetails.discardConfirm"))) lifecycleMutation.mutate("discard");
+                void confirm({ title: t("draftDetails.discardConfirm"), confirmLabel: t("draftDetails.discard"), tone: "danger" }).then(
+                  (ok) => ok && lifecycleMutation.mutate("discard"),
+                );
               }}
               disabled={lifecycleMutation.isPending}
               className="text-xs text-red underline disabled:opacity-60"
             >
               {t("draftDetails.discard")}
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => lifecycleMutation.mutate("cancel")}
-              disabled={lifecycleMutation.isPending}
-              className="text-xs text-red underline disabled:opacity-60"
-            >
-              {t("owner.projectDetail.cancelProject")}
-            </button>
           )}
         </div>
       )}
+
+      {/* Stage 3.16: ending it without a U-Tender award -- and saying how it ended. */}
+      {(project.status === "open" || project.status === "closed" || project.status === "under_evaluation") && <EndRequirement project={project} />}
+      {(project.status === "canceled" || project.status === "no_award") && <ClosureOutcome project={project} />}
+      {(project.status === "canceled" || project.status === "no_award" || project.status === "expired") && <StartAgain project={project} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-6 items-start">
         <div>
@@ -548,7 +585,9 @@ export function OwnerProjectDetailPage() {
                         <button
                           type="button"
                           onClick={() => {
-                            if (window.confirm(t("documents.removeConfirm"))) documentMutation.mutate({ drawingId: d.id, change: "remove" });
+                            void confirm({ title: t("documents.removeConfirm"), confirmLabel: t("confirm.remove"), tone: "danger" }).then(
+                              (ok) => ok && documentMutation.mutate({ drawingId: d.id, change: "remove" }),
+                            );
                           }}
                           className="text-[11px] text-red-tint underline"
                         >
@@ -675,6 +714,15 @@ export function OwnerProjectDetailPage() {
                     <td className="py-3 px-2.5">
                       <div className="font-display font-semibold text-[13.5px]">
                         {o.service_provider_company_name ?? t("owner.projectDetail.serviceProviderCol")}
+                        {o.status === "submitted" && (o.based_on_material_revision ?? 0) < (project.material_revision ?? 0) && (
+                          <span className="block font-mono text-[10px] uppercase text-amber-dark font-normal">{t("postPub.outdatedOwner")}</span>
+                        )}
+                        {/* Stage 3.17: which version of the requirement this offer priced. */}
+                        {(project.material_revision ?? 0) > 0 && (
+                          <span className="block font-mono text-[10px] text-steel font-normal" data-testid="offer-version">
+                            {t("versions.pricedOn").replace("{n}", String(o.based_on_material_revision ?? 0))}
+                          </span>
+                        )}
                         {o.revision > 1 && (
                           <span className="text-steel-light font-normal">
                             {" "}

@@ -5,6 +5,7 @@ import { apiFetch } from "@/api/client";
 import type { Project, ProjectStatus } from "@/api/types";
 import { formatDeadline } from "@/lib/format";
 import { QueryError } from "@/components/QueryError";
+import { outcomeLabel } from "@/components/ClosureOutcome";
 import { useI18n } from "@/i18n/I18nContext";
 
 function badgeClasses(status: string) {
@@ -170,7 +171,7 @@ export function OwnerDashboardPage() {
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <span className={`font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full ${badgeClasses(p.status)}`}>
-                    {p.status.replace(/_/g, " ")}
+                    {outcomeLabel(t, p.status, p.closure_reason)}
                   </span>
                   {p.tender_type === "sealed" && (
                     <span className="font-mono text-[9px] uppercase text-steel-light">{t("owner.dashboard.sealed")}</span>

@@ -32,6 +32,22 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.en: ("Your question was answered", "The owner of {project_title} answered your question."),
         Language.ar: ("تمت الإجابة على سؤالك", "أجاب مالك {project_title} على سؤالك."),
     },
+    NotificationType.new_requirement: {
+        Language.en: ("New opportunity: {project_title}", "A new {trade} requirement in {area} is open for offers until {deadline}. You meet its conditions."),
+        Language.ar: ("فرصة جديدة: {project_title}", "طلب جديد لأعمال {trade} في {area} مفتوح للعروض حتى {deadline}. أنت تستوفي شروطه."),
+    },
+    NotificationType.tender_paused: {
+        Language.en: ("{project_title} is paused", "The owner paused this requirement: {reason} No offers or changes are accepted until it resumes. Your offer is kept."),
+        Language.ar: ("تم إيقاف {project_title} مؤقتًا", "أوقف المالك هذا الطلب مؤقتًا: {reason} لا تُقبل عروض أو تعديلات حتى يُستأنف. عرضك محفوظ."),
+    },
+    NotificationType.tender_resumed: {
+        Language.en: ("{project_title} is open again", "The owner resumed this requirement. Offers are open until {deadline}."),
+        Language.ar: ("{project_title} مفتوح مجددًا", "استأنف المالك هذا الطلب. العروض مفتوحة حتى {deadline}."),
+    },
+    NotificationType.tender_closed: {
+        Language.en: ("{project_title} closed for offers", "The owner closed this requirement early. No more offers are accepted; your offer is kept as submitted."),
+        Language.ar: ("أُغلق {project_title} أمام العروض", "أغلق المالك هذا الطلب مبكرًا. لا تُقبل عروض أخرى؛ عرضك محفوظ كما قُدّم."),
+    },
     NotificationType.tender_amendment: {
         Language.en: ("{project_title} was updated", "{summary}"),
         Language.ar: ("تم تحديث {project_title}", "{summary}"),
@@ -73,12 +89,16 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.ar: ("تم رفض التحقق", "تم رفض طلب التحقق الخاص بك. السبب: {note}"),
     },
     NotificationType.tender_no_award: {
-        Language.en: ("No award on {project_title}", "The owner decided not to award {project_title}."),
-        Language.ar: ("لم يتم الترسية على {project_title}", "قرر المالك عدم الترسية على {project_title}."),
+        Language.en: ("No award on {project_title}", "The owner closed {project_title} without awarding it through U-Tender. Your offer is kept on record."),
+        Language.ar: ("لم يتم الترسية على {project_title}", "أغلق المالك {project_title} دون ترسيته عبر U-Tender. يبقى عرضك محفوظًا في السجل."),
     },
     NotificationType.tender_cancelled: {
-        Language.en: ("{project_title} was canceled", "The owner canceled this project."),
-        Language.ar: ("تم إلغاء {project_title}", "قام المالك بإلغاء هذا المشروع."),
+        Language.en: ("{project_title} was canceled", "The owner canceled this project. It won't go ahead in its current form; your offer is kept on record."),
+        Language.ar: ("تم إلغاء {project_title}", "قام المالك بإلغاء هذا المشروع. لن يمضي بصيغته الحالية؛ يبقى عرضك محفوظًا في السجل."),
+    },
+    NotificationType.requirement_ended: {
+        Language.en: ("{project_title} has ended", "The owner ended {project_title} before its deadline. It is no longer open for offers."),
+        Language.ar: ("انتهى {project_title}", "أنهى المالك {project_title} قبل موعده النهائي. لم يعد مفتوحًا لتلقي العروض."),
     },
     NotificationType.deadline_approaching: {
         Language.en: ("Bidding closes soon — {project_title}", "{project_title} stops accepting offers within 24 hours."),
@@ -149,6 +169,12 @@ def notify(db: Session, user: User, notification_type: NotificationType, link: s
         .first()
     )
     if existing:
+        # Still one unread notice for this place -- but it says what the
+        # latest event says (e.g. a scope change after a title fix), never a
+        # stale earlier message.
+        existing.title, existing.body = title, body
+        existing.created_at = datetime.utcnow()
+        db.commit()
         return existing
 
     row = Notification(user_id=user.id, type=notification_type, title=title, body=body, link=link)

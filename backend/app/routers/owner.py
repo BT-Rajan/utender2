@@ -1,17 +1,19 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.deps import get_owner_profile, require_owner
 from app.models.award_record import AwardRecord
+from app.models.notification import Notification
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import DocumentRequirement
 from app.models.enums import DocumentStatus, NotificationType, OfferStatus, ProjectStatus, UserRole
 from app.models.offer import Offer, OfferRevision
 from app.models.owner import OwnerProfile
-from app.models.project import Project
+from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.review import Review
 from app.models.user import User
 from app.schemas.document import DocumentRequirementOut, OwnerDocumentOut
@@ -20,11 +22,10 @@ from app.schemas.owner import OwnerProfileOut
 from app.schemas.project import EligibilityQualification, ProjectOut
 from app.schemas.review import ReviewCreate, ReviewOut
 from app.services.audit import log_action
-from app.services.email import notify_service_provider_offer_decision
+from app.services.email import notify_provider_requirement_ended, notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify, notify_team
 from app.services.team import acting_profile, mine, owns
-from app.services import requirement_quality
 from app.services.eligibility import qualification_options
 from app.services.offer_response import documents_out
 from app.services.stakeholder import require_established
@@ -38,7 +39,7 @@ from app.services.verification import (
     profile_state_fields,
 )
 from app.services.storage import get_storage
-from app.services.tender_lifecycle import is_sealed_and_open, lock_project, sync_expired_projects
+from app.services.tender_lifecycle import interested_providers, is_sealed_and_open, lock_project, publish, sync_expired_projects
 
 router = APIRouter(prefix="/owner", tags=["owner"])
 
@@ -123,6 +124,7 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
                 message=None,
                 status=o.status,
                 revision=o.revision,
+            based_on_material_revision=o.based_on_material_revision,
                 created_at=o.created_at,
                 updated_at=o.updated_at,
                 sealed=True,
@@ -144,6 +146,7 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
             documents=documents_out(db, project_id, o.organization_id, o.service_provider_id),
             status=o.status,
             revision=o.revision,
+            based_on_material_revision=o.based_on_material_revision,
             created_at=o.created_at,
             updated_at=o.updated_at,
             service_provider_company_name=cp.company_name,
@@ -270,14 +273,7 @@ def _project_response(project: Project, db: Session) -> ProjectOut:
 @router.post("/projects/{project_id}/publish", response_model=ProjectOut)
 def publish_project(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     project = _get_owned_project(project_id, user, db, lock=True)
-    if project.status != ProjectStatus.draft or project.discarded_at is not None:
-        raise HTTPException(status_code=400, detail="Only a draft project can be published.")
-    if project.bid_deadline <= datetime.utcnow():
-        raise HTTPException(status_code=400, detail="Set a bid deadline in the future before publishing.")
-    # Stage 3.12: the quality gate, authoritative whatever the page showed.
-    requirement_quality.assert_publishable(db, project)
-    project.status = ProjectStatus.open
-    db.commit()
+    publish(db, project, user.id)  # the one publication transition (tender_lifecycle)
     db.refresh(project)
     return _project_response(project, db)
 
@@ -298,8 +294,58 @@ def close_project(project_id: str, user: User = Depends(require_owner), db: Sess
             detail="A sealed tender can't be closed early \u2014 its bids stay sealed until the deadline. "
             "Cancel the tender instead if you no longer want bids.",
         )
+    # Stage 3.15: the authoritative closure time, an audit entry, and the
+    # bidders told. Every offer stays exactly as submitted.
+    now = datetime.utcnow().replace(microsecond=0)
     project.status = ProjectStatus.closed
-    db.commit()
+    project.closed_at = now
+    project.paused_at = None
+    log_action(db, actor_id=user.id, action="project.close", target_type="project", target_id=project_id, previous_value="open", new_value="closed")
+    _notify_bidders(db, project, NotificationType.tender_closed)
+    db.refresh(project)
+    return _project_response(project, db)
+
+
+class PauseRequest(BaseModel):
+    reason: str = Field(min_length=3, max_length=500)
+
+
+@router.post("/projects/{project_id}/pause", response_model=ProjectOut)
+def pause_project(project_id: str, payload: PauseRequest, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 3.15: the owner keeps the requirement but stops participation for
+    now. Providers see it is paused, and why; nothing is accepted (offers,
+    revisions, withdrawals, attachments, questions) until it resumes.
+    Offers, documents and history are untouched. The deadline still runs:
+    extend it (an amendment) if the pause will outlast it."""
+    sync_expired_projects(db)
+    project = _get_owned_project(project_id, user, db, lock=True)
+    if project.status != ProjectStatus.open:
+        raise HTTPException(status_code=400, detail="Only an open requirement can be paused.")
+    if project.paused_at is not None:
+        raise HTTPException(status_code=400, detail="This requirement is already paused.")
+    project.paused_at = datetime.utcnow().replace(microsecond=0)
+    project.pause_reason = payload.reason.strip()
+    log_action(db, actor_id=user.id, action="project.pause", target_type="project", target_id=project_id, new_value=project.pause_reason)
+    _notify_bidders(db, project, NotificationType.tender_paused, reason=project.pause_reason)
+    db.refresh(project)
+    return _project_response(project, db)
+
+
+@router.post("/projects/{project_id}/resume", response_model=ProjectOut)
+def resume_project(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Back to open under the same rules and the deadline as it now stands --
+    never silently reopening one whose deadline has passed (it is then closed
+    or expired, and stays so)."""
+    sync_expired_projects(db)
+    project = _get_owned_project(project_id, user, db, lock=True)
+    if project.status != ProjectStatus.open or project.paused_at is None:
+        raise HTTPException(status_code=400, detail="Only a paused, still-open requirement can be resumed.")
+    if project.bid_deadline <= datetime.utcnow():
+        raise HTTPException(status_code=400, detail="The offer deadline has passed, so this requirement can't reopen.")
+    project.paused_at = None
+    project.pause_reason = None
+    log_action(db, actor_id=user.id, action="project.resume", target_type="project", target_id=project_id)
+    _notify_bidders(db, project, NotificationType.tender_resumed, deadline=project.bid_deadline.strftime("%d %b %Y %H:%M UTC"))
     db.refresh(project)
     return _project_response(project, db)
 
@@ -311,12 +357,13 @@ def start_evaluation(project_id: str, user: User = Depends(require_owner), db: S
     if project.status != ProjectStatus.closed:
         raise HTTPException(status_code=400, detail="Only a closed project can enter evaluation.")
     project.status = ProjectStatus.under_evaluation
-    db.commit()
+    # Stage 3.18: recorded like every other lifecycle change (log_action commits both together).
+    log_action(db, actor_id=user.id, action="project.start_evaluation", target_type="project", target_id=project_id, previous_value="closed", new_value="under_evaluation")
     db.refresh(project)
     return _project_response(project, db)
 
 
-def _notify_bidders(db: Session, project: Project, notification_type: NotificationType) -> None:
+def _notify_bidders(db: Session, project: Project, notification_type: NotificationType, **details) -> None:
     bidders = (
         db.query(Offer.service_provider_id, Offer.organization_id)
         .filter(Offer.project_id == project.id, Offer.status != OfferStatus.withdrawn)
@@ -327,22 +374,166 @@ def _notify_bidders(db: Session, project: Project, notification_type: Notificati
         bidder = db.get(User, service_provider_id)
         if bidder:
             notify_team(
-                db, bidder, notification_type, link=f"/service-provider/projects/{project.id}/offer", organization_id=organization_id, project_title=project.title
+                db,
+                bidder,
+                notification_type,
+                link=f"/service-provider/projects/{project.id}/offer",
+                organization_id=organization_id,
+                project_title=project.title,
+                **details,
             )
 
 
+def _notify_watchers(db: Session, project: Project) -> None:
+    """A requirement ended while still open for offers: the providers who were
+    told about it (or asked about it) but hadn't offered hear it is over,
+    rather than it just vanishing from their feed. Bidders are told separately."""
+    link = f"/service-provider/projects/{project.id}/offer"
+    for person in interested_providers(db, project):
+        notify(db, person, NotificationType.requirement_ended, link=link, project_title=project.title)
+        notify_provider_requirement_ended(person.email, person.language.value, project_title=project.title, project_id=project.id)
+    # A "new opportunity" still waiting to be read no longer is one.
+    db.query(Notification).filter(
+        Notification.type == NotificationType.new_requirement, Notification.link == link, Notification.is_read.is_(False)
+    ).update({Notification.is_read: True}, synchronize_session=False)
+    db.commit()
+
+
+# Stage 3.16: how a requirement ends without a U-Tender award. The status
+# says what happened (canceled / no_award / expired); closure_reason says
+# why, so outcomes with different meanings stay distinguishable without new
+# states. A note, if given, goes to the audit trail only -- it may be
+# commercially sensitive, so providers never see it.
+CANCEL_REASONS = ("not_needed", "postponed", "other")
+NO_AWARD_REASONS = ("no_suitable_offer", "closed_externally")
+
+
+class ClosureRequest(BaseModel):
+    reason: str | None = None
+    note: str | None = Field(default=None, max_length=1000)
+
+
+def _end(db: Session, user: User, project: Project, status: ProjectStatus, reason: str, note: str | None, action: str, kind: NotificationType):
+    previous = project.status.value
+    now = datetime.utcnow().replace(microsecond=0)
+    if project.status == ProjectStatus.open:
+        project.closed_at = now  # offers stop now
+    project.status = status
+    project.closure_reason = reason
+    project.closure_note = (note or "").strip() or None
+    project.paused_at = None
+    log_action(
+        db, actor_id=user.id, action=action, target_type="project", target_id=project.id,
+        previous_value=previous, new_value=f"{status.value}:{reason}", reason=project.closure_note,
+    )
+    _notify_bidders(db, project, kind)
+    if previous == ProjectStatus.open.value:
+        _notify_watchers(db, project)
+    db.refresh(project)
+    return _project_response(project, db)
+
+
 @router.post("/projects/{project_id}/no-award", response_model=ProjectOut)
-def mark_no_award(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+def mark_no_award(project_id: str, payload: ClosureRequest | None = None, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Offers have closed and none of them is suitable: no award."""
     sync_expired_projects(db)
     project = _get_owned_project(project_id, user, db, lock=True)
     if project.status not in (ProjectStatus.closed, ProjectStatus.under_evaluation):
         raise HTTPException(status_code=400, detail="Only a closed or under-evaluation project can be marked no-award.")
-    previous = project.status.value
-    project.status = ProjectStatus.no_award
-    log_action(db, actor_id=user.id, action="project.no_award", target_type="project", target_id=project_id, previous_value=previous, new_value="no_award")
-    _notify_bidders(db, project, NotificationType.tender_no_award)
-    db.refresh(project)
-    return _project_response(project, db)
+    note = payload.note if payload else None
+    return _end(db, user, project, ProjectStatus.no_award, "no_suitable_offer", note, "project.no_award", NotificationType.tender_no_award)
+
+
+@router.post("/projects/{project_id}/close-externally", response_model=ProjectOut)
+def close_externally(project_id: str, payload: ClosureRequest | None = None, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """The owner will handle the work outside U-Tender. Recorded as ending
+    without a U-Tender award -- nobody is awarded, nothing about the outside
+    arrangement is asked for or tracked. Possible while offers are open
+    (they stop now) or after they close."""
+    sync_expired_projects(db)
+    project = _get_owned_project(project_id, user, db, lock=True)
+    if project.status not in (ProjectStatus.open, ProjectStatus.closed, ProjectStatus.under_evaluation):
+        raise HTTPException(status_code=400, detail="This project can no longer be closed.")
+    note = payload.note if payload else None
+    return _end(db, user, project, ProjectStatus.no_award, "closed_externally", note, "project.closed_externally", NotificationType.tender_no_award)
+
+
+@router.post("/projects/{project_id}/cancel", response_model=ProjectOut)
+def cancel_project(project_id: str, payload: ClosureRequest | None = None, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """The requirement won't proceed in its current form (no longer needed,
+    postponed indefinitely, or another reason). Offers and history stay."""
+    sync_expired_projects(db)
+    project = _get_owned_project(project_id, user, db, lock=True)
+    if project.status == ProjectStatus.draft:
+        # A draft was never published: "cancelling" it is discarding it. It
+        # must not become a canceled tender, which providers can open.
+        db.rollback()
+        return discard_draft(project_id, user, db)
+    if project.status not in (ProjectStatus.open, ProjectStatus.closed, ProjectStatus.under_evaluation):
+        raise HTTPException(status_code=400, detail="This project can no longer be canceled.")
+    reason = (payload.reason if payload and payload.reason else "other")
+    if reason not in CANCEL_REASONS:
+        raise HTTPException(status_code=400, detail="Choose why the requirement is being canceled.")
+    return _end(db, user, project, ProjectStatus.canceled, reason, payload.note if payload else None, "project.cancel", NotificationType.tender_cancelled)
+
+
+# Content that carries over when an ended requirement is started again.
+_RESTART_FIELDS = (
+    "title", "address", "governorate", "area", "description", "trade", "category_id", "expected_start_date",
+    "expected_completion_date", "expected_duration_days", "tender_type", "pricing_basis", "response_requirements",
+    "provider_eligibility", "questions_allowed", "commercial_terms", "documents_required", "commercial_conditions",
+    "bidder_instructions",
+)
+
+
+class RestartRequest(BaseModel):
+    creation_token: str | None = Field(default=None, max_length=64)
+
+
+@router.post("/projects/{project_id}/restart", response_model=ProjectOut, status_code=201)
+def restart_project(project_id: str, payload: RestartRequest | None = None, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """An ended requirement stays ended (canceled, expired, no award). When
+    the work comes back -- postponed, say -- the owner starts a NEW draft from
+    its content: description, items, rules, eligibility and current documents.
+    Nothing about the old one changes; its offers and history stay with it,
+    and the new draft is published (or not) like any other."""
+    sync_expired_projects(db)
+    source = _get_owned_project(project_id, user, db, lock=True)
+    if source.status not in (ProjectStatus.canceled, ProjectStatus.no_award, ProjectStatus.expired):
+        raise HTTPException(status_code=400, detail="Only an ended requirement can be started again.")
+    token = payload.creation_token if payload and payload.creation_token else None
+    if token:
+        existing = db.query(Project).filter(Project.owner_id == source.owner_id, Project.creation_token == token).first()
+        if existing:
+            db.rollback()
+            return _project_response(existing, db)
+    copy = Project(
+        **{f: getattr(source, f) for f in _RESTART_FIELDS},
+        owner_id=source.owner_id,
+        organization_id=source.organization_id,
+        status=ProjectStatus.draft,
+        # The old dates have passed: a placeholder the owner sets before publishing.
+        bid_deadline=(datetime.utcnow() + timedelta(days=7)).replace(second=0, microsecond=0),
+        creation_token=token,
+        restarted_from_id=source.id,
+    )
+    db.add(copy)
+    db.flush()
+    for item in source.items:
+        db.add(ProjectItem(project_id=copy.id, position=item.position, description=item.description, quantity=item.quantity, unit=item.unit, specification=item.specification))
+    storage = get_storage()
+    for drawing in source.drawings:
+        if not drawing.is_current:
+            continue
+        content = storage.download("project-drawings", drawing.file_path)
+        if content is None:
+            continue
+        path = f"{copy.id}/{drawing.file_path.split('/', 1)[-1]}"
+        storage.save("project-drawings", path, content, "application/octet-stream")
+        db.add(ProjectDrawing(project_id=copy.id, file_path=path, file_name=drawing.file_name, category=drawing.category, is_required=drawing.is_required))
+    log_action(db, actor_id=user.id, action="project.restart", target_type="project", target_id=copy.id, previous_value=source.id, new_value="draft")
+    db.refresh(copy)
+    return _project_response(copy, db)
 
 
 @router.post("/projects/{project_id}/discard", response_model=ProjectOut)
@@ -358,25 +549,6 @@ def discard_draft(project_id: str, user: User = Depends(require_owner), db: Sess
         raise HTTPException(status_code=400, detail="This draft has already been discarded.")
     project.discarded_at = datetime.utcnow().replace(microsecond=0)
     log_action(db, actor_id=user.id, action="project.discard_draft", target_type="project", target_id=project_id, previous_value="draft", new_value="discarded")
-    db.refresh(project)
-    return _project_response(project, db)
-
-
-@router.post("/projects/{project_id}/cancel", response_model=ProjectOut)
-def cancel_project(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
-    sync_expired_projects(db)
-    project = _get_owned_project(project_id, user, db, lock=True)
-    if project.status == ProjectStatus.draft:
-        # A draft was never published: "cancelling" it is discarding it. It
-        # must not become a canceled tender, which providers can open.
-        db.rollback()
-        return discard_draft(project_id, user, db)
-    if project.status not in (ProjectStatus.draft, ProjectStatus.open, ProjectStatus.closed, ProjectStatus.under_evaluation):
-        raise HTTPException(status_code=400, detail="This project can no longer be canceled.")
-    previous = project.status.value
-    project.status = ProjectStatus.canceled
-    log_action(db, actor_id=user.id, action="project.cancel", target_type="project", target_id=project_id, previous_value=previous, new_value="canceled")
-    _notify_bidders(db, project, NotificationType.tender_cancelled)
     db.refresh(project)
     return _project_response(project, db)
 
@@ -543,4 +715,12 @@ def _project_fields(p: Project) -> dict:
         updated_at=p.updated_at,
         discarded_at=p.discarded_at,
         version=p.version,
+        published_at=p.published_at,
+        paused_at=p.paused_at,
+        pause_reason=p.pause_reason,
+        closed_at=p.closed_at,
+        material_revision=p.material_revision,
+        closure_reason=p.closure_reason,
+        closure_note=p.closure_note,  # owner side only (this router)
+        restarted_from_id=p.restarted_from_id,
     )

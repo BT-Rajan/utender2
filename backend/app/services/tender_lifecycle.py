@@ -23,7 +23,10 @@ from app.models.project import Project
 def is_sealed_and_open(project: Project) -> bool:
     return (
         project.tender_type == TenderType.sealed
-        and project.status in (ProjectStatus.open, ProjectStatus.canceled)
+        # Ended before its deadline (canceled, or closed outside U-Tender):
+        # sealed bids stay sealed until the deadline all the same, so ending
+        # a tender early is never a way to read competitors' sealed prices.
+        and project.status in (ProjectStatus.open, ProjectStatus.canceled, ProjectStatus.no_award)
         and project.bid_deadline > datetime.utcnow()
     )
 
@@ -33,7 +36,16 @@ def is_sealed_and_open(project: Project) -> bool:
 # sync_expired_projects (<=) and publish (<=). Judged on the server clock;
 # nothing the client sends is consulted.
 def bidding_is_open(project: Project) -> bool:
-    return project.status == ProjectStatus.open and project.bid_deadline > datetime.utcnow()
+    # Stage 3.15: an owner-paused requirement accepts nothing -- no offers,
+    # revisions, withdrawals, attachments or questions -- until resumed.
+    # Stage 3.18: nor does one an admin has suspended (moderation) -- the same
+    # one rule for offers, revisions, withdrawals, confirmations and questions.
+    return (
+        project.status == ProjectStatus.open
+        and project.paused_at is None
+        and not project.is_suspended
+        and project.bid_deadline > datetime.utcnow()
+    )
 
 
 # SELECT ... FOR UPDATE on the tender row. Every operation that can change
@@ -90,4 +102,82 @@ def sync_expired_projects(db: Session) -> None:
         # expired: nobody bid (or every bid was withdrawn) — nothing to
         # evaluate, so it never needs an owner decision to leave "open".
         project.status = ProjectStatus.closed if has_live_offer else ProjectStatus.expired
+        # Offers stopped at the deadline (Stage 3.15), paused or not.
+        project.closed_at = project.bid_deadline
+        project.paused_at = None
     db.commit()
+
+
+def publish(db: Session, project: Project, actor_id: str) -> None:
+    """Stage 3.14: the one transition from draft to published, used by every
+    path that publishes. The caller holds the row lock (lock_project), so the
+    checks below and the change are one step: a second publish finds it no
+    longer a draft, and nothing becomes visible to providers until the commit
+    that makes it open -- with its deadline, its server-recorded
+    publication time and its audit entry -- succeeds as a whole."""
+    from fastapi import HTTPException
+
+    from app.services import requirement_quality
+    from app.services.audit import log_action
+
+    if project.status != ProjectStatus.draft or project.discarded_at is not None:
+        raise HTTPException(status_code=400, detail="Only a draft project can be published.")
+    now = datetime.utcnow()
+    if project.bid_deadline is None or project.bid_deadline <= now:
+        raise HTTPException(status_code=400, detail="Set a bid deadline in the future before publishing.")
+    requirement_quality.assert_publishable(db, project)  # Stage 3.12, authoritative
+    project.status = ProjectStatus.open
+    project.published_at = now.replace(microsecond=0)
+    # log_action commits: the status, the timestamp and the audit entry land together.
+    log_action(db, actor_id=actor_id, action="project.publish", target_type="project", target_id=project.id, previous_value="draft", new_value="open")
+    _announce(db, project)
+
+
+def _announce(db: Session, project: Project) -> None:
+    """After the publication is committed -- never before, so no one is told
+    about a requirement that didn't go live -- tell the providers it is for.
+    Best-effort: a failed notification never undoes a publication."""
+    import logging
+
+    from app.models.enums import NotificationType
+    from app.services.email import notify_provider_new_requirement
+    from app.services.eligibility import matching_providers
+    from app.services.notify import notify
+    from app.services.team import side_users
+
+    try:
+        area = ", ".join(x for x in (project.area, (project.governorate or "").replace("_", " ").title()) if x) or project.address
+        deadline = project.bid_deadline.strftime("%d %b %Y %H:%M UTC")
+        details = {"project_title": project.title, "trade": project.trade or "", "area": area, "deadline": deadline}
+        for profile in matching_providers(db, project):
+            # Every member of a provider organization; just the person otherwise.
+            for person in side_users(db, profile.organization_id, profile.user_id):
+                notify(db, person, NotificationType.new_requirement, link=f"/service-provider/projects/{project.id}/offer", **details)
+                notify_provider_new_requirement(person.email, person.language.value, project_id=project.id, **details)
+    except Exception:
+        db.rollback()
+        logging.getLogger("notify").exception("new-requirement notifications failed for %s", project.id)
+
+
+def interested_providers(db: Session, project: Project) -> list:
+    """Providers who were told about this requirement (a new-opportunity
+    notification) or asked about it, but have no offer on it -- everyone who
+    may be preparing one. Bidders are told through their offer instead."""
+    from app.models.clarification import Clarification
+    from app.models.enums import NotificationType, UserRole
+    from app.models.notification import Notification
+    from app.models.offer import Offer
+    from app.models.user import User
+    from app.services.team import side_users
+
+    link = f"/service-provider/projects/{project.id}/offer"
+    bidders: set[str] = set()
+    for provider_id, organization_id in db.query(Offer.service_provider_id, Offer.organization_id).filter(Offer.project_id == project.id).distinct():
+        bidders.update(u.id for u in side_users(db, organization_id, provider_id))
+    told = {n.user_id for n in db.query(Notification.user_id).filter(Notification.type == NotificationType.new_requirement, Notification.link == link)}
+    for provider_id, organization_id in db.query(Clarification.service_provider_id, Clarification.organization_id).filter(Clarification.project_id == project.id).distinct():
+        told.update(u.id for u in side_users(db, organization_id, provider_id))
+    ids = told - bidders
+    if not ids:
+        return []
+    return db.query(User).filter(User.id.in_(ids), User.role == UserRole.service_provider).order_by(User.id).all()

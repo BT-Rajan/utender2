@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -81,7 +81,10 @@ def feed(
         term = f"%{search.strip()}%"
         query = query.filter(or_(Project.title.ilike(term), Project.area.ilike(term), Project.description.ilike(term)))
 
-    query = query.order_by(Project.created_at.desc()) if sort == "newest" else query.order_by(Project.bid_deadline.asc())
+    # "Newest" means newest on the marketplace: by publication (Stage 3.14),
+    # not by when the owner started the draft.
+    newest = func.coalesce(Project.published_at, Project.created_at).desc()
+    query = query.order_by(newest) if sort == "newest" else query.order_by(Project.bid_deadline.asc())
     projects = query.all()
     my_offers = {o.project_id: o.status.value for o in db.query(Offer).filter(mine(db, user, Offer, Offer.service_provider_id)).all()}
     profile = acting_profile(db, user)
@@ -104,6 +107,8 @@ def feed(
                 description=None,
                 trade=p.trade,
                 category_id=p.category_id,
+                paused_at=p.paused_at,
+                pause_reason=p.pause_reason,
                 bid_deadline=p.bid_deadline,
                 expected_start_date=p.expected_start_date,
                 expected_completion_date=p.expected_completion_date,
@@ -156,6 +161,8 @@ def my_bids(user: User = Depends(require_service_provider), db: Session = Depend
             project_title=p.title,
             project_address=p.address,
             project_status=p.status,
+            closure_reason=p.closure_reason,
+            project_suspended=p.is_suspended,
             bid_deadline=p.bid_deadline,
             offer_id=o.id,
             amount=o.amount,

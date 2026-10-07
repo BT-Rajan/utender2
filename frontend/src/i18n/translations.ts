@@ -144,6 +144,131 @@ export interface Dictionary {
     invalid: string;
     acceptError: string;
   };
+  preview: {
+    heading: string;
+    draftNote: string;
+    liveNote: string;
+    back: string;
+    inList: string;
+    inListHint: string;
+    opened: string;
+    openedHint: string;
+    thenForm: string;
+    open: string;
+    audienceHeading: string;
+    audienceCount: string;
+    excluded_organization_only: string;
+    excluded_qualification_missing: string;
+    excluded_qualification_expired: string;
+    excluded_category_not_offered: string;
+    excluded_governorate_not_served: string;
+    audienceNone: string;
+    audienceNote: string;
+  };
+  confirm: {
+    cancel: string;
+    remove: string;
+  };
+  versions: {
+    version: string;
+    before: string;
+    yourOfferVersion: string;
+    pricedOn: string;
+    from: string;
+    until: string;
+    current: string;
+    incomplete: string;
+    documents: string;
+    replacedSince: string;
+    docsAdded: string;
+    docsReplaced: string;
+    yes: string;
+    no: string;
+    field_title: string;
+    field_address: string;
+    field_governorate: string;
+    field_area: string;
+    field_trade: string;
+    field_description: string;
+    field_bid_deadline: string;
+    field_expected_start_date: string;
+    field_expected_completion_date: string;
+    field_expected_duration_days: string;
+    field_documents_required: string;
+  };
+  closure: {
+    open: string;
+    heading: string;
+    hint: string;
+    note: string;
+    noteHint: string;
+    cancelHeading: string;
+    reason_not_needed: string;
+    reason_postponed: string;
+    reason_other: string;
+    cancel: string;
+    cancelConfirm: string;
+    cancelConfirmBody: string;
+    externalHeading: string;
+    externalHint: string;
+    external: string;
+    externalConfirm: string;
+    externalConfirmBody: string;
+    noSuitableHeading: string;
+    noSuitableHint: string;
+    noSuitable: string;
+    noSuitableConfirm: string;
+    noSuitableConfirmBody: string;
+    error: string;
+    labelCanceled: string;
+    labelExpired: string;
+    labelExternal: string;
+    labelNoSuitable: string;
+    textCanceled: string;
+    textExpired: string;
+    textExternal: string;
+    textNoSuitable: string;
+    offersKept: string;
+    dismiss: string;
+    yourNote: string;
+    restart: string;
+    restartConfirm: string;
+    restartConfirmBody: string;
+    restartedFrom: string;
+    restartedFromLink: string;
+    adminSuspended: string;
+    labelSuspended: string;
+  };
+  postPub: {
+    pause: string;
+    pauseReason: string;
+    pauseHint: string;
+    pausedSince: string;
+    pausedDeadline: string;
+    resume: string;
+    resumeConfirm: string;
+    amendHeading: string;
+    amendHint: string;
+    address: string;
+    area: string;
+    reason: string;
+    amendSave: string;
+    savedMaterial: string;
+    savedMinor: string;
+    changesHeading: string;
+    material: string;
+    outdatedHeading: string;
+    outdatedBody: string;
+    confirmOffer: string;
+    outdatedOwner: string;
+    pausedProvider: string;
+    pausedProviderBody: string;
+    closedEarly: string;
+    closeConfirm: string;
+    closeConfirmBody: string;
+    error: string;
+    pausedPill: string;
+  };
   eligibility: {
     heading: string;
     hint: string;
@@ -322,6 +447,9 @@ export interface Dictionary {
     untitled: string;
     lastSavedShort: string;
     expired: string;
+    publishConfirm: string;
+    publishNowConfirm: string;
+    published: string;
   };
   verification: {
     scopeLabel: string;
@@ -1053,6 +1181,131 @@ export const en: Dictionary = {
     invalid: "This invitation link is invalid, has expired or was withdrawn. Ask for a new one.",
     acceptError: "Could not accept the invitation.",
   },
+  preview: {
+    heading: "Provider preview",
+    draftNote: "This is how verified providers who may respond will see your requirement once you publish it. It is not published: only you and your organization can see it.",
+    liveNote: "This is how providers who may respond see your requirement.",
+    back: "Back to the draft",
+    inList: "In the list of opportunities",
+    inListHint: "Before opening it, providers see only this: not the exact address, scope or documents.",
+    opened: "When a provider opens it",
+    openedHint: "What an eligible provider sees, with the exact address, scope, items, documents and rules.",
+    thenForm: "Below this, providers fill in their offer: the price (per item if you asked for it) and everything listed under \"What your offer must include\".",
+    open: "Preview as a provider",
+    audienceHeading: "Who this reaches",
+    audienceCount: "{eligible} of the {total} verified providers on U-Tender meet your \"who can respond\" rules today.",
+    excluded_organization_only: "{count} are registered as individuals (you asked for organizations only)",
+    excluded_qualification_missing: "{count} don't hold a required qualification",
+    excluded_qualification_expired: "{count} hold a required qualification that has expired",
+    excluded_category_not_offered: "{count} don't list this type of work among their services",
+    excluded_governorate_not_served: "{count} don't serve this governorate",
+    audienceNone: "No provider meets these rules right now. Consider relaxing them under Who can respond.",
+    audienceNote: "Counts only; providers who qualify later will be able to respond too.",
+  },
+  confirm: {
+    cancel: "Cancel",
+    remove: "Remove",
+  },
+  versions: {
+    version: "Version {n}",
+    before: "See the requirement as it was before (version {n})",
+    yourOfferVersion: "See the requirement your offer was priced on (version {n})",
+    pricedOn: "Priced on version {n}",
+    from: "from {date}",
+    until: "until {date}",
+    current: "current",
+    incomplete: "Some earlier details weren’t kept for changes made before version history was recorded; they show as they are now.",
+    documents: "Documents in this version:",
+    replacedSince: "replaced since",
+    docsAdded: "Documents added:",
+    docsReplaced: "Documents replaced:",
+    yes: "Yes",
+    no: "No",
+    field_title: "Title",
+    field_address: "Location",
+    field_governorate: "Governorate",
+    field_area: "Area",
+    field_trade: "Type of work",
+    field_description: "Scope of work",
+    field_bid_deadline: "Offers close",
+    field_expected_start_date: "Expected start",
+    field_expected_completion_date: "Expected completion",
+    field_expected_duration_days: "Expected duration (days)",
+    field_documents_required: "Documents needed to price",
+  },
+  closure: {
+    open: "End this requirement…",
+    heading: "End this requirement",
+    hint: "Each of these ends the requirement for good: no new offers, and it can't be reopened. Offers already submitted stay on record. Nothing here awards the work.",
+    note: "Private note (optional)",
+    noteHint: "Kept in your records only; providers don't see it.",
+    cancelHeading: "Cancel — it won't go ahead in this form",
+    reason_not_needed: "The work is no longer needed.",
+    reason_postponed: "The work is postponed.",
+    reason_other: "Other reason.",
+    cancel: "Cancel requirement",
+    cancelConfirm: "Cancel this requirement?",
+    cancelConfirmBody: "Providers who responded are told it was canceled and why (the reason above, not your note). It can't be reopened.",
+    externalHeading: "Closed outside U-Tender",
+    externalHint: "You've arranged the work another way. Nothing is awarded on U-Tender, and no provider is recorded as having won.",
+    external: "Close — handled outside U-Tender",
+    externalConfirm: "Close this requirement as handled outside U-Tender?",
+    externalConfirmBody: "No offer is accepted. Providers who responded are told it was closed without an award through U-Tender. It can't be reopened.",
+    noSuitableHeading: "None of the offers is suitable",
+    noSuitableHint: "End it without accepting any offer.",
+    noSuitable: "End — no suitable offer",
+    noSuitableConfirm: "End without accepting any offer?",
+    noSuitableConfirmBody: "No offer is accepted and nothing is awarded. Providers who responded are told. It can't be reopened.",
+    error: "Couldn't end the requirement.",
+    labelCanceled: "Canceled",
+    labelExpired: "Expired",
+    labelExternal: "Closed outside U-Tender",
+    labelNoSuitable: "No award",
+    textCanceled: "The owner canceled this requirement; it won't go ahead in this form.",
+    textExpired: "The response period ended without any offers.",
+    textExternal: "The owner closed this requirement and arranged the work outside U-Tender. No offer was accepted through U-Tender.",
+    textNoSuitable: "The owner ended this requirement without accepting any offer.",
+    offersKept: "Offers submitted stay on record. This requirement has ended and won't reopen.",
+    dismiss: "Keep it as it is",
+    yourNote: "Your private note:",
+    restart: "Start a new draft from this",
+    restartConfirm: "Start a new draft from this requirement?",
+    restartConfirmBody: "A new draft is created with this requirement’s description, items, rules, eligibility and current documents. Set a new deadline, check it, then publish it as a new requirement. This one stays as it ended, with its offers.",
+    restartedFrom: "Started again from an ended requirement:",
+    restartedFromLink: "see the original",
+    adminSuspended: "Suspended by U-Tender: hidden from providers and not accepting offers, questions or changes to offers until reactivated. Contact support if you think this is a mistake.",
+    labelSuspended: "Suspended by U-Tender",
+  },
+  postPub: {
+    pause: "Pause this requirement",
+    pauseReason: "Why are you pausing it? Providers will see this.",
+    pauseHint: "While paused, no offers, changes, withdrawals or questions are accepted. Existing offers are kept. The offer deadline keeps running: extend it if the pause will last longer.",
+    pausedSince: "Paused since {date}",
+    pausedDeadline: "Offers close {date} unless you extend the deadline.",
+    resume: "Resume",
+    resumeConfirm: "Resume the requirement? Offers will be accepted again until {date}.",
+    amendHeading: "Change the published requirement",
+    amendHint: "Providers may already be pricing this. Every change is recorded as a numbered amendment and the bidders are told.\nChanges to the scope, location or work timing (and documents you add) change what providers price: their existing offers are flagged so they confirm or revise them, and at least 3 days must remain before offers close. A title correction or more time is not.\nItems, response requirements, who can respond and the tender rules can't change after publication.",
+    address: "Site address",
+    area: "Area",
+    reason: "Reason for the change (shown to providers)",
+    amendSave: "Save change",
+    savedMaterial: "Saved as an amendment that changes what providers price. Bidders were told and asked to confirm or revise their offers.",
+    savedMinor: "Saved as an amendment. Bidders were told; their offers stay as they are.",
+    changesHeading: "Changes since publication",
+    material: "Changes pricing",
+    outdatedHeading: "The requirement changed after your offer",
+    outdatedBody: "Review the changes listed above. If your offer still stands as it is, confirm it; otherwise revise it below.",
+    confirmOffer: "My offer still stands — confirm it",
+    outdatedOwner: "Made before amendment — not yet confirmed",
+    pausedProvider: "Paused by the owner since {date}",
+    pausedProviderBody: "No offers, changes or questions are accepted until it resumes. Offers already made are kept.",
+    closedEarly: "Closed for offers on {date}.",
+    closeConfirm: "Close this requirement for offers now?",
+    closeConfirmBody: "No more offers will be accepted. All offers received are kept as submitted; awarding is a separate step.",
+    error: "Could not complete this.",
+    pausedPill: "Paused",
+  },
   eligibility: {
     heading: "Who can respond",
     hint: "Every provider must already be verified by U-Tender. Narrow it further only if the work genuinely needs it — each restriction reduces the offers you receive.",
@@ -1231,6 +1484,9 @@ export const en: Dictionary = {
     untitled: "Untitled",
     lastSavedShort: "last saved {date}",
     expired: "This requirement expired at its offer deadline ({date}) without any offers. It is now read-only.",
+    publishConfirm: "Publish \"{title}\" now?\n\nVerified providers who meet your \"who can respond\" rules will be able to find it, open it and send offers until {deadline}.\n\nOnce published, its rules and conditions can't be changed here.",
+    publishNowConfirm: "Publish this requirement straight away, without saving it as a draft first?\n\nVerified providers will be able to find it and send offers until {deadline}. To review it as providers will see it first, save it as a draft and use Preview.",
+    published: "Published {date} — open to offers until {deadline}.",
   },
   verification: {
     scopeLabel: "Applies to",
@@ -1987,6 +2243,131 @@ export const ar: Dictionary = {
     invalid: "رابط الدعوة غير صالح أو منتهي أو تم سحبه. اطلب رابطًا جديدًا.",
     acceptError: "تعذر قبول الدعوة.",
   },
+  preview: {
+    heading: "معاينة مقدم الخدمة",
+    draftNote: "هكذا سيرى مقدمو الخدمة الموثقون المؤهلون طلبك بعد نشره. الطلب غير منشور: لا يراه إلا أنت وجهتك.",
+    liveNote: "هكذا يرى مقدمو الخدمة المؤهلون طلبك.",
+    back: "العودة إلى المسودة",
+    inList: "في قائمة الفرص",
+    inListHint: "قبل فتحه، يرى مقدمو الخدمة هذا فقط: دون العنوان الدقيق أو نطاق العمل أو المستندات.",
+    opened: "عندما يفتحه مقدم الخدمة",
+    openedHint: "ما يراه مقدم الخدمة المؤهل، مع العنوان الدقيق ونطاق العمل والبنود والمستندات والقواعد.",
+    thenForm: "أسفل ذلك يملأ مقدمو الخدمة عرضهم: السعر (حسب البنود إذا طلبت ذلك) وكل ما هو مدرج تحت \"ما يجب أن يتضمنه عرضك\".",
+    open: "معاينة كمقدم خدمة",
+    audienceHeading: "من سيصله الطلب",
+    audienceCount: "{eligible} من أصل {total} من مقدمي الخدمة الموثقين على U-Tender يستوفون شروط \"من يمكنه تقديم عرض\" اليوم.",
+    excluded_organization_only: "{count} مسجلون كأفراد (طلبت الجهات فقط)",
+    excluded_qualification_missing: "{count} لا يحملون مؤهلًا مطلوبًا",
+    excluded_qualification_expired: "{count} يحملون مؤهلًا مطلوبًا منتهي الصلاحية",
+    excluded_category_not_offered: "{count} لا يدرجون هذا النوع من العمل ضمن خدماتهم",
+    excluded_governorate_not_served: "{count} لا يخدمون هذه المحافظة",
+    audienceNone: "لا يستوفي أي مقدم خدمة هذه الشروط حاليًا. فكر في تخفيفها في من يمكنه تقديم عرض.",
+    audienceNote: "أعداد فقط؛ من يستوفي الشروط لاحقًا سيتمكن من تقديم عرض أيضًا.",
+  },
+  confirm: {
+    cancel: "إلغاء",
+    remove: "إزالة",
+  },
+  versions: {
+    version: "النسخة {n}",
+    before: "اطّلع على الطلب كما كان قبل التغيير (النسخة {n})",
+    yourOfferVersion: "اطّلع على الطلب الذي سُعّر عرضك على أساسه (النسخة {n})",
+    pricedOn: "سُعّر على النسخة {n}",
+    from: "من {date}",
+    until: "حتى {date}",
+    current: "الحالية",
+    incomplete: "لم تُحفظ بعض التفاصيل السابقة للتغييرات التي جرت قبل بدء تسجيل النسخ؛ تظهر كما هي الآن.",
+    documents: "المستندات في هذه النسخة:",
+    replacedSince: "استُبدل لاحقًا",
+    docsAdded: "مستندات أُضيفت:",
+    docsReplaced: "مستندات استُبدلت:",
+    yes: "نعم",
+    no: "لا",
+    field_title: "العنوان",
+    field_address: "الموقع",
+    field_governorate: "المحافظة",
+    field_area: "المنطقة",
+    field_trade: "نوع العمل",
+    field_description: "نطاق العمل",
+    field_bid_deadline: "إغلاق العروض",
+    field_expected_start_date: "البدء المتوقع",
+    field_expected_completion_date: "الإنجاز المتوقع",
+    field_expected_duration_days: "المدة المتوقعة (أيام)",
+    field_documents_required: "المستندات لازمة للتسعير",
+  },
+  closure: {
+    open: "إنهاء هذا الطلب…",
+    heading: "إنهاء هذا الطلب",
+    hint: "كلٌّ من هذه الخيارات ينهي الطلب نهائياً: لا عروض جديدة ولا يمكن إعادة فتحه. تبقى العروض المقدَّمة محفوظة. لا شيء هنا يُرسي العمل.",
+    note: "ملاحظة خاصة (اختيارية)",
+    noteHint: "تُحفظ في سجلاتك فقط؛ لا يراها مقدّمو الخدمة.",
+    cancelHeading: "إلغاء — لن يُنفَّذ بهذه الصيغة",
+    reason_not_needed: "لم يعد العمل مطلوباً.",
+    reason_postponed: "تم تأجيل العمل.",
+    reason_other: "سبب آخر.",
+    cancel: "إلغاء الطلب",
+    cancelConfirm: "إلغاء هذا الطلب؟",
+    cancelConfirmBody: "سيُبلَّغ مقدّمو الخدمة الذين قدّموا عروضاً بالإلغاء وسببه (السبب أعلاه، لا ملاحظتك). لا يمكن إعادة فتحه.",
+    externalHeading: "أُغلق خارج U-Tender",
+    externalHint: "رتّبت تنفيذ العمل بطريقة أخرى. لا تتم أي ترسية على U-Tender ولا يُسجَّل أي مقدّم خدمة فائزاً.",
+    external: "إغلاق — تمّت المعالجة خارج U-Tender",
+    externalConfirm: "إغلاق هذا الطلب على أنه عولج خارج U-Tender؟",
+    externalConfirmBody: "لن يُقبل أي عرض. سيُبلَّغ مقدّمو الخدمة بأنه أُغلق دون ترسية عبر U-Tender. لا يمكن إعادة فتحه.",
+    noSuitableHeading: "لا يوجد عرض مناسب",
+    noSuitableHint: "أنهِ الطلب دون قبول أي عرض.",
+    noSuitable: "إنهاء — لا عرض مناسب",
+    noSuitableConfirm: "إنهاء دون قبول أي عرض؟",
+    noSuitableConfirmBody: "لن يُقبل أي عرض ولن تتم ترسية. سيُبلَّغ مقدّمو الخدمة. لا يمكن إعادة فتحه.",
+    error: "تعذّر إنهاء الطلب.",
+    labelCanceled: "ملغى",
+    labelExpired: "منتهي الصلاحية",
+    labelExternal: "أُغلق خارج U-Tender",
+    labelNoSuitable: "بلا ترسية",
+    textCanceled: "ألغى المالك هذا الطلب؛ لن يُنفَّذ بهذه الصيغة.",
+    textExpired: "انتهت فترة تقديم العروض دون أي عرض.",
+    textExternal: "أغلق المالك هذا الطلب ورتّب تنفيذ العمل خارج U-Tender. لم يُقبل أي عرض عبر U-Tender.",
+    textNoSuitable: "أنهى المالك هذا الطلب دون قبول أي عرض.",
+    offersKept: "تبقى العروض المقدَّمة محفوظة. انتهى هذا الطلب ولن يُعاد فتحه.",
+    dismiss: "إبقاؤه كما هو",
+    yourNote: "ملاحظتك الخاصة:",
+    restart: "بدء مسودة جديدة من هذا الطلب",
+    restartConfirm: "بدء مسودة جديدة من هذا الطلب؟",
+    restartConfirmBody: "تُنشأ مسودة جديدة بوصف هذا الطلب وبنوده وقواعده وشروط الأهلية ومستنداته الحالية. حدّد موعداً نهائياً جديداً وراجعها ثم انشرها كطلب جديد. يبقى هذا الطلب كما انتهى، مع عروضه.",
+    restartedFrom: "بُدئ من جديد من طلب منتهٍ:",
+    restartedFromLink: "اطّلع على الطلب الأصلي",
+    adminSuspended: "علّقته إدارة U-Tender: مخفي عن مقدّمي الخدمة ولا يقبل عروضاً أو أسئلة أو تعديلات على العروض حتى إعادة تفعيله. تواصل مع الدعم إن رأيت أن ذلك خطأ.",
+    labelSuspended: "معلّق من U-Tender",
+  },
+  postPub: {
+    pause: "إيقاف الطلب مؤقتًا",
+    pauseReason: "لماذا توقفه مؤقتًا؟ سيرى مقدمو الخدمة السبب.",
+    pauseHint: "أثناء الإيقاف لا تُقبل عروض أو تعديلات أو سحب أو أسئلة. تبقى العروض الحالية محفوظة. يستمر موعد إغلاق العروض: مدّده إذا طال الإيقاف.",
+    pausedSince: "موقوف مؤقتًا منذ {date}",
+    pausedDeadline: "تُغلق العروض في {date} ما لم تمدد الموعد.",
+    resume: "استئناف",
+    resumeConfirm: "هل تريد استئناف الطلب؟ ستُقبل العروض مجددًا حتى {date}.",
+    amendHeading: "تعديل الطلب المنشور",
+    amendHint: "قد يكون مقدمو الخدمة يسعّرون هذا الطلب الآن. يُسجَّل كل تعديل بتعديل مرقّم ويُبلَّغ مقدمو العروض.\nتغيير نطاق العمل أو الموقع أو توقيت العمل (أو إضافة مستندات) يغيّر ما يسعّره مقدمو الخدمة: تُعلَّم عروضهم الحالية ليؤكدوها أو يعدّلوها، ويجب أن يتبقى 3 أيام على الأقل قبل إغلاق العروض. تصحيح العنوان أو تمديد الوقت ليس كذلك.\nلا يمكن تغيير البنود ومتطلبات العرض ومن يمكنه تقديم عرض وقواعد المناقصة بعد النشر.",
+    address: "عنوان الموقع",
+    area: "المنطقة",
+    reason: "سبب التعديل (يظهر لمقدمي الخدمة)",
+    amendSave: "حفظ التعديل",
+    savedMaterial: "حُفظ كتعديل يغيّر ما يسعّره مقدمو الخدمة. تم إبلاغ مقدمي العروض وطُلب منهم تأكيد عروضهم أو تعديلها.",
+    savedMinor: "حُفظ كتعديل. تم إبلاغ مقدمي العروض؛ تبقى عروضهم كما هي.",
+    changesHeading: "التعديلات منذ النشر",
+    material: "يغيّر التسعير",
+    outdatedHeading: "تغيّر الطلب بعد تقديم عرضك",
+    outdatedBody: "راجع التعديلات أعلاه. إذا كان عرضك ما زال قائمًا كما هو فأكّده، وإلا فعدّله أدناه.",
+    confirmOffer: "عرضي ما زال قائمًا — تأكيد",
+    outdatedOwner: "قُدّم قبل التعديل — لم يُؤكَّد بعد",
+    pausedProvider: "أوقفه المالك مؤقتًا منذ {date}",
+    pausedProviderBody: "لا تُقبل عروض أو تعديلات أو أسئلة حتى يُستأنف. تبقى العروض المقدمة محفوظة.",
+    closedEarly: "أُغلق أمام العروض في {date}.",
+    closeConfirm: "هل تريد إغلاق هذا الطلب أمام العروض الآن؟",
+    closeConfirmBody: "لن تُقبل عروض أخرى. تبقى جميع العروض المستلمة كما قُدّمت؛ والترسية خطوة منفصلة.",
+    error: "تعذر إتمام ذلك.",
+    pausedPill: "موقوف مؤقتًا",
+  },
   eligibility: {
     heading: "من يمكنه تقديم عرض",
     hint: "يجب أن يكون كل مقدم خدمة موثقًا مسبقًا لدى U-Tender. لا تضيّق النطاق إلا إذا تطلّب العمل ذلك فعلًا — فكل قيد يقلل عدد العروض التي تصلك.",
@@ -2165,6 +2546,9 @@ export const ar: Dictionary = {
     untitled: "بدون عنوان",
     lastSavedShort: "آخر حفظ {date}",
     expired: "انتهت صلاحية هذا الطلب عند موعد إغلاق العروض ({date}) دون أي عروض. أصبح الآن للقراءة فقط.",
+    publishConfirm: "هل تريد نشر \"{title}\" الآن؟\n\nسيتمكن مقدمو الخدمة الموثقون الذين يستوفون شروط \"من يمكنه تقديم عرض\" من العثور عليه وفتحه وتقديم العروض حتى {deadline}.\n\nبعد النشر لا يمكن تغيير قواعده وشروطه من هنا.",
+    publishNowConfirm: "هل تريد نشر هذا الطلب فورًا دون حفظه كمسودة أولًا؟\n\nسيتمكن مقدمو الخدمة الموثقون من العثور عليه وتقديم العروض حتى {deadline}. لمراجعته كما سيراه مقدمو الخدمة أولًا، احفظه كمسودة واستخدم المعاينة.",
+    published: "نُشر في {date} — مفتوح للعروض حتى {deadline}.",
   },
   verification: {
     scopeLabel: "ينطبق على",

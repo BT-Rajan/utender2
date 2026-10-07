@@ -101,6 +101,29 @@ class Project(Base):
     # Sequential per project; bumped by the amendment service whenever a
     # published tender's material fields change (spec §2.8/§2.12).
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # Stage 3.14: when it was published -- set once, by the server, in the
+    # same transaction that makes it open. NULL = never published.
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Stage 3.15: post-publication control.
+    # The owner paused participation (still open, but no offers, changes,
+    # withdrawals or questions until resumed). NULL = not paused. Distinct
+    # from is_suspended, which is admin moderation that hides the project.
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    pause_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # When offers stopped being accepted (closed early, or at the deadline).
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Stage 3.16: why a requirement ended without a U-Tender award, within
+    # its terminal status (no new states): canceled -> not_needed |
+    # postponed | other; no_award -> no_suitable_offer | closed_externally.
+    # Expired needs no reason (the deadline passed with no live offer).
+    closure_reason: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # The owner's private note on why it ended: shown to the owner side and admins, never to providers.
+    closure_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The ended requirement this draft was started again from (Stage 3.16).
+    restarted_from_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True)
+    # How many material amendments (changes to what providers price) have been
+    # made since publication; an offer made against an earlier one is flagged.
+    material_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     deadline_reminder_sent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     # Stage 3.11 (drafts): when the requirement was last saved (shown as
@@ -171,5 +194,9 @@ class ProjectDrawing(Base):
     # providers need it to price the work (True) or it's supplementary.
     category: Mapped[str] = mapped_column(String(20), nullable=False, default="drawing")
     is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Stage 3.17: the requirement's material version this file became current
+    # in (0 = as published). With the revision chain, it says which documents
+    # an offer made against a given version was priced on.
+    material_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     project = relationship("Project", back_populates="drawings")

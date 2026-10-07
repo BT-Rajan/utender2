@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -39,7 +39,7 @@ from app.services.stakeholder import describe as describe_stakeholder
 from app.services.verification import assert_ready_to_approve, checklist, document_out_fields, is_added_qualification, profile_state_fields
 from app.services.notify import notify, notify_team
 from app.services.storage import get_storage
-from app.services.tender_lifecycle import is_sealed_and_open, lock_project
+from app.services.tender_lifecycle import is_sealed_and_open, lock_project, sync_expired_projects
 from app.models.category import ServiceCategory
 from app.schemas.category import CategoryCreate, CategoryOut, CategoryPatch
 from app.services.categories import rename_category, resolve_trade
@@ -1033,6 +1033,9 @@ def _project_admin_fields(p: Project, owner: User | None) -> dict:
         "trade": p.trade,
         "bid_deadline": utc_iso(p.bid_deadline),
         "status": p.status,
+        "closure_reason": p.closure_reason,  # Stage 3.16: why it ended, if without an award
+        "closed_at": p.closed_at,
+        "closure_note": p.closure_note,
         "tender_type": p.tender_type,
         "tender_type_locked": p.tender_type_locked,
         "is_suspended": p.is_suspended,
@@ -1112,21 +1115,26 @@ class AdminProjectEdit(BaseModel):
 
 
 # A direct correction tool for an admin fixing an owner's listing (a typo, a
-# wrong address, a deadline that needs adjusting) — distinct from the
-# owner's own PATCH /projects/{id}, which is a versioned tender amendment
-# that notifies every bidder and enforces the "can't pull a deadline
-# earlier once bids are locked in" rule (spec D-001). This one is a plain
-# edit with an audit trail, not a new amendment record; it doesn't touch
-# tender_type or status, both of which have their own dedicated,
-# validated transitions elsewhere.
+# wrong address, a deadline that needs adjusting). Stage 3.18: it follows the
+# same lifecycle rules as the owner's own PATCH /projects/{id} -- once
+# published, a change is a recorded amendment (before/after, material version,
+# providers told), the deadline can't move into the past or earlier once bids
+# exist, and an ended requirement isn't edited at all (suspend it instead).
+# It never touches tender_type or status, which have their own transitions.
 @router.patch("/projects/{project_id}")
 def admin_edit_project(
     project_id: str, payload: AdminProjectEdit, admin: User = Depends(require_admin), db: Session = Depends(get_db)
 ):
-    project = db.get(Project, project_id)
+    from app.routers.projects import TRACKED_FIELDS, _field_changes, _record_amendment
+
+    sync_expired_projects(db)  # a deadline that just passed is closed first, never extended back open
+    project = lock_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found.")
+    if project.status not in (ProjectStatus.draft, ProjectStatus.open):
+        raise HTTPException(status_code=400, detail="This project can no longer be amended.")
 
+    before = {f: getattr(project, f) for f in TRACKED_FIELDS}
     changed: list[str] = []
     if payload.title is not None:
         title = payload.title.strip()
@@ -1153,15 +1161,28 @@ def admin_edit_project(
             raise HTTPException(status_code=409, detail="Who can respond depends on this requirement's type of work, so it can't be changed after publishing.")
         changed.append("trade")
         project.category_id, project.trade = category_value, trade
-    if payload.bid_deadline is not None and payload.bid_deadline != project.bid_deadline:
+    deadline_extended = False
+    deadline = payload.bid_deadline
+    if deadline is not None and deadline.tzinfo is not None:
+        deadline = deadline.astimezone(timezone.utc).replace(tzinfo=None)
+    if deadline is not None and deadline != project.bid_deadline:
+        if deadline <= datetime.utcnow():
+            raise HTTPException(status_code=400, detail="The offer deadline must be in the future.")
+        if deadline < project.bid_deadline and project.tender_type_locked:
+            raise HTTPException(status_code=400, detail="Cannot move the deadline earlier once bids have been submitted.")
+        if project.questions_deadline and deadline <= project.questions_deadline:
+            raise HTTPException(status_code=400, detail="The offer deadline must be after the question deadline.")
+        deadline_extended = deadline > project.bid_deadline
         changed.append("bid_deadline")
-        project.bid_deadline = payload.bid_deadline
+        project.bid_deadline = deadline
 
     if not changed:
         raise HTTPException(status_code=400, detail="No changes were provided.")
 
-    db.commit()
-    db.refresh(project)
+    if project.status == ProjectStatus.open:
+        # Published: the same numbered, announced amendment an owner's change makes.
+        _record_amendment(db, project, admin, changed, "Corrected by U-Tender administration.", deadline_extended, _field_changes(before, project))
+    # log_action commits (for a draft: the edit and its audit row together).
     log_action(
         db,
         actor_id=admin.id,
@@ -1170,6 +1191,7 @@ def admin_edit_project(
         target_id=project_id,
         new_value=", ".join(changed),
     )
+    db.refresh(project)
     owner = db.get(User, project.owner_id)
     return _project_admin_fields(project, owner)
 
@@ -1182,13 +1204,12 @@ class ProjectSuspendPatch(BaseModel):
 def suspend_project(
     project_id: str, payload: ProjectSuspendPatch, admin: User = Depends(require_admin), db: Session = Depends(get_db)
 ):
-    project = db.get(Project, project_id)
+    project = lock_project(db, project_id)  # serialized with bids and lifecycle changes on it
     if not project:
         raise HTTPException(status_code=404, detail="Project not found.")
     previous = project.is_suspended
     project.is_suspended = payload.suspended
-    db.commit()
-    db.refresh(project)
+    # log_action commits: the flag and its audit row land together.
     log_action(
         db,
         actor_id=admin.id,
