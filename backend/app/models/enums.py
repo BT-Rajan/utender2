@@ -143,3 +143,5 @@ class NotificationType(str, enum.Enum):
     verification_changes_requested = "verification_changes_requested"
     verification_rejected = "verification_rejected"
     new_requirement = "new_requirement"
+    tender_paused = "tender_paused"
+    tender_resumed = "tender_resumed"

@@ -36,6 +36,18 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.en: ("New opportunity: {project_title}", "A new {trade} requirement in {area} is open for offers until {deadline}. You meet its conditions."),
         Language.ar: ("فرصة جديدة: {project_title}", "طلب جديد لأعمال {trade} في {area} مفتوح للعروض حتى {deadline}. أنت تستوفي شروطه."),
     },
+    NotificationType.tender_paused: {
+        Language.en: ("{project_title} is paused", "The owner paused this requirement: {reason} No offers or changes are accepted until it resumes. Your offer is kept."),
+        Language.ar: ("تم إيقاف {project_title} مؤقتًا", "أوقف المالك هذا الطلب مؤقتًا: {reason} لا تُقبل عروض أو تعديلات حتى يُستأنف. عرضك محفوظ."),
+    },
+    NotificationType.tender_resumed: {
+        Language.en: ("{project_title} is open again", "The owner resumed this requirement. Offers are open until {deadline}."),
+        Language.ar: ("{project_title} مفتوح مجددًا", "استأنف المالك هذا الطلب. العروض مفتوحة حتى {deadline}."),
+    },
+    NotificationType.tender_closed: {
+        Language.en: ("{project_title} closed for offers", "The owner closed this requirement early. No more offers are accepted; your offer is kept as submitted."),
+        Language.ar: ("أُغلق {project_title} أمام العروض", "أغلق المالك هذا الطلب مبكرًا. لا تُقبل عروض أخرى؛ عرضك محفوظ كما قُدّم."),
+    },
     NotificationType.tender_amendment: {
         Language.en: ("{project_title} was updated", "{summary}"),
         Language.ar: ("تم تحديث {project_title}", "{summary}"),
@@ -153,6 +165,12 @@ def notify(db: Session, user: User, notification_type: NotificationType, link: s
         .first()
     )
     if existing:
+        # Still one unread notice for this place -- but it says what the
+        # latest event says (e.g. a scope change after a title fix), never a
+        # stale earlier message.
+        existing.title, existing.body = title, body
+        existing.created_at = datetime.utcnow()
+        db.commit()
         return existing
 
     row = Notification(user_id=user.id, type=notification_type, title=title, body=body, link=link)

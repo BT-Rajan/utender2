@@ -11,6 +11,7 @@ from app.models.offer import Offer, OfferDocument, OfferRevision
 from app.models.project import Project
 from app.models.user import User
 from app.schemas.offer import OfferCreate, OfferDocumentOut, OfferOut, OfferRevisionOut
+from app.services.audit import log_action
 from app.services.eligibility import assert_eligible
 from app.services.email import notify_owner_new_offer
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name, sanitize_path_segment
@@ -195,6 +196,7 @@ def submit_offer(
         offer.item_prices = item_prices
         offer.assumptions = payload.assumptions
         offer.declarations_accepted = declarations
+        offer.based_on_material_revision = project.material_revision  # made against the requirement as it now stands
         offer.status = OfferStatus.submitted
         offer.updated_at = datetime.utcnow()
     else:
@@ -208,6 +210,7 @@ def submit_offer(
             item_prices=item_prices,
             assumptions=payload.assumptions,
             declarations_accepted=declarations,
+            based_on_material_revision=project.material_revision,
             status=OfferStatus.submitted,
         )
         db.add(offer)
@@ -234,6 +237,34 @@ def submit_offer(
             service_provider_name="A service provider" if sealed else profile.company_name,
         )
 
+    return _with_documents(db, offer)
+
+
+@router.post("/confirm", response_model=OfferOut)
+def confirm_offer(project_id: str, user: User = Depends(require_marketplace_active_service_provider), db: Session = Depends(get_db)):
+    """Stage 3.15: after a material change to the requirement, the provider
+    confirms their offer still stands as submitted -- its price and content
+    unchanged -- against the requirement as it now is. (To change anything,
+    they revise the offer instead.) The same rules as revising apply: only
+    while bidding is open, and only for an eligible provider."""
+    project = lock_project(db, project_id)
+    offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
+    if not project or not offer or offer.status != OfferStatus.submitted:
+        raise HTTPException(status_code=404, detail="No offer to confirm.")
+    if not bidding_is_open(project):
+        raise HTTPException(status_code=400, detail="Bidding on this project is closed.")
+    assert_eligible(db, project, acting_profile(db, user))
+    if offer.based_on_material_revision >= project.material_revision:
+        raise HTTPException(status_code=400, detail="Your offer is already up to date with the requirement.")
+    previous = offer.based_on_material_revision
+    offer.based_on_material_revision = project.material_revision
+    offer.updated_at = datetime.utcnow()
+    db.commit()
+    log_action(
+        db, actor_id=user.id, action="offer.confirmed", target_type="offer", target_id=offer.id,
+        previous_value=f"material revision {previous}", new_value=f"material revision {project.material_revision}",
+    )
+    db.refresh(offer)
     return _with_documents(db, offer)
 
 

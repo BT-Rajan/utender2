@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import type { Offer, OfferDocument, ProjectDetail } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { OutdatedOfferNotice } from "@/components/PostPublication";
 import { useI18n } from "@/i18n/I18nContext";
 import { money } from "@/lib/money";
 
@@ -112,6 +113,7 @@ export function OfferForm({ project, existingOffer, preview = false }: { project
   return (
     <>
       <ErrorBanner message={error} />
+      {existingOffer && !preview && <OutdatedOfferNotice project={project} offer={existingOffer} />}
       <fieldset disabled={preview} className={preview ? "opacity-80" : undefined}>
         <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6 items-start">
           <form onSubmit={handleSubmit} className="grid gap-[18px]">

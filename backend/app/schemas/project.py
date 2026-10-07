@@ -64,6 +64,12 @@ class ProjectOut(BaseModel):
     updated_at: UTCDateTime | None = None
     discarded_at: UTCDateTime | None = None
     published_at: UTCDateTime | None = None  # set by the server on publication
+    # Stage 3.15: paused by the owner (and why); when offers stopped; how many
+    # material amendments since publication.
+    paused_at: UTCDateTime | None = None
+    pause_reason: str | None = None
+    closed_at: UTCDateTime | None = None
+    material_revision: int = 0
     version: int = 1  # send back as If-Match when saving a draft
     documents_required: bool = False
     offer_count: int = 0

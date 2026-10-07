@@ -26,7 +26,9 @@ export function OpportunityCard({ project, locked = false }: { project: Project;
           </span>
         )}
       </div>
-      <p className="font-mono text-xs text-blue">{timeRemaining(project.bid_deadline)}</p>
+      <p className="font-mono text-xs text-blue">
+        {project.paused_at ? <span className="text-amber-dark uppercase">{t("postPub.pausedProvider").replace("{date}", formatDeadline(project.paused_at))}</span> : timeRemaining(project.bid_deadline)}
+      </p>
       <div className="tblock-strip mt-4">
         <div className="tblock-field">
           <span className="k">{t("service_provider.feed.deadline")}</span>

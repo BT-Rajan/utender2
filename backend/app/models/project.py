@@ -104,6 +104,17 @@ class Project(Base):
     # Stage 3.14: when it was published -- set once, by the server, in the
     # same transaction that makes it open. NULL = never published.
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Stage 3.15: post-publication control.
+    # The owner paused participation (still open, but no offers, changes,
+    # withdrawals or questions until resumed). NULL = not paused. Distinct
+    # from is_suspended, which is admin moderation that hides the project.
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    pause_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # When offers stopped being accepted (closed early, or at the deadline).
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # How many material amendments (changes to what providers price) have been
+    # made since publication; an offer made against an earlier one is flagged.
+    material_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     deadline_reminder_sent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     # Stage 3.11 (drafts): when the requirement was last saved (shown as

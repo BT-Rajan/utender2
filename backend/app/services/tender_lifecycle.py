@@ -33,7 +33,9 @@ def is_sealed_and_open(project: Project) -> bool:
 # sync_expired_projects (<=) and publish (<=). Judged on the server clock;
 # nothing the client sends is consulted.
 def bidding_is_open(project: Project) -> bool:
-    return project.status == ProjectStatus.open and project.bid_deadline > datetime.utcnow()
+    # Stage 3.15: an owner-paused requirement accepts nothing -- no offers,
+    # revisions, withdrawals, attachments or questions -- until resumed.
+    return project.status == ProjectStatus.open and project.paused_at is None and project.bid_deadline > datetime.utcnow()
 
 
 # SELECT ... FOR UPDATE on the tender row. Every operation that can change
@@ -90,6 +92,9 @@ def sync_expired_projects(db: Session) -> None:
         # expired: nobody bid (or every bid was withdrawn) — nothing to
         # evaluate, so it never needs an owner decision to leave "open".
         project.status = ProjectStatus.closed if has_live_offer else ProjectStatus.expired
+        # Offers stopped at the deadline (Stage 3.15), paused or not.
+        project.closed_at = project.bid_deadline
+        project.paused_at = None
     db.commit()
 
 

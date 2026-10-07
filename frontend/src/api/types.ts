@@ -39,6 +39,10 @@ export interface Project {
   discarded_at?: string | null;
   version?: number;
   published_at?: string | null;
+  paused_at?: string | null;
+  pause_reason?: string | null;
+  closed_at?: string | null;
+  material_revision?: number;
   documents_required?: boolean;
   offer_count: number;
   my_offer_status: OfferStatus | null;
@@ -158,6 +162,7 @@ export interface Offer {
   status: OfferStatus;
   is_suspended: boolean;
   revision: number;
+  based_on_material_revision?: number;
   created_at: string;
   updated_at: string;
   service_provider_company_name?: string | null;
@@ -350,6 +355,7 @@ export interface ProjectAmendment {
   changed_fields: string;
   reason: string | null;
   deadline_extended: boolean;
+  material?: boolean;
   created_by: string;
   created_at: string;
 }

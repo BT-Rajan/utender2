@@ -169,6 +169,36 @@ export interface Dictionary {
     cancel: string;
     remove: string;
   };
+  postPub: {
+    pause: string;
+    pauseReason: string;
+    pauseHint: string;
+    pausedSince: string;
+    pausedDeadline: string;
+    resume: string;
+    resumeConfirm: string;
+    amendHeading: string;
+    amendHint: string;
+    address: string;
+    area: string;
+    reason: string;
+    amendSave: string;
+    savedMaterial: string;
+    savedMinor: string;
+    changesHeading: string;
+    material: string;
+    outdatedHeading: string;
+    outdatedBody: string;
+    confirmOffer: string;
+    outdatedOwner: string;
+    pausedProvider: string;
+    pausedProviderBody: string;
+    closedEarly: string;
+    closeConfirm: string;
+    closeConfirmBody: string;
+    error: string;
+    pausedPill: string;
+  };
   eligibility: {
     heading: string;
     hint: string;
@@ -1105,6 +1135,36 @@ export const en: Dictionary = {
   confirm: {
     cancel: "Cancel",
     remove: "Remove",
+  },
+  postPub: {
+    pause: "Pause this requirement",
+    pauseReason: "Why are you pausing it? Providers will see this.",
+    pauseHint: "While paused, no offers, changes, withdrawals or questions are accepted. Existing offers are kept. The offer deadline keeps running: extend it if the pause will last longer.",
+    pausedSince: "Paused since {date}",
+    pausedDeadline: "Offers close {date} unless you extend the deadline.",
+    resume: "Resume",
+    resumeConfirm: "Resume the requirement? Offers will be accepted again until {date}.",
+    amendHeading: "Change the published requirement",
+    amendHint: "Providers may already be pricing this. Every change is recorded as a numbered amendment and the bidders are told.\nChanges to the scope, location or work timing (and documents you add) change what providers price: their existing offers are flagged so they confirm or revise them, and at least 3 days must remain before offers close. A title correction or more time is not.\nItems, response requirements, who can respond and the tender rules can't change after publication.",
+    address: "Site address",
+    area: "Area",
+    reason: "Reason for the change (shown to providers)",
+    amendSave: "Save change",
+    savedMaterial: "Saved as an amendment that changes what providers price. Bidders were told and asked to confirm or revise their offers.",
+    savedMinor: "Saved as an amendment. Bidders were told; their offers stay as they are.",
+    changesHeading: "Changes since publication",
+    material: "Changes pricing",
+    outdatedHeading: "The requirement changed after your offer",
+    outdatedBody: "Review the changes listed above. If your offer still stands as it is, confirm it; otherwise revise it below.",
+    confirmOffer: "My offer still stands — confirm it",
+    outdatedOwner: "Made before amendment — not yet confirmed",
+    pausedProvider: "Paused by the owner since {date}",
+    pausedProviderBody: "No offers, changes or questions are accepted until it resumes. Offers already made are kept.",
+    closedEarly: "Closed for offers on {date}.",
+    closeConfirm: "Close this requirement for offers now?",
+    closeConfirmBody: "No more offers will be accepted. All offers received are kept as submitted; awarding is a separate step.",
+    error: "Could not complete this.",
+    pausedPill: "Paused",
   },
   eligibility: {
     heading: "Who can respond",
@@ -2067,6 +2127,36 @@ export const ar: Dictionary = {
   confirm: {
     cancel: "إلغاء",
     remove: "إزالة",
+  },
+  postPub: {
+    pause: "إيقاف الطلب مؤقتًا",
+    pauseReason: "لماذا توقفه مؤقتًا؟ سيرى مقدمو الخدمة السبب.",
+    pauseHint: "أثناء الإيقاف لا تُقبل عروض أو تعديلات أو سحب أو أسئلة. تبقى العروض الحالية محفوظة. يستمر موعد إغلاق العروض: مدّده إذا طال الإيقاف.",
+    pausedSince: "موقوف مؤقتًا منذ {date}",
+    pausedDeadline: "تُغلق العروض في {date} ما لم تمدد الموعد.",
+    resume: "استئناف",
+    resumeConfirm: "هل تريد استئناف الطلب؟ ستُقبل العروض مجددًا حتى {date}.",
+    amendHeading: "تعديل الطلب المنشور",
+    amendHint: "قد يكون مقدمو الخدمة يسعّرون هذا الطلب الآن. يُسجَّل كل تعديل بتعديل مرقّم ويُبلَّغ مقدمو العروض.\nتغيير نطاق العمل أو الموقع أو توقيت العمل (أو إضافة مستندات) يغيّر ما يسعّره مقدمو الخدمة: تُعلَّم عروضهم الحالية ليؤكدوها أو يعدّلوها، ويجب أن يتبقى 3 أيام على الأقل قبل إغلاق العروض. تصحيح العنوان أو تمديد الوقت ليس كذلك.\nلا يمكن تغيير البنود ومتطلبات العرض ومن يمكنه تقديم عرض وقواعد المناقصة بعد النشر.",
+    address: "عنوان الموقع",
+    area: "المنطقة",
+    reason: "سبب التعديل (يظهر لمقدمي الخدمة)",
+    amendSave: "حفظ التعديل",
+    savedMaterial: "حُفظ كتعديل يغيّر ما يسعّره مقدمو الخدمة. تم إبلاغ مقدمي العروض وطُلب منهم تأكيد عروضهم أو تعديلها.",
+    savedMinor: "حُفظ كتعديل. تم إبلاغ مقدمي العروض؛ تبقى عروضهم كما هي.",
+    changesHeading: "التعديلات منذ النشر",
+    material: "يغيّر التسعير",
+    outdatedHeading: "تغيّر الطلب بعد تقديم عرضك",
+    outdatedBody: "راجع التعديلات أعلاه. إذا كان عرضك ما زال قائمًا كما هو فأكّده، وإلا فعدّله أدناه.",
+    confirmOffer: "عرضي ما زال قائمًا — تأكيد",
+    outdatedOwner: "قُدّم قبل التعديل — لم يُؤكَّد بعد",
+    pausedProvider: "أوقفه المالك مؤقتًا منذ {date}",
+    pausedProviderBody: "لا تُقبل عروض أو تعديلات أو أسئلة حتى يُستأنف. تبقى العروض المقدمة محفوظة.",
+    closedEarly: "أُغلق أمام العروض في {date}.",
+    closeConfirm: "هل تريد إغلاق هذا الطلب أمام العروض الآن؟",
+    closeConfirmBody: "لن تُقبل عروض أخرى. تبقى جميع العروض المستلمة كما قُدّمت؛ والترسية خطوة منفصلة.",
+    error: "تعذر إتمام ذلك.",
+    pausedPill: "موقوف مؤقتًا",
   },
   eligibility: {
     heading: "من يمكنه تقديم عرض",

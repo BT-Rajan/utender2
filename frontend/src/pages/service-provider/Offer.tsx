@@ -89,7 +89,8 @@ export function ServiceProviderOfferPage() {
   }
   if (!project) return <PageLoading />;
 
-  const biddingClosed = project.status !== "open" || new Date(project.bid_deadline) < new Date();
+  // Stage 3.15: an owner-paused requirement accepts nothing until resumed.
+  const biddingClosed = project.status !== "open" || !!project.paused_at || new Date(project.bid_deadline) < new Date();
 
   return (
     <main className="max-w-4xl mx-auto px-5 py-8">
@@ -105,7 +106,7 @@ export function ServiceProviderOfferPage() {
 
       {biddingClosed ? (
         <div className="border border-dashed border-border rounded p-6 text-sm text-steel">
-          {t("service_provider.offer.biddingClosedNotice")}
+          {project.paused_at ? t("postPub.pausedProviderBody") : t("service_provider.offer.biddingClosedNotice")}
           {existingOffer && (
             <div className="mt-3 font-mono text-xs text-navy">
               {t("service_provider.offer.yourFinalOffer")} {money(existingOffer.amount, project.currency)} — status: {existingOffer.status}

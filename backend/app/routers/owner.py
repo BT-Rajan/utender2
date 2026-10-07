@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
@@ -122,6 +123,7 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
                 message=None,
                 status=o.status,
                 revision=o.revision,
+            based_on_material_revision=o.based_on_material_revision,
                 created_at=o.created_at,
                 updated_at=o.updated_at,
                 sealed=True,
@@ -143,6 +145,7 @@ def list_offers(project_id: str, user: User = Depends(require_owner), db: Sessio
             documents=documents_out(db, project_id, o.organization_id, o.service_provider_id),
             status=o.status,
             revision=o.revision,
+            based_on_material_revision=o.based_on_material_revision,
             created_at=o.created_at,
             updated_at=o.updated_at,
             service_provider_company_name=cp.company_name,
@@ -290,8 +293,58 @@ def close_project(project_id: str, user: User = Depends(require_owner), db: Sess
             detail="A sealed tender can't be closed early \u2014 its bids stay sealed until the deadline. "
             "Cancel the tender instead if you no longer want bids.",
         )
+    # Stage 3.15: the authoritative closure time, an audit entry, and the
+    # bidders told. Every offer stays exactly as submitted.
+    now = datetime.utcnow().replace(microsecond=0)
     project.status = ProjectStatus.closed
-    db.commit()
+    project.closed_at = now
+    project.paused_at = None
+    log_action(db, actor_id=user.id, action="project.close", target_type="project", target_id=project_id, previous_value="open", new_value="closed")
+    _notify_bidders(db, project, NotificationType.tender_closed)
+    db.refresh(project)
+    return _project_response(project, db)
+
+
+class PauseRequest(BaseModel):
+    reason: str = Field(min_length=3, max_length=500)
+
+
+@router.post("/projects/{project_id}/pause", response_model=ProjectOut)
+def pause_project(project_id: str, payload: PauseRequest, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 3.15: the owner keeps the requirement but stops participation for
+    now. Providers see it is paused, and why; nothing is accepted (offers,
+    revisions, withdrawals, attachments, questions) until it resumes.
+    Offers, documents and history are untouched. The deadline still runs:
+    extend it (an amendment) if the pause will outlast it."""
+    sync_expired_projects(db)
+    project = _get_owned_project(project_id, user, db, lock=True)
+    if project.status != ProjectStatus.open:
+        raise HTTPException(status_code=400, detail="Only an open requirement can be paused.")
+    if project.paused_at is not None:
+        raise HTTPException(status_code=400, detail="This requirement is already paused.")
+    project.paused_at = datetime.utcnow().replace(microsecond=0)
+    project.pause_reason = payload.reason.strip()
+    log_action(db, actor_id=user.id, action="project.pause", target_type="project", target_id=project_id, new_value=project.pause_reason)
+    _notify_bidders(db, project, NotificationType.tender_paused, reason=project.pause_reason)
+    db.refresh(project)
+    return _project_response(project, db)
+
+
+@router.post("/projects/{project_id}/resume", response_model=ProjectOut)
+def resume_project(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Back to open under the same rules and the deadline as it now stands --
+    never silently reopening one whose deadline has passed (it is then closed
+    or expired, and stays so)."""
+    sync_expired_projects(db)
+    project = _get_owned_project(project_id, user, db, lock=True)
+    if project.status != ProjectStatus.open or project.paused_at is None:
+        raise HTTPException(status_code=400, detail="Only a paused, still-open requirement can be resumed.")
+    if project.bid_deadline <= datetime.utcnow():
+        raise HTTPException(status_code=400, detail="The offer deadline has passed, so this requirement can't reopen.")
+    project.paused_at = None
+    project.pause_reason = None
+    log_action(db, actor_id=user.id, action="project.resume", target_type="project", target_id=project_id)
+    _notify_bidders(db, project, NotificationType.tender_resumed, deadline=project.bid_deadline.strftime("%d %b %Y %H:%M UTC"))
     db.refresh(project)
     return _project_response(project, db)
 
@@ -308,7 +361,7 @@ def start_evaluation(project_id: str, user: User = Depends(require_owner), db: S
     return _project_response(project, db)
 
 
-def _notify_bidders(db: Session, project: Project, notification_type: NotificationType) -> None:
+def _notify_bidders(db: Session, project: Project, notification_type: NotificationType, **details) -> None:
     bidders = (
         db.query(Offer.service_provider_id, Offer.organization_id)
         .filter(Offer.project_id == project.id, Offer.status != OfferStatus.withdrawn)
@@ -319,7 +372,13 @@ def _notify_bidders(db: Session, project: Project, notification_type: Notificati
         bidder = db.get(User, service_provider_id)
         if bidder:
             notify_team(
-                db, bidder, notification_type, link=f"/service-provider/projects/{project.id}/offer", organization_id=organization_id, project_title=project.title
+                db,
+                bidder,
+                notification_type,
+                link=f"/service-provider/projects/{project.id}/offer",
+                organization_id=organization_id,
+                project_title=project.title,
+                **details,
             )
 
 
@@ -536,4 +595,8 @@ def _project_fields(p: Project) -> dict:
         discarded_at=p.discarded_at,
         version=p.version,
         published_at=p.published_at,
+        paused_at=p.paused_at,
+        pause_reason=p.pause_reason,
+        closed_at=p.closed_at,
+        material_revision=p.material_revision,
     )

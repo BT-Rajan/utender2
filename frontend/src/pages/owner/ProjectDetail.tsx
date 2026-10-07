@@ -19,6 +19,7 @@ import { CategoryField } from "@/components/CategoryField";
 import { TenderRulesEditor } from "@/components/TenderRules";
 import { QualityCheck, type QualityReport } from "@/components/QualityCheck";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { AmendPublishedForm, AmendmentsList, PauseControl } from "@/components/PostPublication";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
 import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
 
@@ -438,6 +439,13 @@ export function OwnerProjectDetailPage() {
       {editableDraft && <ResponseRequirementsEditor project={project} />}
       {editableDraft && <ProviderEligibilityEditor project={project} />}
 
+      {/* Stage 3.15: controlling the published requirement. */}
+      {project.status === "open" && <PauseControl project={project} />}
+      {project.status === "open" && <AmendPublishedForm project={project} />}
+      {project.closed_at && project.status !== "open" && (
+        <p className="text-[12.5px] text-steel mb-4">{t("postPub.closedEarly").replace("{date}", formatDeadline(project.closed_at))}</p>
+      )}
+      {project.published_at && <div className="max-w-2xl"><AmendmentsList projectId={project.id} /></div>}
       {editableDraft && <QualityCheck report={quality} />}
       {editableDraft && (
         <Link
@@ -475,7 +483,11 @@ export function OwnerProjectDetailPage() {
           {project.status === "open" && (
             <button
               type="button"
-              onClick={() => lifecycleMutation.mutate("close")}
+              onClick={() =>
+                void confirm({ title: t("postPub.closeConfirm"), body: t("postPub.closeConfirmBody"), confirmLabel: t("owner.projectDetail.closeEarly") }).then(
+                  (ok) => ok && lifecycleMutation.mutate("close"),
+                )
+              }
               disabled={lifecycleMutation.isPending}
               className="border border-navy text-navy hover:bg-navy hover:text-white disabled:opacity-60 text-xs font-semibold rounded px-4 py-2"
             >
@@ -701,6 +713,9 @@ export function OwnerProjectDetailPage() {
                     <td className="py-3 px-2.5">
                       <div className="font-display font-semibold text-[13.5px]">
                         {o.service_provider_company_name ?? t("owner.projectDetail.serviceProviderCol")}
+                        {o.status === "submitted" && (o.based_on_material_revision ?? 0) < (project.material_revision ?? 0) && (
+                          <span className="block font-mono text-[10px] uppercase text-amber-dark font-normal">{t("postPub.outdatedOwner")}</span>
+                        )}
                         {o.revision > 1 && (
                           <span className="text-steel-light font-normal">
                             {" "}

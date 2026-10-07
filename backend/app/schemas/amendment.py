@@ -2,6 +2,8 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.common import UTCDateTime
+
 
 class ProjectAmendmentRequest(BaseModel):
     title: str | None = None
@@ -30,5 +32,6 @@ class ProjectAmendmentOut(BaseModel):
     changed_fields: str
     reason: str | None
     deadline_extended: bool
+    material: bool = False  # Stage 3.15: changed what providers price
     created_by: str
-    created_at: datetime
+    created_at: UTCDateTime

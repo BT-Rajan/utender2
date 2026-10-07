@@ -25,5 +25,8 @@ class ProjectAmendment(Base):
     changed_fields: Mapped[str] = mapped_column(String(500), nullable=False)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     deadline_extended: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Stage 3.15: changes what providers price (scope, location, work timing,
+    # type of work, documents) -- as opposed to a title correction or more time.
+    material: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="0")
     created_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

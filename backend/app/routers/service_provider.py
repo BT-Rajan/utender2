@@ -107,6 +107,8 @@ def feed(
                 description=None,
                 trade=p.trade,
                 category_id=p.category_id,
+                paused_at=p.paused_at,
+                pause_reason=p.pause_reason,
                 bid_deadline=p.bid_deadline,
                 expected_start_date=p.expected_start_date,
                 expected_completion_date=p.expected_completion_date,

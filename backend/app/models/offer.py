@@ -30,6 +30,10 @@ class Offer(Base):
         String(36), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(15, 3), nullable=False)  # KWD: 3 decimals (fils)
+    # Stage 3.15: the requirement's material_revision this offer was made or
+    # last confirmed against. Lower than the requirement's = made before a
+    # material change: the provider is asked to review and confirm or revise.
+    based_on_material_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     timeline_estimate: Mapped[str | None] = mapped_column(String(255), nullable=True)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Stage 3.8 response content. item_prices: [{"item_id", "rate", "line_total"}]

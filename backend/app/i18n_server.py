@@ -232,6 +232,15 @@ AR: dict[str, str] = {
     "The scope is very brief.": "نطاق العمل مختصر جدًا.",
     "Providers price more accurately when they know exactly what's included and what isn't.": "يسعّر مقدمو الخدمة بدقة أكبر عندما يعرفون ما يشمله العمل وما لا يشمله.",
     "The type of work isn't one of the platform's categories, so providers filtering by category won't find it.": "نوع العمل ليس من فئات المنصة، لذا لن يجده من يبحث حسب الفئة.",
+    # --- post-publication control (Stage 3.15) ---
+    "A change to what providers price needs at least 3 days before offers close.": "يحتاج أي تغيير فيما يسعّره مقدمو الخدمة إلى 3 أيام على الأقل قبل إغلاق العروض.",
+    "Extend the deadline in the same change.": "مدّد الموعد النهائي في التغيير نفسه.",
+    "No offer to confirm.": "لا يوجد عرض لتأكيده.",
+    "Only a paused, still-open requirement can be resumed.": "يمكن استئناف الطلب الموقوف مؤقتًا والمفتوح فقط.",
+    "Only an open requirement can be paused.": "يمكن إيقاف الطلب المفتوح مؤقتًا فقط.",
+    "The offer deadline has passed, so this requirement can't reopen.": "انتهى موعد إغلاق العروض، لذا لا يمكن إعادة فتح هذا الطلب.",
+    "This requirement is already paused.": "هذا الطلب موقوف مؤقتًا بالفعل.",
+    "Your offer is already up to date with the requirement.": "عرضك محدّث بالفعل وفق الطلب.",
     # --- billing, misc ---
     "No billing account yet — subscribe first.": "لا يوجد حساب فوترة بعد — اشترك أولًا.",
     "Could not start checkout.": "تعذر بدء الدفع.",

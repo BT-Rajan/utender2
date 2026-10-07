@@ -57,6 +57,9 @@ class OfferOut(BaseModel):
     status: OfferStatus
     is_suspended: bool = False
     revision: int = 1
+    # Stage 3.15: the requirement's material revision this offer was made or
+    # last confirmed against (lower than the requirement's = before a change).
+    based_on_material_revision: int = 0
     created_at: datetime
     updated_at: datetime
     service_provider_company_name: str | None = None

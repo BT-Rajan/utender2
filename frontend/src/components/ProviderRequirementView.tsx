@@ -4,6 +4,7 @@ import { RequirementItemsView } from "@/components/RequirementItems";
 import { ResponseRequirementsSummary } from "@/components/ResponseRequirements";
 import { ParticipationRules } from "@/components/TenderRules";
 import { eligibilitySummary } from "@/components/ProviderEligibility";
+import { AmendmentsList } from "@/components/PostPublication";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatDeadline, timeRemaining } from "@/lib/format";
 import { formatWorkTiming } from "@/lib/dates";
@@ -30,9 +31,18 @@ export function ProviderRequirementView({ project, closed }: { project: ProjectD
           </div>
         </div>
         <span className="font-mono text-[10px] uppercase tracking-wide px-2.5 py-1 rounded-full bg-white/15">
-          {closed ? t("service_provider.offer.closed") : timeRemaining(project.bid_deadline)}
+          {project.paused_at && project.status === "open" ? t("postPub.pausedPill") : closed ? t("service_provider.offer.closed") : timeRemaining(project.bid_deadline)}
         </span>
       </div>
+
+      {project.paused_at && (
+        <div className="border border-amber-dark/40 bg-amber/10 rounded px-4 py-3 mb-6 text-sm text-navy">
+          <strong className="font-display block">{t("postPub.pausedProvider").replace("{date}", formatDeadline(project.paused_at))}</strong>
+          {project.pause_reason && <span className="block">{project.pause_reason}</span>}
+          <span className="block text-steel text-[13px]">{t("postPub.pausedProviderBody")}</span>
+        </div>
+      )}
+      {project.published_at && <AmendmentsList projectId={project.id} />}
 
       {project.description && (
         <div className="mb-6 text-sm text-steel">
