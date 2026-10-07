@@ -240,6 +240,12 @@ export interface Dictionary {
     count: string;
     row: string;
   };
+  award: {
+    confirmTitle: string;
+    confirmBody: string;
+    earlierVersion: string;
+    confirm: string;
+  };
   ownerOffer: {
     open: string;
     back: string;
@@ -1520,6 +1526,12 @@ export const en: Dictionary = {
     note: "A private marker for your evaluation. It isn't an award, nothing is sent to the provider, and the offer stays exactly as submitted.",
     count: "{n} shortlisted",
     row: "On your shortlist",
+  },
+  award: {
+    confirmTitle: "Award this requirement to {provider}?",
+    confirmBody: "This is your final decision on this requirement: {provider}'s offer of {amount} is accepted as submitted, every other live offer is marked not selected, and every provider is told. It can't be undone. It isn't a contract or a payment.",
+    earlierVersion: "Note: this offer was made against version {n} of the requirement, which is now at version {m}, and its provider didn't confirm it since. You'd be awarding it as it stands.",
+    confirm: "Award",
   },
   ownerOffer: {
     open: "View offer",
@@ -2826,6 +2838,12 @@ export const ar: Dictionary = {
     note: "علامة خاصة لتقييمك. ليست ترسية، ولا يُرسل شيء إلى المزوّد، ويبقى العرض كما قُدّم تمامًا.",
     count: "{n} في القائمة المختصرة",
     row: "في قائمتك المختصرة",
+  },
+  award: {
+    confirmTitle: "ترسية هذا المتطلب على {provider}؟",
+    confirmBody: "هذا قرارك النهائي في هذا المتطلب: يُقبل عرض {provider} بقيمة {amount} كما قُدّم، ويُعلَّم كل عرض قائم آخر بأنه لم يُختر، ويُبلَّغ كل المزوّدين. لا يمكن التراجع عنه. وهو ليس عقدًا ولا دفعًا.",
+    earlierVersion: "ملاحظة: قُدّم هذا العرض على الإصدار {n} من المتطلب، وهو الآن في الإصدار {m}، ولم يؤكده مزوّده منذ ذلك الحين. ستُرسيه كما هو.",
+    confirm: "رسِّ",
   },
   ownerOffer: {
     open: "عرض العرض",

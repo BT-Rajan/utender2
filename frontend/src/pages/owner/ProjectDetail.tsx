@@ -368,7 +368,8 @@ export function OwnerProjectDetailPage() {
   const approvedOffer = offers?.find((o) => o.status === "approved");
 
   const approveMutation = useMutation({
-    mutationFn: (offerId: string) => apiFetch(`/owner/projects/${id}/offers/${offerId}/approve`, { method: "POST" }),
+    mutationFn: ({ offerId, acknowledge }: { offerId: string; acknowledge: boolean }) =>
+      apiFetch(`/owner/projects/${id}/offers/${offerId}/approve`, { method: "POST", body: { acknowledge_earlier_version: acknowledge } }),
     onSuccess: () => {
       setError(null);
       queryClient.invalidateQueries({ queryKey: ["project", id] });
@@ -865,7 +866,18 @@ export function OwnerProjectDetailPage() {
                       {o.status !== "submitted" ? null : project.status === "closed" || project.status === "under_evaluation" ? (
                         <button
                           type="button"
-                          onClick={() => approveMutation.mutate(o.id)}
+                          onClick={() => {
+                            // Stage 6.13: a final decision -- said plainly, and confirmed first.
+                            const name = o.service_provider_company_name ?? t("owner.projectDetail.theServiceProvider");
+                            const earlier = (o.based_on_material_revision ?? 0) < (project.material_revision ?? 0);
+                            const body = [
+                              t("award.confirmBody").replace("{provider}", name).replace("{amount}", money(o.amount, project.currency)),
+                              ...(earlier ? [t("award.earlierVersion").replace("{n}", String(o.based_on_material_revision ?? 0)).replace("{m}", String(project.material_revision ?? 0))] : []),
+                            ];
+                            void confirm({ title: t("award.confirmTitle").replace("{provider}", name), body: body.join("\n\n"), confirmLabel: t("award.confirm") }).then(
+                              (ok) => ok && approveMutation.mutate({ offerId: o.id, acknowledge: earlier }),
+                            );
+                          }}
                           disabled={approveMutation.isPending}
                           className="bg-navy hover:bg-navy-deep disabled:opacity-60 text-white text-xs font-semibold rounded px-3 py-1.5"
                         >

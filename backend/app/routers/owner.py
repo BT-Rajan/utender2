@@ -528,10 +528,22 @@ def open_offer_document(
     return open_file(*found)
 
 
+class AwardRequest(BaseModel):
+    # Stage 6.13: awarding an offer made against an earlier version of the
+    # requirement (not confirmed by its provider since) needs the owner to say so.
+    acknowledge_earlier_version: bool = False
+
+
 @router.post("/projects/{project_id}/offers/{offer_id}/approve", response_model=ProjectOut)
-def approve_offer(project_id: str, offer_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+def approve_offer(
+    project_id: str, offer_id: str, payload: AwardRequest | None = None, user: User = Depends(require_owner), db: Session = Depends(get_db)
+):
     sync_expired_projects(db)
     project = _get_owned_project(project_id, user, db, lock=True)
+    # Stage 6.13: an admin-suspended requirement is out of sight until an
+    # admin reactivates it -- no decision is taken on it meanwhile.
+    if project.is_suspended:
+        raise HTTPException(status_code=400, detail="This requirement has been suspended by an admin.")
     # Awarding is only meaningful once bidding has actually stopped — the
     # full lifecycle (spec §2.12) makes "open" and "draft" ineligible, not
     # just "already awarded". A deadline that just passed is caught by the
@@ -551,6 +563,13 @@ def approve_offer(project_id: str, offer_id: str, user: User = Depends(require_o
         raise HTTPException(status_code=400, detail="Only a live bid can be awarded.")
     if winning_offer.is_suspended:
         raise HTTPException(status_code=400, detail="This offer has been suspended by an admin and cannot be awarded.")
+    # Stage 6.13: never silently award an offer priced against an earlier
+    # version of the requirement as if it answered the current one.
+    if winning_offer.based_on_material_revision < project.material_revision and not (payload and payload.acknowledge_earlier_version):
+        raise HTTPException(
+            status_code=409,
+            detail="This offer was made against an earlier version of the requirement and its provider hasn't confirmed it since. Confirm that you want to award it as it stands.",
+        )
 
     # Only other LIVE bids get marked rejected — a bid the service provider
     # already withdrew stays withdrawn, not overwritten into a status that

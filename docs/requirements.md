@@ -540,4 +540,15 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - **Pages:** a shortlist button and badge on the owner's offer page, a badge and count in the inbox, and a row in the comparison.
   - **Rollback guard:** a downgrade below 0047 is refused while any offer is shortlisted, unless `ALLOW_SHORTLIST_LOSS=1` is set.
 
+- **6.13 Award decision:**
+  - **Already working:** `POST /owner/projects/{id}/offers/{offer}/approve` awards one live offer.
+    - Owner side, active account, under the requirement's lock (serialized with closing, cancelling, a second award, another member or tab), only once offers have closed (closed or under evaluation). The offer must be this requirement's, live and not suspended.
+    - One transaction: the winner becomes approved, every other live offer rejected (withdrawn ones stay withdrawn) and the requirement awarded. It writes the award record (one per requirement, enforced by the database) with the offer, its revision, the amount and who awarded, plus an audit entry.
+    - Winner and others are notified through the existing notifications.
+    - **Final:** a repeat or stale request is refused, and nothing is awarded twice. The offers, the shortlist and the notes are untouched, and new or changed offers are refused.
+  - **Fixed:**
+    - No award on an admin-suspended requirement.
+    - An offer made against an earlier requirement version, not confirmed by its provider since, is awarded only when the owner says so explicitly (`acknowledge_earlier_version`). Otherwise the server returns 409 and nothing changes.
+    - The owner's Approve button now asks for confirmation. The dialog states the provider, the amount, that the decision is final (not a contract or payment) and, where it applies, the earlier-version warning.
+
 _Later Stage 6 steps are added as they are implemented._

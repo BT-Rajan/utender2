@@ -203,6 +203,7 @@ AR: dict[str, str] = {
     "This note was changed somewhere else since you opened it. Reload to see the latest version.": "عُدّلت هذه الملاحظة في مكان آخر منذ فتحها. أعد التحميل لرؤية أحدث نسخة.",
     "Notes are for reviewing offers on a published requirement.": "الملاحظات مخصّصة لمراجعة العروض على متطلب منشور.",
     "Enter a note.": "أدخل ملاحظة.",
+    "This offer was made against an earlier version of the requirement and its provider hasn't confirmed it since. Confirm that you want to award it as it stands.": "قُدّم هذا العرض على إصدار سابق من المتطلب ولم يؤكده مزوّده منذ ذلك الحين. أكّد أنك تريد ترسيته كما هو.",
     "Offers can be shortlisted only while they are being evaluated: after offers close and before the requirement's outcome.": "يمكن إدراج العروض في القائمة المختصرة فقط أثناء تقييمها: بعد إغلاق العروض وقبل تحديد نتيجة المتطلب.",
     "This requirement doesn't accept questions.": "هذا الطلب لا يقبل الأسئلة.",
     "Questions for this requirement have closed.": "أُغلقت الأسئلة لهذا الطلب.",
