@@ -225,4 +225,14 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - One per stakeholder and requirement, enforced by the database for both provider and organisation, and decided under the requirement's lock. Organisation members share it.
   - Lifecycle: extending keeps the same draft; after an amendment the draft moves to the current version only once the provider has seen it, and draft holders are notified as people preparing an offer; suspension preserves it; closed, expired or cancelled leave it a draft, never an offer.
 
-_Further steps (5.3 onwards) are added as they are implemented._
+- **5.3 Commercial / price:**
+  - The provider saves the price on their offer draft with "Save draft", without submitting. They can leave, return, and edit it until they submit.
+  - It follows the requirement's pricing basis (Stage 3.4):
+    - **One total:** a single amount above 0, with no item table.
+    - **Per item:** a rate for each of the requirement's own items. The server multiplies rate by quantity (or uses the rate alone for items with no quantity), rounding to 3 decimals. The offer total is the server's sum, set only once every item is priced, and a total sent by the browser is ignored.
+  - Rejected: anything not a number, negative values, more than 3 decimals, totals beyond the limit, items not in this requirement, and the same item twice.
+  - The currency is the requirement's (KWD, set on the server); the provider can't change it, and nothing is converted.
+  - Saves are refused when the page is out of date (another tab or team member saved since it was opened), and while the requirement is paused, suspended, closed, past its deadline or changed since the provider last reviewed it. Saves are also refused once the offer is submitted.
+  - Pricing basis, items and quantities can't change after publication (Stage 3.4), so a saved price always refers to the current items.
+
+_Further steps (5.4 onwards) are added as they are implemented._

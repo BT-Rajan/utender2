@@ -58,6 +58,10 @@ class Offer(Base):
     # OfferRevision snapshot of the pre-edit values and bumps this counter
     # (spec §29, D-009) — old values are never lost, just superseded.
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # Stage 5.3: bumped by every save of the draft, so a save from a page
+    # showing an older draft (another tab, another member) is refused
+    # instead of overwriting newer work (If-Match, as for requirement drafts).
+    draft_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     # Stage 5.2: the people who started it and last changed it (an
     # organization's members share one offer).
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

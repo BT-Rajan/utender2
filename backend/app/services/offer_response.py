@@ -23,22 +23,62 @@ def requirements_for(project: Project) -> ResponseRequirements:
     return ResponseRequirements(**(project.response_requirements or {}))
 
 
+# offers.amount is NUMERIC(15,3) (KWD has 3 decimals). Totals are capped well
+# inside the column's range; more than 3 decimals is refused by the schema.
+AMOUNT_LIMIT = Decimal("10000000000")
+
+
+def _lines(project: Project, rates: dict) -> list[dict]:
+    """Line total = rate x quantity (or the rate itself for an item with no
+    quantity), for each item priced, in the requirement's order."""
+    lines = []
+    for item in sorted(project.items, key=lambda i: i.position):
+        if item.id in rates:
+            rate = rates[item.id]
+            line_total = (rate * item.quantity if item.quantity is not None else rate).quantize(_FILS, ROUND_HALF_UP)
+            lines.append({"item_id": item.id, "rate": str(rate), "line_total": str(line_total)})
+    return lines
+
+
 def priced_total(project: Project, payload: OfferCreate) -> tuple[Decimal | None, list[dict] | None]:
     """(total, item_prices). One total: the amount as sent. Per item: a rate
     for every listed item, line total = rate x quantity (or the rate itself
     for an item with no quantity), total = the sum."""
     if project.pricing_basis != PricingBasis.per_item:
         return payload.amount, None
-    items = {i.id: i for i in project.items}
+    items = {i.id for i in project.items}
     rates = {p.item_id: p.rate for p in payload.item_prices or []}
-    if set(rates) != set(items) or len(rates) != len(payload.item_prices or []):
+    if set(rates) != items or len(rates) != len(payload.item_prices or []):
         raise HTTPException(status_code=400, detail="Give a rate for every item listed in the requirement, once each.")
-    lines = []
-    for item in sorted(items.values(), key=lambda i: i.position):
-        rate = rates[item.id]
-        line_total = (rate * item.quantity if item.quantity is not None else rate).quantize(_FILS, ROUND_HALF_UP)
-        lines.append({"item_id": item.id, "rate": str(rate), "line_total": str(line_total)})
+    lines = _lines(project, rates)
     return sum(Decimal(line["line_total"]) for line in lines), lines
+
+
+def draft_pricing(project: Project, amount: Decimal | None, item_prices: list | None) -> tuple[Decimal | None, list[dict] | None]:
+    """Stage 5.3: the commercial part of a draft, on the requirement's pricing
+    basis (Stage 3.4) -- the same arithmetic as a submission, but it may be
+    incomplete. One total: the amount entered, if any. Per item: rates for
+    the items priced so far (only the requirement's own items, once each);
+    the total is the server's sum, and only once every item has a rate --
+    a partial sum is never presented as the offer's price. Raises 400 on a
+    value that could never make a valid offer."""
+    if project.pricing_basis != PricingBasis.per_item:
+        if item_prices:
+            raise HTTPException(status_code=400, detail="This requirement is priced as one total, not per item.")
+        if amount is not None and not (Decimal(0) < amount < AMOUNT_LIMIT):
+            raise HTTPException(status_code=400, detail="Enter a valid bid amount.")
+        return amount, None
+    items = {i.id for i in project.items}
+    rates = {p.item_id: p.rate for p in item_prices or []}
+    if len(rates) != len(item_prices or []):
+        raise HTTPException(status_code=400, detail="Give a rate for every item listed in the requirement, once each.")
+    if set(rates) - items:
+        raise HTTPException(status_code=400, detail="That item isn't part of this requirement.")
+    lines = _lines(project, rates)
+    total = sum((Decimal(line["line_total"]) for line in lines), Decimal(0))
+    if total >= AMOUNT_LIMIT:
+        raise HTTPException(status_code=400, detail="Enter a valid bid amount.")
+    return (total if set(rates) == items and total > 0 else None), lines
 
 
 def _side_documents(db: Session, project_id: str, organization_id: str | None, provider_id: str):

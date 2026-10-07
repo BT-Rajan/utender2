@@ -11,7 +11,18 @@ import { money } from "@/lib/money";
 // preview (Stage 3.13), where it is shown read-only: the owner sees exactly
 // the fields a provider will fill in -- the item rate table, the required
 // fields, the requested documents, the declarations -- and nothing is sent.
-export function OfferForm({ project, existingOffer, preview = false }: { project: ProjectDetail; existingOffer: Offer | null; preview?: boolean }) {
+export function OfferForm({
+  project,
+  existingOffer,
+  draft = null,
+  preview = false,
+}: {
+  project: ProjectDetail;
+  existingOffer: Offer | null;
+  // Stage 5.2/5.3: the provider's unsubmitted draft, when there is one.
+  draft?: Offer | null;
+  preview?: boolean;
+}) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +32,17 @@ export function OfferForm({ project, existingOffer, preview = false }: { project
   const [assumptions, setAssumptions] = useState("");
   const [rates, setRates] = useState<Record<string, string>>({});
   const [accepted, setAccepted] = useState<string[]>([]);
+  const [savedNotice, setSavedNotice] = useState(false);
+
+  // Stage 5.3: the price saved on the draft, when returning to it.
+  useEffect(() => {
+    if (draft && !existingOffer) {
+      setAmount(draft.amount === null ? "" : String(Number(draft.amount)));
+      setRates(Object.fromEntries((draft.item_prices ?? []).map((l) => [l.item_id, String(Number(l.rate))])));
+    }
+    // Only when a different draft (or a newer save of it) arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft?.id, draft?.draft_version]);
 
   useEffect(() => {
     if (existingOffer) {
@@ -84,6 +106,32 @@ export function OfferForm({ project, existingOffer, preview = false }: { project
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-offer", project.id] });
       queryClient.invalidateQueries({ queryKey: ["service-provider-feed"] });
+    },
+  });
+
+  // Stage 5.3: save the price on the draft -- nothing is submitted. The
+  // server prices it on the requirement's basis and computes every total;
+  // If-Match makes a save from a stale tab fail instead of overwriting.
+  const saveDraftMutation = useMutation({
+    mutationFn: () =>
+      apiFetch<Offer>(`/projects/${project.id}/offers/draft/commercial`, {
+        method: "PUT",
+        headers: draft ? { "If-Match": String(draft.draft_version ?? 0) } : undefined,
+        body: {
+          amount: perItem || !clean(amount) ? null : clean(amount),
+          item_prices: perItem
+            ? project.items.filter((item) => clean(rates[item.id] ?? "")).map((item) => ({ item_id: item.id, rate: clean(rates[item.id] ?? "") }))
+            : null,
+        },
+      }),
+    onSuccess: (saved) => {
+      setError(null);
+      setSavedNotice(true);
+      queryClient.setQueryData(["my-offer", project.id], saved);
+    },
+    onError: (err) => {
+      setSavedNotice(false);
+      setError(err instanceof ApiError ? err.detail : t("response.saveDraftError"));
     },
   });
 
@@ -283,6 +331,20 @@ export function OfferForm({ project, existingOffer, preview = false }: { project
               >
                 {existingOffer ? t("service_provider.offer.updateOffer") : t("service_provider.offer.submitOffer")}
               </button>
+              {draft && !existingOffer && !preview && (
+                <button
+                  type="button"
+                  onClick={() => saveDraftMutation.mutate()}
+                  disabled={saveDraftMutation.isPending}
+                  className="border border-navy text-navy font-semibold text-sm rounded px-4 py-2.5 disabled:opacity-60"
+                  data-testid="save-draft"
+                >
+                  {t("response.saveDraft")}
+                </button>
+              )}
+              {savedNotice && !saveDraftMutation.isPending && (
+                <span className="text-xs text-green" data-testid="draft-saved">{t("response.draftSaved")}</span>
+              )}
               {existingOffer && existingOffer.status !== "withdrawn" && (
                 <button
                   type="button"

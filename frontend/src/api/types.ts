@@ -199,6 +199,7 @@ export interface Offer {
   is_suspended: boolean;
   revision: number;
   based_on_material_revision?: number;
+  draft_version?: number; // Stage 5.3: sent back as If-Match when saving the draft
   created_at: string;
   updated_at: string;
   service_provider_company_name?: string | null;

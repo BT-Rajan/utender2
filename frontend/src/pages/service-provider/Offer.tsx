@@ -199,7 +199,7 @@ export function ServiceProviderOfferPage() {
           {!existingOffer && (project.material_revision ?? 0) > (project.participation?.seen_material_revision ?? 0) ? (
             <ChangedSinceDecided projectId={project.id} />
           ) : (
-            <OfferForm project={project} existingOffer={existingOffer ?? null} />
+            <OfferForm project={project} existingOffer={existingOffer ?? null} draft={draft} />
           )}
         </>
       ) : project.participation?.status === "can_participate" ? (

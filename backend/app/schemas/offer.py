@@ -26,6 +26,15 @@ class OfferCreate(BaseModel):
     message: str | None = Field(default=None, max_length=10_000)
 
 
+class OfferCommercialDraft(BaseModel):
+    """Stage 5.3: the commercial part of an offer draft, saved without
+    submitting. Either may be incomplete while it is a draft: a total not yet
+    entered, or rates for only some items. Totals are always the server's."""
+
+    amount: Decimal | None = Field(default=None, decimal_places=3)
+    item_prices: list[OfferItemPrice] | None = Field(default=None, max_length=300)
+
+
 class OfferDocumentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -60,6 +69,7 @@ class OfferOut(BaseModel):
     # Stage 3.15: the requirement's material revision this offer was made or
     # last confirmed against (lower than the requirement's = before a change).
     based_on_material_revision: int = 0
+    draft_version: int = 0  # Stage 5.3: send back as If-Match when saving the draft
     created_at: datetime
     updated_at: datetime
     service_provider_company_name: str | None = None

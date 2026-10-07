@@ -1,7 +1,6 @@
 from datetime import datetime
-from decimal import Decimal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -10,22 +9,18 @@ from app.models.enums import NotificationType, OfferStatus, ProjectStatus, Tende
 from app.models.offer import Offer, OfferDocument, OfferRevision
 from app.models.project import Project
 from app.models.user import User
-from app.schemas.offer import OfferCreate, OfferDocumentOut, OfferOut, OfferRevisionOut
+from app.schemas.offer import OfferCommercialDraft, OfferCreate, OfferDocumentOut, OfferOut, OfferRevisionOut
 from app.services.audit import log_action
 from app.services.eligibility import assert_eligible
 from app.services.email import notify_owner_new_offer
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name, sanitize_path_segment
 from app.services.notify import notify, notify_team
 from app.services.team import acting_id, acting_profile, can_access, mine, org_of
-from app.services.offer_response import OFFER_DOCUMENTS_BUCKET, check_complete, documents_out, priced_total, requirements_for
+from app.services.offer_response import AMOUNT_LIMIT, OFFER_DOCUMENTS_BUCKET, check_complete, documents_out, draft_pricing, priced_total, requirements_for
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import bidding_is_open, lock_project
 
 router = APIRouter(prefix="/projects/{project_id}/offers", tags=["offers"])
-
-# offers.amount is NUMERIC(15,3) (KWD has 3 decimals). Totals are capped well
-# inside the column's range; more than 3 decimals is refused by the schema.
-_AMOUNT_LIMIT = Decimal("10000000000")
 
 
 @router.get("/mine", response_model=OfferOut | None)
@@ -41,6 +36,51 @@ def _with_documents(db: Session, offer: Offer) -> OfferOut:
     out = OfferOut.model_validate(offer)
     out.documents = documents_out(db, offer.project_id, offer.organization_id, offer.service_provider_id)
     return out
+
+
+# ---------- Stage 5.3: the commercial part of the draft ----------
+
+
+@router.put("/draft/commercial", response_model=OfferOut)
+def save_commercial_draft(
+    project_id: str,
+    payload: OfferCommercialDraft,
+    if_match: str | None = Header(None, alias="If-Match"),
+    user: User = Depends(require_marketplace_active_service_provider),
+    db: Session = Depends(get_db),
+):
+    """Save the price -- one total, or a rate per item -- on this provider's
+    offer draft (Stage 5.2), without submitting it. Judged under the
+    requirement's lock, like every offer change: only while bidding is open,
+    for an eligible provider, on their own side's draft (found by who is
+    asking, never an id from the request), against the requirement version
+    they have seen, and from a page showing the latest draft (If-Match:
+    draft_version). The requirement's pricing basis, items, quantities and
+    currency are read from the requirement, never from the request."""
+    project = lock_project(db, project_id)
+    if project and project.is_suspended:
+        raise HTTPException(status_code=400, detail="This project has been suspended and is not accepting offers.")
+    if not project or not bidding_is_open(project):
+        raise HTTPException(status_code=400, detail="Bidding on this project is closed.")
+    assert_eligible(db, project, acting_profile(db, user))
+    offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
+    if not offer:
+        raise HTTPException(status_code=404, detail="Start preparing your offer first.")
+    if offer.status != OfferStatus.draft:
+        raise HTTPException(status_code=409, detail="Your offer has already been submitted. Change it by updating your offer.")
+    if offer.based_on_material_revision < project.material_revision:
+        raise HTTPException(status_code=409, detail="The requirement changed after you started this offer. Review the current requirement first.")
+    if if_match is not None and if_match.strip('"') != str(offer.draft_version):
+        raise HTTPException(
+            status_code=409,
+            detail="Your offer draft was changed somewhere else (another tab, device or team member) since you opened it. Reload to see the latest, then make your change again.",
+        )
+    offer.amount, offer.item_prices = draft_pricing(project, payload.amount, payload.item_prices)
+    offer.draft_version += 1
+    offer.updated_at, offer.updated_by = datetime.utcnow(), user.id
+    db.commit()
+    db.refresh(offer)
+    return _with_documents(db, offer)
 
 
 # ---------- Stage 3.8: documents a provider submits with their response ----------
@@ -178,7 +218,7 @@ def submit_offer(
     # Stage 3.8: the response must match what the requirement asks for --
     # its pricing basis and its response rules.
     amount, item_prices = priced_total(project, payload)
-    if amount is None or amount <= 0 or amount >= _AMOUNT_LIMIT:
+    if amount is None or amount <= 0 or amount >= AMOUNT_LIMIT:
         raise HTTPException(status_code=400, detail="Enter a valid bid amount.")
     declarations = check_complete(db, project, org_of(db, user.id), acting_id(db, user), payload)
 

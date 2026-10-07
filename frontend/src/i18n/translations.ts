@@ -395,6 +395,9 @@ export interface Dictionary {
     priceTotal: string;
     pricePerItem: string;
     rateCol: string;
+    saveDraft: string;
+    draftSaved: string;
+    saveDraftError: string;
     lineTotalCol: string;
     total: string;
     amount: string;
@@ -1513,6 +1516,9 @@ export const en: Dictionary = {
     priceTotal: "Total price in {currency}",
     pricePerItem: "A rate in {currency} for every item listed",
     rateCol: "Rate ({currency})",
+    saveDraft: "Save draft",
+    draftSaved: "Draft saved — not submitted.",
+    saveDraftError: "Couldn’t save your draft.",
     lineTotalCol: "Line total",
     total: "Total",
     amount: "Your total price ({currency})",
@@ -2656,6 +2662,9 @@ export const ar: Dictionary = {
     priceTotal: "السعر الإجمالي بعملة {currency}",
     pricePerItem: "سعر وحدة بعملة {currency} لكل بند مدرج",
     rateCol: "سعر الوحدة ({currency})",
+    saveDraft: "حفظ المسودة",
+    draftSaved: "حُفظت المسودة — لم تُقدَّم.",
+    saveDraftError: "تعذّر حفظ المسودة.",
     lineTotalCol: "إجمالي البند",
     total: "الإجمالي",
     amount: "السعر الإجمالي ({currency})",
