@@ -640,6 +640,13 @@ export interface Dictionary {
     closesAt: string;
     closedAt: string;
     unansweredClosed: string;
+    yourQuestion: string;
+    answeredOn: string;
+    cameWithChange: string;
+    publishForAll: string;
+    materialHint: string;
+    becauseOf: string;
+    notBecauseOf: string;
   };
   service_provider: {
     roleLabel: string;
@@ -1739,6 +1746,13 @@ export const en: Dictionary = {
     closesAt: "Questions and answers close {date}.",
     closedAt: "Questions and answers closed {date}. No new questions or answers.",
     unansweredClosed: "Not answered before the question cut-off.",
+    yourQuestion: "Your question",
+    answeredOn: "Answered {date}",
+    cameWithChange: "This answer came with a change to the requirement (change #{n}) — see the changes above.",
+    publishForAll: "Publish this question and answer to every provider (the asker stays anonymous)",
+    materialHint: "If the answer changes the scope, quantities, documents, timing or who can respond, change the requirement itself too (Change the published requirement) and choose this question there.",
+    becauseOf: "Because of a question (optional)",
+    notBecauseOf: "Not because of a question",
   },
   service_provider: {
     roleLabel: "Service provider",
@@ -2846,6 +2860,13 @@ export const ar: Dictionary = {
     closesAt: "تُغلق الأسئلة والأجوبة في {date}.",
     closedAt: "أُغلقت الأسئلة والأجوبة في {date}. لا أسئلة أو أجوبة جديدة.",
     unansweredClosed: "لم تتم الإجابة قبل موعد إغلاق الأسئلة.",
+    yourQuestion: "سؤالك",
+    answeredOn: "أُجيب في {date}",
+    cameWithChange: "جاءت هذه الإجابة مع تعديل على الطلب (التعديل رقم {n}) — اطّلع على التعديلات أعلاه.",
+    publishForAll: "انشر هذا السؤال وإجابته لجميع مقدّمي الخدمة (يبقى السائل مجهولًا)",
+    materialHint: "إن غيّرت الإجابة نطاق العمل أو الكميات أو المستندات أو التوقيت أو من يمكنه الرد، فعدّل الطلب نفسه أيضًا (تعديل الطلب المنشور) واختر هذا السؤال هناك.",
+    becauseOf: "بسبب سؤال (اختياري)",
+    notBecauseOf: "ليس بسبب سؤال",
   },
   service_provider: {
     roleLabel: "مزوّد خدمة",

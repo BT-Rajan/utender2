@@ -31,3 +31,8 @@ class Clarification(Base):
     shared_with_all: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     answered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Stage 4.7: who on the owner's side answered, and -- when the answer
+    # changed the requirement itself -- the amendment that did it, so a
+    # material clarification is never just text beside an unchanged record.
+    answered_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    amendment_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("project_amendments.id", ondelete="SET NULL"), nullable=True)

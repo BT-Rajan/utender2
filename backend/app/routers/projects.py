@@ -13,6 +13,7 @@ from app.models.service_provider import ServiceProviderProfile
 from app.models.enums import NotificationType, OfferStatus, PricingBasis, ProjectStatus, TenderType, UserRole
 from app.models.offer import Offer
 from app.models.owner import OwnerProfile
+from app.models.clarification import Clarification
 from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.project_amendment import ProjectAmendment
 from app.models.user import User
@@ -455,6 +456,15 @@ def amend_project(
     if project.status not in (ProjectStatus.draft, ProjectStatus.open):
         raise HTTPException(status_code=400, detail="This project can no longer be amended.")
 
+    # Stage 4.7: a change made because of an answered question is tied to it.
+    clarification = None
+    if payload.clarification_id:
+        clarification = db.get(Clarification, payload.clarification_id)
+        if not clarification or clarification.project_id != project.id or clarification.answer is None:
+            raise HTTPException(status_code=400, detail="Choose an answered question on this requirement.")
+        if project.status == ProjectStatus.draft:
+            raise HTTPException(status_code=400, detail="Choose an answered question on this requirement.")
+
     before = {f: getattr(project, f) for f in TRACKED_FIELDS}
     changed: list[str] = []
 
@@ -554,7 +564,14 @@ def amend_project(
         db.refresh(project)
         return _serialize_detail(project, db)
 
-    _record_amendment(db, project, user, changed, (payload.reason or "").strip() or None, deadline_extended, _field_changes(before, project))
+    reason = (payload.reason or "").strip() or None
+    if clarification is not None and not reason:
+        reason = f"Following a question: {clarification.question[:200]}"
+    _record_amendment(db, project, user, changed, reason, deadline_extended, _field_changes(before, project))
+    if clarification is not None:
+        latest = db.query(ProjectAmendment).filter(ProjectAmendment.project_id == project.id).order_by(ProjectAmendment.amendment_number.desc()).first()
+        clarification.amendment_id = latest.id
+        db.commit()
     return _serialize_detail(project, db)
 
 

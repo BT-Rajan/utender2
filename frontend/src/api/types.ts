@@ -373,6 +373,10 @@ export interface Clarification {
   created_at: string;
   answered_at: string | null;
   service_provider_company_name: string | null;
+  // Stage 4.7.
+  mine?: boolean;
+  answered_by_name?: string | null;
+  amendment_number?: number | null;
 }
 
 export interface ProjectAmendment {

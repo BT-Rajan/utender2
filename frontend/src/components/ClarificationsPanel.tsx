@@ -24,6 +24,7 @@ export function ClarificationsPanel({
   const [question, setQuestion] = useState("");
   const [sharedWithAll, setSharedWithAll] = useState(true);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [publish, setPublish] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
 
   const { data: clarifications } = useQuery({
@@ -53,7 +54,7 @@ export function ClarificationsPanel({
     mutationFn: (clarificationId: string) =>
       apiFetch(`/projects/${projectId}/clarifications/${clarificationId}/answer`, {
         method: "POST",
-        body: { answer: drafts[clarificationId] || "" },
+        body: { answer: drafts[clarificationId] || "", shared_with_all: publish[clarificationId] ? true : null },
       }),
     onSuccess: (_, clarificationId) => {
       setDrafts((d) => ({ ...d, [clarificationId]: "" }));
@@ -86,26 +87,49 @@ export function ClarificationsPanel({
                   ) : (
                     <span className="font-mono text-[10px] text-steel-light italic">{t("clarifications.sealedBidder")}</span>
                   ))}
+                {c.mine && <span className="font-mono text-[9px] uppercase text-blue">{t("clarifications.yourQuestion")}</span>}
                 {!c.shared_with_all && <span className="font-mono text-[9px] uppercase text-amber-dark">{t("clarifications.privateTag")}</span>}
+                <span className="font-mono text-[10px] text-steel-light">{formatDeadline(c.created_at)}</span>
               </div>
-              <p className="text-[13px] text-navy">{c.question}</p>
+              <p dir="auto" className="text-[13px] text-navy whitespace-pre-wrap break-words">{c.question}</p>
               {c.answer ? (
-                <p className="text-[12.5px] text-steel mt-1.5 pl-3 border-s-2 border-blue">{c.answer}</p>
+                <div className="mt-1.5 ps-3 border-s-2 border-blue">
+                  <p dir="auto" className="text-[12.5px] text-steel whitespace-pre-wrap break-words">{c.answer}</p>
+                  <p className="font-mono text-[10px] text-steel-light mt-0.5">
+                    {t("clarifications.answeredOn").replace("{date}", c.answered_at ? formatDeadline(c.answered_at) : "")}
+                    {c.answered_by_name && ` · ${c.answered_by_name}`}
+                  </p>
+                  {/* Stage 4.7: an answer that changed the requirement points at the change itself. */}
+                  {c.amendment_number && (
+                    <p className="text-[11.5px] text-amber-dark mt-0.5" data-testid="clarification-amendment">
+                      {t("clarifications.cameWithChange").replace("{n}", String(c.amendment_number))}
+                    </p>
+                  )}
+                </div>
               ) : role === "owner" && !qaOpen ? (
                 <p className="text-[12px] text-steel-light mt-1 italic">{t("clarifications.unansweredClosed")}</p>
               ) : role === "owner" ? (
-                <div className="mt-2 flex items-center gap-2">
-                  <input
+                <div className="mt-2 grid gap-1.5">
+                  <textarea
                     value={drafts[c.id] || ""}
                     onChange={(e) => setDrafts((d) => ({ ...d, [c.id]: e.target.value }))}
                     placeholder={t("clarifications.writeAnswerPlaceholder")}
-                    className="flex-1 border border-border rounded px-2.5 py-1.5 text-xs"
+                    rows={2}
+                    maxLength={4000}
+                    className="border border-border rounded px-2.5 py-1.5 text-xs"
                   />
+                  {!c.shared_with_all && (
+                    <label className="flex items-center gap-1.5 text-[11.5px] text-steel">
+                      <input type="checkbox" checked={!!publish[c.id]} onChange={(e) => setPublish((p) => ({ ...p, [c.id]: e.target.checked }))} />
+                      {t("clarifications.publishForAll")}
+                    </label>
+                  )}
+                  <p className="text-[11px] text-steel-light">{t("clarifications.materialHint")}</p>
                   <button
                     type="button"
                     onClick={() => answerMutation.mutate(c.id)}
                     disabled={answerMutation.isPending || !drafts[c.id]?.trim()}
-                    className="bg-navy hover:bg-navy-deep disabled:opacity-40 text-white text-xs font-semibold rounded px-3 py-1.5"
+                    className="w-fit bg-navy hover:bg-navy-deep disabled:opacity-40 text-white text-xs font-semibold rounded px-3 py-1.5"
                   >
                     {t("clarifications.answerButton")}
                   </button>
@@ -124,6 +148,7 @@ export function ClarificationsPanel({
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             rows={2}
+            maxLength={2000}
             placeholder={t("clarifications.askPlaceholder")}
             className="w-full border border-border rounded px-3 py-2 text-sm resize-y mb-2"
           />
