@@ -73,6 +73,8 @@ export function OfferForm({
     queryKey: ["my-offer-documents", project.id],
     queryFn: () => apiFetch<OfferDocument[]>(`/projects/${project.id}/offers/documents`),
     enabled: !preview,
+    // Stage 5.6: links last an hour; fetch fresh ones before they lapse.
+    refetchInterval: 20 * 60 * 1000,
   });
   const uploadMutation = useMutation({
     mutationFn: ({ label, file }: { label: string; file: File }) => {

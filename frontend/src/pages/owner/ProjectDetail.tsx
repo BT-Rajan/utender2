@@ -312,6 +312,7 @@ export function OwnerProjectDetailPage() {
     queryKey: ["owner-offers", id],
     queryFn: () => apiFetch<Offer[]>(`/owner/projects/${id}/offers`),
     enabled: !!id,
+    refetchInterval: 20 * 60 * 1000, // Stage 5.6: offer document links last an hour
   });
 
   const { data: existingReview } = useQuery({

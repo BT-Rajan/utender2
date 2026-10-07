@@ -114,8 +114,10 @@ class OfferRevision(Base):
 # Stage 3.8: a file a provider submits with their response (method statement,
 # programme, data sheets...), against one of the documents the requirement
 # asks for (label). Keyed like the offer itself -- one requirement, one
-# provider -- so it can be attached before the offer is first submitted.
-# Re-uploading the same label replaces it until bidding closes.
+# provider. Re-uploading the same label replaces it until bidding closes.
+# Stage 5.6: it belongs to the side's offer (offer_id: the draft Participate
+# started, or the offer it became), and records the requirement version it
+# was supplied against and who supplied it.
 class OfferDocument(Base):
     __tablename__ = "offer_documents"
     __table_args__ = (
@@ -134,6 +136,9 @@ class OfferDocument(Base):
     organization_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    offer_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("offers.id", ondelete="CASCADE"), nullable=True, index=True)
+    material_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    uploaded_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     label: Mapped[str] = mapped_column(String(120), nullable=False)
     file_path: Mapped[str] = mapped_column(String(500), nullable=False)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)

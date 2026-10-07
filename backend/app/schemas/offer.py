@@ -65,6 +65,8 @@ class OfferDocumentOut(BaseModel):
     file_name: str
     uploaded_at: datetime
     url: str | None = None
+    # Stage 5.6: the requirement version it was supplied against.
+    material_revision: int = 0
 
 
 class OfferOut(BaseModel):

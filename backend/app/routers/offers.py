@@ -152,6 +152,26 @@ def my_offer_documents(project_id: str, user: User = Depends(require_approved_se
     return documents_out(db, project_id, org_of(db, user.id), acting_id(db, user))
 
 
+def _offer_for_documents(db: Session, user: User, project: Project) -> Offer:
+    """Stage 5.6: the side's offer the documents belong to -- its draft, or
+    the offer it became. Attaching a document is preparing an offer, so with
+    none yet (an older page) the draft is started here, as Participate does;
+    the caller has already checked everything Participate checks. A draft
+    started before a material change takes no new document until the
+    current requirement has been reviewed."""
+    from app.routers.projects import ensure_draft, record_decision
+
+    offer = db.query(Offer).filter(Offer.project_id == project.id, mine(db, user, Offer, Offer.service_provider_id)).first()
+    if offer is None:
+        record_decision(db, user, project)
+        ensure_draft(db, user, project)
+        db.flush()
+        offer = db.query(Offer).filter(Offer.project_id == project.id, mine(db, user, Offer, Offer.service_provider_id)).first()
+    elif offer.status == OfferStatus.draft and offer.based_on_material_revision < project.material_revision:
+        raise HTTPException(status_code=409, detail="The requirement changed after you started this offer. Review the current requirement first.")
+    return offer
+
+
 @router.post("/documents", response_model=list[OfferDocumentOut])
 async def upload_offer_document(
     project_id: str,
@@ -171,6 +191,7 @@ async def upload_offer_document(
     content = await file.read()
     if not content:
         raise HTTPException(status_code=400, detail="No file provided.")
+    offer = _offer_for_documents(db, user, project)
 
     storage = get_storage()
     path = f"{project_id}/{user.id}/{int(datetime.utcnow().timestamp() * 1000)}-{sanitize_path_segment(file.filename)}"
@@ -184,9 +205,22 @@ async def upload_offer_document(
     if existing:
         existing.file_path, existing.file_name = path, safe_relative_name(file.filename)
         existing.uploaded_at = datetime.utcnow()
+        existing.offer_id, existing.material_revision, existing.uploaded_by = offer.id, project.material_revision, user.id
     else:
-        db.add(OfferDocument(project_id=project_id, service_provider_id=acting_id(db, user), organization_id=org_of(db, user.id), label=label, file_path=path, file_name=safe_relative_name(file.filename)))
-    db.commit()
+        db.add(OfferDocument(
+            project_id=project_id, service_provider_id=acting_id(db, user), organization_id=org_of(db, user.id), label=label,
+            file_path=path, file_name=safe_relative_name(file.filename),
+            offer_id=offer.id, material_revision=project.material_revision, uploaded_by=user.id,
+        ))
+    try:
+        db.commit()
+    except Exception:  # never leave a stored file no record points to
+        db.rollback()
+        try:
+            storage.delete(OFFER_DOCUMENTS_BUCKET, [path])
+        except Exception:
+            pass
+        raise
     if replaced:
         try:
             storage.delete(OFFER_DOCUMENTS_BUCKET, [replaced])
@@ -197,14 +231,17 @@ async def upload_offer_document(
 
 @router.delete("/documents/{document_id}", response_model=list[OfferDocumentOut])
 def remove_offer_document(
-    project_id: str, document_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)
+    project_id: str, document_id: str, user: User = Depends(require_marketplace_active_service_provider), db: Session = Depends(get_db)
 ):
+    # Stage 5.6: the same gates as attaching one -- a change to the offer.
     project = lock_project(db, project_id)
     doc = db.get(OfferDocument, document_id)
     if not project or not doc or doc.project_id != project_id or not can_access(db, user, doc.organization_id, doc.service_provider_id):
         raise HTTPException(status_code=404, detail="Document not found.")
     if not bidding_is_open(project):
         raise HTTPException(status_code=400, detail="Bidding on this project has closed.")
+    assert_eligible(db, project, acting_profile(db, user))
+    _offer_for_documents(db, user, project)
     path = doc.file_path
     db.delete(doc)
     db.commit()

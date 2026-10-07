@@ -256,4 +256,15 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - Earlier commitments stay in the offer's revision history.
   - Saving has the same checks as 5.3/5.4 (own side's draft only, up-to-date page, open requirement, amended timing reviewed first). The owner's timing can't be changed through the offer API.
 
-_Further steps (5.6 onwards) are added as they are implemented._
+- **5.6 Supporting documents:**
+  - The provider attaches only the documents the requirement asks for (Stage 3.8 document list, set by the owner). There's no universal list.
+  - Uses the existing private file store: allowed file types only (no zip), empty files refused, and the platform's request-size cap. Files are stored under a server-made key, never under the uploaded name.
+  - Each document belongs to the provider's offer (the draft, or the offer it became), the requirement, the provider or organisation, the user who supplied it, and the requirement version it was supplied against.
+  - Attaching starts the draft if the provider has none yet. Nothing is submitted, and the price, technical response and timing stay as they are.
+  - Upload, view, replace (same document name) and remove while the requirement is open. Removing has the same checks as uploading: an active account, eligibility, and the provider's own side only.
+  - Links last an hour, are issued fresh on every authorised read, and carry the real file name signed in. Pages refresh them automatically. Other providers can't list or open them, and neither can the owner until the offer is submitted (and unsealed).
+  - Owner requirement documents and provider offer documents stay separate.
+  - After an owner document change (material amendment): the provider sees the current document, the earlier version stays on record, the provider's earlier documents keep their version, and new ones wait until the change has been reviewed.
+  - Suspended, closed, expired or cancelled requirements: documents are kept and still viewable, but can't be changed.
+
+_Further steps (5.7 onwards) are added as they are implemented._

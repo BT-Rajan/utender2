@@ -13,11 +13,10 @@ from app.models.offer import OfferDocument
 from app.models.project import Project
 from app.schemas.offer import OfferCreate, OfferDocumentOut
 from app.schemas.project import ResponseRequirements
-from app.services.storage import get_storage
+from app.services.storage import DOCUMENT_LINK_SECONDS, get_storage
 
 OFFER_DOCUMENTS_BUCKET = "offer-documents"
 _FILS = Decimal("0.001")
-_LINK_SECONDS = 60 * 60 * 24
 
 
 def requirements_for(project: Project) -> ResponseRequirements:
@@ -180,7 +179,10 @@ def documents_out(db: Session, project_id: str, organization_id: str | None, pro
             label=d.label,
             file_name=d.file_name,
             uploaded_at=d.uploaded_at,
-            url=storage.signed_url(OFFER_DOCUMENTS_BUCKET, d.file_path, _LINK_SECONDS),
+            # Stage 5.6: like requirement documents (Stage 4.6) -- an hour,
+            # re-issued on every authorized read, the real name signed in.
+            url=storage.signed_url(OFFER_DOCUMENTS_BUCKET, d.file_path, DOCUMENT_LINK_SECONDS, d.file_name),
+            material_revision=d.material_revision,
         )
         for d in rows
     ]
