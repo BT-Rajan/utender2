@@ -409,6 +409,21 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - Ids from another requirement, another owner or another provider find nothing. Removing a member takes away their access on their very next request.
   - Offer documents are reached only through short-lived signed links (Stage 4.6), issued only to someone who may read the offer. A forged or re-pointed link is refused.
   - **Withdrawn offers:** the owner sees who withdrew and when, never the content (price, items, response, timing, assumptions, documents or history). This also means a sealed offer withdrawn before the deadline isn't opened at the deadline. The provider keeps their own in full.
-  - **By design:** a signed document link works for whoever holds it until it expires, at most an hour. A link issued to someone who has since left the organisation therefore works until then. Admins see all offers for oversight.
+  - **Offer document links are checked on every click** (follow-up). Offer lists no longer contain signed links. Each document points to a download route: `/owner/projects/{id}/offers/{offer}/documents/file` for the owner, and `/projects/{id}/offers/mine/documents/file` or `/projects/{id}/offers/documents/{doc}/file` for the provider.
+    - Each click checks access again on the server: membership as it is now, the offer not withdrawn or suspended, the seal lifted.
+    - Only then does it redirect to a signed link that lasts one minute, using the same signed-link mechanism.
+    - Files are found by label and version within the caller's own offer, never by a path from the request.
+    - A link kept by someone who has since lost access no longer opens.
+  - **By design:** admins see all offers for oversight. On a sealed tender, the owner choosing to close bidding early opens the offers (the page says so). Cancelling or ending it early does not.
+
+- **6.3 Offer completeness & status:**
+  - Offer statuses are the existing ones: draft (never shown to the owner), submitted (shown as "received"), withdrawn, awarded and not selected.
+  - One offer per provider side: a revision updates it (version N). Earlier versions are kept in its history.
+  - An offer reaches the owner only after passing the Stage 5 submission gate. That gate checks completeness against the requirement's own response rules (frozen once published) and the provider's eligibility.
+  - Each offer keeps the requirement version it answered. An amendment flags it as made on the earlier version until its provider confirms or revises it.
+  - A withdrawn offer is listed as withdrawn, can't be awarded, and its history is kept.
+  - The inbox shows how many offers were received, how many are active, withdrawn and revised, counted from the server's list.
+  - The owner's dashboard, the requirement page and providers' cards count the same offers as the inbox: an admin-suspended offer is left out of all of them.
+  - The inbox and requirement state refresh every minute and when the owner returns to the page. A refused action (for example, approving an offer that has just been withdrawn) reloads both, so the page never acts on stale data.
 
 _Later Stage 6 steps are added as they are implemented._

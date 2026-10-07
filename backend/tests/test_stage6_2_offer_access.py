@@ -4,14 +4,20 @@ unrelated owners and anonymous callers get nothing, whatever ids they put in;
 a withdrawn offer's content stays the provider's; admin oversight is as
 before; losing membership loses access at once."""
 from datetime import datetime, timedelta
+from urllib.parse import parse_qs, urlparse
 
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.models.offer import Offer
 from app.models.project import Project
 from tests.test_organization_sharing import _organization
 from tests.test_stage4_9_participation import _admin
 from tests.test_stage5_12_confidentiality import MARKERS, _ids, _parties, _submit, _sweep, _tender
+
+
+def _local(url):
+    return "/" + url.split("://", 1)[-1].split("/", 1)[-1]
 
 
 def _secret(sp, pid):
@@ -78,6 +84,8 @@ def test_a_withdrawn_offer_is_never_opened(db):
         assert not any(m in str(listed) for m in MARKERS if m != "alphasecret"), pid  # who withdrew is shown
         assert "11111" in str(listed)  # the live offer is there in full
         assert owner.get(f"/owner/projects/{pid}/offers/{withdrawn[0]['id']}/history").status_code == 404
+    # A link to its document from before the withdrawal no longer opens for the owner.
+    assert owner.get(f"/owner/projects/{visible}/offers/{withdrawn[0]['id']}/documents/file", params={"label": "Method statement"}).status_code == 404
     # The provider keeps their own withdrawn offer in full.
     assert a.get(f"/projects/{sealed}/offers/mine").json()["message"] == "SECRET-METHOD-A7"
 
@@ -87,10 +95,38 @@ def test_a_removed_member_loses_access_to_offers_at_once(db):
     _, a, *_ = _parties(db)
     pid = _tender(fahad, sealed=False)
     _secret(a, pid)
-    offer_id = noura.get(f"/owner/projects/{pid}/offers").json()[0]["id"]
+    listed = noura.get(f"/owner/projects/{pid}/offers").json()[0]
+    offer_id, doc_url = listed["id"], _local(listed["documents"][0]["url"])
     assert noura.get(f"/owner/projects/{pid}/offers/{offer_id}/history").status_code == 200
+    assert noura.get(doc_url).content == b"%PDF-A7"
     assert fahad.delete(f"/account/organization/members/{noura_id}").status_code == 200
     # The same session, the very next request.
     assert noura.get(f"/owner/projects/{pid}/offers").status_code == 404
     assert noura.get(f"/owner/projects/{pid}/offers/{offer_id}/history").status_code == 404
+    # A document link she was given earlier no longer opens: every click is authorised afresh.
+    assert noura.get(doc_url, follow_redirects=False).status_code == 404
+    assert fahad.get(doc_url).content == b"%PDF-A7"
     assert len(fahad.get(f"/owner/projects/{pid}/offers").json()) == 1
+
+
+def test_a_document_link_is_authorised_on_every_click_and_lasts_a_minute(db):
+    owner, a, b, *_ = _parties(db)
+    pid = _tender(owner, sealed=True)
+    _secret(a, pid)
+    offer_id = db.query(Offer).filter(Offer.project_id == pid).one().id
+    route = f"/owner/projects/{pid}/offers/{offer_id}/documents/file"
+    # Sealed and open: even the owner's route opens nothing.
+    assert owner.get(route, params={"label": "Method statement"}, follow_redirects=False).status_code == 404
+    db.get(Project, pid).bid_deadline = datetime.utcnow() - timedelta(seconds=1)
+    db.commit()
+    r = owner.get(route, params={"label": "Method statement"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["cache-control"] == "no-store"
+    expires = int(parse_qs(urlparse(r.headers["location"]).query)["exp"][0])
+    assert expires - datetime.utcnow().timestamp() <= 65
+    assert owner.get(_local(r.headers["location"])).content == b"%PDF-A7"
+    # A label that isn't there, or an earlier version that doesn't exist: not found; nothing is read from a path.
+    assert owner.get(route, params={"label": "../../etc/passwd"}, follow_redirects=False).status_code == 404
+    assert owner.get(route, params={"label": "Method statement", "revision": 9}, follow_redirects=False).status_code == 404
+    # Another provider gets nowhere with it.
+    assert b.get(route, params={"label": "Method statement"}).status_code == 403
+    assert b.get(f"/projects/{pid}/offers/mine/documents/file", params={"label": "Method statement"}).status_code == 404

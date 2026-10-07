@@ -219,7 +219,7 @@ def _cards(db: Session, page: list[Project], profile, my_offers: dict, full_acce
     """The opportunity summary (Stage 4.3) for a list of requirements -- the
     feed's and the saved list's one representation."""
     ids = [p.id for p in page]
-    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(Offer.project_id.in_(ids), tendered()).group_by(Offer.project_id).all()) if ids else {}
+    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(Offer.project_id.in_(ids), tendered(), Offer.is_suspended.is_(False)).group_by(Offer.project_id).all()) if ids else {}
     item_counts = dict(db.query(ProjectItem.project_id, func.count(ProjectItem.id)).filter(ProjectItem.project_id.in_(ids)).group_by(ProjectItem.project_id).all()) if ids else {}
     document_counts = dict(
         db.query(ProjectDrawing.project_id, func.count(ProjectDrawing.id))

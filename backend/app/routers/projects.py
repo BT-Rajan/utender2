@@ -1158,7 +1158,8 @@ def drawing_history(project_id: str, user: User = Depends(get_current_user), db:
 
 
 def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
-    offer_count = db.query(Offer).filter(Offer.project_id == project.id, tendered()).count()
+    # Stage 6.3: an admin-suspended offer is out of sight, and out of the count.
+    offer_count = db.query(Offer).filter(Offer.project_id == project.id, tendered(), Offer.is_suspended.is_(False)).count()
     storage = get_storage()
     expiry = drawing_url_expiry_seconds(project.bid_deadline)
     # Current revisions only — superseded ones are never lost, just not

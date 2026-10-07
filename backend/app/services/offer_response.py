@@ -5,15 +5,19 @@ system; this only decides whether a submission is complete."""
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
+from urllib.parse import urlencode
+
 from fastapi import HTTPException
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.models.enums import PricingBasis
-from app.models.offer import OfferDocument
+from app.config import get_settings
+from app.models.offer import OfferDocument, OfferRevision
 from app.models.project import Project
 from app.schemas.offer import OfferCreate, OfferDocumentOut
 from app.schemas.project import ResponseRequirements
-from app.services.storage import DOCUMENT_LINK_SECONDS, get_storage
+from app.services.storage import get_storage
 
 OFFER_DOCUMENTS_BUCKET = "offer-documents"
 _FILS = Decimal("0.001")
@@ -252,8 +256,51 @@ def readiness(db: Session, project: Project, profile, offer) -> list:
     return issues
 
 
+# Stage 6.2: an offer document is never handed out as a long-lived link.
+# Lists carry the address of an authorised download route instead; each click
+# re-checks, on the server and as things stand then, that the caller may read
+# that offer (a member who has left, a provider who withdrew, a tender still
+# sealed: refused), and only then redirects to a signed link that lasts a
+# minute -- the same signed-link mechanism (Stage 4.6), just not a bearer
+# token that outlives the access it was issued for.
+OPEN_LINK_SECONDS = 60
+
+
+def _api(path: str, **params) -> str:
+    query = urlencode({k: v for k, v in params.items() if v is not None})
+    return f"{get_settings().api_url}{path}" + (f"?{query}" if query else "")
+
+
+def offer_file_link(viewer: str, project_id: str, offer_id: str, label: str, revision: int | None = None) -> str:
+    """The download route for one of an offer's submitted documents (or an
+    earlier version's): the owner's, or the provider's own."""
+    path = f"/owner/projects/{project_id}/offers/{offer_id}/documents/file" if viewer == "owner" else f"/projects/{project_id}/offers/mine/documents/file"
+    return _api(path, label=label, revision=revision)
+
+
+def offer_file(db: Session, offer, label: str, revision: int | None = None) -> tuple[str, str] | None:
+    """(storage path, file name) of the document under `label` in the offer's
+    submitted version, or in its earlier `revision` -- never a path from the request."""
+    if revision is not None:
+        r = db.query(OfferRevision).filter(OfferRevision.offer_id == offer.id, OfferRevision.revision_number == revision).first()
+        docs = (r.documents or []) if r else []
+    elif offer.submitted_documents is not None:
+        docs = offer.submitted_documents
+    else:  # submitted before these were recorded: its current documents
+        d = _side_documents(db, offer.project_id, offer.organization_id, offer.service_provider_id).filter(OfferDocument.label == label).first()
+        return (d.file_path, d.file_name) if d else None
+    d = next((d for d in docs if d.get("label") == label and d.get("file_path")), None)
+    return (d["file_path"], d["file_name"]) if d else None
+
+
+def open_file(file_path: str, file_name: str) -> RedirectResponse:
+    """Sends an authorised caller on to a one-minute signed link."""
+    url = get_storage().signed_url(OFFER_DOCUMENTS_BUCKET, file_path, OPEN_LINK_SECONDS, file_name)
+    return RedirectResponse(url, status_code=303, headers={"Cache-Control": "no-store"})
+
+
 def documents_out(db: Session, project_id: str, organization_id: str | None, provider_id: str) -> list[OfferDocumentOut]:
-    storage = get_storage()
+    """The side's current attachments, for the side itself."""
     rows = _side_documents(db, project_id, organization_id, provider_id).order_by(OfferDocument.label.asc()).all()
     return [
         OfferDocumentOut(
@@ -261,9 +308,7 @@ def documents_out(db: Session, project_id: str, organization_id: str | None, pro
             label=d.label,
             file_name=d.file_name,
             uploaded_at=d.uploaded_at,
-            # Stage 5.6: like requirement documents (Stage 4.6) -- an hour,
-            # re-issued on every authorized read, the real name signed in.
-            url=storage.signed_url(OFFER_DOCUMENTS_BUCKET, d.file_path, DOCUMENT_LINK_SECONDS, d.file_name),
+            url=_api(f"/projects/{project_id}/offers/documents/{d.id}/file"),
             material_revision=d.material_revision,
         )
         for d in rows
@@ -272,36 +317,34 @@ def documents_out(db: Session, project_id: str, organization_id: str | None, pro
 
 def submitted_documents_out(db: Session, offer) -> list[OfferDocumentOut]:
     """Stage 5.13: the documents that went with the offer's current
-    submitted version -- what the owner receives -- with fresh short-lived
-    links (Stage 4.6). An offer submitted before these were recorded falls
-    back to its current documents."""
+    submitted version -- what the owner receives. An offer submitted before
+    these were recorded falls back to its current documents."""
     if offer.submitted_documents is None:
-        return documents_out(db, offer.project_id, offer.organization_id, offer.service_provider_id)
-    storage = get_storage()
+        rows = _side_documents(db, offer.project_id, offer.organization_id, offer.service_provider_id).order_by(OfferDocument.label.asc()).all()
+        docs = [(d.label, d.file_name, d.uploaded_at, d.material_revision) for d in rows]
+    else:
+        docs = [(d["label"], d["file_name"], offer.updated_at, offer.based_on_material_revision) for d in offer.submitted_documents]
     return [
         OfferDocumentOut(
-            id=f"{offer.id}:{d['label']}", label=d["label"], file_name=d["file_name"], uploaded_at=offer.updated_at,
-            url=storage.signed_url(OFFER_DOCUMENTS_BUCKET, d["file_path"], DOCUMENT_LINK_SECONDS, d["file_name"]),
-            material_revision=offer.based_on_material_revision,
+            id=f"{offer.id}:{label}", label=label, file_name=file_name, uploaded_at=uploaded_at,
+            url=offer_file_link("owner", offer.project_id, offer.id, label), material_revision=material_revision,
         )
-        for d in offer.submitted_documents
+        for label, file_name, uploaded_at, material_revision in docs
     ]
 
 
-def history_out(db: Session, revisions) -> list:
-    """Stage 5.13/5.16: an offer's earlier versions, each with short-lived
-    links to the files that went with it (kept on record) -- for whoever may
-    already read that history (the provider's side; the owner once unsealed).
-    Paths are signed into links, never returned."""
+def history_out(db: Session, revisions, viewer: str, project_id: str) -> list:
+    """Stage 5.13/5.16: an offer's earlier versions, each with the files that
+    went with it (kept on record) -- for whoever may already read that
+    history (the provider's side; the owner once unsealed). Paths are never
+    returned; each file opens through the viewer's download route."""
     from app.schemas.offer import OfferRevisionOut
 
-    storage = get_storage()
     out = []
     for r in revisions:
         item = OfferRevisionOut.model_validate(r)
         item.documents = [
-            {"label": d["label"], "file_name": d["file_name"],
-             "url": storage.signed_url(OFFER_DOCUMENTS_BUCKET, d["file_path"], DOCUMENT_LINK_SECONDS, d["file_name"])}
+            {"label": d["label"], "file_name": d["file_name"], "url": offer_file_link(viewer, project_id, r.offer_id, d["label"], r.revision_number)}
             for d in (r.documents or []) if d.get("file_path")
         ]
         out.append(item)

@@ -36,6 +36,26 @@ interface Review {
   created_at: string;
 }
 
+// Stage 6.3: how many offers came in, and where each stands -- counted from
+// the server's list, never kept in the page.
+function InboxCounts({ offers, t }: { offers: Offer[]; t: (key: string) => string }) {
+  const count = (pred: (o: Offer) => boolean) => offers.filter(pred).length;
+  const active = count((o) => o.status === "submitted");
+  const withdrawn = count((o) => o.status === "withdrawn");
+  const revised = count((o) => o.status !== "withdrawn" && o.revision > 1);
+  const parts = [
+    t("owner.projectDetail.inboxReceived").replace("{n}", String(offers.length)),
+    active > 0 && t("owner.projectDetail.inboxActive").replace("{n}", String(active)),
+    withdrawn > 0 && t("owner.projectDetail.withdrawnCount").replace("{n}", String(withdrawn)),
+    revised > 0 && t("owner.projectDetail.inboxRevised").replace("{n}", String(revised)),
+  ].filter(Boolean);
+  return (
+    <p className="font-mono text-[11px] text-steel mb-3" data-testid="inbox-counts">
+      {parts.join(" · ")}
+    </p>
+  );
+}
+
 // Stage 6.1: the server's default page of the owner's offer list.
 const OFFERS_PAGE = 200;
 
@@ -309,13 +329,18 @@ export function OwnerProjectDetailPage() {
     // Stage 4.6: document links last an hour; refresh them -- but never under
     // a draft being edited.
     refetchInterval: (q) => (q.state.data && q.state.data.status !== "draft" ? 20 * 60 * 1000 : false),
+    // Stage 6.3: back on the page, the requirement's state as it is now.
+    refetchOnWindowFocus: (q) => !!q.state.data && q.state.data.status !== "draft",
   });
 
   const { data: offers, isPending: offersLoading, isError: offersError } = useQuery({
     queryKey: ["owner-offers", id],
     queryFn: () => apiFetch<Offer[]>(`/owner/projects/${id}/offers`),
     enabled: !!id,
-    refetchInterval: 20 * 60 * 1000, // Stage 5.6: offer document links last an hour
+    // Stage 6.3: the offers as the server now holds them -- a provider may
+    // submit, revise or withdraw while the owner has the page open.
+    refetchInterval: 60 * 1000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: existingReview } = useQuery({
@@ -334,7 +359,12 @@ export function OwnerProjectDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["owner-offers", id] });
       queryClient.invalidateQueries({ queryKey: ["owner-projects"] });
     },
-    onError: (err) => setError(errorMessage(err, t("owner.projectDetail.approveError"))),
+    onError: (err) => {
+      setError(errorMessage(err, t("owner.projectDetail.approveError")));
+      // Stage 6.3: refused because things changed (e.g. the offer was withdrawn): show them as they are.
+      queryClient.invalidateQueries({ queryKey: ["project", id] });
+      queryClient.invalidateQueries({ queryKey: ["owner-offers", id] });
+    },
   });
 
   const addDrawingsMutation = useMutation({
@@ -716,6 +746,7 @@ export function OwnerProjectDetailPage() {
             </div>
           ) : (
             <>
+              <InboxCounts offers={offers} t={t} />
               <EvaluationSummary offers={offers} t={t} />
               <div className="overflow-x-auto">
               <table className="w-full border-collapse">

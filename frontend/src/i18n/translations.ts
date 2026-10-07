@@ -989,6 +989,9 @@ export interface Dictionary {
       offersLoadError: string;
       offersTruncated: string;
       withdrawnCount: string;
+      inboxReceived: string;
+      inboxActive: string;
+      inboxRevised: string;
       offerReceived: string;
       statusCol: string;
       serviceProviderCol: string;
@@ -2211,6 +2214,9 @@ export const en: Dictionary = {
       offersLoadError: "Could not load the offers. Refresh the page to try again.",
       offersTruncated: "Showing the first {n} offers.",
       withdrawnCount: "{n} withdrawn",
+      inboxReceived: "{n} offer(s) received",
+      inboxActive: "{n} active",
+      inboxRevised: "{n} revised",
       offerReceived: "Received",
       statusCol: "Status",
       serviceProviderCol: "Service provider",
@@ -3438,6 +3444,9 @@ export const ar: Dictionary = {
       offersLoadError: "تعذر تحميل العروض. حدّث الصفحة للمحاولة مجددًا.",
       offersTruncated: "يُعرض أول {n} عرض.",
       withdrawnCount: "{n} مسحوب",
+      inboxReceived: "{n} عرض/عروض مستلمة",
+      inboxActive: "{n} قائم",
+      inboxRevised: "{n} معدّل",
       offerReceived: "مستلم",
       statusCol: "الحالة",
       serviceProviderCol: "مزوّد الخدمة",

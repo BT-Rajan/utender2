@@ -28,7 +28,7 @@ from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allow
 from app.services.notify import notify, notify_team
 from app.services.team import acting_profile, mine, owns
 from app.services.eligibility import qualification_options
-from app.services.offer_response import history_out, submitted_documents_out, timing_conflicts
+from app.services.offer_response import history_out, offer_file, open_file, submitted_documents_out, timing_conflicts
 from app.services.stakeholder import require_established
 from app.services.verification import (
     applicable_requirements,
@@ -85,7 +85,8 @@ def dashboard(user: User = Depends(require_owner), db: Session = Depends(get_db)
     )
     out = []
     for p in projects:
-        offer_count = db.query(Offer).filter(Offer.project_id == p.id, tendered()).count()
+        # Stage 6.3: the offers the owner's inbox lists (an admin-suspended one is withheld from it).
+        offer_count = db.query(Offer).filter(Offer.project_id == p.id, tendered(), Offer.is_suspended.is_(False)).count()
         out.append(ProjectOut(**_project_fields(p), offer_count=offer_count))
     return out
 
@@ -199,8 +200,8 @@ def list_offers(
     ]
 
 
-@router.get("/projects/{project_id}/offers/{offer_id}/history", response_model=list[OfferRevisionOut])
-def offer_history(project_id: str, offer_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+def _readable_offer(project_id: str, offer_id: str, user: User, db: Session) -> Offer:
+    """An offer on the owner's requirement whose content the owner may read now."""
     project = _get_owned_project(project_id, user, db)
     if is_sealed_and_open(project):
         # Same rule as the list itself — a per-bid revision trail is just
@@ -210,12 +211,29 @@ def offer_history(project_id: str, offer_id: str, user: User = Depends(require_o
 
     offer = db.get(Offer, offer_id)
     # Stage 6.1: an admin-suspended offer is withheld from the owner (see
-    # list_offers) -- its id doesn't open its history either.
-    # Stage 6.2: nor does a withdrawn offer's (its content stays the provider's).
+    # list_offers) -- its id doesn't open it either.
+    # Stage 6.2: nor does a withdrawn offer (its content stays the provider's).
     if not offer or offer.project_id != project_id or offer.status in (OfferStatus.draft, OfferStatus.withdrawn) or offer.is_suspended:
         raise HTTPException(status_code=404, detail="Offer not found.")
+    return offer
 
-    return history_out(db, db.query(OfferRevision).filter(OfferRevision.offer_id == offer_id).order_by(OfferRevision.revision_number.asc()))
+
+@router.get("/projects/{project_id}/offers/{offer_id}/history", response_model=list[OfferRevisionOut])
+def offer_history(project_id: str, offer_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    _readable_offer(project_id, offer_id, user, db)
+    return history_out(db, db.query(OfferRevision).filter(OfferRevision.offer_id == offer_id).order_by(OfferRevision.revision_number.asc()), "owner", project_id)
+
+
+@router.get("/projects/{project_id}/offers/{offer_id}/documents/file")
+def open_offer_document(
+    project_id: str, offer_id: str, label: str, revision: int | None = None, user: User = Depends(require_owner), db: Session = Depends(get_db)
+):
+    """Stage 6.2: opens one of the offer's documents (as submitted, or as in
+    an earlier version) -- authorised again on every click, then a one-minute link."""
+    found = offer_file(db, _readable_offer(project_id, offer_id, user, db), label, revision)
+    if not found:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    return open_file(*found)
 
 
 @router.post("/projects/{project_id}/offers/{offer_id}/approve", response_model=ProjectOut)

@@ -21,6 +21,13 @@ def _get(client, url):
     return client.get("/" + url.split("://", 1)[-1].split("/", 1)[-1])
 
 
+def _signed(client, url):
+    """Stage 6.2: the one-minute signed link an authorised click is sent on to."""
+    r = client.get("/" + url.split("://", 1)[-1].split("/", 1)[-1], follow_redirects=False)
+    assert r.status_code == 303, r.text
+    return r.headers["location"]
+
+
 def _asking(owner, title="Rewiring with documents"):
     pid = owner.post("/projects", data={"title": title, "address": "Kaifan", "description": "Rewire a villa.", "bid_deadline": _when(10)},
                      files=[("drawings", ("plan.pdf", b"%PDF-owner", "application/pdf"))]).json()["id"]
@@ -51,9 +58,9 @@ def test_attach_view_replace_remove_on_the_draft(db):
     assert (mine["status"], Decimal(mine["amount"]), mine["message"], [d["label"] for d in mine["documents"]]) == ("draft", Decimal("900"), "Method.", ["Method statement"])
     assert owner.get(f"/owner/projects/{pid}/offers").json() == []
     # Leave and return: still there, and openable under its real name, from a fresh, short-lived link.
-    url = sp.get(DOCS.format(pid)).json()[0]["url"]
+    url = _signed(sp, sp.get(DOCS.format(pid)).json()[0]["url"])
     query = parse_qs(urlparse(url).query)
-    assert query["name"] == ["method.pdf"] and int(query["exp"][0]) - datetime.utcnow().timestamp() <= 3600 + 5
+    assert query["name"] == ["method.pdf"] and int(query["exp"][0]) - datetime.utcnow().timestamp() <= 60 + 5
     got = _get(sp, url)
     assert got.status_code == 200 and got.content == b"%PDF-method" and "method.pdf" in got.headers["content-disposition"]
     # The name is signed in: a re-labelled link is refused.
@@ -97,7 +104,11 @@ def test_requirement_and_offer_documents_stay_separate_and_private(db):
     added = db.query(OfferDocument).filter(OfferDocument.label == "Product data").one()
     assert added.organization_id is None and added.offer_id == noor_doc.offer_id
     # A forged link to another side's file: refused.
-    forged = sp.get(DOCS.format(pid)).json()[0]["url"].replace(noor_doc.file_path, rival.get(DOCS.format(pid)).json()[0]["url"].split("/files/offer-documents/")[1].split("?")[0])
+    rival_path = _signed(rival, rival.get(DOCS.format(pid)).json()[0]["url"]).split("/files/offer-documents/")[1].split("?")[0]
+    forged = _signed(sp, sp.get(DOCS.format(pid)).json()[0]["url"]).replace(noor_doc.file_path, rival_path)
+    # Nor does another side's document id open through one's own route.
+    rival_doc = db.query(OfferDocument).filter(OfferDocument.organization_id.isnot(None)).one()
+    assert sp.get(f"{DOCS.format(pid)}/{rival_doc.id}/file", follow_redirects=False).status_code == 404
     assert _get(sp, forged).status_code == 403
     # A draft's documents aren't the owner's to see; once submitted (owner-visible), they are.
     assert owner.get(f"/owner/projects/{pid}/offers").json() == []

@@ -104,10 +104,13 @@ def test_no_route_gives_another_party_any_part_of_a_submitted_offer(db):
     # 8. An unrelated owner gets nothing of these offers.
     assert stranger_owner.get(f"/owner/projects/{pid}/offers").status_code == 404
     # 5. A's document: no signed link is ever issued to B, and a forged or re-pointed one is refused.
-    a_url = mine["documents"][0]["url"]
-    path = "/" + a_url.split("://", 1)[-1].split("/", 1)[-1]
-    b_url = b.get(f"/projects/{pid}/offers/documents").json()[0]["url"]
-    b_path = "/" + b_url.split("://", 1)[-1].split("/", 1)[-1]
+    local = lambda url: "/" + url.split("://", 1)[-1].split("/", 1)[-1]  # noqa: E731
+    path = local(mine["documents"][0]["url"])
+    # Stage 6.2: a document link is an authorised route; B's own sends B on to a one-minute signed link.
+    b_path = local(b.get(local(b.get(f"/projects/{pid}/offers/documents").json()[0]["url"]), follow_redirects=False).headers["location"])
+    # A's document id through B's route, or the owner's route: not found.
+    assert b.get(path, follow_redirects=False).status_code == 404
+    assert b.get(f"/owner/projects/{pid}/offers/{a_offer.id}/documents/file", params={"label": "Method statement"}).status_code == 403
     b_key = b_path.split("/files/offer-documents/")[1].split("?")[0]
     forged = b_path.replace(b_key, doc.file_path)  # B's own valid signature, pointed at A's file
     assert b.get(forged).status_code == 403 and "%PDF-A7" not in b.get(forged).text

@@ -19,7 +19,7 @@ from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowe
 from app.services.notify import notify, notify_team
 from app.services.team import acting_id, acting_profile, can_access, mine, org_of
 from app.services.offer_response import (
-    AMOUNT_LIMIT, OFFER_DOCUMENTS_BUCKET, _side_documents, check_commitment, history_out, check_complete, documents_out, draft_pricing, priced_total, readiness, requirements_for,
+    AMOUNT_LIMIT, OFFER_DOCUMENTS_BUCKET, _side_documents, offer_file, open_file, check_commitment, history_out, check_complete, documents_out, draft_pricing, priced_total, readiness, requirements_for,
     timing_conflicts,
 )
 from app.services.storage import get_storage
@@ -400,7 +400,30 @@ def my_offer_history(project_id: str, user: User = Depends(require_approved_serv
     offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
     if not offer:
         return []
-    return history_out(db, db.query(OfferRevision).filter(OfferRevision.offer_id == offer.id).order_by(OfferRevision.revision_number.asc()))
+    return history_out(db, db.query(OfferRevision).filter(OfferRevision.offer_id == offer.id).order_by(OfferRevision.revision_number.asc()), "provider", project_id)
+
+
+@router.get("/mine/documents/file")
+def open_my_offer_document(
+    project_id: str, label: str, revision: int | None = None, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)
+):
+    """Stage 6.2: opens a document of the side's own offer as submitted (or
+    as in an earlier version) -- authorised on every click, then a one-minute link."""
+    offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
+    found = offer_file(db, offer, label, revision) if offer else None
+    if not found:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    return open_file(*found)
+
+
+@router.get("/documents/{document_id}/file")
+def open_my_document(project_id: str, document_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """Stage 6.2: opens one of the side's current attachments -- found among
+    the caller's own side's documents only, authorised on every click."""
+    d = _side_documents(db, project_id, org_of(db, user.id), acting_id(db, user)).filter(OfferDocument.id == document_id).first()
+    if not d:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    return open_file(d.file_path, d.file_name)
 
 
 def _snapshot_revision(db: Session, offer: Offer) -> None:

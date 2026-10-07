@@ -59,7 +59,7 @@ def test_preview_is_the_stored_offer_and_follows_every_save(db):
     assert (offer["message"], offer["proposed_start_date"], offer["proposed_duration_days"], offer["assumptions"], offer["declarations_accepted"]) == (
         "Isolate, swap, test.", _d(22), 30, "Excludes civil works.", [DECL])
     assert [(d["label"], d["file_name"]) for d in offer["documents"]] == [("Method statement", "method.pdf")]
-    assert "/offer-documents/" in offer["documents"][0]["url"] and "file_path" not in offer["documents"][0]
+    assert offer["documents"][0]["url"].endswith("/file") and "file_path" not in offer["documents"][0]  # Stage 6.2: an authorised route, never a path
     assert p["readiness"] == {"ready": True, "issues": []}
     # Back to edit, change, preview again: the latest saved values, nothing stale.
     sp.put(D.format(pid) + "commercial", json={"item_prices": [{"item_id": a.id, "rate": "3900"}, {"item_id": b.id, "rate": "750.5"}]})
