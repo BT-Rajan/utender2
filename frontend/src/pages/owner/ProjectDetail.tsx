@@ -49,10 +49,20 @@ function InboxCounts({ offers, t }: { offers: Offer[]; t: (key: string) => strin
     withdrawn > 0 && t("owner.projectDetail.withdrawnCount").replace("{n}", String(withdrawn)),
     revised > 0 && t("owner.projectDetail.inboxRevised").replace("{n}", String(revised)),
   ].filter(Boolean);
+  // Stage 6.5: live offers made against different versions of the requirement
+  // don't answer the same thing -- said plainly before any figures across them.
+  const versions = [...new Set(offers.filter((o) => o.status !== "withdrawn").map((o) => o.based_on_material_revision ?? 0))].sort((a, b) => a - b);
   return (
-    <p className="font-mono text-[11px] text-steel mb-3" data-testid="inbox-counts">
-      {parts.join(" · ")}
-    </p>
+    <>
+      <p className="font-mono text-[11px] text-steel mb-3" data-testid="inbox-counts">
+        {parts.join(" · ")}
+      </p>
+      {versions.length > 1 && (
+        <p className="text-xs text-amber-dark mb-3" data-testid="inbox-mixed-versions">
+          ⚠ {t("owner.projectDetail.mixedVersions").replace("{versions}", versions.map((v) => t("versions.version").replace("{n}", String(v))).join(", "))}
+        </p>
+      )}
+    </>
   );
 }
 

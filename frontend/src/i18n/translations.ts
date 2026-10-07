@@ -1004,6 +1004,7 @@ export interface Dictionary {
       inboxReceived: string;
       inboxActive: string;
       inboxRevised: string;
+      mixedVersions: string;
       offerReceived: string;
       statusCol: string;
       serviceProviderCol: string;
@@ -2241,6 +2242,7 @@ export const en: Dictionary = {
       inboxReceived: "{n} offer(s) received",
       inboxActive: "{n} active",
       inboxRevised: "{n} revised",
+      mixedVersions: "These offers answer different versions of the requirement ({versions}). Check which version each offer was made against before reading them side by side.",
       offerReceived: "Received",
       statusCol: "Status",
       serviceProviderCol: "Service provider",
@@ -3483,6 +3485,7 @@ export const ar: Dictionary = {
       inboxReceived: "{n} عرض/عروض مستلمة",
       inboxActive: "{n} قائم",
       inboxRevised: "{n} معدّل",
+      mixedVersions: "هذه العروض مقدّمة على إصدارات مختلفة من المتطلب ({versions}). تحقّق من الإصدار الذي قُدّم عليه كل عرض قبل قراءتها جنبًا إلى جنب.",
       offerReceived: "مستلم",
       statusCol: "الحالة",
       serviceProviderCol: "مزوّد الخدمة",

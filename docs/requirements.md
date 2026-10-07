@@ -439,4 +439,12 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - Same display as the provider's own preview (shared component).
   - Read-only: the route only reads; awarding stays on the requirement page. Refreshes every minute and on returning to the page. Withdrawn, sealed or unavailable offers say so instead of showing stale content.
 
+- **6.5 Requirement-to-offer context:** the existing Stage 3.17 mechanism is the one record of versions; no second versioning was added.
+  - **What the versions record:** an offer belongs to exactly one requirement (`offers.project_id`; every owner route checks the requirement and offer ids together). It records the material version it answered (`based_on_material_revision`), and so does each earlier version of it.
+  - **What makes a new version:** a material amendment does. That is a change to scope, location, dates or documents, including adding or replacing a document after publishing. A title correction or a deadline extension is not material, so offers stay current.
+  - **How amendments affect offers:** an amendment never changes a submitted offer. An offer made earlier shows the version it answered, and the owner's offer page says it was made on an earlier version and links to that version. It becomes current only when its provider confirms or revises it. Earlier versions stay in its history with their own version and files.
+  - **Mixed versions in the inbox:** when live offers answer different versions, the inbox says so (listing the versions) before the price figures across them.
+  - **Document integrity (fixed):** adding or replacing a requirement document after publishing now commits the file together with its amendment, in one transaction under the requirement's lock. Before, the file was committed first and only tied to the new version in a second step. Until that second step (or if it failed), a replacement file would count as part of the earlier version, so earlier offers would appear to have priced it, and the lock was released early.
+  - **Over the requirement's life:** each offer's version stays the same through suspend, resume, extension, closing and ending without an award.
+
 _Later Stage 6 steps are added as they are implemented._

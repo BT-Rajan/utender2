@@ -1001,8 +1001,7 @@ async def add_drawings(
 
     real_files = [f for f in drawings if f.filename]
     existing = {d.id for d in db.query(ProjectDrawing.id).filter(ProjectDrawing.project_id == project_id)}
-    await upload_drawings_for_project(db, get_storage(), project_id, real_files, category, is_required)
-    db.commit()
+    await upload_drawings_for_project(db, get_storage(), project_id, real_files, category, is_required, commit=not published)
     if published:
         # Stage 3.17: a same-named file replaces the current one as a new
         # revision; the old one stays, tied to the version it belonged to.
@@ -1016,6 +1015,8 @@ async def add_drawings(
                 db, project, user, ["documents"], None,  # the files are in `changes`
                 changes={"documents": documents}, documents=new,
             )
+        else:
+            db.commit()
     db.refresh(project)
     return _serialize_detail(project, db)
 

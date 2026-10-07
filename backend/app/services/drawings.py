@@ -71,6 +71,7 @@ async def upload_drawings_for_project(
     files: list[UploadFile],
     category: str = "drawing",
     is_required: bool = True,
+    commit: bool = True,
 ) -> dict[str, int]:
     uploaded = 0
     failed = 0
@@ -121,5 +122,8 @@ async def upload_drawings_for_project(
         _record_drawing(db, project_id, path, safe_relative_name(file.filename), category, is_required, len(content))
         uploaded += 1
 
-    db.commit()
+    # Stage 6.5: after publication the caller commits these together with the
+    # amendment that ties them to their version (one transaction, under the
+    # requirement's lock) -- never a replacement file left in the old version.
+    db.commit() if commit else db.flush()
     return {"uploaded": uploaded, "failed": failed}
