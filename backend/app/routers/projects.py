@@ -20,6 +20,7 @@ from app.schemas.amendment import ProjectAmendmentOut, ProjectAmendmentRequest
 from app.schemas.award import AwardRecordOut
 from app.config import get_settings
 from app.schemas.project import (
+    ProviderEligibilityOut,
     OpportunityListing,
     RequirementVersionOut,
     DrawingOut,
@@ -36,7 +37,7 @@ from app.schemas.project import (
 )
 from app.services.tender_rules import questions_close_at, questions_open
 from app.services.categories import resolve_trade
-from app.services.eligibility import audience, ineligibility_reasons, rules_for, rules_out, validate_rules
+from app.services.eligibility import audience, ineligibility_reasons, participation, rules_for, rules_out, validate_rules
 from app.services.drawings import DOCUMENT_CATEGORIES, upload_drawings_for_project
 from app.services.locations import clean_area, clean_governorate
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name
@@ -284,8 +285,10 @@ def get_project(project_id: str, user: User = Depends(get_current_user), db: Ses
     elif user.role == UserRole.service_provider:
         # Stage 4.4: whether this provider may respond, and if not why -- the
         # same check the offer endpoints enforce. (Only ever their own.)
-        reasons = ineligibility_reasons(db, project, acting_profile(db, user))
+        profile = acting_profile(db, user)
+        reasons = ineligibility_reasons(db, project, profile)
         detail.eligible, detail.ineligible_reasons = not reasons, reasons
+        detail.participation = participation(db, project, profile, reasons)  # Stage 4.5
     return detail
 
 
@@ -713,10 +716,15 @@ def my_eligibility(project_id: str, user: User = Depends(require_approved_servic
     """A provider's standing against one requirement, and why. Available at
     the same level as the feed listing (platform-verified), so a provider who
     can't open the full requirement can still see the reason."""
+    sync_expired_projects(db)
     project = db.get(Project, project_id)
-    if not project or project.status == ProjectStatus.draft or project.is_suspended:
+    if not project or project.status == ProjectStatus.draft:
         raise HTTPException(status_code=404, detail="Project not found.")
-    reasons = ineligibility_reasons(db, project, acting_profile(db, user))
+    profile = acting_profile(db, user)
+    if project.is_suspended:
+        # Stage 4.5: say it's unavailable for now -- nothing about it, or why.
+        return EligibilityCheckOut(eligible=False, rules=ProviderEligibilityOut(provider_type="any", qualifications=[], match_category=False, match_governorate=False), participation=participation(db, project, profile))
+    reasons = ineligibility_reasons(db, project, profile)
     listing = None
     if project.status == ProjectStatus.open and project.bid_deadline > datetime.utcnow():  # open (paused or not), as the feed shows it
         listing = OpportunityListing(
@@ -724,7 +732,9 @@ def my_eligibility(project_id: str, user: User = Depends(require_approved_servic
             bid_deadline=project.bid_deadline, tender_type=project.tender_type, published_at=project.published_at,
             paused=project.paused_at is not None,
         )
-    return EligibilityCheckOut(eligible=not reasons, reasons=reasons, rules=rules_out(db, project), listing=listing)
+    return EligibilityCheckOut(
+        eligible=not reasons, reasons=reasons, rules=rules_out(db, project), listing=listing, participation=participation(db, project, profile, reasons)
+    )
 
 
 @router.get("/{project_id}/amendments", response_model=list[ProjectAmendmentOut])

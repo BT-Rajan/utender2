@@ -87,6 +87,7 @@ def ineligibility_reasons(db: Session, project: Project, profile: ServiceProvide
     if rules.provider_type == "organization" and profile.stakeholder_type != StakeholderType.organization:
         reasons.append(EligibilityReason(
             code="organization_only",
+            fixable=False,
             message="This requirement is open to providers registered as an organization only; your account is registered as an individual.",
         ))
     if rules.qualifications:
@@ -110,12 +111,14 @@ def ineligibility_reasons(db: Session, project: Project, profile: ServiceProvide
             if not doc:
                 reasons.append(EligibilityReason(
                     code="qualification_missing",
+                    fixable=True,
                     name=name,
                     message=f'This requirement needs a platform-approved "{name}"; your verification doesn\'t include an approved one.',
                 ))
             elif doc.expires_on is not None and doc.expires_on < today:
                 reasons.append(EligibilityReason(
                     code="qualification_expired",
+                    fixable=True,
                     name=name,
                     date=doc.expires_on.isoformat(),
                     message=f'This requirement needs a valid "{name}"; yours expired on {doc.expires_on.isoformat()}.',
@@ -130,6 +133,7 @@ def ineligibility_reasons(db: Session, project: Project, profile: ServiceProvide
     if rules.match_category and project.category_id and project.category_id not in offered:
         reasons.append(EligibilityReason(
             code="category_not_offered",
+            fixable=True,
             name=project.trade,
             message=f'This requirement is for "{project.trade}"; your profile doesn\'t list it among your services.',
         ))
@@ -138,6 +142,7 @@ def ineligibility_reasons(db: Session, project: Project, profile: ServiceProvide
     if rules.match_governorate and project.governorate and served and project.governorate not in served:
         reasons.append(EligibilityReason(
             code="governorate_not_served",
+            fixable=True,
             governorate=project.governorate,
             message=f"This requirement is in {project.governorate.replace('_', ' ').title()}, which isn't among the governorates your profile says you serve.",
         ))
@@ -180,6 +185,43 @@ def feed_condition(db: Session, profile: ServiceProviderProfile):
     if served:  # none declared = all of Kuwait
         conditions.append(or_(Project.elig_match_governorate.is_(False), Project.governorate.is_(None), Project.governorate.in_(served)))
     return and_(true(), *conditions)
+
+
+def availability(project: Project) -> str:
+    """Where the requirement stands for participation, from its authoritative
+    state: open, paused (by its owner), ended (closed, past its deadline,
+    or a final outcome), or unavailable (hidden by U-Tender)."""
+    from datetime import datetime
+
+    from app.models.enums import ProjectStatus
+
+    if project.is_suspended:
+        return "unavailable"
+    if project.status == ProjectStatus.open and project.bid_deadline > datetime.utcnow():
+        return "paused" if project.paused_at is not None else "open"
+    return "ended"
+
+
+def participation(db: Session, project: Project, profile: ServiceProviderProfile | None, reasons: list[EligibilityReason] | None = None):
+    """Stage 4.5: can this provider take part in this requirement, and if not
+    why -- lifecycle first (eligibility never reopens anything), then the
+    provider's platform standing, then this requirement's conditions, then
+    marketplace access. The offer endpoints enforce exactly these checks."""
+    from app.models.enums import VerificationStatus
+    from app.schemas.project import Participation
+
+    state = availability(project)
+    if state != "open":
+        return Participation(status="unavailable", availability=state)
+    if not profile or profile.is_suspended or profile.verification_status != VerificationStatus.approved:
+        return Participation(status="action_required", action="verification", availability=state)
+    if reasons is None:
+        reasons = ineligibility_reasons(db, project, profile)
+    if reasons:
+        return Participation(status="not_eligible", availability=state)
+    if not profile.is_verified_active:
+        return Participation(status="action_required", action="activate_access", availability=state)
+    return Participation(status="can_participate", availability=state)
 
 
 def assert_eligible(db: Session, project: Project, profile: ServiceProviderProfile) -> None:

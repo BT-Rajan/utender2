@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "@/api/client";
-import type { EligibilityCheck, Offer, OpportunityListing, ProjectDetail, ServiceProviderProfile } from "@/api/types";
+import { apiFetch, serverNow } from "@/api/client";
+import type { EligibilityCheck, Offer, OpportunityListing, ProjectDetail } from "@/api/types";
 import { PageLoading } from "@/components/PageLoading";
 import { ClarificationsPanel } from "@/components/ClarificationsPanel";
 import { IneligibleNotice } from "@/components/ProviderEligibility";
@@ -64,23 +64,21 @@ export function ServiceProviderOfferPage() {
     enabled: !!id && projectError,
     retry: false,
   });
-  const { data: profile } = useQuery({
-    queryKey: ["service-provider-profile"],
-    queryFn: () => apiFetch<ServiceProviderProfile>("/service-provider/profile"),
-    enabled: !!id && projectError,
-  });
-  const ineligible = projectError && eligibility && !eligibility.eligible;
-  // Stage 4.4 follow-up: qualifies, but hasn't full marketplace access yet --
-  // say what the opportunity is and how to open it, not just "not available".
-  const needsAccess = projectError && eligibility?.eligible && !!eligibility.listing && !!profile && profile.marketplace_status !== "verified_active";
+  // Stage 4.5: when the requirement itself can't be opened, the server's
+  // verdict says why -- ended or unavailable, not eligible (and what can be
+  // fixed), or an action to take -- rather than a generic "not available".
+  const verdict = projectError ? eligibility?.participation : undefined;
+  const unavailable = verdict?.status === "unavailable";
+  const ineligible = projectError && eligibility && !unavailable && !eligibility.eligible;
+  const needsAccess = verdict?.status === "action_required" && verdict.action === "activate_access" && !!eligibility?.listing;
   useEffect(() => {
-    if (projectError && (eligibilityError || (eligibility?.eligible && profile && !needsAccess))) {
+    if (projectError && (eligibilityError || (eligibility && verdict?.status === "can_participate"))) {
       navigate("/service-provider/feed", {
         replace: true,
         state: { notice: t("service_provider.offer.notAvailableNotice") },
       });
     }
-  }, [projectError, eligibility, eligibilityError, profile, needsAccess, navigate, t]);
+  }, [projectError, eligibility, eligibilityError, verdict, navigate, t]);
 
   const { data: existingOffer } = useQuery({
     queryKey: ["my-offer", id],
@@ -88,6 +86,20 @@ export function ServiceProviderOfferPage() {
     enabled: !!id,
   });
 
+  if (unavailable && eligibility) {
+    return (
+      <main className="max-w-2xl mx-auto px-5 py-8 grid gap-4">
+        {eligibility.listing && <ListingSummary listing={eligibility.listing} />}
+        <div className="border border-dashed border-border rounded p-6 text-sm text-steel" data-testid="participation">
+          {verdict?.availability === "paused" ? t("postPub.pausedProviderBody") : verdict?.availability === "ended" ? t("eligibility.ended") : t("eligibility.unavailable")}
+        </div>
+        {eligibility.reasons.length > 0 && <IneligibleNotice reasons={eligibility.reasons} />}
+        <button type="button" onClick={() => navigate("/service-provider/feed")} className="text-sm text-blue underline w-fit">
+          {t("eligibility.backToFeed")}
+        </button>
+      </main>
+    );
+  }
   if (ineligible) {
     return (
       <main className="max-w-2xl mx-auto px-5 py-8 grid gap-4">
@@ -118,7 +130,11 @@ export function ServiceProviderOfferPage() {
   if (!project) return <PageLoading />;
 
   // Stage 3.15: an owner-paused requirement accepts nothing until resumed.
-  const biddingClosed = project.status !== "open" || !!project.paused_at || new Date(project.bid_deadline) < new Date();
+  // Stage 4.5: the server's availability, and its clock for a deadline that
+  // passes while the page is open.
+  const biddingClosed =
+    (project.participation ? project.participation.availability !== "open" : project.status !== "open" || !!project.paused_at) ||
+    new Date(project.bid_deadline).getTime() <= serverNow();
 
   return (
     <main className="max-w-4xl mx-auto px-5 py-8">
@@ -132,6 +148,12 @@ export function ServiceProviderOfferPage() {
         />
       </div>
 
+      {/* Stage 4.5: the server's verdict for this provider, when they can take part. */}
+      {project.participation?.status === "can_participate" && (
+        <p className="mb-4 text-sm text-green font-semibold" data-testid="participation">
+          ✓ {t("eligibility.canParticipate")}
+        </p>
+      )}
       {biddingClosed ? (
         <div className="border border-dashed border-border rounded p-6 text-sm text-steel">
           {project.paused_at ? t("postPub.pausedProviderBody") : outcomeText(t, project.status, project.closure_reason) ?? t("service_provider.offer.biddingClosedNotice")}

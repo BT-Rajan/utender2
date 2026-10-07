@@ -93,6 +93,7 @@ class ProjectOut(BaseModel):
     # and if not, why.
     eligible: bool | None = None
     ineligible_reasons: list["EligibilityReason"] = Field(default_factory=list)
+    participation: "Participation | None" = None  # Stage 4.5, providers only
     category_id: str | None = None
 
 
@@ -185,6 +186,25 @@ class EligibilityReason(BaseModel):
     date: str | None = None  # expiry date (ISO)
     governorate: str | None = None
     message: str
+    # Stage 4.5: something the provider can put right themselves (supply or
+    # renew a qualification; declare a type of work or area they do serve)
+    # -- as opposed to the requirement simply not being for them.
+    fixable: bool = False
+
+
+class Participation(BaseModel):
+    """Stage 4.5: the one answer to "can this provider take part, and if not
+    why?" -- computed by services.eligibility.participation(), the same
+    checks the offer endpoints enforce.
+
+      status        can_participate | not_eligible | action_required | unavailable
+      action        with action_required: "activate_access" (verified, but
+                    marketplace access isn't active) or "verification"
+      availability  open | paused | ended | unavailable (hidden by U-Tender)"""
+
+    status: str
+    action: str | None = None
+    availability: str
 
 
 class OpportunityListing(BaseModel):
@@ -208,6 +228,7 @@ class EligibilityCheckOut(BaseModel):
     # Stage 4.4 follow-up: what the opportunity is, at listing level (no
     # address, no scope) -- only while it is open, as in the feed.
     listing: OpportunityListing | None = None
+    participation: Participation | None = None
 
 
 class PaymentStage(BaseModel):

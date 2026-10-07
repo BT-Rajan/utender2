@@ -14,7 +14,7 @@ from app.models.service_provider import ServiceProviderProfile
 DEADLINE = (datetime.utcnow() + timedelta(days=14)).isoformat() + "Z"
 # Fields that describe the requirement's state rather than its content: they
 # legitimately change when it is published (or as offers arrive).
-STATE = {"status", "published_at", "version", "updated_at", "offer_count", "tender_type_locked", "my_offer_status", "eligible", "ineligible_reasons"}
+STATE = {"status", "published_at", "version", "updated_at", "offer_count", "tender_type_locked", "my_offer_status", "eligible", "ineligible_reasons", "participation"}
 
 
 def _verified(db, role: str, email: str) -> TestClient:

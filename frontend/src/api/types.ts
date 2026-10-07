@@ -61,6 +61,8 @@ export interface Project {
   // Stage 4.3, provider feed only.
   document_count?: number | null;
   conditions?: ProviderEligibility | null;
+  // Stage 4.5, providers only.
+  participation?: Participation | null;
 }
 
 export interface Drawing {
@@ -129,6 +131,15 @@ export interface EligibilityReason {
   date: string | null;
   governorate: string | null;
   message: string;
+  // Stage 4.5: something the provider can put right themselves.
+  fixable?: boolean;
+}
+
+// Stage 4.5: the server's one answer to "can I take part, and if not why?"
+export interface Participation {
+  status: "can_participate" | "not_eligible" | "action_required" | "unavailable";
+  action: "activate_access" | "verification" | null;
+  availability: "open" | "paused" | "ended" | "unavailable";
 }
 
 export interface EligibilityCheck {
@@ -137,6 +148,7 @@ export interface EligibilityCheck {
   rules: ProviderEligibility;
   // Stage 4.4 follow-up: what the opportunity is, at listing level, while it is open.
   listing?: OpportunityListing | null;
+  participation?: Participation | null;
 }
 
 export interface ServiceCategory {

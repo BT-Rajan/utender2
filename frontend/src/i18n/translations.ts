@@ -337,6 +337,12 @@ export interface Dictionary {
     matchingHeading: string;
     fixServices: string;
     addQualification: string;
+    notForYou: string;
+    youCanFix: string;
+    canParticipate: string;
+    ended: string;
+    unavailable: string;
+    verificationNeeded: string;
   };
   response: {
     heading: string;
@@ -1413,6 +1419,12 @@ export const en: Dictionary = {
     matchingHeading: "Type of work and location",
     fixServices: "Update your services",
     addQualification: "Add a qualification",
+    notForYou: "This opportunity’s conditions — not something you can change:",
+    youCanFix: "You can put these right, if they are true of your business:",
+    canParticipate: "You can take part in this opportunity.",
+    ended: "This opportunity is no longer accepting offers.",
+    unavailable: "This opportunity is temporarily unavailable.",
+    verificationNeeded: "Complete your verification to take part in opportunities.",
   },
   response: {
     heading: "What providers must submit",
@@ -2514,6 +2526,12 @@ export const ar: Dictionary = {
     matchingHeading: "نوع العمل والموقع",
     fixServices: "تحديث خدماتك",
     addQualification: "إضافة مؤهل",
+    notForYou: "شروط هذه الفرصة — ليست مما يمكنك تغييره:",
+    youCanFix: "يمكنك تصحيح ما يلي إن كان ينطبق على نشاطك:",
+    canParticipate: "يمكنك المشاركة في هذه الفرصة.",
+    ended: "لم تعد هذه الفرصة تقبل العروض.",
+    unavailable: "هذه الفرصة غير متاحة مؤقتًا.",
+    verificationNeeded: "أكمل التحقق من حسابك للمشاركة في الفرص.",
   },
   response: {
     heading: "ما يجب على مقدمي الخدمة تقديمه",

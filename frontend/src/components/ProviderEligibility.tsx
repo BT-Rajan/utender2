@@ -163,33 +163,42 @@ export function reasonText(t: (key: string) => string, reason: EligibilityReason
     .replace("{governorate}", reason.governorate ? t(`location.${reason.governorate}`) : "");
 }
 
-// Each reason in the viewer's language, with a way to act on it where the
-// provider can (their declared services, or adding a qualification).
+// Each reason in the viewer's language. Stage 4.5: what the provider can put
+// right themselves (with where to do it) apart from conditions that mean the
+// opportunity simply isn't for them.
 export function IneligibleNotice({ reasons }: { reasons: EligibilityReason[] }) {
   const { t } = useI18n();
-  const fixServices = reasons.some((r) => r.code === "category_not_offered" || r.code === "governorate_not_served");
-  const addQualification = reasons.some((r) => r.code === "qualification_missing" || r.code === "qualification_expired");
+  const fixable = reasons.filter((r) => r.fixable);
+  const fixed = reasons.filter((r) => !r.fixable);
+  const fixServices = fixable.some((r) => r.code === "category_not_offered" || r.code === "governorate_not_served");
+  const addQualification = fixable.some((r) => r.code === "qualification_missing" || r.code === "qualification_expired");
+  const item = (r: EligibilityReason) => <li key={r.code + (r.name ?? "") + (r.governorate ?? "")}>{reasonText(t, r)}</li>;
   return (
-    <div className="border border-amber-dark/40 bg-amber/10 rounded px-4 py-3 text-sm text-navy">
+    <div className="border border-amber-dark/40 bg-amber/10 rounded px-4 py-3 text-sm text-navy" data-testid="ineligible-notice">
       <strong className="font-display block mb-1">{t("eligibility.notEligible")}</strong>
-      <ul className="list-disc ps-5 text-[13px] text-steel">
-        {reasons.map((r) => (
-          <li key={r.code + (r.name ?? "") + (r.governorate ?? "")}>{reasonText(t, r)}</li>
-        ))}
-      </ul>
-      {(fixServices || addQualification) && (
-        <div className="flex gap-3 mt-1.5 text-xs">
-          {fixServices && (
-            <Link to="/service-provider/dashboard#services" className="text-blue underline">
-              {t("eligibility.fixServices")}
-            </Link>
-          )}
-          {addQualification && (
-            <Link to="/service-provider/verify" className="text-blue underline">
-              {t("eligibility.addQualification")}
-            </Link>
-          )}
-        </div>
+      {fixed.length > 0 && (
+        <>
+          {fixable.length > 0 && <p className="text-[12px] font-semibold text-navy mt-1">{t("eligibility.notForYou")}</p>}
+          <ul className="list-disc ps-5 text-[13px] text-steel">{fixed.map(item)}</ul>
+        </>
+      )}
+      {fixable.length > 0 && (
+        <>
+          <p className="text-[12px] font-semibold text-navy mt-1.5">{t("eligibility.youCanFix")}</p>
+          <ul className="list-disc ps-5 text-[13px] text-steel">{fixable.map(item)}</ul>
+          <div className="flex gap-3 mt-1.5 text-xs">
+            {fixServices && (
+              <Link to="/service-provider/dashboard#services" className="text-blue underline">
+                {t("eligibility.fixServices")}
+              </Link>
+            )}
+            {addQualification && (
+              <Link to="/service-provider/verify" className="text-blue underline">
+                {t("eligibility.addQualification")}
+              </Link>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
