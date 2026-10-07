@@ -515,4 +515,16 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - **Pages:** the owner's offer page (6.4) shows the clarifications and a form to ask while allowed. The provider's read-only offer page shows them with an answer form.
   - **Rollback guard:** a downgrade below 0045 is refused while any offer clarification exists, unless `ALLOW_CLARIFICATION_LOSS=1` is set.
 
+- **6.11 Evaluation notes:**
+  - **Before:** there was no notes mechanism for evaluation. The only "notes" were `closure_note` (the owner's private reason a requirement ended), admin notes on verification documents and the audit log (actions, not observations). None could hold notes on an offer.
+  - **Now:** one small table, `evaluation_notes` (migration 0046). Endpoints: `GET/POST /owner/projects/{id}/notes` (list all, or `?offer_id=`) and `PUT/DELETE /owner/projects/{id}/notes/{note}`.
+  - **Who:** the requirement's owner side only (its organization's members, or the individual owner), in any state of the requirement. Providers, competitors, other owners and the public get nothing.
+  - **What a note can attach to:** the requirement, or one of its own offers that has been put forward and isn't admin-suspended. Never a draft, another requirement's offer, or an offer on a tender still sealed (a note on the requirement itself is fine then).
+  - **Editing:** members read all the side's notes; each author edits or removes their own, with `If-Match` on the note's version against stale pages. A submission carrying the same client token twice is one note.
+  - **Writing access:** writing needs an active owner account and takes the requirement's lock.
+  - **History:** author and timestamps are kept, and adding, editing and removing are recorded in the audit log. Notes are kept through closing, expiry, cancellation, ending outside U-Tender and award.
+  - **Pages:** a notes panel on the owner's offer page (notes on that offer) and on the requirement page (notes on the requirement).
+  - **No judgement:** nothing scores, ranks or interprets.
+  - **Rollback guard:** a downgrade below 0046 is refused while any note exists, unless `ALLOW_NOTE_LOSS=1` is set.
+
 _Later Stage 6 steps are added as they are implemented._

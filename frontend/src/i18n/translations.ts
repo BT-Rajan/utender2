@@ -220,6 +220,18 @@ export interface Dictionary {
     ask: string;
     askPlaceholder: string;
   };
+  evaluationNotes: {
+    offerHeading: string;
+    requirementHeading: string;
+    private: string;
+    edited: string;
+    save: string;
+    cancel: string;
+    edit: string;
+    remove: string;
+    add: string;
+    placeholder: string;
+  };
   ownerOffer: {
     open: string;
     back: string;
@@ -1480,6 +1492,18 @@ export const en: Dictionary = {
     sendAnswer: "Send answer",
     ask: "Ask for clarification",
     askPlaceholder: "What would you like this provider to clarify?",
+  },
+  evaluationNotes: {
+    offerHeading: "Your evaluation notes on this offer",
+    requirementHeading: "Your evaluation notes on this requirement",
+    private: "Private to your side: only you and your organization's members see these notes. Providers never do.",
+    edited: "edited",
+    save: "Save",
+    cancel: "Cancel",
+    edit: "Edit",
+    remove: "Remove",
+    add: "Add note",
+    placeholder: "An observation for your own evaluation",
   },
   ownerOffer: {
     open: "View offer",
@@ -2766,6 +2790,18 @@ export const ar: Dictionary = {
     sendAnswer: "أرسل الإجابة",
     ask: "اطلب توضيحًا",
     askPlaceholder: "ما الذي تريد من هذا المزوّد توضيحه؟",
+  },
+  evaluationNotes: {
+    offerHeading: "ملاحظات التقييم الخاصة بك على هذا العرض",
+    requirementHeading: "ملاحظات التقييم الخاصة بك على هذا المتطلب",
+    private: "خاصة بجهتك: لا يراها غيرك وأعضاء مؤسستك. لا يراها مزوّدو الخدمات أبدًا.",
+    edited: "عُدّلت",
+    save: "حفظ",
+    cancel: "إلغاء",
+    edit: "تعديل",
+    remove: "حذف",
+    add: "أضف ملاحظة",
+    placeholder: "ملاحظة لتقييمك الخاص",
   },
   ownerOffer: {
     open: "عرض العرض",

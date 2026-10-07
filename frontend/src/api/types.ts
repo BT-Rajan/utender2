@@ -247,6 +247,19 @@ export interface OwnerOffer {
   on_current_version: boolean;
 }
 
+// Stage 6.11: an owner-side private evaluation note.
+export interface EvaluationNote {
+  id: string;
+  project_id: string;
+  offer_id: string | null;
+  body: string;
+  author_name: string | null;
+  mine: boolean;
+  version: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 // Stage 6.10: the owner's clarification of one offer, and the provider's answer.
 export interface OfferClarification {
   id: string;

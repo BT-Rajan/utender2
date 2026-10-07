@@ -264,3 +264,28 @@ class OfferComparisonOut(BaseModel):
     requirement: PreviewRequirement
     offers: list[OfferOut]
     unavailable: list[str] = []
+
+
+class EvaluationNoteIn(BaseModel):
+    """Stage 6.11: an owner-side evaluation note -- on the requirement, or on
+    one of its offers. client_token: a retried submission is one note."""
+
+    body: str = Field(min_length=1, max_length=4000)
+    offer_id: str | None = None
+    client_token: str | None = Field(default=None, max_length=64)
+
+
+class EvaluationNoteEdit(BaseModel):
+    body: str = Field(min_length=1, max_length=4000)
+
+
+class EvaluationNoteOut(BaseModel):
+    id: str
+    project_id: str
+    offer_id: str | None
+    body: str
+    author_name: str | None
+    mine: bool  # written by the reader (who alone may edit or remove it)
+    version: int
+    created_at: UTCDateTime | None
+    updated_at: UTCDateTime | None

@@ -5,6 +5,7 @@ import type { OwnerOffer } from "@/api/types";
 import { PageLoading } from "@/components/PageLoading";
 import { OfferHistory, OfferRecord } from "@/components/OfferPreview";
 import { OfferClarifications } from "@/components/OfferClarifications";
+import { EvaluationNotes } from "@/components/EvaluationNotes";
 import { VersionView } from "@/components/PostPublication";
 import { useI18n } from "@/i18n/I18nContext";
 import { fullDate } from "@/lib/format";
@@ -90,6 +91,8 @@ export function OwnerOfferDetailPage() {
         }
       />
       <OfferHistory projectId={requirement.id} offerId={offer.id} currency={requirement.currency} />
+      {/* Stage 6.11: the owner side's own private notes on this offer. */}
+      <EvaluationNotes projectId={requirement.id} offerId={offer.id} />
       {/* Stage 6.10: clarifying this offer while it is being evaluated. */}
       <OfferClarifications
         projectId={requirement.id}

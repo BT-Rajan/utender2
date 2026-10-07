@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile
 from sqlalchemy import case
 from sqlalchemy.orm import Session
 
@@ -9,6 +9,7 @@ from app.db import get_db
 from app.deps import get_owner_profile, require_owner
 from app.models.award_record import AwardRecord
 from app.models.clarification import Clarification
+from app.models.evaluation_note import EvaluationNote
 from app.models.notification import Notification
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import DocumentRequirement
@@ -20,7 +21,7 @@ from app.models.review import Review
 from app.models.user import User
 from app.schemas.clarification import OfferClarificationAsk, OfferClarificationOut
 from app.schemas.document import DocumentRequirementOut, OwnerDocumentOut
-from app.schemas.offer import OfferComparisonOut, OfferOut, OfferRevisionOut, OwnerOfferOut
+from app.schemas.offer import EvaluationNoteEdit, EvaluationNoteIn, EvaluationNoteOut, OfferComparisonOut, OfferOut, OfferRevisionOut, OwnerOfferOut
 from app.schemas.owner import OwnerProfileOut
 from app.schemas.project import EligibilityQualification, ProjectOut
 from app.schemas.review import ReviewCreate, ReviewOut
@@ -338,6 +339,107 @@ def ask_offer_clarification(
             link=f"/service-provider/projects/{project_id}/offer", project_title=project.title,
         )
     return clarification_out(db, clarification, owner_side=True)
+
+
+# ---------- Stage 6.11: the owner side's private evaluation notes ----------
+
+
+def _note_offer(db: Session, project: Project, offer_id: str | None) -> Offer | None:
+    """The offer a note is about: on THIS requirement only, put forward (never a
+    draft), not admin-suspended, and not while the tender is sealed (whose
+    offers the owner can't yet tell apart). None: the requirement itself."""
+    if offer_id is None:
+        return None
+    offer = db.get(Offer, offer_id)
+    if (
+        not offer or offer.project_id != project.id or offer.status == OfferStatus.draft or offer.is_suspended
+        or is_sealed_and_open(project)
+    ):
+        raise HTTPException(status_code=404, detail="Offer not found.")
+    return offer
+
+
+def _note_out(db: Session, note: EvaluationNote, user: User) -> EvaluationNoteOut:
+    author = db.get(User, note.author_id) if note.author_id else None
+    return EvaluationNoteOut(
+        id=note.id, project_id=note.project_id, offer_id=note.offer_id, body=note.body,
+        author_name=(author.full_name or author.email) if author else None, mine=note.author_id == user.id,
+        version=note.version, created_at=note.created_at, updated_at=note.updated_at,
+    )
+
+
+def _own_note(db: Session, project_id: str, note_id: str, user: User, if_match: str | None) -> tuple[Project, EvaluationNote]:
+    project = _get_owned_project(project_id, user, db, lock=True)  # an active owner; serialized
+    note = db.query(EvaluationNote).filter(EvaluationNote.id == note_id).populate_existing().with_for_update().first()
+    if not note or note.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Note not found.")
+    if note.author_id != user.id:
+        raise HTTPException(status_code=403, detail="Only the note's author can change or remove it.")
+    if if_match and if_match.strip('"') != str(note.version):
+        raise HTTPException(status_code=409, detail="This note was changed somewhere else since you opened it. Reload to see the latest version.")
+    return project, note
+
+
+@router.get("/projects/{project_id}/notes", response_model=list[EvaluationNoteOut])
+def list_notes(project_id: str, offer_id: str | None = None, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 6.11: the owner side's notes on this requirement (all of them, or
+    those on one offer) -- for its owner side only, in any state."""
+    project = _get_owned_project(project_id, user, db)
+    query = db.query(EvaluationNote).filter(EvaluationNote.project_id == project_id)
+    if offer_id is not None:
+        query = query.filter(EvaluationNote.offer_id == _note_offer(db, project, offer_id).id)
+    return [_note_out(db, n, user) for n in query.order_by(EvaluationNote.created_at.asc(), EvaluationNote.id)]
+
+
+@router.post("/projects/{project_id}/notes", response_model=EvaluationNoteOut, status_code=201)
+def add_note(project_id: str, payload: EvaluationNoteIn, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    project = _get_owned_project(project_id, user, db, lock=True)
+    if project.status == ProjectStatus.draft:
+        raise HTTPException(status_code=400, detail="Notes are for reviewing offers on a published requirement.")
+    offer = _note_offer(db, project, payload.offer_id)
+    body = payload.body.strip()
+    if not body:
+        raise HTTPException(status_code=400, detail="Enter a note.")
+    if payload.client_token:
+        existing = db.query(EvaluationNote).filter(EvaluationNote.author_id == user.id, EvaluationNote.client_token == payload.client_token).first()
+        if existing:  # the same submission again (a retry, a double click)
+            db.rollback()
+            return _note_out(db, existing, user)
+    note = EvaluationNote(project_id=project_id, offer_id=offer.id if offer else None, author_id=user.id, body=body, client_token=payload.client_token)
+    db.add(note)
+    db.flush()
+    # log_action commits: the note and its audit entry land together.
+    log_action(db, actor_id=user.id, action="evaluation_note.add", target_type="evaluation_note", target_id=note.id, new_value=offer.id if offer else project_id)
+    db.refresh(note)
+    return _note_out(db, note, user)
+
+
+@router.put("/projects/{project_id}/notes/{note_id}", response_model=EvaluationNoteOut)
+def edit_note(
+    project_id: str, note_id: str, payload: EvaluationNoteEdit,
+    if_match: str | None = Header(None, alias="If-Match"), user: User = Depends(require_owner), db: Session = Depends(get_db),
+):
+    _, note = _own_note(db, project_id, note_id, user, if_match)
+    body = payload.body.strip()
+    if not body:
+        raise HTTPException(status_code=400, detail="Enter a note.")
+    if body != note.body:
+        note.body, note.version, note.updated_at = body, note.version + 1, datetime.utcnow()
+        log_action(db, actor_id=user.id, action="evaluation_note.edit", target_type="evaluation_note", target_id=note.id)
+    else:
+        db.commit()
+    db.refresh(note)
+    return _note_out(db, note, user)
+
+
+@router.delete("/projects/{project_id}/notes/{note_id}", status_code=204)
+def delete_note(
+    project_id: str, note_id: str,
+    if_match: str | None = Header(None, alias="If-Match"), user: User = Depends(require_owner), db: Session = Depends(get_db),
+):
+    _, note = _own_note(db, project_id, note_id, user, if_match)
+    db.delete(note)
+    log_action(db, actor_id=user.id, action="evaluation_note.delete", target_type="evaluation_note", target_id=note_id)
 
 
 @router.get("/projects/{project_id}/offers/{offer_id}/documents/file")

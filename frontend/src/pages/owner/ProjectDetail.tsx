@@ -9,6 +9,7 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { RequirementItemsEditor, RequirementItemsView } from "@/components/RequirementItems";
 import { PageLoading } from "@/components/PageLoading";
 import { ClarificationsPanel } from "@/components/ClarificationsPanel";
+import { EvaluationNotes } from "@/components/EvaluationNotes";
 import { useI18n } from "@/i18n/I18nContext";
 import { money } from "@/lib/money";
 import { formatWorkTiming } from "@/lib/dates";
@@ -881,6 +882,9 @@ export function OwnerProjectDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Stage 6.11: the owner side's own private notes on the requirement. */}
+      {project.status !== "draft" && <EvaluationNotes projectId={project.id} />}
 
       {approvedOffer && (
         <div className="mt-8 max-w-xl">
