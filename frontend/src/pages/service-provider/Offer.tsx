@@ -197,6 +197,14 @@ export function ServiceProviderOfferPage() {
               </p>
             </div>
           )}
+          {/* Stage 5.14: a withdrawn offer says so; the existing rule lets it be resubmitted while offers are open. */}
+          {existingOffer?.status === "withdrawn" && (
+            <div className="border border-border bg-white rounded px-4 py-3 mb-4 text-sm" data-testid="offer-withdrawn">
+              <strong className="font-display text-navy block">{t("feed.offer_withdrawn")}</strong>
+              <span className="text-steel">{t("submitOffer.withdrawnAt")} {fullDate(existingOffer.updated_at, language)}</span>
+              <p className="text-xs text-steel mt-1">{t("submitOffer.withdrawnNote")}</p>
+            </div>
+          )}
           {/* Stage 5.1: which requirement this offer is for. */}
           <p className="mb-4 text-sm text-navy" data-testid="preparing-for">
             {t("participate.preparingFor")} <strong dir="auto" className="font-display">{project.title}</strong>

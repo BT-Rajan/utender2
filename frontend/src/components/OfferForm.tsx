@@ -210,12 +210,17 @@ export function OfferForm({
     },
   });
 
+  // Stage 5.14: withdrawing is decided by the server (open, before the
+  // deadline, the provider's own offer); the page asks first and then shows
+  // the server's answer -- a refusal refreshes to the current state.
   const withdrawMutation = useMutation({
-    mutationFn: () => apiFetch(`/projects/${project.id}/offers/withdraw`, { method: "POST" }),
-    onSuccess: () => {
+    mutationFn: () => apiFetch<Offer>(`/projects/${project.id}/offers/withdraw`, { method: "POST" }),
+    onSuccess: (withdrawn) => {
       setError(null);
-      queryClient.invalidateQueries({ queryKey: ["my-offer", project.id] });
+      queryClient.setQueryData(["my-offer", project.id], withdrawn);
+      queryClient.invalidateQueries({ queryKey: ["project", project.id] });
     },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["my-offer", project.id] }),
     onError: (err) => setError(err instanceof ApiError ? err.detail : t("service_provider.offer.withdrawError")),
   });
 
@@ -486,7 +491,11 @@ export function OfferForm({
                 disabled={submitMutation.isPending || submitDraftMutation.isPending}
                 className="bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 w-fit"
               >
-                {existingOffer ? t("service_provider.offer.updateOffer") : t("service_provider.offer.submitOffer")}
+                {existingOffer?.status === "withdrawn"
+                  ? t("submitOffer.resubmit")
+                  : existingOffer
+                    ? t("service_provider.offer.updateOffer")
+                    : t("service_provider.offer.submitOffer")}
               </button>
               {draft && !existingOffer && !preview && (
                 <button
@@ -513,7 +522,15 @@ export function OfferForm({
               {existingOffer && existingOffer.status !== "withdrawn" && (
                 <button
                   type="button"
-                  onClick={() => withdrawMutation.mutate()}
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: t("submitOffer.withdrawTitle"),
+                      body: t("submitOffer.withdrawBody"),
+                      confirmLabel: t("service_provider.offer.withdraw"),
+                      tone: "danger",
+                    });
+                    if (ok) withdrawMutation.mutate();
+                  }}
                   disabled={withdrawMutation.isPending}
                   className="text-xs text-red underline disabled:opacity-60"
                 >

@@ -353,4 +353,15 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - A revision from a page showing an earlier revision (another tab, a colleague, a retried request) is refused (If-Match on the revision number), never overwritten. Simultaneous revisions: one wins.
   - "Update offer" asks for confirmation and says the previous version stays in the history. Competitors and sealed rules are unaffected.
 
-_Further steps (5.14 onwards) are added as they are implemented._
+- **5.14 Withdraw offer:**
+  - Existing rule kept: a submitted offer can be withdrawn only while offers are open. That means before the deadline (exactly at it is too late) and not when paused, suspended, closed early, cancelled, ended or awarded. It's decided on the server under the requirement's lock, so it can't race a close or an award.
+  - Only the provider's own side's offer. IDs in the request are ignored; drafts and other providers' offers aren't withdrawable.
+  - Nothing is deleted: the offer keeps its content, documents and files. The submitted version goes into the history, and the withdrawal time and who did it are recorded.
+  - A withdrawn offer can't be awarded and doesn't count as a live offer at the deadline (a requirement with only withdrawn offers expires).
+  - The owner sees it as withdrawn; sealed tenders still reveal nothing.
+  - Once only: a repeat, a retry or a second tab is refused.
+  - Resubmission works as before (same offer, recorded in the history).
+  - The page asks for confirmation, then shows "Offer withdrawn" with the time. The button becomes "Submit again" while offers are open.
+  - The owner isn't notified of a withdrawal: the existing `bid_withdrawn` notification type was never wired up and is left as is.
+
+_Further steps (5.15 onwards) are added as they are implemented._

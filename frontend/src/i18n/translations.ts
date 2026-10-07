@@ -198,6 +198,11 @@ export interface Dictionary {
     reviseTitle: string;
     reviseBody: string;
     docsOnUpdate: string;
+    withdrawTitle: string;
+    withdrawBody: string;
+    withdrawnAt: string;
+    withdrawnNote: string;
+    resubmit: string;
   };
   offerPreview: {
     open: string;
@@ -1384,6 +1389,11 @@ export const en: Dictionary = {
     reviseTitle: "Update your submitted offer?",
     reviseBody: "This version replaces your current offer for the owner. The previous version stays in your offer’s history, as submitted.",
     docsOnUpdate: "Document changes go to the owner when you update your offer; until then the owner has the documents you submitted.",
+    withdrawTitle: "Withdraw your offer?",
+    withdrawBody: "The owner will no longer have an offer from you to consider. Your offer and its history are kept, and you can submit again while offers are open.",
+    withdrawnAt: "Withdrawn",
+    withdrawnNote: "The owner has no offer from you to consider. You can submit again while offers are open; your earlier versions stay in the history.",
+    resubmit: "Submit again",
   },
   offerPreview: {
     open: "Preview offer",
@@ -2595,6 +2605,11 @@ export const ar: Dictionary = {
     reviseTitle: "تحديث عرضك المقدَّم؟",
     reviseBody: "يحلّ هذا الإصدار محل عرضك الحالي لدى المالك. يبقى الإصدار السابق في سجل عرضك كما قُدِّم.",
     docsOnUpdate: "تصل تغييرات المستندات إلى المالك عند تحديث عرضك؛ وحتى ذلك الحين لدى المالك المستندات التي قدّمتها.",
+    withdrawTitle: "سحب عرضك؟",
+    withdrawBody: "لن يكون لدى المالك عرض منك للنظر فيه. يُحتفظ بعرضك وسجله، ويمكنك التقديم مجددًا ما دامت العروض مفتوحة.",
+    withdrawnAt: "سُحب في",
+    withdrawnNote: "ليس لدى المالك عرض منك للنظر فيه. يمكنك التقديم مجددًا ما دامت العروض مفتوحة؛ وتبقى إصداراتك السابقة في السجل.",
+    resubmit: "التقديم مجددًا",
   },
   offerPreview: {
     open: "معاينة العرض",

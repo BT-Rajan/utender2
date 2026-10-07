@@ -689,4 +689,4 @@ def withdraw_offer(project_id: str, user: User = Depends(require_approved_servic
     offer.updated_at, offer.updated_by = datetime.utcnow(), user.id
     db.commit()
     db.refresh(offer)
-    return offer
+    return _with_documents(db, offer)  # Stage 5.14: the same shape as every other offer response
