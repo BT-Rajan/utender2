@@ -70,8 +70,9 @@ def test_no_link_or_endpoint_reaches_a_file_it_shouldnt(db):
     other_owner = _verified(db, "owner", "other@example.com")
     sp = _verified(db, "service_provider", "a@example.com")
     pid, other = _files(owner), _files(other_owner)
-    url = sp.get(f"/projects/{pid}").json()["drawings"][0]["url"]
-    other_url = sp.get(f"/projects/{other}").json()["drawings"][0]["url"]
+    # Picked by name, not position: the test swaps in the other file's name below.
+    url = next(d["url"] for d in sp.get(f"/projects/{pid}").json()["drawings"] if d["file_name"] == "single-line.pdf")
+    other_url = next(d["url"] for d in sp.get(f"/projects/{other}").json()["drawings"] if d["file_name"] == "single-line.pdf")
     # 4/8. Another requirement's file by changing the path, the name, the expiry or the signature: refused.
     assert _get(sp, url.replace(pid, other)).status_code == 403
     assert _get(sp, url.split("&name=")[0] + "&name=boq.xlsx").status_code == 403

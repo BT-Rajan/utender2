@@ -1164,6 +1164,9 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
     drawing_rows = (
         db.query(ProjectDrawing)
         .filter(ProjectDrawing.project_id == project.id, ProjectDrawing.is_current.is_(True))
+        # A stable order on every database: upload time is whole seconds on
+        # MySQL, so files uploaded together are ordered by name.
+        .order_by(ProjectDrawing.uploaded_at, ProjectDrawing.file_name)
         .all()
     )
     drawings = [

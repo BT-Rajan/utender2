@@ -43,7 +43,11 @@ def _serialize(
             id=a.id, part=a.part, file_name=a.file_name, size_bytes=a.size_bytes,
             url=storage.signed_url(CLARIFICATION_BUCKET, a.file_path, expiry, a.file_name),
         )
-        for a in db.query(ClarificationAttachment).filter(ClarificationAttachment.clarification_id == c.id).order_by(ClarificationAttachment.created_at)
+        # The question's files before the answer's, then in upload order -- a
+        # stable order on every database (MySQL keeps whole seconds).
+        for a in db.query(ClarificationAttachment).filter(ClarificationAttachment.clarification_id == c.id).order_by(
+            ClarificationAttachment.part.desc(), ClarificationAttachment.created_at, ClarificationAttachment.file_name
+        )
         if a.part == "question" or c.answer is not None or owner_side
     ]
     return ClarificationOut(
