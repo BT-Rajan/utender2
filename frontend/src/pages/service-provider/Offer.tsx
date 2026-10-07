@@ -261,7 +261,10 @@ export function ServiceProviderOfferPage() {
 
       <div className="mb-6">
         {/* Stage 3.10: the same rule the server applies to new questions. */}
-        <ClarificationsPanel projectId={project.id} role="service_provider" canAsk={project.tender_rules.questions_open} />
+        <ClarificationsPanel projectId={project.id} role="service_provider" canAsk={project.tender_rules.questions_open}
+          qaOpen={project.tender_rules.questions_open}
+          closesAt={project.tender_rules.questions_close_at}
+        />
       </div>
 
       <ErrorBanner message={error} />

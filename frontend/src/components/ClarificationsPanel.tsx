@@ -3,15 +3,21 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import type { Clarification } from "@/api/types";
 import { useI18n } from "@/i18n/I18nContext";
+import { formatDeadline } from "@/lib/format";
 
 export function ClarificationsPanel({
   projectId,
   role,
   canAsk = true,
+  qaOpen = true,
+  closesAt = null,
 }: {
   projectId: string;
   role: "owner" | "service_provider";
   canAsk?: boolean;
+  // Stage 3.10: the Q&A closes for both sides at the question cut-off.
+  qaOpen?: boolean;
+  closesAt?: string | null;
 }) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
@@ -62,6 +68,11 @@ export function ClarificationsPanel({
 
       {error && <p className="text-xs bg-red-tint text-red border border-red rounded px-3 py-2 mb-3">{error}</p>}
 
+      {closesAt && (
+        <p className={`text-[11.5px] mb-2 ${qaOpen ? "text-steel" : "text-amber-dark"}`}>
+          {(qaOpen ? t("clarifications.closesAt") : t("clarifications.closedAt")).replace("{date}", formatDeadline(closesAt))}
+        </p>
+      )}
       {!clarifications?.length ? (
         <p className="text-[12.5px] text-steel-light mb-3">{t("clarifications.noQuestions")}</p>
       ) : (
@@ -80,6 +91,8 @@ export function ClarificationsPanel({
               <p className="text-[13px] text-navy">{c.question}</p>
               {c.answer ? (
                 <p className="text-[12.5px] text-steel mt-1.5 pl-3 border-s-2 border-blue">{c.answer}</p>
+              ) : role === "owner" && !qaOpen ? (
+                <p className="text-[12px] text-steel-light mt-1 italic">{t("clarifications.unansweredClosed")}</p>
               ) : role === "owner" ? (
                 <div className="mt-2 flex items-center gap-2">
                   <input

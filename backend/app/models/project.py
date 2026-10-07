@@ -75,7 +75,11 @@ class Project(Base):
     # warranty, offer validity...) and anything a provider must know or do
     # before responding (site visit arrangements, access...). Free text, as
     # the owner writes them; nothing is assumed.
-    commercial_terms: Mapped[str | None] = mapped_column(Text, nullable=True)
+    commercial_terms: Mapped[str | None] = mapped_column(Text, nullable=True)  # "other conditions"
+    # The common commercial terms as structured fields (schemas.project.
+    # CommercialConditions): offer validity, payment stages, retention,
+    # warranty. Each optional; NULL = none stated.
+    commercial_conditions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     bidder_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Admin moderation flag — independent of the owner-driven lifecycle
     # `status` above. Hides the project from the service provider feed and blocks

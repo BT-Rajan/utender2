@@ -67,12 +67,21 @@ export interface ProjectDetail extends Project {
   tender_rules: TenderRules;
 }
 
+export interface CommercialConditions {
+  offer_validity_days: number | null;
+  payment_stages: { milestone: string; percent: string }[];
+  retention_percent: string | null;
+  retention_months: number | null;
+  warranty_months: number | null;
+}
+
 // Stage 3.10: how the opportunity is run (separate from what is requested).
 export interface TenderRules {
   questions_allowed: boolean;
   questions_deadline: string | null;
   questions_close_at: string | null;
   questions_open: boolean;
+  commercial_conditions: CommercialConditions;
   commercial_terms: string | null;
   bidder_instructions: string | null;
 }

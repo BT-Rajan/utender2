@@ -127,6 +127,11 @@ def answer_clarification(
         raise HTTPException(status_code=404, detail="Question not found.")
     if clarification.answer is not None:
         raise HTTPException(status_code=400, detail="This question has already been answered.")
+    # Stage 3.10: at the question cut-off the Q&A closes for both sides --
+    # no new questions and no new answers -- so every provider prices
+    # against the same, final set of clarifications.
+    if not questions_open(project):
+        raise HTTPException(status_code=400, detail="Questions and answers for this requirement have closed.")
 
     answer = payload.answer.strip()
     if not answer:

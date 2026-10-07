@@ -6,7 +6,9 @@ enforces come from these functions and the existing ones they build on:
   offers close        Project.bid_deadline, tender_lifecycle.bidding_is_open
                       (submit, revise, withdraw, offer documents)
   offer visibility    Project.tender_type, tender_lifecycle.is_sealed_and_open
-  questions           questions_allowed / questions_deadline, below
+  questions           questions_allowed / questions_deadline, below. At the
+                      cut-off the Q&A closes for both sides: no new questions
+                      and no new answers.
   revise / withdraw   allowed while bidding is open (routers/offers.py)
   declarations        response_requirements (Stage 3.8)
 """

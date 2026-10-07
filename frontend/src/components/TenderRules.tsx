@@ -12,6 +12,8 @@ import { formatDeadline } from "@/lib/format";
 // declarations with the response requirements (3.8); this sets the rest.
 // The server enforces each rule from the same fields (services/tender_rules).
 
+let nextKey = 1;
+
 export function TenderRulesEditor({ project }: { project: ProjectDetail }) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
@@ -20,6 +22,11 @@ export function TenderRulesEditor({ project }: { project: ProjectDetail }) {
     tender_type: project.tender_type,
     questions_allowed: rules.questions_allowed,
     questions_deadline: rules.questions_deadline ? toLocalInputValue(rules.questions_deadline) : "",
+    validity: rules.commercial_conditions.offer_validity_days ? String(rules.commercial_conditions.offer_validity_days) : "",
+    stages: rules.commercial_conditions.payment_stages.map((s) => ({ key: nextKey++, milestone: s.milestone, percent: String(Number(s.percent)) })),
+    retention_percent: rules.commercial_conditions.retention_percent ? String(Number(rules.commercial_conditions.retention_percent)) : "",
+    retention_months: rules.commercial_conditions.retention_months ? String(rules.commercial_conditions.retention_months) : "",
+    warranty: rules.commercial_conditions.warranty_months ? String(rules.commercial_conditions.warranty_months) : "",
     commercial_terms: rules.commercial_terms ?? "",
     bidder_instructions: rules.bidder_instructions ?? "",
   });
@@ -32,7 +39,10 @@ export function TenderRulesEditor({ project }: { project: ProjectDetail }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.tender_type, JSON.stringify(rules)]);
 
-  const dirty = JSON.stringify(values) !== JSON.stringify(initial());
+  const strip = (v: typeof values) => ({ ...v, stages: v.stages.map(({ milestone, percent }) => ({ milestone, percent })) });
+  const dirty = JSON.stringify(strip(values)) !== JSON.stringify(strip(initial()));
+  const stagesTotal = values.stages.reduce((sum, s) => sum + (Number(s.percent) || 0), 0);
+  const num = (v: string) => (v.trim() ? Number(v) : null);
   const set = (patch: Partial<typeof values>) => {
     setSaved(false);
     setValues((v) => ({ ...v, ...patch }));
@@ -46,6 +56,13 @@ export function TenderRulesEditor({ project }: { project: ProjectDetail }) {
           tender_type: values.tender_type,
           questions_allowed: values.questions_allowed,
           questions_deadline: values.questions_allowed && values.questions_deadline ? localInputToUtcIso(values.questions_deadline) : null,
+          commercial_conditions: {
+            offer_validity_days: num(values.validity),
+            payment_stages: values.stages.filter((s) => s.milestone.trim() || s.percent).map((s) => ({ milestone: s.milestone.trim(), percent: s.percent })),
+            retention_percent: values.retention_percent || null,
+            retention_months: num(values.retention_months),
+            warranty_months: num(values.warranty),
+          },
           commercial_terms: values.commercial_terms || null,
           bidder_instructions: values.bidder_instructions || null,
         },
@@ -118,16 +135,82 @@ export function TenderRulesEditor({ project }: { project: ProjectDetail }) {
         </fieldset>
 
         <fieldset className="border-t border-border pt-4 grid gap-3">
+          <div className={`${legend} pt-4`}>{t("tenderRules.commercialTerms")}</div>
+          <p className={`${hint} -mt-2`}>{t("tenderRules.commercialTermsHint")}</p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <label className="text-xs text-steel">
+              {t("tenderRules.offerValidity")}
+              <input type="number" min={1} max={365} value={values.validity} onChange={(e) => set({ validity: e.target.value })} className={`${field} mt-1`} />
+            </label>
+            <label className="text-xs text-steel">
+              {t("tenderRules.warranty")}
+              <input type="number" min={1} max={240} value={values.warranty} onChange={(e) => set({ warranty: e.target.value })} className={`${field} mt-1`} />
+            </label>
+          </div>
           <div>
-            <label htmlFor="commercial-terms" className={`${legend} block pt-4`}>{t("tenderRules.commercialTerms")}</label>
-            <p className={`${hint} mb-1`}>{t("tenderRules.commercialTermsHint")}</p>
+            <div className="text-xs text-steel">{t("tenderRules.paymentStages")}</div>
+            <p className={`${hint} mb-1`}>{t("tenderRules.paymentStagesHint")}</p>
+            <div className="grid gap-1.5">
+              {values.stages.map((s, i) => (
+                <div key={s.key} className="flex items-center gap-2">
+                  <input
+                    aria-label={t("tenderRules.milestone")}
+                    placeholder={t("tenderRules.milestone")}
+                    value={s.milestone}
+                    maxLength={200}
+                    onChange={(e) => set({ stages: values.stages.map((x, j) => (j === i ? { ...x, milestone: e.target.value } : x)) })}
+                    className={`${field} flex-1`}
+                  />
+                  <input
+                    aria-label={`${t("tenderRules.percent")} ${i + 1}`}
+                    type="number"
+                    min={0.01}
+                    max={100}
+                    step="0.01"
+                    value={s.percent}
+                    onChange={(e) => set({ stages: values.stages.map((x, j) => (j === i ? { ...x, percent: e.target.value } : x)) })}
+                    className="w-20 border border-border rounded px-2 py-2 text-sm"
+                  />
+                  <span className="text-xs text-steel">%</span>
+                  <button type="button" onClick={() => set({ stages: values.stages.filter((_, j) => j !== i) })} className="text-xs text-red underline">
+                    {t("tenderRules.remove")}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-3 mt-1">
+              {values.stages.length < 10 && (
+                <button type="button" onClick={() => set({ stages: [...values.stages, { key: nextKey++, milestone: "", percent: "" }] })} className="text-xs text-blue underline">
+                  + {t("tenderRules.addStage")}
+                </button>
+              )}
+              {values.stages.length > 0 && (
+                <span className={`text-xs font-mono ${stagesTotal === 100 ? "text-green" : "text-amber-dark"}`}>
+                  {t("tenderRules.stagesTotal").replace("{total}", String(Math.round(stagesTotal * 100) / 100))}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <span className="text-xs text-steel pb-2.5">{t("tenderRules.retention")}</span>
+            <label className="text-xs text-steel">
+              {t("tenderRules.retentionPercent")}
+              <input type="number" min={0.01} max={100} step="0.01" value={values.retention_percent} onChange={(e) => set({ retention_percent: e.target.value })} className="block w-24 border border-border rounded px-2 py-2 text-sm mt-1" />
+            </label>
+            <label className="text-xs text-steel">
+              {t("tenderRules.retentionMonths")}
+              <input type="number" min={1} max={120} value={values.retention_months} onChange={(e) => set({ retention_months: e.target.value })} className="block w-24 border border-border rounded px-2 py-2 text-sm mt-1" />
+            </label>
+          </div>
+          <div>
+            <label htmlFor="commercial-terms" className="text-xs text-steel">{t("tenderRules.otherConditions")}</label>
             <textarea
               id="commercial-terms"
-              rows={4}
+              rows={3}
               maxLength={5000}
               value={values.commercial_terms}
               onChange={(e) => set({ commercial_terms: e.target.value })}
-              className={`${field} resize-y`}
+              className={`${field} resize-y mt-1`}
             />
           </div>
           <div>
@@ -176,12 +259,7 @@ export function ParticipationRules({ project }: { project: ProjectDetail }) {
         <li>{questions}</li>
         {declarations > 0 && <li>{t("tenderRules.pDeclarations").replace("{count}", String(declarations))}</li>}
       </ul>
-      {rules.commercial_terms && (
-        <div className="mt-3">
-          <h4 className="font-mono text-[10.5px] uppercase tracking-wide text-steel mb-0.5">{t("tenderRules.pCommercial")}</h4>
-          <p className="text-sm text-navy whitespace-pre-wrap break-words">{rules.commercial_terms}</p>
-        </div>
-      )}
+      <CommercialConditionsView rules={rules} />
       {rules.bidder_instructions && (
         <div className="mt-3">
           <h4 className="font-mono text-[10.5px] uppercase tracking-wide text-steel mb-0.5">{t("tenderRules.pInstructions")}</h4>
@@ -189,5 +267,39 @@ export function ParticipationRules({ project }: { project: ProjectDetail }) {
         </div>
       )}
     </section>
+  );
+}
+
+// The commercial conditions as short, readable lines.
+function CommercialConditionsView({ rules }: { rules: ProjectDetail["tender_rules"] }) {
+  const { t } = useI18n();
+  const c = rules.commercial_conditions;
+  const pct = (v: string) => String(Number(v));
+  const lines = [
+    ...(c.offer_validity_days ? [t("tenderRules.pValidity").replace("{days}", String(c.offer_validity_days))] : []),
+    ...(c.payment_stages.length ? [`${t("tenderRules.pPayment")} ${c.payment_stages.map((s) => `${pct(s.percent)}% ${s.milestone}`).join(" · ")}`] : []),
+    ...(c.retention_percent && c.retention_months
+      ? [t("tenderRules.pRetention").replace("{percent}", pct(c.retention_percent)).replace("{months}", String(c.retention_months))]
+      : []),
+    ...(c.warranty_months ? [t("tenderRules.pWarranty").replace("{months}", String(c.warranty_months))] : []),
+  ];
+  if (!lines.length && !rules.commercial_terms) return null;
+  return (
+    <div className="mt-3">
+      <h4 className="font-mono text-[10.5px] uppercase tracking-wide text-steel mb-0.5">{t("tenderRules.pCommercial")}</h4>
+      {lines.length > 0 && (
+        <ul className="text-sm text-navy list-disc ps-5 leading-[1.8]">
+          {lines.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      )}
+      {rules.commercial_terms && (
+        <div className="mt-1.5">
+          <div className="text-xs text-steel">{t("tenderRules.pOther")}</div>
+          <p className="text-sm text-navy whitespace-pre-wrap break-words">{rules.commercial_terms}</p>
+        </div>
+      )}
+    </div>
   );
 }

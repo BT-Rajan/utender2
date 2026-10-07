@@ -131,3 +131,51 @@ def test_questions_switched_off_and_late_questions_are_refused(db):
     db.get(Project, other).bid_deadline = datetime.utcnow() - timedelta(seconds=1)
     db.commit()
     assert sp.post(f"/projects/{other}/clarifications", json={"question": "Late?"}).status_code in (400, 404)
+
+
+def test_structured_commercial_conditions(db):
+    owner = _verified(db, "owner", "owner@example.com")
+    pid = _draft(owner)
+    conditions = {
+        "offer_validity_days": 90,
+        "payment_stages": [
+            {"milestone": "On mobilisation", "percent": "30"},
+            {"milestone": "Monthly progress", "percent": "60"},
+            {"milestone": "On handover", "percent": "10"},
+        ],
+        "retention_percent": "5",
+        "retention_months": 12,
+        "warranty_months": 12,
+    }
+    r = owner.put(f"/projects/{pid}/tender-rules", json={"commercial_conditions": conditions, "commercial_terms": "Prices include delivery to site."})
+    assert r.status_code == 200
+    saved = owner.get(f"/projects/{pid}").json()["tender_rules"]
+    c = saved["commercial_conditions"]
+    assert c["offer_validity_days"] == 90 and [s["milestone"] for s in c["payment_stages"]][0] == "On mobilisation"
+    assert (c["retention_months"], c["warranty_months"]) == (12, 12) and saved["commercial_terms"] == "Prices include delivery to site."
+
+    bad_stages = {**conditions, "payment_stages": [{"milestone": "Advance", "percent": "30"}, {"milestone": "End", "percent": "60"}]}
+    assert owner.put(f"/projects/{pid}/tender-rules", json={"commercial_conditions": bad_stages}).status_code == 422  # 90%, not 100%
+    half_retention = {"retention_percent": "5"}
+    assert owner.put(f"/projects/{pid}/tender-rules", json={"commercial_conditions": half_retention}).status_code == 422
+    # Nothing is forced: no conditions at all is fine.
+    assert owner.put(f"/projects/{pid}/tender-rules", json={}).json()["tender_rules"]["commercial_conditions"]["payment_stages"] == []
+
+
+def test_answers_also_close_at_the_cut_off(db):
+    owner = _verified(db, "owner", "owner@example.com")
+    sp = _verified(db, "service_provider", "fence@example.com")
+    pid = _draft(owner)
+    owner.put(f"/projects/{pid}/tender-rules", json={"questions_deadline": (NOW + timedelta(days=10)).isoformat() + "Z"})
+    owner.post(f"/owner/projects/{pid}/publish")
+    first = sp.post(f"/projects/{pid}/clarifications", json={"question": "Is the gate included?"}).json()
+    second = sp.post(f"/projects/{pid}/clarifications", json={"question": "Fence height?"}).json()
+    assert owner.post(f"/projects/{pid}/clarifications/{first['id']}/answer", json={"answer": "Yes, one 4 m gate."}).status_code == 200
+
+    db.get(Project, pid).questions_deadline = datetime.utcnow() - timedelta(seconds=1)
+    db.commit()
+    r = owner.post(f"/projects/{pid}/clarifications/{second['id']}/answer", json={"answer": "2 m"})
+    assert r.status_code == 400 and "closed" in r.json()["detail"]
+    # What was answered before the cut-off stays.
+    answers = {c["id"]: c["answer"] for c in sp.get(f"/projects/{pid}/clarifications").json()}
+    assert answers[first["id"]] == "Yes, one 4 m gate."

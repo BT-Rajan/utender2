@@ -27,6 +27,7 @@ from app.schemas.project import (
     ProjectItemsUpdate,
     ProviderEligibilityIn,
     ResponseRequirements,
+    CommercialConditions,
     TenderRulesIn,
     TenderRulesOut,
 )
@@ -490,6 +491,7 @@ def set_tender_rules(project_id: str, payload: TenderRulesIn, user: User = Depen
     project.tender_type = payload.tender_type
     project.questions_allowed = payload.questions_allowed
     project.questions_deadline = cutoff
+    project.commercial_conditions = payload.commercial_conditions.model_dump(mode="json")
     project.commercial_terms = (payload.commercial_terms or "").strip() or None
     project.bidder_instructions = (payload.bidder_instructions or "").strip() or None
     db.commit()
@@ -777,6 +779,7 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
             questions_deadline=project.questions_deadline,
             questions_close_at=questions_close_at(project),
             questions_open=questions_open(project),
+            commercial_conditions=CommercialConditions(**(project.commercial_conditions or {})),
             commercial_terms=project.commercial_terms,
             bidder_instructions=project.bidder_instructions,
         ),

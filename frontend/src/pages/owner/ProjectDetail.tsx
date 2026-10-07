@@ -549,7 +549,12 @@ export function OwnerProjectDetailPage() {
             </div>
           )}
           <div className="mt-4">
-            <ClarificationsPanel projectId={project.id} role="owner" />
+            <ClarificationsPanel
+              projectId={project.id}
+              role="owner"
+              qaOpen={project.tender_rules.questions_open}
+              closesAt={project.tender_rules.questions_close_at}
+            />
           </div>
         </div>
 

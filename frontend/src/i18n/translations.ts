@@ -58,6 +58,24 @@ export interface Dictionary {
     pDeclarations: string;
     pCommercial: string;
     pInstructions: string;
+    offerValidity: string;
+    paymentStages: string;
+    paymentStagesHint: string;
+    milestone: string;
+    percent: string;
+    addStage: string;
+    remove: string;
+    stagesTotal: string;
+    retention: string;
+    retentionPercent: string;
+    retentionMonths: string;
+    warranty: string;
+    otherConditions: string;
+    pValidity: string;
+    pPayment: string;
+    pRetention: string;
+    pWarranty: string;
+    pOther: string;
   };
   eligibility: {
     heading: string;
@@ -368,6 +386,9 @@ export interface Dictionary {
     askButton: string;
     askError: string;
     answerError: string;
+    closesAt: string;
+    closedAt: string;
+    unansweredClosed: string;
   };
   service_provider: {
     roleLabel: string;
@@ -849,7 +870,7 @@ export const en: Dictionary = {
     questions: "Questions from providers",
     questionsAllowed: "Providers may ask questions",
     questionsUntil: "Questions close at (optional)",
-    questionsUntilHint: "Leave blank to take questions until offers close. Must be before offers close. In your local time.",
+    questionsUntilHint: "Leave blank to take questions until offers close. At the cut-off, questions and answers both close. In your local time.",
     commercialTerms: "Commercial conditions",
     commercialTermsHint: "Only what applies, e.g. payment stages, retention, warranty, how long prices must stay valid.",
     instructions: "Instructions for providers",
@@ -868,6 +889,24 @@ export const en: Dictionary = {
     pDeclarations: "Before submitting, you must confirm the owner's declarations ({count}).",
     pCommercial: "Commercial conditions",
     pInstructions: "Instructions",
+    offerValidity: "Offer validity (days after offers close)",
+    paymentStages: "Payment stages",
+    paymentStagesHint: "How you will pay, e.g. 30% on mobilisation, 60% on progress, 10% on handover. Must add up to 100%.",
+    milestone: "Milestone",
+    percent: "%",
+    addStage: "Add stage",
+    remove: "Remove",
+    stagesTotal: "Total {total}%",
+    retention: "Retention",
+    retentionPercent: "% held",
+    retentionMonths: "for (months)",
+    warranty: "Warranty / defects liability (months from handover)",
+    otherConditions: "Other conditions",
+    pValidity: "Prices must stay valid for {days} days after offers close.",
+    pPayment: "Payment:",
+    pRetention: "Retention: {percent}% held for {months} months.",
+    pWarranty: "Warranty: {months} months from handover.",
+    pOther: "Other conditions",
   },
   eligibility: {
     heading: "Who can respond",
@@ -1195,6 +1234,9 @@ export const en: Dictionary = {
     askButton: "Ask",
     askError: "Could not submit your question.",
     answerError: "Could not submit your answer.",
+    closesAt: "Questions and answers close {date}.",
+    closedAt: "Questions and answers closed {date}. No new questions or answers.",
+    unansweredClosed: "Not answered before the question cut-off.",
   },
   service_provider: {
     roleLabel: "Service provider",
@@ -1684,7 +1726,7 @@ export const ar: Dictionary = {
     questions: "أسئلة مقدمي الخدمة",
     questionsAllowed: "يمكن لمقدمي الخدمة طرح الأسئلة",
     questionsUntil: "موعد إغلاق الأسئلة (اختياري)",
-    questionsUntilHint: "اتركه فارغًا لاستقبال الأسئلة حتى إغلاق العروض. يجب أن يكون قبل إغلاق العروض. بتوقيتك المحلي.",
+    questionsUntilHint: "اتركه فارغًا لاستقبال الأسئلة حتى إغلاق العروض. عند هذا الموعد تُغلق الأسئلة والأجوبة معًا. بتوقيتك المحلي.",
     commercialTerms: "الشروط التجارية",
     commercialTermsHint: "ما ينطبق فقط، مثل: مراحل الدفع، المحتجزات، الضمان، مدة صلاحية الأسعار.",
     instructions: "تعليمات لمقدمي الخدمة",
@@ -1703,6 +1745,24 @@ export const ar: Dictionary = {
     pDeclarations: "قبل التقديم، يجب أن تؤكد إقرارات المالك ({count}).",
     pCommercial: "الشروط التجارية",
     pInstructions: "التعليمات",
+    offerValidity: "صلاحية العرض (أيام بعد إغلاق العروض)",
+    paymentStages: "مراحل الدفع",
+    paymentStagesHint: "طريقة الدفع، مثل: 30% عند بدء الأعمال، 60% حسب الإنجاز، 10% عند التسليم. يجب أن يكون المجموع 100%.",
+    milestone: "المرحلة",
+    percent: "%",
+    addStage: "إضافة مرحلة",
+    remove: "إزالة",
+    stagesTotal: "المجموع {total}%",
+    retention: "المحتجزات",
+    retentionPercent: "% محتجزة",
+    retentionMonths: "لمدة (أشهر)",
+    warranty: "الضمان / مسؤولية العيوب (أشهر من التسليم)",
+    otherConditions: "شروط أخرى",
+    pValidity: "يجب أن تبقى الأسعار سارية لمدة {days} يومًا بعد إغلاق العروض.",
+    pPayment: "الدفع:",
+    pRetention: "المحتجزات: {percent}% لمدة {months} شهرًا.",
+    pWarranty: "الضمان: {months} شهرًا من التسليم.",
+    pOther: "شروط أخرى",
   },
   eligibility: {
     heading: "من يمكنه تقديم عرض",
@@ -2030,6 +2090,9 @@ export const ar: Dictionary = {
     askButton: "إرسال السؤال",
     askError: "تعذر إرسال سؤالك.",
     answerError: "تعذر إرسال إجابتك.",
+    closesAt: "تُغلق الأسئلة والأجوبة في {date}.",
+    closedAt: "أُغلقت الأسئلة والأجوبة في {date}. لا أسئلة أو أجوبة جديدة.",
+    unansweredClosed: "لم تتم الإجابة قبل موعد إغلاق الأسئلة.",
   },
   service_provider: {
     roleLabel: "مزوّد خدمة",
