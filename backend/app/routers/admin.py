@@ -1307,7 +1307,9 @@ def admin_edit_offer(
     project = lock_project(db, offer.project_id)
     if project and is_sealed_and_open(project):
         raise HTTPException(status_code=400, detail="Bids on a sealed tender can't be edited until it has opened.")
-    decided = project is not None and project.status in (ProjectStatus.awarded, ProjectStatus.no_award)
+    # Stage 6.15: every ended requirement -- cancelled and expired as well as
+    # awarded or ended without award -- keeps its offers as they were.
+    decided = project is not None and project.status in (ProjectStatus.awarded, ProjectStatus.no_award, ProjectStatus.canceled, ProjectStatus.expired)
     if decided or db.query(AwardRecord).filter(AwardRecord.offer_id == offer_id).first():
         raise HTTPException(
             status_code=400,

@@ -562,4 +562,17 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - **What's refused afterwards:** new or changed offers, an award, a shortlist change, or another ending. A retry or stale page gets a refusal, never a second outcome.
   - **Fixed:** no ending is recorded while an admin has the requirement suspended, the same rule as the award (6.13).
 
+- **6.15 Decision integrity & concurrency:**
+  - **Already guaranteed, one outcome per requirement:**
+    - Every decision (award, no award, end outside U-Tender, cancel, close, start evaluation) re-checks ownership, an active account and the requirement's current status under its row lock. So simultaneous decisions, other members, other tabs, double clicks, retries and stale pages settle on exactly one outcome, and the rest are refused.
+    - The database allows one award record per requirement. The award writes the record, the offer statuses, the requirement status and the audit entry in one transaction.
+    - Withdrawing and revising need offers to be open; awarding and the no-award endings need them closed. Both are judged under the same lock, so a withdrawn or superseded offer can never be awarded. New offers are refused once the requirement isn't open.
+    - The expiry sweep locks the rows it changes and skips any being decided (`SKIP LOCKED`), and only moves open requirements on. Nothing moves a requirement out of an ended state.
+    - An awarded offer can't be deleted, even by an admin.
+  - **Fixed:** an admin could still edit an offer on a cancelled or expired requirement (only awarded or no-award ones were protected). Every ended requirement's offers now stay exactly as they were.
+  - **Verified on MySQL:**
+    - simultaneous award vs no award, award vs cancel, award vs end outside U-Tender, and no award vs cancel: exactly one succeeds, and the requirement, offer statuses, award record and audit log agree;
+    - four simultaneous identical awards make one award;
+    - retries and stale requests after an award change nothing.
+
 _Later Stage 6 steps are added as they are implemented._
