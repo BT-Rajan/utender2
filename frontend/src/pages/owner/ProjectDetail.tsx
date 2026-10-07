@@ -19,7 +19,7 @@ import { CategoryField } from "@/components/CategoryField";
 import { TenderRulesEditor } from "@/components/TenderRules";
 import { QualityCheck, type QualityReport } from "@/components/QualityCheck";
 import { useConfirm } from "@/components/ConfirmDialog";
-import { ClosureOutcome, EndRequirement, outcomeLabel } from "@/components/ClosureOutcome";
+import { ClosureOutcome, EndRequirement, StartAgain, outcomeLabel } from "@/components/ClosureOutcome";
 import { AmendPublishedForm, AmendmentsList, PauseControl } from "@/components/PostPublication";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
 import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
@@ -525,6 +525,7 @@ export function OwnerProjectDetailPage() {
       {/* Stage 3.16: ending it without a U-Tender award -- and saying how it ended. */}
       {(project.status === "open" || project.status === "closed" || project.status === "under_evaluation") && <EndRequirement project={project} />}
       {(project.status === "canceled" || project.status === "no_award") && <ClosureOutcome project={project} />}
+      {(project.status === "canceled" || project.status === "no_award" || project.status === "expired") && <StartAgain project={project} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-6 items-start">
         <div>

@@ -275,7 +275,10 @@ def get_project(project_id: str, user: User = Depends(get_current_user), db: Ses
     project = db.get(Project, project_id)
     if not project or not _can_view_project(user, project, db):
         raise HTTPException(status_code=404, detail="Project not found.")
-    return _serialize_detail(project, db)
+    detail = _serialize_detail(project, db)
+    if owns(db, user, project):
+        detail.closure_note = project.closure_note  # Stage 3.16: the owner's private note, never a provider's to see
+    return detail
 
 
 # A published, material change to a tender (spec §2.8/§2.12, D-007) — a

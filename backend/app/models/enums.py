@@ -145,3 +145,4 @@ class NotificationType(str, enum.Enum):
     new_requirement = "new_requirement"
     tender_paused = "tender_paused"
     tender_resumed = "tender_resumed"
+    requirement_ended = "requirement_ended"

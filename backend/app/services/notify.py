@@ -96,6 +96,10 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.en: ("{project_title} was canceled", "The owner canceled this project. It won't go ahead in its current form; your offer is kept on record."),
         Language.ar: ("تم إلغاء {project_title}", "قام المالك بإلغاء هذا المشروع. لن يمضي بصيغته الحالية؛ يبقى عرضك محفوظًا في السجل."),
     },
+    NotificationType.requirement_ended: {
+        Language.en: ("{project_title} has ended", "The owner ended {project_title} before its deadline. It is no longer open for offers."),
+        Language.ar: ("انتهى {project_title}", "أنهى المالك {project_title} قبل موعده النهائي. لم يعد مفتوحًا لتلقي العروض."),
+    },
     NotificationType.deadline_approaching: {
         Language.en: ("Bidding closes soon — {project_title}", "{project_title} stops accepting offers within 24 hours."),
         Language.ar: ("يغلق التقديم قريبًا — {project_title}", "سيتوقف {project_title} عن قبول العروض خلال 24 ساعة."),

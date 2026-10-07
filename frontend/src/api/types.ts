@@ -44,6 +44,7 @@ export interface Project {
   closed_at?: string | null;
   // Stage 3.16: why it ended without a U-Tender award (canceled / no_award only).
   closure_reason?: ClosureReason | null;
+  closure_note?: string | null; // the owner side only
   material_revision?: number;
   documents_required?: boolean;
   offer_count: number;

@@ -203,6 +203,10 @@ export interface Dictionary {
     textNoSuitable: string;
     offersKept: string;
     dismiss: string;
+    yourNote: string;
+    restart: string;
+    restartConfirm: string;
+    restartConfirmBody: string;
   };
   postPub: {
     pause: string;
@@ -1205,6 +1209,10 @@ export const en: Dictionary = {
     textNoSuitable: "The owner ended this requirement without accepting any offer.",
     offersKept: "Offers submitted stay on record. This requirement has ended and won't reopen.",
     dismiss: "Keep it as it is",
+    yourNote: "Your private note:",
+    restart: "Start a new draft from this",
+    restartConfirm: "Start a new draft from this requirement?",
+    restartConfirmBody: "A new draft is created with this requirement’s description, items, rules, eligibility and current documents. Set a new deadline, check it, then publish it as a new requirement. This one stays as it ended, with its offers.",
   },
   postPub: {
     pause: "Pause this requirement",
@@ -2232,6 +2240,10 @@ export const ar: Dictionary = {
     textNoSuitable: "أنهى المالك هذا الطلب دون قبول أي عرض.",
     offersKept: "تبقى العروض المقدَّمة محفوظة. انتهى هذا الطلب ولن يُعاد فتحه.",
     dismiss: "إبقاؤه كما هو",
+    yourNote: "ملاحظتك الخاصة:",
+    restart: "بدء مسودة جديدة من هذا الطلب",
+    restartConfirm: "بدء مسودة جديدة من هذا الطلب؟",
+    restartConfirmBody: "تُنشأ مسودة جديدة بوصف هذا الطلب وبنوده وقواعده وشروط الأهلية ومستنداته الحالية. حدّد موعداً نهائياً جديداً وراجعها ثم انشرها كطلب جديد. يبقى هذا الطلب كما انتهى، مع عروضه.",
   },
   postPub: {
     pause: "إيقاف الطلب مؤقتًا",

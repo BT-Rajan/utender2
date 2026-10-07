@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import type { ClosureReason, ProjectDetail, ProjectStatus } from "@/api/types";
@@ -25,7 +26,7 @@ export function outcomeText(t: T, status: ProjectStatus, reason?: ClosureReason 
   return null;
 }
 
-export function ClosureOutcome({ project }: { project: Pick<ProjectDetail, "status" | "closure_reason"> }) {
+export function ClosureOutcome({ project }: { project: Pick<ProjectDetail, "status" | "closure_reason" | "closure_note"> }) {
   const { t } = useI18n();
   const text = outcomeText(t, project.status, project.closure_reason);
   if (!text) return null;
@@ -34,6 +35,11 @@ export function ClosureOutcome({ project }: { project: Pick<ProjectDetail, "stat
       <strong className="font-display text-navy block">{outcomeLabel(t, project.status, project.closure_reason)}</strong>
       {text}
       <p className="text-xs text-steel-light mt-1">{t("closure.offersKept")}</p>
+      {project.closure_note && (
+        <p className="text-xs text-steel mt-2" data-testid="closure-note">
+          <span className="font-semibold">{t("closure.yourNote")}</span> {project.closure_note}
+        </p>
+      )}
     </div>
   );
 }
@@ -133,6 +139,38 @@ export function EndRequirement({ project }: { project: ProjectDetail }) {
       <ErrorBanner message={error} />
       <button type="button" onClick={() => setOpen(false)} className="w-fit border border-border text-steel text-xs font-semibold rounded px-4 py-2">
         {t("closure.dismiss")}
+      </button>
+    </div>
+  );
+}
+
+// An ended requirement stays ended; when the work comes back, the owner starts
+// a new draft from its content (the server copies it; the old one is untouched).
+export function StartAgain({ project }: { project: ProjectDetail }) {
+  const { t } = useI18n();
+  const confirm = useConfirm();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const token = useRef(typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`);
+  const act = useMutation({
+    mutationFn: () => apiFetch<ProjectDetail>(`/owner/projects/${project.id}/restart`, { method: "POST", body: { creation_token: token.current } }),
+    onSuccess: (draft) => {
+      queryClient.invalidateQueries({ queryKey: ["owner-projects"] });
+      navigate(`/owner/projects/${draft.id}`);
+    },
+    onError: (err) => setError(err instanceof ApiError ? err.detail : t("closure.error")),
+  });
+  return (
+    <div className="mb-6 max-w-2xl">
+      <ErrorBanner message={error} />
+      <button
+        type="button"
+        disabled={act.isPending}
+        onClick={() => void confirm({ title: t("closure.restartConfirm"), body: t("closure.restartConfirmBody"), confirmLabel: t("closure.restart") }).then((ok) => ok && act.mutate())}
+        className="border border-navy text-navy hover:bg-navy hover:text-white disabled:opacity-60 text-xs font-semibold rounded px-4 py-2"
+      >
+        {t("closure.restart")}
       </button>
     </div>
   );

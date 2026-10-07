@@ -72,6 +72,8 @@ class ProjectOut(BaseModel):
     material_revision: int = 0
     # Stage 3.16: why it ended without a U-Tender award (see Project.closure_reason).
     closure_reason: str | None = None
+    # The owner's private note on ending it: filled in for the owner side only.
+    closure_note: str | None = None
     version: int = 1  # send back as If-Match when saving a draft
     documents_required: bool = False
     offer_count: int = 0

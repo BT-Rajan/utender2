@@ -150,3 +150,67 @@ def test_only_the_owner_side_ends_a_requirement(db):
         for action in ("cancel", "close-externally", "no-award"):
             assert client.post(f"/owner/projects/{pid}/{action}").status_code == expected, action
     assert db.get(Project, pid).status.value == "open"
+
+
+def test_the_owner_side_reads_its_private_note(db):
+    owner = _verified(db, "owner", "owner@example.com")
+    alpha = _verified(db, "service_provider", "alpha@example.com")
+    pid = _published(owner)
+    alpha.post(f"/projects/{pid}/offers", json={"amount": "3000"})
+    r = owner.post(f"/owner/projects/{pid}/cancel", json={"reason": "postponed", "note": "Bank financing delayed."})
+    assert r.json()["closure_note"] == "Bank financing delayed."
+    assert owner.get(f"/projects/{pid}").json()["closure_note"] == "Bank financing delayed."
+    assert next(p for p in owner.get("/owner/projects").json() if p["id"] == pid)["closure_note"] == "Bank financing delayed."
+    seen = alpha.get(f"/projects/{pid}").json()
+    assert seen["closure_note"] is None and "Bank" not in str(seen) and "Bank" not in str(alpha.get("/service-provider/my-bids").json())
+
+
+def test_an_ended_requirement_can_be_started_again_as_a_new_draft(db):
+    owner = _verified(db, "owner", "owner@example.com")
+    other = _verified(db, "owner", "other@example.com")
+    alpha = _verified(db, "service_provider", "alpha@example.com")
+    pid = _published(owner)
+    owner.post(f"/projects/{pid}/drawings", files=[("drawings", ("plan.pdf", b"%PDF-plan", "application/pdf"))])
+    alpha.post(f"/projects/{pid}/offers", json={"amount": "3000"})
+    assert owner.post(f"/owner/projects/{pid}/restart").status_code == 400  # still open: nothing to restart
+    owner.post(f"/owner/projects/{pid}/cancel", json={"reason": "postponed"})
+    assert other.post(f"/owner/projects/{pid}/restart").status_code == 404
+    assert alpha.post(f"/owner/projects/{pid}/restart").status_code == 403
+
+    r = owner.post(f"/owner/projects/{pid}/restart", json={"creation_token": "again-1"})
+    assert r.status_code == 201
+    new = r.json()
+    assert new["id"] != pid and new["status"] == "draft" and new["closure_reason"] is None and new["offer_count"] == 0
+    assert owner.post(f"/owner/projects/{pid}/restart", json={"creation_token": "again-1"}).json()["id"] == new["id"]  # a retry: same draft
+    draft = owner.get(f"/projects/{new['id']}").json()
+    assert (draft["title"], draft["description"]) == ("Majlis extension", "Extend the majlis by 4 m.")
+    doc = draft["drawings"][0]
+    assert doc["file_name"] == "plan.pdf" and owner.get("/" + doc["url"].split("://", 1)[-1].split("/", 1)[-1]).content == b"%PDF-plan"
+    # The old one is untouched: still canceled, its offer still there; nobody else sees the draft.
+    old = owner.get(f"/projects/{pid}").json()
+    assert (old["status"], old["closure_reason"], old["offer_count"]) == ("canceled", "postponed", 1)
+    assert alpha.get(f"/projects/{new['id']}").status_code == 404
+    assert db.query(AuditLog).filter(AuditLog.action == "project.restart", AuditLog.previous_value == pid).count() == 1
+
+
+def test_providers_who_were_told_hear_it_ended(db):
+    from app.models.clarification import Clarification
+
+    owner = _verified(db, "owner", "owner@example.com")
+    bidder = _verified(db, "service_provider", "alpha@example.com")
+    asker = _verified(db, "service_provider", "beta@example.com")
+    told = _verified(db, "service_provider", "gamma@example.com")
+    _verified(db, "service_provider", "delta@example.com")  # never told about it
+    pid = _published(owner)
+    told_id = told.get("/auth/me").json()["id"]
+    db.add(Notification(user_id=told_id, type="new_requirement", title="New", body="x", link=f"/service-provider/projects/{pid}/offer"))
+    db.commit()
+    bidder.post(f"/projects/{pid}/offers", json={"amount": "3000"})
+    assert asker.post(f"/projects/{pid}/clarifications", json={"question": "Is parking available?"}).status_code in (200, 201)
+    assert db.query(Clarification).count() == 1
+
+    owner.post(f"/owner/projects/{pid}/close-externally")
+    ended = {db.get(ServiceProviderProfile, n.user_id).company_name for n in db.query(Notification).filter(Notification.type == "requirement_ended")}
+    assert ended == {"beta", "gamma"}  # the bidder gets its own notice instead
+    assert db.query(Notification).filter(Notification.type == "tender_no_award").count() == 1
+    assert db.query(Notification).filter(Notification.type == "new_requirement", Notification.is_read.is_(False)).count() == 0
