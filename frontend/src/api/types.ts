@@ -38,6 +38,7 @@ export interface Project {
   updated_at?: string | null;
   discarded_at?: string | null;
   version?: number;
+  documents_required?: boolean;
   offer_count: number;
   my_offer_status: OfferStatus | null;
   // Stage 3.9, provider feed only.

@@ -15,16 +15,21 @@ The four states are kept distinct:
   eligible                -> profile.is_verified_active (owners: verified and
                              not suspended; service providers: also paid)
 """
+import hashlib
+import secrets
+from datetime import datetime, timedelta
+
 from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.enums import MembershipRole, StakeholderType, UserRole, VerificationStatus
-from app.models.organization import Organization, OrganizationMembership
+from app.models.organization import Organization, OrganizationInvitation, OrganizationMembership
 from app.models.owner import OwnerProfile
 from app.models.service_provider import ServiceProviderProfile
 from app.models.user import User
 from app.services.audit import log_action
+from app.services.email import notify_organization_invitation
 
 # Identity may only change while the profile is not under (or past) review --
 # otherwise an approved individual could become an unverified organization.
@@ -213,7 +218,8 @@ def require_established(profile) -> None:
 
 # ---------- organization members ----------
 # An organization is one stakeholder: one profile, verified once (Step 3).
-# Its authorized representative (membership admin) brings colleagues in;
+# Its authorized representative (membership admin) invites colleagues by
+# email; they join by accepting, signed in with that email;
 # each colleague keeps their own login and acts as the organization's
 # profile (services.team.acting_profile), so its verification, payment,
 # trading name and everything recorded under it are shared. Their own
@@ -240,40 +246,145 @@ def list_members(user: User, db: Session) -> list[dict]:
         db.query(OrganizationMembership, User)
         .join(User, OrganizationMembership.user_id == User.id)
         .filter(OrganizationMembership.organization_id == membership.organization_id)
-        .order_by(OrganizationMembership.created_at.asc())
+        .order_by(OrganizationMembership.created_at.asc(), User.email.asc())
         .all()
     )
+    # The representative first, then everyone else in the order they joined.
+    rows.sort(key=lambda row: row[0].role != MembershipRole.admin)
     return [
         {"user_id": u.id, "full_name": u.full_name, "email": u.email, "role": m.role.value, "position": m.position}
         for m, u in rows
     ]
 
 
-def add_member(user: User, db: Session, email: str, position: str | None) -> None:
-    membership = _require_representative(user, db)
-    target = db.query(User).filter(func.lower(User.email) == email.strip().lower()).first()
-    if not target:
-        raise HTTPException(status_code=404, detail="No account with that email. Ask your colleague to sign up first.")
-    if target.role != user.role:
-        raise HTTPException(status_code=400, detail="That account is on the other side of the marketplace.")
+INVITATION_DAYS = 14  # an unused invitation link stops working after this
+
+
+def _hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def _check_can_join(target: User, db: Session) -> None:
+    """The same rule as changing who an account represents: an account that
+    already represents someone in its own right (established, under review or
+    verified) stays as it is."""
     if db.query(OrganizationMembership).filter(OrganizationMembership.user_id == target.id).first():
         raise HTTPException(status_code=409, detail="That account already belongs to an organization.")
     own = stakeholder_profile(target, db)
     if own is None:
         raise HTTPException(status_code=400, detail="That account can't join an organization.")
     if own.verification_status not in EDITABLE_STATUSES or own.is_suspended or own.stakeholder_type is not None:
-        # An account already established, under review or verified in its own
-        # right stays as it is (the same rule as changing who it represents).
         raise HTTPException(status_code=409, detail="That account already represents someone in its own right, so it can't join.")
+
+
+def invite_member(user: User, db: Session, email: str, position: str | None) -> tuple[OrganizationInvitation, str]:
+    """Invite a colleague by email, account or not. Returns the invitation and
+    its one-time token (the link is emailed; the representative may also
+    share it directly)."""
+    membership = _require_representative(user, db)
+    email = email.strip().lower()
+    existing = db.query(User).filter(func.lower(User.email) == email).first()
+    if existing:
+        if (
+            db.query(OrganizationMembership)
+            .filter(OrganizationMembership.organization_id == membership.organization_id, OrganizationMembership.user_id == existing.id)
+            .first()
+        ):
+            raise HTTPException(status_code=409, detail="That person is already a member.")
+        if existing.role != user.role:
+            raise HTTPException(status_code=400, detail="That account is on the other side of the marketplace.")
+        _check_can_join(existing, db)
+    now = datetime.utcnow()
+    pending = (
+        db.query(OrganizationInvitation)
+        .filter(
+            OrganizationInvitation.organization_id == membership.organization_id,
+            OrganizationInvitation.email == email,
+            OrganizationInvitation.accepted_at.is_(None),
+            OrganizationInvitation.revoked_at.is_(None),
+            OrganizationInvitation.expires_at > now,
+        )
+        .first()
+    )
+    if pending:
+        raise HTTPException(status_code=409, detail="An invitation to that email is already pending.")
+    token = secrets.token_urlsafe(32)
+    invitation = OrganizationInvitation(
+        organization_id=membership.organization_id,
+        email=email,
+        role=user.role,
+        position=(position or "").strip() or None,
+        token_hash=_hash(token),
+        invited_by=user.id,
+        expires_at=now + timedelta(days=INVITATION_DAYS),
+    )
+    db.add(invitation)
+    db.flush()
+    log_action(db, actor_id=user.id, action="organization.member_invited", target_type="organization", target_id=membership.organization_id, new_value=email)
+    notify_organization_invitation(email, membership.organization.legal_name, user.full_name or user.email, token)
+    return invitation, token
+
+
+def pending_invitations(user: User, db: Session) -> list[OrganizationInvitation]:
+    membership = _my_membership(user, db)
+    return (
+        db.query(OrganizationInvitation)
+        .filter(
+            OrganizationInvitation.organization_id == membership.organization_id,
+            OrganizationInvitation.accepted_at.is_(None),
+            OrganizationInvitation.revoked_at.is_(None),
+            OrganizationInvitation.expires_at > datetime.utcnow(),
+        )
+        .order_by(OrganizationInvitation.created_at.asc())
+        .all()
+    )
+
+
+def revoke_invitation(user: User, db: Session, invitation_id: str) -> None:
+    membership = _require_representative(user, db)
+    invitation = db.get(OrganizationInvitation, invitation_id)
+    if not invitation or invitation.organization_id != membership.organization_id or invitation.accepted_at:
+        raise HTTPException(status_code=404, detail="Invitation not found.")
+    invitation.revoked_at = datetime.utcnow()
+    db.flush()
+
+
+def _live_invitation(db: Session, token: str) -> OrganizationInvitation:
+    invitation = db.query(OrganizationInvitation).filter(OrganizationInvitation.token_hash == _hash(token)).first()
+    if not invitation or invitation.accepted_at or invitation.revoked_at or invitation.expires_at <= datetime.utcnow():
+        raise HTTPException(status_code=404, detail="This invitation is invalid, has expired or was withdrawn.")
+    return invitation
+
+
+def describe_invitation(db: Session, token: str) -> dict:
+    """What the invitation link shows before signing in: who invites whom to what."""
+    invitation = _live_invitation(db, token)
+    inviter = db.get(User, invitation.invited_by) if invitation.invited_by else None
+    return {
+        "organization_name": invitation.organization.legal_name,
+        "email": invitation.email,
+        "role": invitation.role.value,
+        "invited_by": (inviter.full_name or inviter.email) if inviter else None,
+        "expires_at": invitation.expires_at,
+        "account_exists": db.query(User.id).filter(func.lower(User.email) == invitation.email).first() is not None,
+    }
+
+
+def accept_invitation(user: User, db: Session, token: str) -> None:
+    invitation = _live_invitation(db, token)
+    if user.email.strip().lower() != invitation.email:
+        raise HTTPException(status_code=403, detail="This invitation is for a different email address.")
+    if user.role != invitation.role:
+        raise HTTPException(status_code=400, detail="This invitation is for an account on the other side of the marketplace.")
+    _check_can_join(user, db)
     db.add(
         OrganizationMembership(
-            organization_id=membership.organization_id, user_id=target.id, role=MembershipRole.member, position=(position or "").strip() or None
+            organization_id=invitation.organization_id, user_id=user.id, role=MembershipRole.member, position=invitation.position
         )
     )
+    invitation.accepted_at = datetime.utcnow()
     db.flush()
-    log_action(
-        db, actor_id=user.id, action="organization.member_added", target_type="organization", target_id=membership.organization_id, new_value=target.id
-    )
+    log_action(db, actor_id=user.id, action="organization.member_joined", target_type="organization", target_id=invitation.organization_id, new_value=user.id)
 
 
 def remove_member(user: User, db: Session, member_id: str) -> None:

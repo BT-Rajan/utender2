@@ -365,6 +365,10 @@ def amend_project(
         changed.append("description")
         project.description = payload.description or None
 
+    if payload.documents_required is not None and payload.documents_required != project.documents_required:
+        changed.append("documents_required")
+        project.documents_required = payload.documents_required
+
     if "category_id" in payload.model_fields_set or payload.trade is not None:
         category_value, trade = resolve_trade(db, payload.category_id, payload.trade)
         if (category_value, trade) != (project.category_id, project.trade):
@@ -862,6 +866,7 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
         updated_at=project.updated_at,
         discarded_at=project.discarded_at,
         version=project.version,
+        documents_required=project.documents_required,
         offer_count=offer_count,
         drawings=drawings,
         pricing_basis=project.pricing_basis,

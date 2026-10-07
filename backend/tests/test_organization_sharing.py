@@ -35,9 +35,12 @@ def _organization(db, role: str, name: str, admin_email: str, member_email: str)
     admin, admin_id = _account(role, admin_email)
     assert admin.put("/account/stakeholder", json={"type": "organization", "legal_name": name, "authorized": True}).status_code == 200
     member, member_id = _account(role, member_email)
-    r = admin.post("/account/organization/members", json={"email": member_email.upper(), "position": "Projects engineer"})
+    # The representative invites by email; the colleague joins by accepting.
+    r = admin.post("/account/organization/invitations", json={"email": member_email.upper(), "position": "Projects engineer"})
     assert r.status_code == 201, r.text
-    assert [m["role"] for m in r.json()] == ["admin", "member"]
+    token = r.json()["link"].rsplit("/", 1)[-1]
+    assert member.post(f"/account/invitations/{token}/accept").status_code == 200
+    assert [m["role"] for m in admin.get("/account/organization/members").json()] == ["admin", "member"]
     _approve(db, role, admin_id)  # the organization is verified once; members share it
     return admin, member, admin_id, member_id
 
@@ -66,7 +69,7 @@ def test_owner_organization_members_share_requirements(db):
     # Others still can't; a removed member loses access, the organization keeps it.
     outsider, _ = _account("owner", "outsider@example.com")
     assert outsider.get(f"/projects/{pid}").status_code == 404
-    assert noura.post("/account/organization/members", json={"email": "outsider@example.com"}).status_code == 403  # only the representative
+    assert noura.post("/account/organization/invitations", json={"email": "outsider@example.com"}).status_code == 403  # only the representative
     assert fahad.delete(f"/account/organization/members/{noura_id}").status_code == 200
     assert noura.get(f"/projects/{pid}").status_code == 404
     assert fahad.get(f"/projects/{pid}").status_code == 200
@@ -101,13 +104,44 @@ def test_provider_organization_members_share_one_offer(db):
     assert ali.get(f"/projects/{pid}/offers/mine").json()["status"] == "withdrawn"
 
 
-def test_who_can_be_added(db):
+def test_invitations(db):
     admin, _member, _a, _m = _organization(db, "owner", "Gulf Holdings W.L.L.", "fahad@gulf.example", "noura@gulf.example")
-    _sp, _ = _account("service_provider", "provider@example.com")
-    assert admin.post("/account/organization/members", json={"email": "provider@example.com"}).status_code == 400  # other side
+    invite = lambda email: admin.post("/account/organization/invitations", json={"email": email})  # noqa: E731
+
+    # Someone without an account yet: invited by email, signs up, then accepts.
+    r = invite("khalid@gulf.example")
+    assert r.status_code == 201
+    token = r.json()["link"].rsplit("/", 1)[-1]
+    seen = TestClient(app).get(f"/account/invitations/{token}").json()  # the link, before signing in
+    assert seen["organization_name"] == "Gulf Holdings W.L.L." and seen["account_exists"] is False and seen["role"] == "owner"
+    assert invite("khalid@gulf.example").status_code == 409  # already pending
+    assert [i["email"] for i in admin.get("/account/organization/invitations").json()] == ["khalid@gulf.example"]
+
+    wrong, _ = _account("owner", "someone.else@example.com")
+    assert wrong.post(f"/account/invitations/{token}/accept").status_code == 403  # a different email
+    khalid, _ = _account("owner", "khalid@gulf.example")
+    assert khalid.post(f"/account/invitations/{token}/accept").json()["acting_as"]["name"] == "Gulf Holdings W.L.L."
+    assert khalid.post(f"/account/invitations/{token}/accept").status_code == 404  # used once
+
+    # Withdrawn and expired links stop working.
+    r = invite("late@gulf.example")
+    admin.delete(f"/account/organization/invitations/{r.json()['id']}")
+    late, _ = _account("owner", "late@gulf.example")
+    assert late.post(f"/account/invitations/{r.json()['link'].rsplit('/', 1)[-1]}/accept").status_code == 404
+    from app.models.organization import OrganizationInvitation
+
+    r = invite("old@gulf.example")
+    row = db.get(OrganizationInvitation, r.json()["id"])
+    row.expires_at = datetime.utcnow() - timedelta(seconds=1)
+    db.commit()
+    assert TestClient(app).get(f"/account/invitations/{r.json()['link'].rsplit('/', 1)[-1]}").status_code == 404
+
+    # Who can't be invited or join.
+    _account("service_provider", "provider@example.com")
+    assert invite("provider@example.com").status_code == 400  # other side of the marketplace
     verified, verified_id = _account("owner", "verified@example.com")
     verified.put("/account/stakeholder", json={"type": "individual"})
     _approve(db, "owner", verified_id)
-    assert admin.post("/account/organization/members", json={"email": "verified@example.com"}).status_code == 409
-    assert admin.post("/account/organization/members", json={"email": "nobody@example.com"}).status_code == 404
-    assert admin.post("/account/organization/members", json={"email": "noura@gulf.example"}).status_code == 409  # already in one
+    assert invite("verified@example.com").status_code == 409  # represents someone in its own right
+    assert invite("noura@gulf.example").status_code == 409  # already a member
+    assert _member.post("/account/organization/invitations", json={"email": "x@example.com"}).status_code == 403  # only the representative

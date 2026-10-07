@@ -8,6 +8,7 @@ class ProjectAmendmentRequest(BaseModel):
     description: str | None = None
     trade: str | None = None
     category_id: str | None = None  # one of the platform's service categories (sets trade)
+    documents_required: bool | None = None  # providers need the documents to price (Stage 3.12)
     address: str | None = None
     governorate: str | None = None
     area: str | None = None

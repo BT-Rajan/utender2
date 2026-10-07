@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth.router import router as auth_router
 from app.config import get_settings
 from app.error_handlers import register_error_handlers
-from app.middleware import MaxBodySizeMiddleware
+from app.middleware import LanguageMiddleware, MaxBodySizeMiddleware
 from app.routers.admin import router as admin_router
 from app.routers.account import router as account_router
 from app.routers.billing import router as billing_router
@@ -26,6 +26,7 @@ app = FastAPI(title="U-Tender API")
 register_error_handlers(app)
 
 app.add_middleware(MaxBodySizeMiddleware, max_body_bytes=settings.max_upload_mb * 1024 * 1024)
+app.add_middleware(LanguageMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

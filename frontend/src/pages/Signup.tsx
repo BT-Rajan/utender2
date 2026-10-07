@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
+import { safeNext } from "@/lib/next";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ApiError } from "@/api/client";
 import { formatPlanPrice, parseRole, usePricing, usePublicCms, type SignupRole } from "@/lib/publicInfo";
@@ -84,13 +85,23 @@ export function SignupPage() {
   // preselected: the visitor picks one of the two here, never a guess.
   const roleParam = searchParams.get("role");
   const role = parseRole(roleParam);
-  const setRole = (r: SignupRole) => setSearchParams({ role: r }, { replace: true });
-  const clearRole = () => setSearchParams({}, { replace: true });
+  // Keep any invitation context (?next=, ?email=) when the role changes.
+  const withRole = (r: SignupRole | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (r) next.set("role", r);
+    else next.delete("role");
+    return next;
+  };
+  const setRole = (r: SignupRole) => setSearchParams(withRole(r), { replace: true });
+  const clearRole = () => setSearchParams(withRole(null), { replace: true });
+  const next = safeNext(searchParams.get("next"));
+  const invitedEmail = searchParams.get("email") ?? undefined;
 
   // Drop an unknown ?role= value so the URL never claims a role that
   // isn't selected.
   useEffect(() => {
-    if (roleParam !== null && role === null) setSearchParams({}, { replace: true });
+    if (roleParam !== null && role === null) setSearchParams(withRole(null), { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleParam, role, setSearchParams]);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -112,7 +123,7 @@ export function SignupPage() {
         role,
       });
       // Route by the role the backend persisted, not by what this form sent.
-      navigate(me.role === "owner" ? "/owner/verify" : "/service-provider/verify");
+      navigate(next ?? (me.role === "owner" ? "/owner/verify" : "/service-provider/verify"));
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : t("auth.signup.genericError"));
     } finally {
@@ -152,7 +163,7 @@ export function SignupPage() {
           <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
             {t("auth.signup.email")}
           </label>
-          <input type="email" name="email" required className="w-full border border-border rounded px-3 py-2.5 text-sm" />
+          <input type="email" name="email" required defaultValue={invitedEmail} className="w-full border border-border rounded px-3 py-2.5 text-sm" />
         </div>
         <div>
           <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">

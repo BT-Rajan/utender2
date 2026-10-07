@@ -4,6 +4,27 @@ from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 
+class LanguageMiddleware:
+    """Holds the language of the request (Accept-Language: en | ar, sent by
+    the interface) for the duration of the request, so the server's own
+    messages are sent in it (app.i18n_server)."""
+
+    def __init__(self, app: ASGIApp):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        from app.i18n_server import current_language, language_from
+
+        token = current_language.set(language_from(Headers(scope=scope).get("accept-language")))
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            current_language.reset(token)
+
+
 class MaxBodySizeMiddleware:
     """Caps request bodies (file uploads included) at the configured size --
     the Python equivalent of the original app's explicit Server Action body
@@ -32,7 +53,10 @@ class MaxBodySizeMiddleware:
             try:
                 if int(declared) > self.max_body_bytes:
                     exc = self._too_large()
-                    await JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})(scope, receive, send)
+                    from app.i18n_server import language_from, translate
+
+                    detail = translate(exc.detail, language_from(Headers(scope=scope).get("accept-language")))
+                    await JSONResponse(status_code=exc.status_code, content={"detail": detail})(scope, receive, send)
                     return
             except ValueError:
                 pass

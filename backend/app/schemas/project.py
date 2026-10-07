@@ -64,6 +64,7 @@ class ProjectOut(BaseModel):
     updated_at: UTCDateTime | None = None
     discarded_at: UTCDateTime | None = None
     version: int = 1  # send back as If-Match when saving a draft
+    documents_required: bool = False
     offer_count: int = 0
     my_offer_status: str | None = None  # only populated on the service provider feed
     # Stage 3.9, service provider feed only: whether this provider may respond,

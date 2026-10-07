@@ -16,13 +16,14 @@ translates, plus an English message used in API errors.
 Not every requirement is the same: a simple service (AC servicing) needs a
 clear scope, a location and a deadline; drawings, quantities and dates are
 only expected of a *detailed* requirement -- one priced per item or listing
-several items -- and even then only warned about. Nothing here scores or
-guesses: every rule is a plain, explainable check.
+several items -- and even then only warned about, unless the owner has said
+providers need the documents to price (documents_required), which makes a
+missing document an error. Nothing here scores or guesses at the wording:
+every rule is a plain, explainable check.
 
 The gate is authoritative server-side (assert_publishable, called on every
 path that publishes); the draft page shows the same list.
 """
-import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 
@@ -38,13 +39,6 @@ MIN_SCOPE = 30  # below this there is no meaningful description of the work
 BRIEF_SCOPE = 120
 DETAILED_ITEMS = 5
 SHORT_WINDOW = timedelta(days=3)
-
-# The scope says the work depends on attached material.
-_REFERS_TO_DOCUMENTS = re.compile(
-    r"\b(attached|attachment|drawings?|plans?|bo\s?q|bill of quantities|as per (the )?(drawing|plan|spec))\b|مرفق|مخطط|المخططات|جدول الكميات",
-    re.IGNORECASE,
-)
-
 
 @dataclass
 class Issue:
@@ -148,8 +142,12 @@ def check(db: Session, project: Project) -> QualityReport:
             err("qualification_retired", "eligibility", "A required qualification is no longer on the platform's list. Choose again under Who can respond.")
 
     # --- supporting documents ---
-    if not documents and _REFERS_TO_DOCUMENTS.search(scope):
-        warn("documents_referenced", "documents", "The scope refers to drawings or attachments, but none are uploaded.")
+    if not documents and project.documents_required:
+        err(
+            "documents_required_missing",
+            "documents",
+            "The requirement depends on its documents, but none are uploaded. Upload them, or untick that providers need them to price.",
+        )
     elif not documents and detailed:
         warn("documents_missing", "documents", "No drawings, BOQ or photos are attached. For detailed work, providers usually need them to price accurately.")
     return r

@@ -8,7 +8,7 @@ from app.models.service_provider import ServiceProviderProfile
 from app.models.document import ServiceProviderDocument, DocumentRequirement, OwnerDocument
 from app.models.notification import Notification
 from app.models.offer import Offer, OfferDocument, OfferRevision
-from app.models.organization import Organization, OrganizationMembership
+from app.models.organization import Organization, OrganizationInvitation, OrganizationMembership
 from app.models.owner import OwnerProfile
 from app.models.payment_override import PaymentOverride
 from app.models.project import Project, ProjectDrawing, ProjectItem
@@ -26,6 +26,7 @@ __all__ = [
     "OwnerProfile",
     "Organization",
     "OrganizationMembership",
+    "OrganizationInvitation",
     "OwnerDocument",
     "Project",
     "ProjectDrawing",

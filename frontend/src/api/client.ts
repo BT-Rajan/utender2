@@ -10,6 +10,11 @@ export class ApiError extends Error {
   }
 }
 
+// The language the interface is showing (I18nProvider keeps <html lang> in step).
+function interfaceLanguage(): string {
+  return typeof document !== "undefined" && document.documentElement.lang === "ar" ? "ar" : "en";
+}
+
 async function parseError(res: Response): Promise<never> {
   let detail = res.statusText;
   try {
@@ -48,13 +53,14 @@ export async function apiFetch<T>(
   const init: RequestInit = {
     method,
     credentials: "include",
-    headers: { ...headers },
+    // The server sends its messages in the interface's language.
+    headers: { "Accept-Language": interfaceLanguage(), ...headers },
   };
 
   if (formData) {
     init.body = formData;
   } else if (body !== undefined) {
-    init.headers = { ...headers, "Content-Type": "application/json" };
+    init.headers = { "Accept-Language": interfaceLanguage(), ...headers, "Content-Type": "application/json" };
     init.body = JSON.stringify(body);
   }
 

@@ -90,6 +90,12 @@ export interface Dictionary {
     add: string;
     addHint: string;
     error: string;
+    invite: string;
+    inviteHint: string;
+    inviteSent: string;
+    pending: string;
+    expires: string;
+    withdraw: string;
   };
   quality: {
     ready: string;
@@ -122,9 +128,21 @@ export interface Dictionary {
     eligibility_category_missing: string;
     eligibility_governorate_missing: string;
     qualification_retired: string;
-    documents_referenced: string;
     documents_missing: string;
     publishBlocked: string;
+    documents_required_missing: string;
+  };
+  invite: {
+    heading: string;
+    body: string;
+    someone: string;
+    expires: string;
+    accept: string;
+    signUp: string;
+    logIn: string;
+    wrongAccount: string;
+    invalid: string;
+    acceptError: string;
   };
   eligibility: {
     heading: string;
@@ -231,6 +249,8 @@ export interface Dictionary {
     uploadHint: string;
     heading: string;
     saveError: string;
+    neededToPrice: string;
+    neededToPriceHint: string;
   };
   location: {
     governorate: string;
@@ -979,6 +999,12 @@ export const en: Dictionary = {
     add: "Add member",
     addHint: "Your colleague signs up for their own account first. They then act for the organization; they don't need to verify separately.",
     error: "Could not update the members.",
+    invite: "Send invitation",
+    inviteHint: "We email them a link. They accept it after signing in (or signing up) with that email, and then act for the organization — no separate verification. You can also share the link yourself.",
+    inviteSent: "Invitation sent. You can also share this link (for example on WhatsApp); it only works for that email:",
+    pending: "Invitations waiting to be accepted",
+    expires: "link valid until {date}",
+    withdraw: "Withdraw",
   },
   quality: {
     ready: "Ready for preview",
@@ -1011,9 +1037,21 @@ export const en: Dictionary = {
     eligibility_category_missing: "Who can respond depends on the type of work, but none from the platform's list is chosen.",
     eligibility_governorate_missing: "Who can respond depends on the governorate, but none is chosen.",
     qualification_retired: "A required qualification is no longer on the platform's list. Choose again under Who can respond.",
-    documents_referenced: "The scope refers to drawings or attachments, but none are uploaded.",
     documents_missing: "No drawings, BOQ or photos are attached. For detailed work, providers usually need them to price accurately.",
     publishBlocked: "Fix the items above before publishing.",
+    documents_required_missing: "You said providers need the documents to price this, but none are uploaded. Upload them, or untick that option.",
+  },
+  invite: {
+    heading: "Join {organization} on U-Tender",
+    body: "{inviter} invited {email} to act for {organization}: to work on its requirements or offers together with colleagues.",
+    someone: "Someone",
+    expires: "This invitation is valid until {date}.",
+    accept: "Join {organization}",
+    signUp: "Sign up with this email",
+    logIn: "Log in",
+    wrongAccount: "You're signed in with a different account. Log out and sign in as {email} to accept.",
+    invalid: "This invitation link is invalid, has expired or was withdrawn. Ask for a new one.",
+    acceptError: "Could not accept the invitation.",
   },
   eligibility: {
     heading: "Who can respond",
@@ -1120,6 +1158,8 @@ export const en: Dictionary = {
     uploadHint: "PDF, DWG, Excel (.xlsx), Word (.docx), JPG/PNG, or a .zip of them, up to 50 MB per upload. Uploading a file with the same name replaces it as a new version.",
     heading: "Documents",
     saveError: "Could not update the document.",
+    neededToPrice: "Providers need these documents to price this work",
+    neededToPriceHint: "Tick this if the work can't be priced without the drawings, BOQ or photos. Publishing then needs at least one document.",
   },
   location: {
     governorate: "Governorate",
@@ -1893,6 +1933,12 @@ export const ar: Dictionary = {
     add: "إضافة عضو",
     addHint: "ينشئ زميلك حسابه الخاص أولًا، ثم يعمل باسم الجهة دون حاجة إلى توثيق منفصل.",
     error: "تعذر تحديث الأعضاء.",
+    invite: "إرسال دعوة",
+    inviteHint: "نرسل لهم رابطًا بالبريد. يقبلونه بعد تسجيل الدخول (أو التسجيل) بهذا البريد، ثم يعملون باسم الجهة دون توثيق منفصل. يمكنك أيضًا مشاركة الرابط بنفسك.",
+    inviteSent: "تم إرسال الدعوة. يمكنك أيضًا مشاركة هذا الرابط (مثلًا عبر واتساب)؛ لا يعمل إلا لهذا البريد:",
+    pending: "دعوات بانتظار القبول",
+    expires: "الرابط صالح حتى {date}",
+    withdraw: "سحب",
   },
   quality: {
     ready: "جاهز للمعاينة",
@@ -1925,9 +1971,21 @@ export const ar: Dictionary = {
     eligibility_category_missing: "شرط من يمكنه تقديم عرض يعتمد على نوع العمل، لكن لم يُختر نوع من قائمة المنصة.",
     eligibility_governorate_missing: "شرط من يمكنه تقديم عرض يعتمد على المحافظة، لكن لم تُختر محافظة.",
     qualification_retired: "أحد المؤهلات المطلوبة لم يعد ضمن قائمة المنصة. اختر مجددًا في من يمكنه تقديم عرض.",
-    documents_referenced: "يشير نطاق العمل إلى مخططات أو مرفقات، لكن لم يُرفع أي منها.",
     documents_missing: "لا توجد مخططات أو جدول كميات أو صور. في الأعمال التفصيلية يحتاجها مقدمو الخدمة عادةً للتسعير بدقة.",
     publishBlocked: "أصلح البنود أعلاه قبل النشر.",
+    documents_required_missing: "ذكرت أن مقدمي الخدمة يحتاجون المستندات للتسعير، لكن لم يُرفع أي منها. ارفعها أو ألغِ تحديد هذا الخيار.",
+  },
+  invite: {
+    heading: "انضم إلى {organization} على U-Tender",
+    body: "دعا {inviter} البريد {email} للعمل باسم {organization}: للعمل على طلباتها أو عروضها مع الزملاء.",
+    someone: "شخص ما",
+    expires: "هذه الدعوة صالحة حتى {date}.",
+    accept: "انضم إلى {organization}",
+    signUp: "سجّل بهذا البريد",
+    logIn: "تسجيل الدخول",
+    wrongAccount: "أنت مسجل الدخول بحساب مختلف. سجّل الخروج وادخل باسم {email} لقبول الدعوة.",
+    invalid: "رابط الدعوة غير صالح أو منتهي أو تم سحبه. اطلب رابطًا جديدًا.",
+    acceptError: "تعذر قبول الدعوة.",
   },
   eligibility: {
     heading: "من يمكنه تقديم عرض",
@@ -2034,6 +2092,8 @@ export const ar: Dictionary = {
     uploadHint: "PDF أو DWG أو Excel (.xlsx) أو Word (.docx) أو JPG/PNG أو ملف .zip يضمها، حتى 50 ميجابايت لكل رفع. رفع ملف بالاسم نفسه يستبدله كنسخة جديدة.",
     heading: "المستندات",
     saveError: "تعذر تحديث المستند.",
+    neededToPrice: "يحتاج مقدمو الخدمة هذه المستندات لتسعير العمل",
+    neededToPriceHint: "حدد هذا إذا تعذر تسعير العمل بدون المخططات أو جدول الكميات أو الصور. عندها يتطلب النشر مستندًا واحدًا على الأقل.",
   },
   location: {
     governorate: "المحافظة",

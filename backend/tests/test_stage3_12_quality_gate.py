@@ -88,8 +88,17 @@ def test_a_detailed_construction_requirement_gets_specific_findings(db):
     q = owner.get(f"/projects/{pid}/quality").json()
     assert _codes(q["errors"]) == ["item_unit_missing"] and q["errors"][0]["params"]["position"] == 2
     warnings = set(_codes(q["warnings"]))
-    assert {"item_quantity_missing", "timing_missing", "documents_referenced"} <= warnings
+    assert {"item_quantity_missing", "timing_missing", "documents_missing"} <= warnings
     assert owner.post(f"/owner/projects/{pid}/publish").status_code == 400
+
+    # The owner says providers need the drawings to price it: now a missing
+    # drawing blocks publication -- an explicit statement, not a guess from the wording.
+    version = owner.get(f"/projects/{pid}").json()["version"]
+    assert owner.patch(f"/projects/{pid}", json={"documents_required": True}, headers={"If-Match": str(version)}).status_code == 200
+    q = owner.get(f"/projects/{pid}/quality").json()
+    assert "documents_required_missing" in _codes(q["errors"])
+    owner.post(f"/projects/{pid}/drawings", files=[("drawings", ("wall-plan.pdf", b"%PDF-1", "application/pdf"))])
+    assert "documents_required_missing" not in _codes(owner.get(f"/projects/{pid}/quality").json()["errors"])
 
     # Priced per item with nothing to price is an error too.
     other = owner.post("/projects", data={"title": "Interlock paving", "address": "Fintas", "governorate": "ahmadi", "description": AC_SCOPE, "bid_deadline": DEADLINE}).json()["id"]

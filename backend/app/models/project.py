@@ -84,6 +84,10 @@ class Project(Base):
     # before responding (site visit arrangements, access...). Free text, as
     # the owner writes them; nothing is assumed.
     commercial_terms: Mapped[str | None] = mapped_column(Text, nullable=True)  # "other conditions"
+    # Stage 3.12: the owner says providers can't price this without its
+    # documents (drawings, BOQ, photos). The quality gate then requires at
+    # least one -- an explicit statement, not a guess from the wording.
+    documents_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     # The common commercial terms as structured fields (schemas.project.
     # CommercialConditions): offer validity, payment stages, retention,
     # warranty. Each optional; NULL = none stated.

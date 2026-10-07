@@ -106,6 +106,41 @@ function statusBadgeClasses(status: string) {
 // Mirrors MAX_SCOPE_CHARS in backend/app/routers/projects.py.
 const MAX_SCOPE_CHARS = 20000;
 
+// Stage 3.12: the owner says outright whether providers need the documents
+// to price (rather than the quality check guessing from the wording).
+function DocumentsNeeded({ project }: { project: ProjectDetail }) {
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const save = useMutation({
+    mutationFn: (value: boolean) =>
+      apiFetch<ProjectDetail>(`/projects/${project.id}`, { method: "PATCH", body: { documents_required: value }, headers: draftVersion(project) }),
+    onSuccess: (data) => {
+      setError(null);
+      queryClient.setQueryData(["project", project.id], data);
+    },
+    onError: (err) => setError(err instanceof ApiError ? err.detail : t("draftDetails.saveError")),
+  });
+  return (
+    <div className="mt-3">
+      <label className="flex items-start gap-2 text-[12.5px] text-navy">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={!!project.documents_required}
+          disabled={save.isPending}
+          onChange={(e) => save.mutate(e.target.checked)}
+        />
+        <span>
+          {t("documents.neededToPrice")}
+          <span className="block text-[11px] text-steel-light">{t("documents.neededToPriceHint")}</span>
+        </span>
+      </label>
+      {error && <p className="text-[11px] text-red mt-1">{error}</p>}
+    </div>
+  );
+}
+
 // Stage 3.2: the requirement's basic identity -- what the work is and where --
 // editable while it is still a private draft.
 function DraftDetailsForm({ project }: { project: ProjectDetail }) {
@@ -543,6 +578,7 @@ export function OwnerProjectDetailPage() {
           </button>
           {showHistory && <DrawingHistory projectId={project.id} t={t} />}
 
+          {editableDraft && <DocumentsNeeded project={project} />}
           <form
             id="section-documents"
             ref={drawingsFormRef}
