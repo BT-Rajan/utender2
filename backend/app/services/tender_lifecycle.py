@@ -83,6 +83,14 @@ def sync_expired_projects(db: Session) -> None:
         .all()
     )
     if not stale:
+        # End the transaction even when nothing expired: under MySQL's
+        # REPEATABLE READ the FOR UPDATE scan above keeps its locks on the
+        # status-index entries it read (open requirements whose deadline
+        # hasn't passed) until commit. Held for the rest of the request, they
+        # deadlocked against another request that already held a
+        # requirement's row lock and was changing its status (cancel vs close
+        # externally, at once). Callers run this first, with nothing pending.
+        db.commit()
         return
     for project in stale:
         if project.status == ProjectStatus.draft:
