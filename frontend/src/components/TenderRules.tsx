@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, ApiError } from "@/api/client";
+import { apiFetch, ApiError, draftVersion } from "@/api/client";
 import type { ProjectDetail, TenderType } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
@@ -52,6 +52,7 @@ export function TenderRulesEditor({ project }: { project: ProjectDetail }) {
     mutationFn: () =>
       apiFetch<ProjectDetail>(`/projects/${project.id}/tender-rules`, {
         method: "PUT",
+        headers: draftVersion(project),
         body: {
           tender_type: values.tender_type,
           questions_allowed: values.questions_allowed,

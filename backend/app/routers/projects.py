@@ -1,7 +1,8 @@
 from datetime import date, datetime, timezone
 
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.responses import StreamingResponse
 
@@ -18,6 +19,7 @@ from app.models.user import User
 from app.schemas.amendment import ProjectAmendmentOut, ProjectAmendmentRequest
 from app.schemas.award import AwardRecordOut
 from app.config import get_settings
+from app.schemas.common import utc_iso
 from app.schemas.project import (
     DrawingOut,
     EligibilityCheckOut,
@@ -140,6 +142,7 @@ async def create_project(
     description: str | None = Form(None),
     trade: str | None = Form(None),
     category_id: str | None = Form(None),
+    creation_token: str | None = Form(None, max_length=64),
     bid_deadline: str = Form(...),
     expected_start_date: date | None = Form(None),
     expected_completion_date: date | None = Form(None),
@@ -152,6 +155,12 @@ async def create_project(
     user: User = Depends(require_verified_owner),
     db: Session = Depends(get_db),
 ):
+    # Stage 3.11: the same start sent again (double click, retry after a lost
+    # response) returns the draft it already created.
+    if creation_token:
+        existing = db.query(Project).filter(Project.owner_id == user.id, Project.creation_token == creation_token).first()
+        if existing:
+            return _serialize_detail(existing, db)
     try:
         tender_type_value = TenderType(tender_type)
     except ValueError:
@@ -191,9 +200,18 @@ async def create_project(
         expected_duration_days=expected_duration_days,
         tender_type=tender_type_value,
         status=status_value,
+        creation_token=creation_token or None,
     )
     db.add(project)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Two copies of the same start arrived at once: the other one won.
+        db.rollback()
+        existing = db.query(Project).filter(Project.owner_id == user.id, Project.creation_token == creation_token).first()
+        if not existing:
+            raise
+        return _serialize_detail(existing, db)
     db.refresh(project)
 
     real_files = [f for f in drawings if f.filename]
@@ -250,9 +268,31 @@ def _require_active_owner(user: User, db: Session) -> None:
         raise HTTPException(status_code=403, detail="not_approved")
 
 
+def _guard_draft_write(project: Project, if_match: str | None) -> None:
+    """Stage 3.11: a discarded draft is closed to changes; and a save sent
+    from a page showing an older version (another tab, another device) is
+    refused rather than silently overwriting newer work. If-Match carries the
+    updated_at the page last saw."""
+    if project.discarded_at is not None:
+        raise HTTPException(status_code=409, detail="This draft was discarded and can no longer be changed.")
+    if if_match and if_match != (utc_iso(project.updated_at) or ""):
+        raise HTTPException(
+            status_code=409,
+            detail="This requirement was changed somewhere else (another tab or device) since you opened it. Reload to see the latest version, then make your change again.",
+        )
+
+
+def _touch(project: Project) -> None:
+    project.updated_at = datetime.utcnow().replace(microsecond=0)
+
+
 @router.patch("/{project_id}", response_model=ProjectDetailOut)
 def amend_project(
-    project_id: str, payload: ProjectAmendmentRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    project_id: str,
+    payload: ProjectAmendmentRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    if_match: str | None = Header(None, alias="If-Match"),
 ):
     sync_expired_projects(db)
     # Locked: "can't move the deadline earlier once bids exist" reads
@@ -261,6 +301,7 @@ def amend_project(
     if not project or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
+    _guard_draft_write(project, if_match)
     if project.status not in (ProjectStatus.draft, ProjectStatus.open, ProjectStatus.closed, ProjectStatus.under_evaluation):
         raise HTTPException(status_code=400, detail="This project can no longer be amended.")
 
@@ -401,7 +442,8 @@ def amend_project(
 
 @router.put("/{project_id}/items", response_model=ProjectDetailOut)
 def set_project_items(
-    project_id: str, payload: ProjectItemsUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    project_id: str, payload: ProjectItemsUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db),
+    if_match: str | None = Header(None, alias="If-Match"),
 ):
     """Stage 3.4: the requirement's pricing basis and its measurable items,
     saved together and replaced as a whole. Items are optional -- a
@@ -411,6 +453,7 @@ def set_project_items(
     if not project or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
+    _guard_draft_write(project, if_match)
     if project.status != ProjectStatus.draft:
         raise HTTPException(status_code=409, detail="Items and the pricing basis can only be changed while the requirement is a draft.")
 
@@ -440,7 +483,8 @@ def set_project_items(
 
 @router.put("/{project_id}/response-requirements", response_model=ProjectDetailOut)
 def set_response_requirements(
-    project_id: str, payload: ResponseRequirements, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    project_id: str, payload: ResponseRequirements, user: User = Depends(get_current_user), db: Session = Depends(get_db),
+    if_match: str | None = Header(None, alias="If-Match"),
 ):
     """Stage 3.8: what providers must submit with their price. Owner only,
     while a draft -- once published, providers rely on these terms."""
@@ -448,6 +492,7 @@ def set_response_requirements(
     if not project or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
+    _guard_draft_write(project, if_match)
     if project.status != ProjectStatus.draft:
         raise HTTPException(status_code=409, detail="Response requirements can only be changed while the requirement is a draft.")
     project.response_requirements = payload.model_dump()
@@ -466,7 +511,13 @@ def _to_naive_utc(value: datetime | None, label: str) -> datetime | None:
 
 
 @router.put("/{project_id}/tender-rules", response_model=ProjectDetailOut)
-def set_tender_rules(project_id: str, payload: TenderRulesIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def set_tender_rules(
+    project_id: str,
+    payload: TenderRulesIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    if_match: str | None = Header(None, alias="If-Match"),
+):
     """Stage 3.10: how the opportunity is run -- who sees offers when,
     whether and until when questions are taken, and the owner's commercial
     conditions and instructions. Owner only, while a draft."""
@@ -474,6 +525,7 @@ def set_tender_rules(project_id: str, payload: TenderRulesIn, user: User = Depen
     if not project or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
+    _guard_draft_write(project, if_match)
     if project.status != ProjectStatus.draft:
         raise HTTPException(status_code=409, detail="Tender rules can only be changed while the requirement is a draft.")
     if payload.tender_type != project.tender_type and project.tender_type_locked:
@@ -501,7 +553,8 @@ def set_tender_rules(project_id: str, payload: TenderRulesIn, user: User = Depen
 
 @router.put("/{project_id}/eligibility", response_model=ProjectDetailOut)
 def set_provider_eligibility(
-    project_id: str, payload: ProviderEligibilityIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    project_id: str, payload: ProviderEligibilityIn, user: User = Depends(get_current_user), db: Session = Depends(get_db),
+    if_match: str | None = Header(None, alias="If-Match"),
 ):
     """Stage 3.9: who may respond. Owner only, while a draft -- once
     published, providers have decided whether to respond on these terms."""
@@ -509,6 +562,7 @@ def set_provider_eligibility(
     if not project or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
+    _guard_draft_write(project, if_match)
     if project.status != ProjectStatus.draft:
         raise HTTPException(status_code=409, detail="Eligibility can only be changed while the requirement is a draft.")
     project.provider_eligibility = validate_rules(db, payload, project)
@@ -582,11 +636,14 @@ async def add_drawings(
     if not project or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
+    _guard_draft_write(project, None)
     if category not in DOCUMENT_CATEGORIES:
         raise HTTPException(status_code=400, detail="Unknown document type.")
 
     real_files = [f for f in drawings if f.filename]
     await upload_drawings_for_project(db, get_storage(), project_id, real_files, category, is_required)
+    _touch(project)
+    db.commit()
     db.refresh(project)
     return _serialize_detail(project, db)
 
@@ -597,6 +654,7 @@ def _owned_draft_document(project_id: str, drawing_id: str, user: User, db: Sess
     if not project or project.owner_id != user.id or not drawing or drawing.project_id != project_id:
         raise HTTPException(status_code=404, detail="Document not found.")
     _require_active_owner(user, db)
+    _guard_draft_write(project, None)
     if project.status != ProjectStatus.draft:
         # Once published, providers may already be pricing against a file;
         # replace it by uploading a new revision instead.
@@ -620,6 +678,7 @@ def update_document(
         drawing.category = payload.category
     if payload.is_required is not None:
         drawing.is_required = payload.is_required
+    _touch(project)
     db.commit()
     db.refresh(project)
     return _serialize_detail(project, db)
@@ -638,6 +697,7 @@ def remove_document(project_id: str, drawing_id: str, user: User = Depends(get_c
     paths = [v.file_path for v in versions]
     for v in versions:
         db.delete(v)
+    _touch(project)
     db.commit()
     try:
         get_storage().delete("project-drawings", paths)
@@ -769,6 +829,8 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
         tender_type_locked=project.tender_type_locked,
         is_suspended=project.is_suspended,
         created_at=project.created_at,
+        updated_at=project.updated_at,
+        discarded_at=project.discarded_at,
         offer_count=offer_count,
         drawings=drawings,
         pricing_basis=project.pricing_basis,

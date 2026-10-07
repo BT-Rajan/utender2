@@ -60,6 +60,9 @@ class ProjectOut(BaseModel):
     tender_type_locked: bool
     is_suspended: bool = False
     created_at: datetime
+    # Stage 3.11: last saved, and whether a draft was discarded.
+    updated_at: UTCDateTime | None = None
+    discarded_at: UTCDateTime | None = None
     offer_count: int = 0
     my_offer_status: str | None = None  # only populated on the service provider feed
     # Stage 3.9, service provider feed only: whether this provider may respond,

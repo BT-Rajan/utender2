@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, ApiError } from "@/api/client";
+import { apiFetch, ApiError, draftVersion } from "@/api/client";
 import type { PricingBasis, ProjectDetail, RequirementItem } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
@@ -98,6 +98,7 @@ export function RequirementItemsEditor({ project }: { project: ProjectDetail }) 
   const save = useMutation({
     mutationFn: () =>
       apiFetch<ProjectDetail>(`/projects/${project.id}/items`, {
+        headers: draftVersion(project),
         method: "PUT",
         body: {
           pricing_basis: basis,

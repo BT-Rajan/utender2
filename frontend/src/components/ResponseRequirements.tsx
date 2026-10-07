@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, ApiError } from "@/api/client";
+import { apiFetch, ApiError, draftVersion } from "@/api/client";
 import type { Offer, ProjectDetail, ResponseRequirements } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
@@ -57,7 +57,7 @@ export function ResponseRequirementsEditor({ project }: { project: ProjectDetail
   };
 
   const save = useMutation({
-    mutationFn: () => apiFetch<ProjectDetail>(`/projects/${project.id}/response-requirements`, { method: "PUT", body: payload() }),
+    mutationFn: () => apiFetch<ProjectDetail>(`/projects/${project.id}/response-requirements`, { method: "PUT", body: payload() , headers: draftVersion(project) }),
     onSuccess: (data) => {
       setError(null);
       setSaved(true);

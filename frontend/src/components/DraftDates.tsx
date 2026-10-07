@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, ApiError } from "@/api/client";
+import { apiFetch, ApiError, draftVersion } from "@/api/client";
 import type { ProjectDetail } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
@@ -37,6 +37,7 @@ export function DraftDates({ project }: { project: ProjectDetail }) {
     mutationFn: () =>
       apiFetch<ProjectDetail>(`/projects/${project.id}`, {
         method: "PATCH",
+        headers: draftVersion(project),
         body: {
           bid_deadline: localInputToUtcIso(values.deadline),
           expected_start_date: values.start || null,

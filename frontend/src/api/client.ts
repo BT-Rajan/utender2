@@ -41,19 +41,20 @@ async function tryRefresh(): Promise<boolean> {
 // Supabase's auto-refreshing session cookie.
 export async function apiFetch<T>(
   path: string,
-  options: { method?: string; body?: unknown; formData?: FormData; retry?: boolean } = {}
+  options: { method?: string; body?: unknown; formData?: FormData; retry?: boolean; headers?: Record<string, string> } = {}
 ): Promise<T> {
-  const { method = "GET", body, formData, retry = true } = options;
+  const { method = "GET", body, formData, retry = true, headers = {} } = options;
 
   const init: RequestInit = {
     method,
     credentials: "include",
+    headers: { ...headers },
   };
 
   if (formData) {
     init.body = formData;
   } else if (body !== undefined) {
-    init.headers = { "Content-Type": "application/json" };
+    init.headers = { ...headers, "Content-Type": "application/json" };
     init.body = JSON.stringify(body);
   }
 
@@ -77,4 +78,11 @@ export async function apiFetch<T>(
     return res.json();
   }
   return (await res.blob()) as unknown as T;
+}
+
+// Stage 3.11: a draft save carries the version the page last saw, so a stale
+// page (another tab or device) gets a clear refusal instead of overwriting
+// newer work.
+export function draftVersion(project: { updated_at?: string | null }): Record<string, string> {
+  return project.updated_at ? { "If-Match": project.updated_at } : {};
 }

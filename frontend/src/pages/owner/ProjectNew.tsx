@@ -1,11 +1,13 @@
 import { useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
-import type { ProjectDetail, TenderType } from "@/api/types";
+import type { Project, ProjectDetail, TenderType } from "@/api/types";
 import { useI18n } from "@/i18n/I18nContext";
 import { localInputToUtcIso } from "@/lib/dates";
 import { KUWAIT_GOVERNORATES } from "@/lib/location";
 import { CategoryField } from "@/components/CategoryField";
+import { formatDeadline } from "@/lib/format";
 
 export function OwnerProjectNewPage() {
   const { t } = useI18n();
@@ -13,12 +15,22 @@ export function OwnerProjectNewPage() {
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const creationToken = useRef(
+    typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+  );
   const [tenderType, setTenderType] = useState<TenderType>("owner_visible");
 
   const defaultDeadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const defaultDeadlineValue = new Date(defaultDeadline.getTime() - defaultDeadline.getTimezoneOffset() * 60000)
     .toISOString()
     .slice(0, 16);
+
+  // Stage 3.11: offer the drafts already in progress before starting another.
+  const { data: myProjects } = useQuery({
+    queryKey: ["owner-projects"],
+    queryFn: () => apiFetch<Project[]>("/owner/projects"),
+  });
+  const drafts = (myProjects ?? []).filter((p) => p.status === "draft");
 
   async function submitProject(status: "draft" | "open") {
     setError(null);
@@ -35,6 +47,8 @@ export function OwnerProjectNewPage() {
     form.set("bid_deadline", localInputToUtcIso(form.get("bid_deadline") as string));
     form.set("tender_type", tenderType);
     form.set("status", status);
+    // Stage 3.11: one draft per start, however many times this is sent.
+    form.set("creation_token", creationToken.current);
 
     setPending(true);
     try {
@@ -52,6 +66,23 @@ export function OwnerProjectNewPage() {
       <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">{t("owner.projectNew.eyebrow")}</span>
       <h1 className="font-display text-2xl font-semibold text-navy mb-1">{t("owner.projectNew.heading")}</h1>
       <p className="text-[13.5px] text-steel mb-6">{t("owner.projectNew.description")}</p>
+
+      {drafts.length > 0 && (
+        <div className="border border-border bg-blue-tint/40 rounded px-4 py-3 mb-5 max-w-2xl text-sm">
+          <strong className="font-display text-navy block">{t("draftDetails.resumeHeading")}</strong>
+          <p className="text-steel text-[13px] mb-1">{t("draftDetails.resumeHint")}</p>
+          <ul className="list-disc ps-5">
+            {drafts.slice(0, 5).map((d) => (
+              <li key={d.id}>
+                <Link to={`/owner/projects/${d.id}`} className="text-blue underline">
+                  {d.title || t("draftDetails.untitled")}
+                </Link>
+                {d.updated_at && <span className="text-steel-light text-xs"> · {formatDeadline(d.updated_at)}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {error && <p className="text-xs bg-red-tint text-red border border-red rounded px-3 py-2.5 mb-5 max-w-2xl">{error}</p>}
 

@@ -35,6 +35,8 @@ export interface Project {
   tender_type_locked: boolean;
   is_suspended: boolean;
   created_at: string;
+  updated_at?: string | null;
+  discarded_at?: string | null;
   offer_count: number;
   my_offer_status: OfferStatus | null;
   // Stage 3.9, provider feed only.

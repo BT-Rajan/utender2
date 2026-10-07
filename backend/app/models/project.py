@@ -2,12 +2,16 @@ from datetime import date, datetime
 
 from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 from app.models.common import gen_uuid
 from app.models.enums import PricingBasis, ProjectStatus, TenderType
+
+
+def _now_s() -> datetime:
+    return datetime.utcnow().replace(microsecond=0)
 
 
 class Project(Base):
@@ -91,6 +95,20 @@ class Project(Base):
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     deadline_reminder_sent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # Stage 3.11 (drafts): when the requirement was last saved -- shown as
+    # "last saved", and the version a save must match so a stale page can't
+    # silently overwrite newer work (whole seconds: what MySQL keeps).
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=_now_s, onupdate=_now_s)
+    # A draft the owner deliberately discarded. It stays a draft (so it is as
+    # private as ever) but is no longer active: not listed, not editable,
+    # not publishable. Soft, so the audit trail keeps pointing at a record.
+    discarded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Sent with the "start a requirement" request so a repeated submission
+    # (double click, retry, resend after a dropped response) returns the
+    # draft already created instead of making a second one.
+    creation_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    __table_args__ = (UniqueConstraint("owner_id", "creation_token", name="uq_project_creation_token"),)
 
     drawings = relationship("ProjectDrawing", back_populates="project", cascade="all, delete-orphan")
     items = relationship(

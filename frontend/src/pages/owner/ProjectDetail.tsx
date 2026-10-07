@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, ApiError, API_URL } from "@/api/client";
+import { apiFetch, ApiError, API_URL, draftVersion } from "@/api/client";
 import type { Drawing, Offer, ProjectDetail } from "@/api/types";
-import { timeRemaining, stars } from "@/lib/format";
+import { formatDeadline, timeRemaining, stars } from "@/lib/format";
 import { RatingInput } from "@/components/RatingInput";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { RequirementItemsEditor, RequirementItemsView } from "@/components/RequirementItems";
@@ -137,7 +137,11 @@ function DraftDetailsForm({ project }: { project: ProjectDetail }) {
     description !== (project.description ?? "");
 
   const save = useMutation({
-    mutationFn: () => apiFetch<ProjectDetail>(`/projects/${project.id}`, { method: "PATCH", body: { title, trade, governorate, area, address, description } }),
+    mutationFn: () => apiFetch<ProjectDetail>(`/projects/${project.id}`, {
+        method: "PATCH",
+        body: { title, trade, governorate, area, address, description },
+        headers: draftVersion(project),
+      }),
     onSuccess: (data) => {
       setError(null);
       setSaved(true);
@@ -324,7 +328,7 @@ export function OwnerProjectDetailPage() {
   });
 
   const lifecycleMutation = useMutation({
-    mutationFn: (action: "publish" | "close" | "start-evaluation" | "no-award" | "cancel") =>
+    mutationFn: (action: "publish" | "close" | "start-evaluation" | "no-award" | "cancel" | "discard") =>
       apiFetch(`/owner/projects/${id}/${action}`, { method: "POST" }),
     onSuccess: () => {
       setError(null);
@@ -335,6 +339,8 @@ export function OwnerProjectDetailPage() {
   });
 
   if (!project) return <PageLoading />;
+  // Stage 3.11: a discarded draft stays readable to its owner but is closed to changes.
+  const editableDraft = project.status === "draft" && !project.discarded_at;
 
   const deadlinePassed = new Date(project.bid_deadline) < new Date();
 
@@ -360,19 +366,29 @@ export function OwnerProjectDetailPage() {
 
       <ErrorBanner message={error} />
 
-      {project.status === "draft" && <DraftDetailsForm project={project} />}
-      {project.status === "draft" && <DraftDates project={project} />}
-      {project.status === "draft" && <TenderRulesEditor project={project} />}
-      {project.status === "draft" && <RequirementItemsEditor project={project} />}
-      {project.status === "draft" && <ResponseRequirementsEditor project={project} />}
-      {project.status === "draft" && <ProviderEligibilityEditor project={project} />}
+      {/* Stage 3.11: where this draft stands. */}
+      {editableDraft && project.updated_at && (
+        <p className="text-[12.5px] text-steel mb-4">{t("draftDetails.lastSaved").replace("{date}", formatDeadline(project.updated_at))}</p>
+      )}
+      {project.discarded_at && (
+        <div className="border border-border bg-border/30 rounded px-4 py-3 mb-6 text-sm text-steel max-w-2xl">
+          {t("draftDetails.discarded").replace("{date}", formatDeadline(project.discarded_at))}
+        </div>
+      )}
 
-      {(project.status === "draft" ||
+      {editableDraft && <DraftDetailsForm project={project} />}
+      {editableDraft && <DraftDates project={project} />}
+      {editableDraft && <TenderRulesEditor project={project} />}
+      {editableDraft && <RequirementItemsEditor project={project} />}
+      {editableDraft && <ResponseRequirementsEditor project={project} />}
+      {editableDraft && <ProviderEligibilityEditor project={project} />}
+
+      {(editableDraft ||
         project.status === "open" ||
         project.status === "closed" ||
         project.status === "under_evaluation") && (
         <div className="flex flex-wrap gap-2 mb-6">
-          {project.status === "draft" && (
+          {editableDraft && (
             <button
               type="button"
               onClick={() => lifecycleMutation.mutate("publish")}
@@ -412,14 +428,27 @@ export function OwnerProjectDetailPage() {
               {t("owner.projectDetail.markNoAward")}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => lifecycleMutation.mutate("cancel")}
-            disabled={lifecycleMutation.isPending}
-            className="text-xs text-red underline disabled:opacity-60"
-          >
-            {t("owner.projectDetail.cancelProject")}
-          </button>
+          {editableDraft ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(t("draftDetails.discardConfirm"))) lifecycleMutation.mutate("discard");
+              }}
+              disabled={lifecycleMutation.isPending}
+              className="text-xs text-red underline disabled:opacity-60"
+            >
+              {t("draftDetails.discard")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => lifecycleMutation.mutate("cancel")}
+              disabled={lifecycleMutation.isPending}
+              className="text-xs text-red underline disabled:opacity-60"
+            >
+              {t("owner.projectDetail.cancelProject")}
+            </button>
+          )}
         </div>
       )}
 
@@ -442,7 +471,7 @@ export function OwnerProjectDetailPage() {
                       {" "}
                       · {t(`documents.${d.category}`)} · {d.is_required ? t("documents.essential") : t("documents.supplementary")}
                     </span>
-                    {project.status === "draft" && (
+                    {editableDraft && (
                       <div className="flex flex-wrap items-center gap-2 mt-1 normal-case">
                         <select
                           aria-label={`${t("documents.typeLabel")}: ${d.file_name}`}
@@ -499,6 +528,7 @@ export function OwnerProjectDetailPage() {
 
           <form
             ref={drawingsFormRef}
+            hidden={!!project.discarded_at}
             onSubmit={(e) => {
               e.preventDefault();
               const form = new FormData(e.currentTarget);

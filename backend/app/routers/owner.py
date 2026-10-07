@@ -72,7 +72,11 @@ def _get_owned_project(project_id: str, user: User, db: Session, *, lock: bool =
 def dashboard(user: User = Depends(require_owner), db: Session = Depends(get_db)):
     sync_expired_projects(db)
     projects = (
-        db.query(Project).filter(Project.owner_id == user.id).order_by(Project.created_at.desc()).all()
+        db.query(Project)
+        # A discarded draft is no longer one of the owner's active requirements.
+        .filter(Project.owner_id == user.id, Project.discarded_at.is_(None))
+        .order_by(Project.created_at.desc())
+        .all()
     )
     out = []
     for p in projects:
@@ -263,7 +267,7 @@ def _project_response(project: Project, db: Session) -> ProjectOut:
 @router.post("/projects/{project_id}/publish", response_model=ProjectOut)
 def publish_project(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     project = _get_owned_project(project_id, user, db, lock=True)
-    if project.status != ProjectStatus.draft:
+    if project.status != ProjectStatus.draft or project.discarded_at is not None:
         raise HTTPException(status_code=400, detail="Only a draft project can be published.")
     if project.bid_deadline <= datetime.utcnow():
         raise HTTPException(status_code=400, detail="Set a bid deadline in the future before publishing.")
@@ -334,10 +338,32 @@ def mark_no_award(project_id: str, user: User = Depends(require_owner), db: Sess
     return _project_response(project, db)
 
 
+@router.post("/projects/{project_id}/discard", response_model=ProjectOut)
+def discard_draft(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 3.11: the owner decides not to go ahead with a draft. It stays a
+    draft -- never published, so as private as ever -- marked discarded: no
+    longer listed, editable or publishable. Kept (with its files) rather than
+    deleted, so the audit trail still points at a record."""
+    project = _get_owned_project(project_id, user, db, lock=True)
+    if project.status != ProjectStatus.draft:
+        raise HTTPException(status_code=400, detail="Only a draft can be discarded.")
+    if project.discarded_at is not None:
+        raise HTTPException(status_code=400, detail="This draft has already been discarded.")
+    project.discarded_at = datetime.utcnow().replace(microsecond=0)
+    log_action(db, actor_id=user.id, action="project.discard_draft", target_type="project", target_id=project_id, previous_value="draft", new_value="discarded")
+    db.refresh(project)
+    return _project_response(project, db)
+
+
 @router.post("/projects/{project_id}/cancel", response_model=ProjectOut)
 def cancel_project(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     sync_expired_projects(db)
     project = _get_owned_project(project_id, user, db, lock=True)
+    if project.status == ProjectStatus.draft:
+        # A draft was never published: "cancelling" it is discarding it. It
+        # must not become a canceled tender, which providers can open.
+        db.rollback()
+        return discard_draft(project_id, user, db)
     if project.status not in (ProjectStatus.draft, ProjectStatus.open, ProjectStatus.closed, ProjectStatus.under_evaluation):
         raise HTTPException(status_code=400, detail="This project can no longer be canceled.")
     previous = project.status.value
@@ -507,4 +533,6 @@ def _project_fields(p: Project) -> dict:
         tender_type_locked=p.tender_type_locked,
         is_suspended=p.is_suspended,
         created_at=p.created_at,
+        updated_at=p.updated_at,
+        discarded_at=p.discarded_at,
     )

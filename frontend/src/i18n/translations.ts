@@ -244,6 +244,14 @@ export interface Dictionary {
     saved: string;
     saveError: string;
     notSet: string;
+    lastSaved: string;
+    discard: string;
+    discardConfirm: string;
+    discarded: string;
+    resumeHeading: string;
+    resumeHint: string;
+    untitled: string;
+    lastSavedShort: string;
   };
   verification: {
     scopeLabel: string;
@@ -1075,6 +1083,14 @@ export const en: Dictionary = {
     saved: "Saved",
     saveError: "Could not save the draft.",
     notSet: "Not set",
+    lastSaved: "Draft — last saved {date}. Only you can see it; nothing is published until you publish it.",
+    discard: "Discard draft",
+    discardConfirm: "Discard this draft? It will no longer be listed or editable, and it can't be published. This can't be undone.",
+    discarded: "This draft was discarded on {date}. It is kept for your records but can no longer be edited or published.",
+    resumeHeading: "You have drafts in progress",
+    resumeHint: "Continue one instead of starting again:",
+    untitled: "Untitled",
+    lastSavedShort: "last saved {date}",
   },
   verification: {
     scopeLabel: "Applies to",
@@ -1931,6 +1947,14 @@ export const ar: Dictionary = {
     saved: "تم الحفظ",
     saveError: "تعذر حفظ المسودة.",
     notSet: "غير محدد",
+    lastSaved: "مسودة — آخر حفظ {date}. لا يراها أحد غيرك؛ لن يُنشر شيء حتى تقوم بالنشر.",
+    discard: "تجاهل المسودة",
+    discardConfirm: "هل تريد تجاهل هذه المسودة؟ لن تظهر في القائمة ولن يمكن تعديلها أو نشرها. لا يمكن التراجع عن ذلك.",
+    discarded: "تم تجاهل هذه المسودة في {date}. تُحفظ لسجلاتك لكن لا يمكن تعديلها أو نشرها.",
+    resumeHeading: "لديك مسودات قيد الإعداد",
+    resumeHint: "تابع إحداها بدلًا من البدء من جديد:",
+    untitled: "بدون عنوان",
+    lastSavedShort: "آخر حفظ {date}",
   },
   verification: {
     scopeLabel: "ينطبق على",

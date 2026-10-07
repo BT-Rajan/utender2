@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, ApiError } from "@/api/client";
+import { apiFetch, ApiError, draftVersion } from "@/api/client";
 import { Link } from "react-router-dom";
 import type { EligibilityQualification, EligibilityReason, ProjectDetail, ProviderEligibility } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
@@ -41,7 +41,7 @@ export function ProviderEligibilityEditor({ project }: { project: ProjectDetail 
   };
 
   const save = useMutation({
-    mutationFn: () => apiFetch<ProjectDetail>(`/projects/${project.id}/eligibility`, { method: "PUT", body: values }),
+    mutationFn: () => apiFetch<ProjectDetail>(`/projects/${project.id}/eligibility`, { method: "PUT", body: values , headers: draftVersion(project) }),
     onSuccess: (data) => {
       setError(null);
       setSaved(true);
