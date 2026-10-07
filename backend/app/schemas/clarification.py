@@ -18,6 +18,14 @@ class ClarificationAnswer(BaseModel):
     shared_with_all: bool | None = None
 
 
+class ClarificationAttachmentOut(BaseModel):
+    id: str
+    part: str  # "question" | "answer"
+    file_name: str
+    size_bytes: int
+    url: str
+
+
 class ClarificationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -37,3 +45,4 @@ class ClarificationOut(BaseModel):
     mine: bool = False
     answered_by_name: str | None = None
     amendment_number: int | None = None
+    attachments: list[ClarificationAttachmentOut] = Field(default_factory=list)

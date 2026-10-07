@@ -1,11 +1,13 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+import time
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.deps import get_current_user, require_owner
-from app.models.clarification import Clarification
+from app.models.clarification import Clarification, ClarificationAttachment
 from app.models.service_provider import ServiceProviderProfile
 from app.models.enums import NotificationType, OfferStatus, UserRole
 from app.models.offer import Offer
@@ -14,7 +16,9 @@ from app.models.project import Project
 from app.models.user import User
 from app.routers.projects import _can_view_project
 from app.services.tender_rules import questions_closed_reason, questions_open
-from app.schemas.clarification import ClarificationAnswer, ClarificationCreate, ClarificationOut
+from app.schemas.clarification import ClarificationAnswer, ClarificationAttachmentOut, ClarificationCreate, ClarificationOut
+from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name, sanitize_path_segment
+from app.services.storage import drawing_url_expiry_seconds, get_storage
 from app.services.email import notify_clarification_answered, notify_owner_new_clarification
 from app.services.notify import notify, notify_team
 from app.services.audit import log_action
@@ -29,6 +33,19 @@ def _serialize(
 ) -> ClarificationOut:
     amendment = db.get(ProjectAmendment, c.amendment_id) if c.amendment_id else None
     answerer = db.get(User, c.answered_by) if (owner_side and c.answered_by) else None
+    # Files go with what they belong to: the question's with the question; the
+    # answer's once there is an answer (or to the owner side preparing it).
+    storage = get_storage()
+    project = db.get(Project, c.project_id)
+    expiry = drawing_url_expiry_seconds(project.bid_deadline)
+    files = [
+        ClarificationAttachmentOut(
+            id=a.id, part=a.part, file_name=a.file_name, size_bytes=a.size_bytes,
+            url=storage.signed_url(CLARIFICATION_BUCKET, a.file_path, expiry, a.file_name),
+        )
+        for a in db.query(ClarificationAttachment).filter(ClarificationAttachment.clarification_id == c.id).order_by(ClarificationAttachment.created_at)
+        if a.part == "question" or c.answer is not None or owner_side
+    ]
     return ClarificationOut(
         id=c.id,
         project_id=c.project_id,
@@ -42,6 +59,7 @@ def _serialize(
         mine=mine,
         answered_by_name=(answerer.full_name or answerer.email) if answerer else None,
         amendment_number=amendment.amendment_number if amendment else None,
+        attachments=files,
     )
 
 
@@ -221,3 +239,63 @@ def _tell_the_field(db: Session, project: Project, clarification: Clarification)
         if uid not in asker_side:
             notify(db, person, NotificationType.clarification_shared, link=link, project_title=project.title)
     db.commit()
+
+
+CLARIFICATION_BUCKET = "clarification-documents"
+MAX_FILES_PER_PART = 5
+ATTACHMENT_EXTENSIONS = ALLOWED_DRAWING_EXTENSIONS - {"zip"}
+
+
+@router.post("/{clarification_id}/attachments", response_model=ClarificationOut)
+async def attach_files(
+    project_id: str,
+    clarification_id: str,
+    files: list[UploadFile] = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Stage 4.7 follow-up: files on a question (its asker's side, while it is
+    unanswered) or on its answer (the owner's side) -- only while the Q&A is
+    open. Kept once added: what was asked and answered stays as it was."""
+    project = db.get(Project, project_id)
+    if not project or not _can_view_project(user, project, db):
+        raise HTTPException(status_code=404, detail="Project not found.")
+    clarification = db.query(Clarification).filter(Clarification.id == clarification_id).populate_existing().with_for_update().first()
+    if not clarification or clarification.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Question not found.")
+    owner_side = owns(db, user, project)
+    if owner_side:
+        part = "answer"
+        profile = acting_profile(db, user)
+        if not profile or not profile.is_verified_active:
+            raise HTTPException(status_code=403, detail="not_approved")
+    elif user.role == UserRole.service_provider and can_access(db, user, clarification.organization_id, clarification.service_provider_id):
+        part = "question"
+        if clarification.answer is not None:
+            raise HTTPException(status_code=400, detail="This question has already been answered.")
+    else:
+        raise HTTPException(status_code=404, detail="Question not found.")
+    if not questions_open(project):
+        raise HTTPException(status_code=400, detail="Questions and answers for this requirement have closed.")
+
+    real = [f for f in files if f and f.filename]
+    for f in real:
+        assert_allowed_extension(f.filename, ATTACHMENT_EXTENSIONS)
+    existing = db.query(ClarificationAttachment).filter(ClarificationAttachment.clarification_id == clarification.id, ClarificationAttachment.part == part).count()
+    if existing + len(real) > MAX_FILES_PER_PART:
+        raise HTTPException(status_code=400, detail="Attach up to 5 files to a question or an answer.")
+    contents = [(f, await f.read()) for f in real]  # every file checked before any is stored
+    if any(not content for _, content in contents):
+        raise HTTPException(status_code=400, detail="That file is empty.")
+    storage = get_storage()
+    for f, content in contents:
+        name = safe_relative_name(f.filename).rsplit("/", 1)[-1]
+        path = f"{project_id}/{clarification.id}/{part}/{int(time.time() * 1000)}-{sanitize_path_segment(name)}"
+        storage.save(CLARIFICATION_BUCKET, path, content, f.content_type or "application/octet-stream")
+        db.add(ClarificationAttachment(clarification_id=clarification.id, part=part, file_path=path, file_name=name, size_bytes=len(content), uploaded_by=user.id))
+    db.commit()
+    db.refresh(clarification)
+    asker = db.get(ServiceProviderProfile, clarification.service_provider_id)
+    if owner_side:
+        return _serialize(db, clarification, asker.company_name if asker else None, redact=is_sealed_and_open(project), owner_side=True)
+    return _serialize(db, clarification, asker.company_name if asker else None, mine=True)

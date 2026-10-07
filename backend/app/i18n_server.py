@@ -243,6 +243,8 @@ AR: dict[str, str] = {
     "Your offer is already up to date with the requirement.": "عرضك محدّث بالفعل وفق الطلب.",
     "Choose why the requirement is being canceled.": "اختر سبب إلغاء الطلب.",
     "Choose an answered question on this requirement.": "اختر سؤالًا تمت الإجابة عنه على هذا الطلب.",
+    "Attach up to 5 files to a question or an answer.": "أرفق 5 ملفات كحد أقصى بالسؤال أو بالإجابة.",
+    "That file is empty.": "هذا الملف فارغ.",
     "No such version.": "لا توجد نسخة بهذا الرقم.",
     "Only an ended requirement can be started again.": "لا يمكن البدء من جديد إلا بطلب منتهٍ.",
     "This project can no longer be closed.": "لم يعد من الممكن إغلاق هذا المشروع.",

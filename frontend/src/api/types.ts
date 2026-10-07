@@ -377,6 +377,15 @@ export interface Clarification {
   mine?: boolean;
   answered_by_name?: string | null;
   amendment_number?: number | null;
+  attachments?: ClarificationAttachment[];
+}
+
+export interface ClarificationAttachment {
+  id: string;
+  part: "question" | "answer";
+  file_name: string;
+  size_bytes: number;
+  url: string;
 }
 
 export interface ProjectAmendment {

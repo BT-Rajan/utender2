@@ -173,3 +173,49 @@ def test_two_answers_at_once_keep_one(db):
     db.expire_all()
     winner = next(r.json()["answer"] for r in results if r.status_code == 200)
     assert db.get(Clarification, qid).answer == winner
+
+
+def _fetch(client, url):
+    return client.get("/" + url.split("://", 1)[-1].split("/", 1)[-1])
+
+
+def test_files_on_questions_and_answers(db):
+    owner = _verified(db, "owner", "owner@example.com")
+    noor, sami = _verified(db, "service_provider", "noor@example.com"), _verified(db, "service_provider", "sami@example.com")
+    outsider = _verified(db, "owner", "other@example.com")
+    pid = _publish(owner)
+    qid = noor.post(f"/projects/{pid}/clarifications", json={"question": "Which board is meant -- see my markup?"}).json()["id"]
+    # The asker attaches a marked-up drawing to the question.
+    r = noor.post(f"/projects/{pid}/clarifications/{qid}/attachments", files=[("files", ("markup.pdf", b"%PDF-markup", "application/pdf"))])
+    assert r.status_code == 200 and [(a["part"], a["file_name"], a["size_bytes"]) for a in r.json()["attachments"]] == [("question", "markup.pdf", 11)]
+    # Nobody else attaches to someone's question; types and counts are checked.
+    assert sami.post(f"/projects/{pid}/clarifications/{qid}/attachments", files=[("files", ("x.pdf", b"%PDF", "application/pdf"))]).status_code == 404
+    assert outsider.post(f"/projects/{pid}/clarifications/{qid}/attachments", files=[("files", ("x.pdf", b"%PDF", "application/pdf"))]).status_code == 404
+    assert noor.post(f"/projects/{pid}/clarifications/{qid}/attachments", files=[("files", ("run.exe", b"MZ", "application/octet-stream"))]).status_code == 400
+    assert noor.post(f"/projects/{pid}/clarifications/{qid}/attachments", files=[("files", ("bundle.zip", b"PK", "application/zip"))]).status_code == 400
+    many = [("files", (f"p{i}.png", b"\x89PNG", "image/png")) for i in range(5)]
+    assert noor.post(f"/projects/{pid}/clarifications/{qid}/attachments", files=many).status_code == 400  # 1 + 5 > 5
+    # The owner sees the question's file; the answer gets its own.
+    seen = owner.get(f"/projects/{pid}/clarifications").json()[0]
+    assert _fetch(owner, seen["attachments"][0]["url"]).content == b"%PDF-markup"
+    r = owner.post(f"/projects/{pid}/clarifications/{qid}/attachments", files=[("files", ("board-spec.pdf", b"%PDF-spec", "application/pdf"))])
+    assert [a["part"] for a in r.json()["attachments"]] == ["question", "answer"]
+    # Before the answer, the answer's file stays with the owner side.
+    assert [a["part"] for a in noor.get(f"/projects/{pid}/clarifications").json()[0]["attachments"]] == ["question"]
+    owner.post(f"/projects/{pid}/clarifications/{qid}/answer", json={"answer": "The main DB board; spec attached."})
+    # Shared: every provider who may see it gets both files -- still without who asked.
+    for client in (noor, sami):
+        c = client.get(f"/projects/{pid}/clarifications").json()[0]
+        assert [a["file_name"] for a in c["attachments"]] == ["markup.pdf", "board-spec.pdf"]
+        assert _fetch(client, c["attachments"][1]["url"]).content == b"%PDF-spec"
+    assert sami.get(f"/projects/{pid}/clarifications").json()[0]["service_provider_company_name"] is None
+    # Answered: the question's files are as they were.
+    assert noor.post(f"/projects/{pid}/clarifications/{qid}/attachments", files=[("files", ("late.pdf", b"%PDF", "application/pdf"))]).status_code == 400
+    # A private question's files stay private.
+    private = noor.post(f"/projects/{pid}/clarifications", json={"question": "Our pricing approach?", "shared_with_all": False}).json()["id"]
+    noor.post(f"/projects/{pid}/clarifications/{private}/attachments", files=[("files", ("our-rates.xlsx", b"PK-rates", "application/vnd.ms-excel"))])
+    owner.post(f"/projects/{pid}/clarifications/{private}/answer", json={"answer": "Fine."})
+    assert all(c["id"] != private for c in sami.get(f"/projects/{pid}/clarifications").json())
+    # Closed Q&A: no more files.
+    owner.post(f"/owner/projects/{pid}/cancel", json={"reason": "not_needed"})
+    assert owner.post(f"/projects/{pid}/clarifications/{qid}/attachments", files=[("files", ("x.pdf", b"%PDF", "application/pdf"))]).status_code == 400

@@ -157,6 +157,9 @@ class S3Storage(Storage):
             # Stage 3.8 response attachments share the documents bucket; their
             # keys are namespaced by project and provider.
             "offer-documents": settings.s3_bucket_documents,
+            # Stage 4.7 follow-up: files on questions and answers, keyed by
+            # project and question.
+            "clarification-documents": settings.s3_bucket_documents,
         }.get(bucket, bucket)
 
     def _resolve_key(self, key: str) -> str:

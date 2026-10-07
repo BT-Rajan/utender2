@@ -647,6 +647,7 @@ export interface Dictionary {
     materialHint: string;
     becauseOf: string;
     notBecauseOf: string;
+    attachFiles: string;
   };
   service_provider: {
     roleLabel: string;
@@ -1753,6 +1754,7 @@ export const en: Dictionary = {
     materialHint: "If the answer changes the scope, quantities, documents, timing or who can respond, change the requirement itself too (Change the published requirement) and choose this question there.",
     becauseOf: "Because of a question (optional)",
     notBecauseOf: "Not because of a question",
+    attachFiles: "Attach files (optional, up to 5: PDF, images, drawings, Excel, Word)",
   },
   service_provider: {
     roleLabel: "Service provider",
@@ -2867,6 +2869,7 @@ export const ar: Dictionary = {
     materialHint: "إن غيّرت الإجابة نطاق العمل أو الكميات أو المستندات أو التوقيت أو من يمكنه الرد، فعدّل الطلب نفسه أيضًا (تعديل الطلب المنشور) واختر هذا السؤال هناك.",
     becauseOf: "بسبب سؤال (اختياري)",
     notBecauseOf: "ليس بسبب سؤال",
+    attachFiles: "إرفاق ملفات (اختياري، حتى 5: PDF أو صور أو مخططات أو Excel أو Word)",
   },
   service_provider: {
     roleLabel: "مزوّد خدمة",

@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
-import type { Clarification } from "@/api/types";
+import type { Clarification, ClarificationAttachment } from "@/api/types";
 import { useI18n } from "@/i18n/I18nContext";
-import { formatDeadline } from "@/lib/format";
+import { formatDeadline, formatSize } from "@/lib/format";
 
 export function ClarificationsPanel({
   projectId,
@@ -25,6 +25,15 @@ export function ClarificationsPanel({
   const [sharedWithAll, setSharedWithAll] = useState(true);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [publish, setPublish] = useState<Record<string, boolean>>({});
+  // Stage 4.7 follow-up: files for the question being asked, and for each answer.
+  const [questionFiles, setQuestionFiles] = useState<File[]>([]);
+  const [answerFiles, setAnswerFiles] = useState<Record<string, File[]>>({});
+  const upload = (clarificationId: string, files: File[]) => {
+    if (!files.length) return Promise.resolve();
+    const form = new FormData();
+    files.forEach((f) => form.append("files", f));
+    return apiFetch(`/projects/${projectId}/clarifications/${clarificationId}/attachments`, { method: "POST", formData: form });
+  };
   const [error, setError] = useState<string | null>(null);
 
   const { data: clarifications } = useQuery({
@@ -38,26 +47,33 @@ export function ClarificationsPanel({
   };
 
   const askMutation = useMutation({
-    mutationFn: () =>
-      apiFetch(`/projects/${projectId}/clarifications`, {
+    mutationFn: async () => {
+      const asked = await apiFetch<Clarification>(`/projects/${projectId}/clarifications`, {
         method: "POST",
         body: { question, shared_with_all: sharedWithAll },
-      }),
+      });
+      await upload(asked.id, questionFiles);
+    },
     onSuccess: () => {
       setQuestion("");
+      setQuestionFiles([]);
       invalidate();
     },
     onError: (err) => setError(err instanceof ApiError ? err.detail : t("clarifications.askError")),
   });
 
   const answerMutation = useMutation({
-    mutationFn: (clarificationId: string) =>
-      apiFetch(`/projects/${projectId}/clarifications/${clarificationId}/answer`, {
+    // The answer's files go first, so they are there when providers are told.
+    mutationFn: async (clarificationId: string) => {
+      await upload(clarificationId, answerFiles[clarificationId] ?? []);
+      return apiFetch(`/projects/${projectId}/clarifications/${clarificationId}/answer`, {
         method: "POST",
         body: { answer: drafts[clarificationId] || "", shared_with_all: publish[clarificationId] ? true : null },
-      }),
+      });
+    },
     onSuccess: (_, clarificationId) => {
       setDrafts((d) => ({ ...d, [clarificationId]: "" }));
+      setAnswerFiles((f) => ({ ...f, [clarificationId]: [] }));
       invalidate();
     },
     onError: (err) => setError(err instanceof ApiError ? err.detail : t("clarifications.answerError")),
@@ -92,9 +108,11 @@ export function ClarificationsPanel({
                 <span className="font-mono text-[10px] text-steel-light">{formatDeadline(c.created_at)}</span>
               </div>
               <p dir="auto" className="text-[13px] text-navy whitespace-pre-wrap break-words">{c.question}</p>
+              <AttachmentLinks files={c.attachments?.filter((a) => a.part === "question")} />
               {c.answer ? (
                 <div className="mt-1.5 ps-3 border-s-2 border-blue">
                   <p dir="auto" className="text-[12.5px] text-steel whitespace-pre-wrap break-words">{c.answer}</p>
+                  <AttachmentLinks files={c.attachments?.filter((a) => a.part === "answer")} />
                   <p className="font-mono text-[10px] text-steel-light mt-0.5">
                     {t("clarifications.answeredOn").replace("{date}", c.answered_at ? formatDeadline(c.answered_at) : "")}
                     {c.answered_by_name && ` · ${c.answered_by_name}`}
@@ -118,6 +136,7 @@ export function ClarificationsPanel({
                     maxLength={4000}
                     className="border border-border rounded px-2.5 py-1.5 text-xs"
                   />
+                  <FilePicker id={`answer-files-${c.id}`} files={answerFiles[c.id] ?? []} onChange={(files) => setAnswerFiles((f) => ({ ...f, [c.id]: files }))} />
                   {!c.shared_with_all && (
                     <label className="flex items-center gap-1.5 text-[11.5px] text-steel">
                       <input type="checkbox" checked={!!publish[c.id]} onChange={(e) => setPublish((p) => ({ ...p, [c.id]: e.target.checked }))} />
@@ -152,6 +171,9 @@ export function ClarificationsPanel({
             placeholder={t("clarifications.askPlaceholder")}
             className="w-full border border-border rounded px-3 py-2 text-sm resize-y mb-2"
           />
+          <div className="mb-2">
+            <FilePicker id="question-files" files={questionFiles} onChange={setQuestionFiles} />
+          </div>
           <div className="flex items-center justify-between gap-2">
             <label className="flex items-center gap-1.5 text-[11.5px] text-steel">
               <input type="checkbox" checked={sharedWithAll} onChange={(e) => setSharedWithAll(e.target.checked)} />
@@ -168,6 +190,41 @@ export function ClarificationsPanel({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Files on a question or an answer, through their signed, named links.
+function AttachmentLinks({ files }: { files?: ClarificationAttachment[] }) {
+  if (!files?.length) return null;
+  return (
+    <ul className="flex flex-wrap gap-2 mt-1" data-testid="clarification-files">
+      {files.map((a) => (
+        <li key={a.id}>
+          <a href={a.url} target="_blank" rel="noreferrer" className="font-mono text-[11px] text-blue underline bg-blue-tint px-2 py-1 rounded">
+            {a.file_name} · {formatSize(a.size_bytes)}
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// Up to five files: PDF, images, drawings (.dwg), Excel, Word.
+function FilePicker({ id, files, onChange }: { id: string; files: File[]; onChange: (files: File[]) => void }) {
+  const { t } = useI18n();
+  return (
+    <div className="text-[11.5px] text-steel">
+      <label htmlFor={id} className="block mb-0.5">{t("clarifications.attachFiles")}</label>
+      <input
+        id={id}
+        type="file"
+        multiple
+        accept=".pdf,.dwg,.xlsx,.docx,.jpg,.jpeg,.png"
+        onChange={(e) => onChange(Array.from(e.target.files ?? []).slice(0, 5))}
+        className="text-xs"
+      />
+      {files.length > 0 && <span className="block">{files.map((f) => f.name).join(", ")}</span>}
     </div>
   );
 }
