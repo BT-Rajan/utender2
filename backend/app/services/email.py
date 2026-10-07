@@ -124,3 +124,26 @@ def notify_organization_invitation(to_email: str, organization_name: str, invite
         f"<p dir=\"rtl\"><strong>{invited_by}</strong> دعاك للانضمام إلى <strong>{organization_name}</strong> على U-Tender. "
         f'<a href="{link}">اقبل الدعوة</a>.</p>',
     )
+
+
+def notify_provider_new_requirement(
+    to_email: str, language: str, project_title: str, project_id: str, trade: str, area: str, deadline: str
+) -> None:
+    """Stage 3.14: a newly published requirement the provider is suited to
+    (the same audience as the in-app notification), in their language."""
+    link = f"{settings.app_url}/service-provider/projects/{project_id}/offer"
+    if language == "ar":
+        subject = f"فرصة جديدة على U-Tender: {project_title}"
+        html = (
+            f'<div dir="rtl"><p>نُشر طلب جديد لأعمال <strong>{trade}</strong> في {area}: <strong>{project_title}</strong>.</p>'
+            f"<p>أنت تستوفي شروطه، والعروض مفتوحة حتى {deadline}.</p>"
+            f'<p><a href="{link}">اطّلع على الطلب وقدّم عرضك</a></p></div>'
+        )
+    else:
+        subject = f"New opportunity on U-Tender: {project_title}"
+        html = (
+            f"<p>A new <strong>{trade}</strong> requirement in {area} has been published: <strong>{project_title}</strong>.</p>"
+            f"<p>You meet its conditions, and offers are open until {deadline}.</p>"
+            f'<p><a href="{link}">View the requirement and send your offer</a></p>'
+        )
+    _send(to_email, subject, html)

@@ -118,7 +118,7 @@ def test_publish_now_from_the_start_form_is_the_same_step(db):
     assert db.query(AuditLog).filter(AuditLog.action == "project.publish").count() == 1
 
 
-def test_publication_tells_the_providers_it_is_for(db):
+def test_publication_tells_the_providers_it_is_for(db, monkeypatch):
     from app.models.category import ServiceCategory
     from app.models.notification import Notification
 
@@ -141,6 +141,15 @@ def test_publication_tells_the_providers_it_is_for(db):
     db.get(ServiceProviderProfile, unpaid_id).payment_override_active = False
     db.commit()
 
+    from app.models.user import User
+    from app.services import email as email_service
+
+    sent = []
+    monkeypatch.setattr(email_service, "_send", lambda to, subject, html: sent.append((to, subject, html)))
+    match_user = db.query(User).filter(User.email == "match@example.com").one()
+    match_user.language = "ar"  # this provider reads U-Tender in Arabic
+    db.commit()
+
     def told():
         rows = db.query(Notification).filter(Notification.type == "new_requirement").all()
         return {db.get(ServiceProviderProfile, n.user_id).company_name for n in rows}
@@ -154,10 +163,17 @@ def test_publication_tells_the_providers_it_is_for(db):
     assert told() == {"match", "anywhere"}
     note = db.query(Notification).filter(Notification.type == "new_requirement").first()
     assert note.link == f"/service-provider/projects/{pid}/offer" and "Boundary wall" in note.title and "Masonry" in note.body
+    # The same people get an email, each in their own language, linking to the requirement.
+    opportunity_emails = {to: (subject, html) for to, subject, html in sent if "U-Tender" in subject and "Boundary wall" in subject}
+    assert set(opportunity_emails) == {"match@example.com", "anywhere@example.com"}
+    assert opportunity_emails["match@example.com"][0].startswith("فرصة جديدة")
+    assert opportunity_emails["anywhere@example.com"][0].startswith("New opportunity")
+    assert f"/service-provider/projects/{pid}/offer" in opportunity_emails["anywhere@example.com"][1]
 
     # A requirement without a type of work from the platform's list tells nobody.
     db.query(Notification).delete()
     db.commit()
     free = owner.post("/projects", data={**GOOD, "trade": "Some odd job"}).json()["id"]
+    sent.clear()
     owner.post(f"/owner/projects/{free}/publish")
-    assert told() == set()
+    assert told() == set() and not [s for s in sent if "New opportunity" in s[1]]

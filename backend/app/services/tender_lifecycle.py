@@ -125,25 +125,20 @@ def _announce(db: Session, project: Project) -> None:
     import logging
 
     from app.models.enums import NotificationType
-    from app.models.user import User
+    from app.services.email import notify_provider_new_requirement
     from app.services.eligibility import matching_providers
-    from app.services.notify import notify_team
+    from app.services.notify import notify
+    from app.services.team import side_users
 
     try:
         area = ", ".join(x for x in (project.area, (project.governorate or "").replace("_", " ").title()) if x) or project.address
         deadline = project.bid_deadline.strftime("%d %b %Y %H:%M UTC")
+        details = {"project_title": project.title, "trade": project.trade or "", "area": area, "deadline": deadline}
         for profile in matching_providers(db, project):
-            notify_team(
-                db,
-                db.get(User, profile.user_id),
-                NotificationType.new_requirement,
-                link=f"/service-provider/projects/{project.id}/offer",
-                organization_id=profile.organization_id,
-                project_title=project.title,
-                trade=project.trade or "",
-                area=area,
-                deadline=deadline,
-            )
+            # Every member of a provider organization; just the person otherwise.
+            for person in side_users(db, profile.organization_id, profile.user_id):
+                notify(db, person, NotificationType.new_requirement, link=f"/service-provider/projects/{project.id}/offer", **details)
+                notify_provider_new_requirement(person.email, person.language.value, project_id=project.id, **details)
     except Exception:
         db.rollback()
         logging.getLogger("notify").exception("new-requirement notifications failed for %s", project.id)
