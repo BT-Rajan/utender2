@@ -122,7 +122,7 @@ export function RequirementItemsEditor({ project }: { project: ProjectDetail }) 
 
   const input = "w-full border border-border rounded px-2 py-1.5 text-sm";
   return (
-    <section className="bg-white border border-border border-t-4 border-t-navy rounded px-6 py-5 mb-8 max-w-4xl">
+    <section id="section-items" className="bg-white border border-border border-t-4 border-t-navy rounded px-6 py-5 mb-8 max-w-4xl">
       <h2 className="font-display text-lg font-semibold text-navy mb-1">{t("requirementItems.heading")}</h2>
       <p className="text-[13px] text-steel mb-4">{t("requirementItems.intro")}</p>
       <ErrorBanner message={error} />

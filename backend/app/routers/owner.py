@@ -24,6 +24,7 @@ from app.services.email import notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify, notify_team
 from app.services.team import acting_profile, mine, owns
+from app.services import requirement_quality
 from app.services.eligibility import qualification_options
 from app.services.offer_response import documents_out
 from app.services.stakeholder import require_established
@@ -273,6 +274,8 @@ def publish_project(project_id: str, user: User = Depends(require_owner), db: Se
         raise HTTPException(status_code=400, detail="Only a draft project can be published.")
     if project.bid_deadline <= datetime.utcnow():
         raise HTTPException(status_code=400, detail="Set a bid deadline in the future before publishing.")
+    # Stage 3.12: the quality gate, authoritative whatever the page showed.
+    requirement_quality.assert_publishable(db, project)
     project.status = ProjectStatus.open
     db.commit()
     db.refresh(project)

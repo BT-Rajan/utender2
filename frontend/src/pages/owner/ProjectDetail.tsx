@@ -17,6 +17,7 @@ import { OfferResponseDetails, ResponseRequirementsEditor } from "@/components/R
 import { ProviderEligibilityEditor } from "@/components/ProviderEligibility";
 import { CategoryField } from "@/components/CategoryField";
 import { TenderRulesEditor } from "@/components/TenderRules";
+import { QualityCheck, type QualityReport } from "@/components/QualityCheck";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
 import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
 
@@ -155,7 +156,7 @@ function DraftDetailsForm({ project }: { project: ProjectDetail }) {
   const label = "block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5";
   const hint = "text-xs text-steel-light mt-1";
   return (
-    <section className="bg-white border border-border border-t-4 border-t-navy rounded px-6 py-5 mb-8 max-w-2xl">
+    <section id="section-details" className="bg-white border border-border border-t-4 border-t-navy rounded px-6 py-5 mb-8 max-w-2xl">
       <h2 className="font-display text-lg font-semibold text-navy mb-1">{t("draftDetails.heading")}</h2>
       <p className="text-[13px] text-steel mb-4">{t("draftDetails.intro")}</p>
       <ErrorBanner message={error} />
@@ -338,6 +339,13 @@ export function OwnerProjectDetailPage() {
     onError: (err) => setError(errorMessage(err, t("owner.projectDetail.statusError"))),
   });
 
+  // Stage 3.12: the server's quality check, re-read after every save.
+  const { data: quality } = useQuery({
+    queryKey: ["quality", id, project?.version],
+    queryFn: () => apiFetch<QualityReport>(`/projects/${id}/quality`),
+    enabled: !!project && project.status === "draft" && !project.discarded_at,
+  });
+
   if (!project) return <PageLoading />;
   // Stage 3.11: a discarded draft stays readable to its owner but is closed to changes.
   const editableDraft = project.status === "draft" && !project.discarded_at;
@@ -388,6 +396,8 @@ export function OwnerProjectDetailPage() {
       {editableDraft && <ResponseRequirementsEditor project={project} />}
       {editableDraft && <ProviderEligibilityEditor project={project} />}
 
+      {editableDraft && <QualityCheck report={quality} />}
+
       {(editableDraft ||
         project.status === "open" ||
         project.status === "closed" ||
@@ -397,7 +407,9 @@ export function OwnerProjectDetailPage() {
             <button
               type="button"
               onClick={() => lifecycleMutation.mutate("publish")}
-              disabled={lifecycleMutation.isPending}
+              // The server refuses anyway; this just says so up front.
+              disabled={lifecycleMutation.isPending || !quality?.ready}
+              title={quality && !quality.ready ? t("quality.publishBlocked") : undefined}
               className="bg-amber hover:bg-amber-dark disabled:opacity-60 text-white text-xs font-semibold rounded px-4 py-2"
             >
               {t("owner.projectDetail.publish")}
@@ -532,6 +544,7 @@ export function OwnerProjectDetailPage() {
           {showHistory && <DrawingHistory projectId={project.id} t={t} />}
 
           <form
+            id="section-documents"
             ref={drawingsFormRef}
             hidden={!!project.discarded_at}
             onSubmit={(e) => {

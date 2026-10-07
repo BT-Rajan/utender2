@@ -57,7 +57,7 @@ export function DraftDates({ project }: { project: ProjectDetail }) {
   const field = "w-full border border-border rounded px-3 py-2 text-sm";
   const deadlinePassed = new Date(project.bid_deadline) <= new Date();
   return (
-    <section className="bg-white border border-border border-t-4 border-t-navy rounded px-6 py-5 mb-8 max-w-2xl">
+    <section id="section-dates" className="bg-white border border-border border-t-4 border-t-navy rounded px-6 py-5 mb-8 max-w-2xl">
       <h2 className="font-display text-lg font-semibold text-navy mb-3">{t("dates.heading")}</h2>
       <ErrorBanner message={error} />
       <form

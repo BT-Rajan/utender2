@@ -51,7 +51,7 @@ export function ProviderEligibilityEditor({ project }: { project: ProjectDetail 
   });
 
   return (
-    <section className="bg-white border border-border border-t-4 border-t-navy rounded px-6 py-5 mb-8 max-w-2xl">
+    <section id="section-eligibility" className="bg-white border border-border border-t-4 border-t-navy rounded px-6 py-5 mb-8 max-w-2xl">
       <h2 className="font-display text-lg font-semibold text-navy mb-1">{t("eligibility.heading")}</h2>
       <p className="text-xs text-steel-light mb-3">{t("eligibility.hint")}</p>
       <ErrorBanner message={error} />

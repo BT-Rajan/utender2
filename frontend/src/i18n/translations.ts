@@ -91,6 +91,41 @@ export interface Dictionary {
     addHint: string;
     error: string;
   };
+  quality: {
+    ready: string;
+    readyHint: string;
+    notReady: string;
+    notReadyHint: string;
+    warningsHeading: string;
+    section_details: string;
+    section_dates: string;
+    section_rules: string;
+    section_items: string;
+    section_response: string;
+    section_eligibility: string;
+    section_documents: string;
+    title_too_short: string;
+    scope_missing: string;
+    scope_brief: string;
+    type_missing: string;
+    type_unlisted: string;
+    address_missing: string;
+    governorate_missing: string;
+    area_missing: string;
+    deadline_passed: string;
+    deadline_soon: string;
+    timing_missing: string;
+    questions_deadline_passed: string;
+    per_item_without_items: string;
+    item_unit_missing: string;
+    item_quantity_missing: string;
+    eligibility_category_missing: string;
+    eligibility_governorate_missing: string;
+    qualification_retired: string;
+    documents_referenced: string;
+    documents_missing: string;
+    publishBlocked: string;
+  };
   eligibility: {
     heading: string;
     hint: string;
@@ -944,6 +979,41 @@ export const en: Dictionary = {
     add: "Add member",
     addHint: "Your colleague signs up for their own account first. They then act for the organization; they don't need to verify separately.",
     error: "Could not update the members.",
+  },
+  quality: {
+    ready: "Ready for preview",
+    readyHint: "Nothing essential is missing. Look over any suggestions below, then preview and publish when you're ready — nothing is published until you do.",
+    notReady: "{count} thing(s) to fix before publishing",
+    notReadyHint: "Providers couldn't understand or price this requirement yet. Each item says what is missing and where to fix it.",
+    warningsHeading: "Suggestions (won't stop you publishing)",
+    section_details: "Fix in Details",
+    section_dates: "Fix in Dates",
+    section_rules: "Fix in Offer & question rules",
+    section_items: "Fix in What to price",
+    section_response: "Fix in What providers must submit",
+    section_eligibility: "Fix in Who can respond",
+    section_documents: "Add documents",
+    title_too_short: "Give the requirement a title that says what the work is (at least 5 characters).",
+    scope_missing: "Describe the work: what needs doing, where on the site and to what standard. A provider can't price a requirement without it.",
+    scope_brief: "The scope is very brief. Providers price more accurately when they know exactly what's included and what isn't.",
+    type_missing: "Choose the type of work, so the right providers find it.",
+    type_unlisted: "The type of work isn't one of the platform's categories, so providers filtering by category won't find it.",
+    address_missing: "Give the site address or a description of where the site is.",
+    governorate_missing: "Choose the governorate, so providers can judge travel and whether they cover the area.",
+    area_missing: "Add the area (e.g. Salwa), so providers can judge the location without the exact address.",
+    deadline_passed: "Set an offer deadline in the future.",
+    deadline_soon: "Offers close in under 3 days. Providers may not have time to visit the site and price properly.",
+    timing_missing: "Say roughly when the work should happen (a start date or a duration), so providers can check their availability.",
+    questions_deadline_passed: "The question deadline has passed: move it later, or remove it to take questions until offers close.",
+    per_item_without_items: "The requirement is priced per item but lists no items. Add the items, or price it as one total.",
+    item_unit_missing: "Item {position} has a quantity but no unit.",
+    item_quantity_missing: "Item {position} has no quantity, so providers will price it as a lump sum.",
+    eligibility_category_missing: "Who can respond depends on the type of work, but none from the platform's list is chosen.",
+    eligibility_governorate_missing: "Who can respond depends on the governorate, but none is chosen.",
+    qualification_retired: "A required qualification is no longer on the platform's list. Choose again under Who can respond.",
+    documents_referenced: "The scope refers to drawings or attachments, but none are uploaded.",
+    documents_missing: "No drawings, BOQ or photos are attached. For detailed work, providers usually need them to price accurately.",
+    publishBlocked: "Fix the items above before publishing.",
   },
   eligibility: {
     heading: "Who can respond",
@@ -1823,6 +1893,41 @@ export const ar: Dictionary = {
     add: "إضافة عضو",
     addHint: "ينشئ زميلك حسابه الخاص أولًا، ثم يعمل باسم الجهة دون حاجة إلى توثيق منفصل.",
     error: "تعذر تحديث الأعضاء.",
+  },
+  quality: {
+    ready: "جاهز للمعاينة",
+    readyHint: "لا ينقص شيء أساسي. راجع الاقتراحات أدناه، ثم عاين وانشر عندما تكون جاهزًا — لن يُنشر شيء حتى تقوم بذلك.",
+    notReady: "{count} أمر(أمور) يجب إصلاحها قبل النشر",
+    notReadyHint: "لا يستطيع مقدمو الخدمة فهم هذا الطلب أو تسعيره بعد. يوضح كل بند ما ينقص وأين يُصلح.",
+    warningsHeading: "اقتراحات (لن تمنعك من النشر)",
+    section_details: "أصلحه في التفاصيل",
+    section_dates: "أصلحه في التواريخ",
+    section_rules: "أصلحه في قواعد العروض والأسئلة",
+    section_items: "أصلحه في ما يجب تسعيره",
+    section_response: "أصلحه في ما يجب على مقدمي الخدمة تقديمه",
+    section_eligibility: "أصلحه في من يمكنه تقديم عرض",
+    section_documents: "إضافة مستندات",
+    title_too_short: "أعطِ الطلب عنوانًا يوضح نوع العمل (5 أحرف على الأقل).",
+    scope_missing: "صف العمل: ما المطلوب، وأين في الموقع، وبأي مستوى. لا يمكن لمقدم الخدمة تسعير طلب بدون ذلك.",
+    scope_brief: "نطاق العمل مختصر جدًا. يسعّر مقدمو الخدمة بدقة أكبر عندما يعرفون ما يشمله العمل وما لا يشمله.",
+    type_missing: "اختر نوع العمل ليجده مقدمو الخدمة المناسبون.",
+    type_unlisted: "نوع العمل ليس من فئات المنصة، لذا لن يجده من يبحث حسب الفئة.",
+    address_missing: "أدخل عنوان الموقع أو وصفًا لمكانه.",
+    governorate_missing: "اختر المحافظة ليتمكن مقدمو الخدمة من تقدير التنقل وتغطية المنطقة.",
+    area_missing: "أضف المنطقة (مثل سلوى) ليتمكن مقدمو الخدمة من تقدير الموقع دون العنوان الدقيق.",
+    deadline_passed: "حدد موعدًا مستقبليًا لإغلاق العروض.",
+    deadline_soon: "تُغلق العروض خلال أقل من 3 أيام. قد لا يتسع الوقت لزيارة الموقع والتسعير بشكل صحيح.",
+    timing_missing: "حدد تقريبًا متى يجب أن يتم العمل (تاريخ بدء أو مدة) ليتحقق مقدمو الخدمة من توفرهم.",
+    questions_deadline_passed: "انتهى موعد الأسئلة: أجّله، أو احذفه لاستقبال الأسئلة حتى إغلاق العروض.",
+    per_item_without_items: "الطلب مسعّر حسب البنود لكنه لا يتضمن بنودًا. أضف البنود أو اجعله سعرًا إجماليًا واحدًا.",
+    item_unit_missing: "البند {position} له كمية بدون وحدة.",
+    item_quantity_missing: "البند {position} بدون كمية، لذا سيسعّره مقدمو الخدمة كمبلغ مقطوع.",
+    eligibility_category_missing: "شرط من يمكنه تقديم عرض يعتمد على نوع العمل، لكن لم يُختر نوع من قائمة المنصة.",
+    eligibility_governorate_missing: "شرط من يمكنه تقديم عرض يعتمد على المحافظة، لكن لم تُختر محافظة.",
+    qualification_retired: "أحد المؤهلات المطلوبة لم يعد ضمن قائمة المنصة. اختر مجددًا في من يمكنه تقديم عرض.",
+    documents_referenced: "يشير نطاق العمل إلى مخططات أو مرفقات، لكن لم يُرفع أي منها.",
+    documents_missing: "لا توجد مخططات أو جدول كميات أو صور. في الأعمال التفصيلية يحتاجها مقدمو الخدمة عادةً للتسعير بدقة.",
+    publishBlocked: "أصلح البنود أعلاه قبل النشر.",
   },
   eligibility: {
     heading: "من يمكنه تقديم عرض",

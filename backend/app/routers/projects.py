@@ -41,6 +41,7 @@ from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowe
 from app.services.email import notify_service_provider_tender_amended
 from app.services.notify import notify, notify_team
 from app.services.team import acting_id, acting_profile, mine, org_of, owns
+from app.services import requirement_quality
 from app.services.storage import drawing_url_expiry_seconds, get_storage
 from app.services.tender_lifecycle import lock_project, sync_expired_projects
 
@@ -211,6 +212,9 @@ async def create_project(
         creation_token=creation_token or None,
         organization_id=org_of(db, user.id),  # an organization's requirement is shared by its members
     )
+    if status_value == ProjectStatus.open:
+        # Publishing straight from the start form passes the same gate.
+        requirement_quality.assert_publishable(db, project)
     db.add(project)
     try:
         db.commit()
@@ -525,6 +529,18 @@ def _to_naive_utc(value: datetime | None, label: str) -> datetime | None:
         return value.astimezone(timezone.utc).replace(tzinfo=None)
     except OverflowError:
         raise HTTPException(status_code=400, detail=f"Invalid {label}.")
+
+
+@router.get("/{project_id}/quality")
+def requirement_quality_report(project_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Stage 3.12: what is still missing or contradictory before this
+    requirement can go in front of providers (errors block publication;
+    warnings are advice). The owner's side only."""
+    sync_expired_projects(db)
+    project = db.get(Project, project_id)
+    if not project or not owns(db, user, project):
+        raise HTTPException(status_code=404, detail="Project not found.")
+    return requirement_quality.check(db, project).as_dict()
 
 
 @router.put("/{project_id}/tender-rules", response_model=ProjectDetailOut)
