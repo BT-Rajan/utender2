@@ -143,3 +143,22 @@ def test_the_requirement_decides_when_the_price_can_change(db):
     # Arabic.
     r = sp.put(URL.format(paused), json={"amount": "1"}, headers={"Accept-Language": "ar"})
     assert r.status_code == 400 and r.json()["detail"] != "Bidding on this project is closed."
+
+
+def test_an_outdated_draft_cant_be_submitted_directly_either(db):
+    owner = _account(db, "owner", "owner@example.com")
+    sp = _account(db, "service_provider", "noor@example.com")
+    pid = _publish(owner)
+    sp.post(f"/projects/{pid}/participate")
+    sp.put(URL.format(pid), json={"amount": "500"})
+    v = owner.get(f"/projects/{pid}").json()["version"]
+    owner.patch(f"/projects/{pid}", json={"description": "Rewire a villa: 40 points plus 6 outdoor."}, headers={"If-Match": str(v)})
+    # Skipping the page's review step by posting the offer straight to the API: refused, still a draft.
+    r = sp.post(f"/projects/{pid}/offers", json={"amount": "500"})
+    assert r.status_code == 409 and "Review the current requirement" in r.json()["detail"]
+    db.expire_all()
+    assert db.query(Offer).one().status == OfferStatus.draft and owner.get(f"/owner/projects/{pid}/offers").json() == []
+    # Reviewed: submitted against the current version.
+    sp.post(f"/projects/{pid}/participate")
+    offer = sp.post(f"/projects/{pid}/offers", json={"amount": "500"}).json()
+    assert offer["status"] == "submitted" and offer["based_on_material_revision"] == 1

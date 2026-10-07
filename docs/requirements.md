@@ -232,7 +232,7 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **Per item:** a rate for each of the requirement's own items. The server multiplies rate by quantity (or uses the rate alone for items with no quantity), rounding to 3 decimals. The offer total is the server's sum, set only once every item is priced, and a total sent by the browser is ignored.
   - Rejected: anything not a number, negative values, more than 3 decimals, totals beyond the limit, items not in this requirement, and the same item twice.
   - The currency is the requirement's (KWD, set on the server); the provider can't change it, and nothing is converted.
-  - Saves are refused when the page is out of date (another tab or team member saved since it was opened), and while the requirement is paused, suspended, closed, past its deadline or changed since the provider last reviewed it. Saves are also refused once the offer is submitted.
+  - Saves are refused when the page is out of date (another tab or team member saved since it was opened), and while the requirement is paused, suspended, closed, past its deadline or changed since the provider last reviewed it. Saves are also refused once the offer is submitted. A draft started before a material change also can't be submitted directly until the provider has reviewed the current requirement.
   - Pricing basis, items and quantities can't change after publication (Stage 3.4), so a saved price always refers to the current items.
 
 _Further steps (5.4 onwards) are added as they are implemented._

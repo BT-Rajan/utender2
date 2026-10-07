@@ -107,7 +107,9 @@ def test_the_journey_through_every_change(db):
     assert _get(sp, v0["single-line.pdf"]["url"]).content == b"%PDF-v1"  # what was first downloaded is on record
     assert sp.get("/service-provider/preparing").json()[0]["changed_since"] is True
     assert [c["answer"] for c in sp.get(f"/projects/{pid}/clarifications").json()] == ["No."]
-    # The offer is made against the current version.
+    # The offer is made against the current version -- once it has been reviewed (Stage 5.3).
+    assert sp.post(f"/projects/{pid}/offers", json={"amount": "900"}).status_code == 409
+    sp.post(f"/projects/{pid}/participate")
     assert sp.post(f"/projects/{pid}/offers", json={"amount": "900"}).json()["based_on_material_revision"] == 1
     # 10. The owner cancels while the provider's page is open: nothing on it still works.
     owner.post(f"/owner/projects/{pid}/cancel", json={"reason": "postponed"})

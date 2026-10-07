@@ -228,6 +228,12 @@ def submit_offer(
     # next-key/gap lock, and two such locks held at once deadlock on the
     # inserts that follow.
     offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
+    # Stage 5.3: a draft started before a material change is made into an
+    # offer only once the provider has reviewed the current requirement
+    # (Participate again) -- the same rule as saving the draft, so the
+    # browser can't skip it by submitting directly.
+    if offer and offer.status == OfferStatus.draft and offer.based_on_material_revision < project.material_revision:
+        raise HTTPException(status_code=409, detail="The requirement changed after you started this offer. Review the current requirement first.")
     if offer:
         # upsert on the (project_id, service_provider_id) unique constraint — a
         # service provider revising their bid before the deadline updates the
