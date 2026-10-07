@@ -76,10 +76,15 @@ export function EndRequirement({ project }: { project: ProjectDetail }) {
     onSuccess: () => {
       setError(null);
       setOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["project", project.id] });
-      queryClient.invalidateQueries({ queryKey: ["owner-projects"] });
     },
     onError: (err) => setError(err instanceof ApiError ? err.detail : t("closure.error")),
+    // Stage 6.17: either way, show the requirement and its offers as the
+    // server now holds them -- e.g. refused because a colleague already decided.
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["project", project.id] });
+      queryClient.invalidateQueries({ queryKey: ["owner-offers", project.id] });
+      queryClient.invalidateQueries({ queryKey: ["owner-projects"] });
+    },
   });
   const decided = project.status === "closed" || project.status === "under_evaluation";
 

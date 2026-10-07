@@ -430,6 +430,15 @@ export function OwnerProjectDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["owner-projects"] });
     },
     onError: (err) => setError(errorMessage(err, t("owner.projectDetail.statusError"))),
+    // Stage 6.17: a refused close or start of evaluation (e.g. a colleague
+    // already decided) shows the requirement as the server now holds it. Not
+    // after a refused publish: a draft being edited is never reloaded under the owner.
+    onSettled: (_data, error, action) => {
+      if (!error || action === "publish" || action === "discard") return;
+      queryClient.invalidateQueries({ queryKey: ["project", id] });
+      queryClient.invalidateQueries({ queryKey: ["owner-offers", id] });
+      queryClient.invalidateQueries({ queryKey: ["owner-projects"] });
+    },
   });
 
   // Stage 3.12: the server's quality check, re-read after every save.

@@ -586,4 +586,20 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **Ended requirements:** an offer still "submitted" on a requirement that ended without an award (no suitable offer, ended outside U-Tender, cancelled, expired) showed "Offer placed" on the dashboard and offer page. It now shows the requirement's outcome, in neutral styling.
     - **Notification failures:** notifications after an award or ending are best-effort. A failure is logged and rolled back, and never fails the owner's request or undoes the decision (previously a server error after a committed decision).
 
-_Later Stage 6 steps are added as they are implemented._
+- **6.17 Final evaluation & decision integrity audit:** the whole owner journey was traced end to end: receive → review → compare → evaluate → shortlist → award or no award → provider outcome.
+  - **Scenarios** (`tests/test_stage6_17_end_to_end.py`):
+    - normal competition to an award;
+    - no suitable provider;
+    - a withdrawn offer can't win;
+    - an amendment keeps each response on its version;
+    - the deadline passes while reviewing;
+    - a provider probing every owner and provider endpoint with competitors' ids;
+    - stale tabs and retries across organisation members;
+    - a notification failure.
+  - **Simultaneous decisions:** the MySQL race tests from 6.15.
+  - **Fixed during the audit:**
+    - Losing bidders no longer learn the winner's name (see 6.16).
+    - The owner's page reloads the requirement and its offers after a refused ending, close or start of evaluation, as it already did after a refused award. Before, a page refused because a colleague had already decided kept showing the old state and actions. (A draft being edited is never reloaded under the owner.)
+  - **Verdict:** Stage 6 ready.
+
+_Stage 7 onwards is added as it is implemented._
