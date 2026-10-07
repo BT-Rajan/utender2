@@ -164,10 +164,10 @@ def submit_offer(
     # this tender is serialized, so the state read below is the state the bid
     # is written against.
     project = lock_project(db, project_id)
+    if project and project.is_suspended:
+        raise HTTPException(status_code=400, detail="This project has been suspended and is not accepting offers.")
     if not project or not bidding_is_open(project):
         raise HTTPException(status_code=400, detail="Bidding on this project is closed.")
-    if project.is_suspended:
-        raise HTTPException(status_code=400, detail="This project has been suspended and is not accepting offers.")
     # Stage 3.9: the requirement's own eligibility rules, checked at the
     # moment of every submission and revision.
     assert_eligible(db, project, profile)

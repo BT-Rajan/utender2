@@ -38,7 +38,14 @@ def is_sealed_and_open(project: Project) -> bool:
 def bidding_is_open(project: Project) -> bool:
     # Stage 3.15: an owner-paused requirement accepts nothing -- no offers,
     # revisions, withdrawals, attachments or questions -- until resumed.
-    return project.status == ProjectStatus.open and project.paused_at is None and project.bid_deadline > datetime.utcnow()
+    # Stage 3.18: nor does one an admin has suspended (moderation) -- the same
+    # one rule for offers, revisions, withdrawals, confirmations and questions.
+    return (
+        project.status == ProjectStatus.open
+        and project.paused_at is None
+        and not project.is_suspended
+        and project.bid_deadline > datetime.utcnow()
+    )
 
 
 # SELECT ... FOR UPDATE on the tender row. Every operation that can change

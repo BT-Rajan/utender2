@@ -162,6 +162,7 @@ def my_bids(user: User = Depends(require_service_provider), db: Session = Depend
             project_address=p.address,
             project_status=p.status,
             closure_reason=p.closure_reason,
+            project_suspended=p.is_suspended,
             bid_deadline=p.bid_deadline,
             offer_id=o.id,
             amount=o.amount,

@@ -357,7 +357,8 @@ def start_evaluation(project_id: str, user: User = Depends(require_owner), db: S
     if project.status != ProjectStatus.closed:
         raise HTTPException(status_code=400, detail="Only a closed project can enter evaluation.")
     project.status = ProjectStatus.under_evaluation
-    db.commit()
+    # Stage 3.18: recorded like every other lifecycle change (log_action commits both together).
+    log_action(db, actor_id=user.id, action="project.start_evaluation", target_type="project", target_id=project_id, previous_value="closed", new_value="under_evaluation")
     db.refresh(project)
     return _project_response(project, db)
 

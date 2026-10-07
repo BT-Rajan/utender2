@@ -63,6 +63,7 @@ class MyBidOut(BaseModel):
     project_address: str
     project_status: ProjectStatus
     closure_reason: str | None = None
+    project_suspended: bool = False  # Stage 3.18: hidden by an admin -- why it can't be opened
     bid_deadline: UTCDateTime
     offer_id: str
     amount: Decimal

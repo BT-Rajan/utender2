@@ -236,6 +236,8 @@ export interface Dictionary {
     restartConfirmBody: string;
     restartedFrom: string;
     restartedFromLink: string;
+    adminSuspended: string;
+    labelSuspended: string;
   };
   postPub: {
     pause: string;
@@ -1271,6 +1273,8 @@ export const en: Dictionary = {
     restartConfirmBody: "A new draft is created with this requirement’s description, items, rules, eligibility and current documents. Set a new deadline, check it, then publish it as a new requirement. This one stays as it ended, with its offers.",
     restartedFrom: "Started again from an ended requirement:",
     restartedFromLink: "see the original",
+    adminSuspended: "Suspended by U-Tender: hidden from providers and not accepting offers, questions or changes to offers until reactivated. Contact support if you think this is a mistake.",
+    labelSuspended: "Suspended by U-Tender",
   },
   postPub: {
     pause: "Pause this requirement",
@@ -2331,6 +2335,8 @@ export const ar: Dictionary = {
     restartConfirmBody: "تُنشأ مسودة جديدة بوصف هذا الطلب وبنوده وقواعده وشروط الأهلية ومستنداته الحالية. حدّد موعداً نهائياً جديداً وراجعها ثم انشرها كطلب جديد. يبقى هذا الطلب كما انتهى، مع عروضه.",
     restartedFrom: "بُدئ من جديد من طلب منتهٍ:",
     restartedFromLink: "اطّلع على الطلب الأصلي",
+    adminSuspended: "علّقته إدارة U-Tender: مخفي عن مقدّمي الخدمة ولا يقبل عروضاً أو أسئلة أو تعديلات على العروض حتى إعادة تفعيله. تواصل مع الدعم إن رأيت أن ذلك خطأ.",
+    labelSuspended: "معلّق من U-Tender",
   },
   postPub: {
     pause: "إيقاف الطلب مؤقتًا",

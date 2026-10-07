@@ -427,6 +427,12 @@ export function OwnerProjectDetailPage() {
           {t("draftDetails.published").replace("{date}", formatDeadline(project.published_at)).replace("{deadline}", formatDeadline(project.bid_deadline))}
         </p>
       )}
+      {/* Stage 3.18: an admin suspension overrides everything providers see. */}
+      {project.is_suspended && (
+        <div className="border border-red bg-red-tint rounded px-4 py-3 mb-6 text-sm text-red max-w-2xl" data-testid="admin-suspended">
+          {t("closure.adminSuspended")}
+        </div>
+      )}
       {project.restarted_from_id && (
         <p className="text-[12.5px] text-steel mb-4" data-testid="restarted-from">
           {t("closure.restartedFrom")}{" "}

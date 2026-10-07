@@ -14,6 +14,7 @@ interface MyBid {
   project_address: string;
   project_status: ProjectStatus;
   closure_reason?: ClosureReason | null;
+  project_suspended?: boolean;
   bid_deadline: string;
   offer_id: string;
   amount: string;
@@ -184,7 +185,7 @@ export function ServiceProviderDashboardPage() {
                   </div>
                   <div className="flex items-center justify-between font-mono text-xs">
                     <span className="text-navy font-semibold">{money(b.amount)}</span>
-                    <span className="text-steel-light">{outcomeLabel(t, b.project_status, b.closure_reason)}</span>
+                    <span className="text-steel-light">{b.project_suspended ? t("closure.labelSuspended") : outcomeLabel(t, b.project_status, b.closure_reason)}</span>
                   </div>
                 </Link>
               ))}
