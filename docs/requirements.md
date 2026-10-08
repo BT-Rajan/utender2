@@ -984,4 +984,20 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - **Payments:** not tracked, and not part of the outcome.
   - **Tests:** `tests/test_stage8_1_completion_boundary.py` and `tests/test_stage8_2_outcome.py` prove these points.
 
+- **8.3 Owner reviews the service provider:**
+  - **Audit:**
+    - **Already working:** the review (`reviews`: one per requirement, unique; whole-number rating 1–5 enforced by a database check; optional comment). The reviewed provider is always the award's, never the request's (the PASS 17 fix). It requires a completed transaction (8.1), and the provider's public average is recomputed from all its reviews. The owner page shows the review once recorded.
+    - **Gaps found:**
+      - **Authorization:** the endpoint needed only an owner role, so a suspended or unverified owner could record a review, unlike every other owner action.
+      - **Duplicates:** two simultaneous submissions both passed the "already reviewed?" check and the second failed on the unique constraint with a 500.
+      - **Atomicity:** the review and the provider's recomputed rating were two commits, with no audit entry.
+      - **Input:** the comment had no length limit and wasn't trimmed. Callers had to send a `service_provider_id` the server ignores.
+  - **Fixed (`app/routers/owner.py`, `app/schemas/review.py`):**
+    - **Authorization:** the review now goes through `_get_owned_project(lock=True)`, which takes the requirement's lock and requires an active, verified account. Any member of the owner organisation can review; providers, other owners and the signed-out can't.
+    - **Duplicates:** a second review (a retry, a colleague, another tab) is an explained 409.
+    - **One transaction:** the review, the provider's recomputed rating and a `review.create` audit entry commit together; a failure records none of them.
+    - **Input:** the rating is a strict whole number 1–5 (no coercion from text or decimals). The comment is trimmed, at most 2,000 characters, and a blank one becomes none. `service_provider_id` is optional, and still ignored. `created_at` is returned in UTC.
+  - **UI:** the owner confirms before submitting ("A review can't be changed afterwards"). The comment box has the limit and a label. A refused submission reloads what's on record.
+  - **Tests:** `tests/test_stage8_3_owner_review.py`.
+
 _Stage 9 onwards is added as it is implemented._

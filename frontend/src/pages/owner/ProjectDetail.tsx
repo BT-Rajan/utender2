@@ -478,7 +478,10 @@ export function OwnerProjectDetailPage() {
       setError(null);
       queryClient.invalidateQueries({ queryKey: ["owner-review", id] });
     },
-    onError: (err) => setError(errorMessage(err, t("owner.projectDetail.reviewError"))),
+    onError: (err) => {
+      setError(errorMessage(err, t("owner.projectDetail.reviewError")));
+      queryClient.invalidateQueries({ queryKey: ["owner-review", id] });  // Stage 8.3: show what is on record
+    },
   });
 
   const confirm = useConfirm();
@@ -996,7 +999,10 @@ export function OwnerProjectDetailPage() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                reviewMutation.mutate();
+                // Stage 8.3: a review is final -- confirm before it's recorded.
+                void confirm({ title: t("review.confirmTitle"), body: t("review.confirmBody"), confirmLabel: t("owner.projectDetail.submitReview") }).then(
+                  (ok) => ok && reviewMutation.mutate(),
+                );
               }}
               className="bg-white border border-border rounded px-4.5 py-4 grid gap-3.5"
             >
@@ -1005,6 +1011,9 @@ export function OwnerProjectDetailPage() {
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 rows={3}
+                maxLength={2000}
+                dir="auto"
+                aria-label={t("owner.projectDetail.ratingPlaceholder")}
                 placeholder={t("owner.projectDetail.ratingPlaceholder")}
                 className="w-full border border-border rounded px-3 py-2.5 text-sm resize-y"
               />

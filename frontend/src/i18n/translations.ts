@@ -246,6 +246,10 @@ export interface Dictionary {
     earlierVersion: string;
     confirm: string;
   };
+  review: {
+    confirmTitle: string;
+    confirmBody: string;
+  };
   history: {
     heading: string;
     awarded: string;
@@ -1699,6 +1703,10 @@ export const en: Dictionary = {
     confirmBody: "This is your final decision on this requirement: {provider}'s offer of {amount} is accepted as submitted, every other live offer is marked not selected, and every provider is told. It can't be undone. It isn't a contract or a payment.",
     earlierVersion: "Note: this offer was made against version {n} of the requirement, which is now at version {m}, and its provider didn't confirm it since. You'd be awarding it as it stands.",
     confirm: "Award",
+  },
+  review: {
+    confirmTitle: "Submit this review?",
+    confirmBody: "Your rating and comment are recorded against this completed transaction and count towards the service provider's public rating. A review can't be changed afterwards.",
   },
   history: {
     heading: "History",
@@ -3210,6 +3218,10 @@ export const ar: Dictionary = {
     confirmBody: "هذا قرارك النهائي في هذا المتطلب: يُقبل عرض {provider} بقيمة {amount} كما قُدّم، ويُعلَّم كل عرض قائم آخر بأنه لم يُختر، ويُبلَّغ كل المزوّدين. لا يمكن التراجع عنه. وهو ليس عقدًا ولا دفعًا.",
     earlierVersion: "ملاحظة: قُدّم هذا العرض على الإصدار {n} من المتطلب، وهو الآن في الإصدار {m}، ولم يؤكده مزوّده منذ ذلك الحين. ستُرسيه كما هو.",
     confirm: "رسِّ",
+  },
+  review: {
+    confirmTitle: "إرسال هذا التقييم؟",
+    confirmBody: "يُسجَّل تقييمك وتعليقك على هذه المعاملة المكتملة ويُحتسب ضمن التقييم العام لمقدم الخدمة. لا يمكن تغيير التقييم بعد ذلك.",
   },
   history: {
     heading: "السجل",

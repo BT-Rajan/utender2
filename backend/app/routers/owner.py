@@ -969,9 +969,12 @@ def get_review(project_id: str, user: User = Depends(require_owner), db: Session
 
 @router.post("/reviews", response_model=ReviewOut)
 def submit_review(payload: ReviewCreate, user: User = Depends(require_owner), db: Session = Depends(get_db)):
-    project = db.get(Project, payload.project_id)
-    if not project or not owns(db, user, project):
-        raise HTTPException(status_code=404, detail="Project not found.")
+    """Stage 8.3: the owner side reviews the provider it awarded, once the
+    transaction is completed (8.1) -- once per transaction. Under the
+    requirement's lock and from an active, verified owner account like every
+    other owner action; the review, the provider's recomputed public rating
+    and the audit entry are one transaction."""
+    project = _get_owned_project(payload.project_id, user, db, lock=True)
     # Stage 8.1: a review rests on completed work -- the transaction closed by
     # the owner side's acceptance (Stage 7.11) -- never on the award alone.
     if completed_transaction(db, project.id) is None:
@@ -979,10 +982,10 @@ def submit_review(payload: ReviewCreate, user: User = Depends(require_owner), db
 
     existing = db.query(Review).filter(Review.project_id == payload.project_id).first()
     if existing:
-        raise HTTPException(status_code=400, detail="A review already exists for this project.")
+        raise HTTPException(status_code=409, detail="This transaction has already been reviewed (by a colleague or from another tab). This page now shows the latest.")
 
     # The service provider being reviewed is derived from the project's own
-    # AwardRecord, never trusted from the request body — payload.service_provider_id
+    # AwardRecord, never trusted from the request body -- payload.service_provider_id
     # is otherwise a free-text client-supplied ID with only a "some real
     # service provider exists" FK constraint behind it, letting an owner rate ANY
     # service provider's public profile under cover of an unrelated awarded
@@ -996,10 +999,10 @@ def submit_review(payload: ReviewCreate, user: User = Depends(require_owner), db
         owner_id=user.id,
         service_provider_id=award.service_provider_id,
         rating=payload.rating,
-        comment=payload.comment or None,
+        comment=(payload.comment or "").strip() or None,
     )
     db.add(review)
-    db.commit()
+    db.flush()
 
     # Recompute the service provider's public average rather than trusting an
     # incrementally-maintained counter, so it can never drift out of sync.
@@ -1013,8 +1016,9 @@ def submit_review(payload: ReviewCreate, user: User = Depends(require_owner), db
     if profile:
         profile.avg_rating = avg_rating
         profile.review_count = review_count
-        db.commit()
-
+    # log_action commits: the review, the rating and the audit entry land together.
+    log_action(db, actor_id=user.id, action="review.create", target_type="project", target_id=project.id,
+               new_value=f"{review.id} rating:{review.rating} service_provider:{award.service_provider_id}")
     db.refresh(review)
     return review
 

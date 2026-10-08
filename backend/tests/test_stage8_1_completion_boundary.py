@@ -52,7 +52,7 @@ def test_only_a_completed_transaction_is_eligible(db):
     # The owner's review now opens -- once, and about the actual winner.
     r = _review(owner, pid)
     assert r.status_code == 200 and r.json()["service_provider_id"] == db.query(AwardRecord).one().service_provider_id
-    assert db.query(Review).count() == 1 and _review(owner, pid).status_code == 400
+    assert db.query(Review).count() == 1 and _review(owner, pid).status_code == 409
 
 
 def test_other_endings_are_never_eligible(db):

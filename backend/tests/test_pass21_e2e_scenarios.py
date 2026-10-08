@@ -181,7 +181,7 @@ def test_pass21_e2e_scenarios():
     check("A: winning service provider's review_count is 1", r.json()["review_count"] == 1)
 
     r = owner_client.post("/owner/reviews", json={"project_id": projA, "service_provider_id": c2_id, "rating": 1})
-    check("A: duplicate review on the same project rejected", r.status_code == 400)
+    check("A: duplicate review on the same project rejected", r.status_code == 409)
 
     # ======================================================================
     # SCENARIO B: sealed tender, full lifecycle with privacy checks
