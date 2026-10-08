@@ -36,11 +36,12 @@ def create_checkout_session(
         # creating a duplicate customer record.
         customer=cp.stripe_customer_id or None,
         customer_email=None if cp.stripe_customer_id else user.email,
-        client_reference_id=user.id,
-        # The webhook has no session/user context of its own — metadata is
-        # how it knows which service_provider_profiles row to update.
-        metadata={"service_provider_id": user.id},
-        subscription_data={"metadata": {"service_provider_id": user.id}},
+        # Stage 9.6: the stakeholder being billed -- the organisation's profile
+        # (cp), never the member who happens to click. The webhook has no
+        # session of its own; metadata is how it finds that profile.
+        client_reference_id=cp.user_id,
+        metadata={"service_provider_id": cp.user_id},
+        subscription_data={"metadata": {"service_provider_id": cp.user_id}},
         success_url=f"{settings.app_url}/service-provider/feed?subscribed=1",
         cancel_url=f"{settings.app_url}/service-provider/subscribe",
     )
@@ -80,41 +81,30 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     data = event["data"]["object"]
 
     try:
+        event_at = datetime.utcfromtimestamp(event["created"]) if event.get("created") else None
         if event_type == "checkout.session.completed":
-            service_provider_id = (data.get("metadata") or {}).get("service_provider_id") or data.get("client_reference_id")
-            if service_provider_id and data.get("subscription") and data.get("customer"):
-                subscription = stripe.Subscription.retrieve(data["subscription"])
-                cp = db.get(ServiceProviderProfile, service_provider_id)
+            if data.get("subscription") and data.get("customer"):
+                subscription = stripe.Subscription.retrieve(data["subscription"])  # its current state, not the event's
+                cp = _billed_profile(db, subscription_id=subscription["id"],
+                                     reference=(data.get("metadata") or {}).get("service_provider_id") or data.get("client_reference_id"))
                 if cp:
-                    had_access = cp.is_verified_active
                     cp.stripe_customer_id = data["customer"]
-                    cp.stripe_subscription_id = subscription.id
-                    cp.subscription_status = SubscriptionStatus(map_stripe_status(subscription.status))
-                    cp.subscription_current_period_end = datetime.utcfromtimestamp(subscription.current_period_end)
-                    db.commit()
-                    _tell_access_change(db, cp, had_access)
+                    cp.stripe_subscription_id = subscription["id"]
+                    _apply(db, cp, subscription, event_at, event.get("id"))
 
         # Covers plan changes, renewals, payment failures, and
         # cancellations — Stripe sends this on essentially every status
         # change after the initial checkout, so it's the source of truth
         # going forward.
         elif event_type in ("customer.subscription.updated", "customer.subscription.deleted"):
-            service_provider_id = (data.get("metadata") or {}).get("service_provider_id")
-            cp = None
-            if service_provider_id:
-                cp = db.get(ServiceProviderProfile, service_provider_id)
-            else:
-                cp = (
-                    db.query(ServiceProviderProfile)
-                    .filter(ServiceProviderProfile.stripe_subscription_id == data["id"])
-                    .first()
-                )
+            cp = _billed_profile(db, subscription_id=data["id"], reference=(data.get("metadata") or {}).get("service_provider_id"))
             if cp:
-                had_access = cp.is_verified_active
-                cp.subscription_status = SubscriptionStatus(map_stripe_status(data["status"]))
-                cp.subscription_current_period_end = datetime.utcfromtimestamp(data["current_period_end"])
-                db.commit()
-                _tell_access_change(db, cp, had_access)
+                if cp.subscription_event_at and event_at and event_at < cp.subscription_event_at:
+                    # Stage 9.6: a delayed, older event -- the state already reflects something newer.
+                    logger.info("ignoring stale stripe event %s for %s", event.get("id"), cp.user_id)
+                else:
+                    cp.stripe_subscription_id = cp.stripe_subscription_id or data["id"]
+                    _apply(db, cp, data, event_at, event.get("id"))
         # Unhandled event types are expected — Stripe sends many more than
         # we act on. No-op is correct here.
     except Exception:
@@ -146,3 +136,56 @@ def _tell_access_change(db: Session, cp: ServiceProviderProfile, had_access: boo
     except Exception:  # noqa: BLE001 -- the subscription state is already recorded
         db.rollback()
         logger.exception("could not notify %s of a subscription change", cp.user_id)
+
+
+def _billed_profile(db: Session, subscription_id: str | None, reference: str | None) -> ServiceProviderProfile | None:
+    """Stage 9.6: the stakeholder a Stripe object bills -- first by the
+    subscription it already holds; otherwise by the id the checkout recorded,
+    mapped to the stakeholder that person acts for (an organisation's profile,
+    never a member's own row -- older checkouts recorded the member)."""
+    from app.services.team import acting_profile
+
+    held = None
+    if subscription_id:
+        held = db.query(ServiceProviderProfile).filter(ServiceProviderProfile.stripe_subscription_id == subscription_id).first()
+    user = db.get(User, held.user_id if held else reference) if (held or reference) else None
+    profile = acting_profile(db, user) if user else None
+    if not isinstance(profile, ServiceProviderProfile):
+        return held
+    if held is not None and held is not profile:
+        # A member's own row was billed by an older checkout: the subscription
+        # belongs to the organisation it acts for -- move it there.
+        profile.stripe_customer_id, profile.stripe_subscription_id = held.stripe_customer_id, held.stripe_subscription_id
+        held.stripe_customer_id = held.stripe_subscription_id = None
+        held.subscription_status = None
+        db.flush()
+    return profile
+
+
+def _apply(db: Session, cp: ServiceProviderProfile, subscription, event_at: datetime | None, event_id: str | None) -> None:
+    """Stage 9.6: Stripe's subscription state onto the one authoritative
+    record -- status, period end, interval, a scheduled cancellation, the
+    event's time -- audited when the status changes, then (9.5) the provider's
+    side told if that opened or closed its access. Applying the same event
+    twice changes nothing."""
+    from app.services.audit import log_action
+
+    had_access, previous = cp.is_verified_active, cp.subscription_status
+    cp.subscription_status = SubscriptionStatus(map_stripe_status(subscription["status"]))
+    cp.subscription_current_period_end = datetime.utcfromtimestamp(subscription["current_period_end"]) if subscription.get("current_period_end") else None
+    cp.subscription_cancel_at_period_end = bool(subscription.get("cancel_at_period_end"))
+    cp.subscription_interval = _interval(subscription) or cp.subscription_interval
+    if event_at and (cp.subscription_event_at is None or event_at > cp.subscription_event_at):
+        cp.subscription_event_at = event_at
+    db.commit()
+    if previous != cp.subscription_status:
+        log_action(db, actor_id=None, action="billing.subscription_status", target_type="service_provider_profile", target_id=cp.user_id,
+                   previous_value=previous.value if previous else None, new_value=f"{cp.subscription_status.value} ({event_id})")
+    _tell_access_change(db, cp, had_access)
+
+
+def _interval(subscription) -> str | None:
+    try:
+        return subscription["items"]["data"][0]["price"]["recurring"]["interval"]
+    except (KeyError, IndexError, TypeError):
+        return None

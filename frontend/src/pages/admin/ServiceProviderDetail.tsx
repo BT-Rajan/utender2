@@ -85,8 +85,12 @@ function MarketplaceAccessPanel({ serviceProviderId, service_provider }: { servi
       </div>
       <p className="text-[11.5px] text-steel-light mb-3">
         Subscription: {service_provider.subscription_status || "none"}
+        {service_provider.subscription_interval && ` (${service_provider.subscription_interval})`}
         {service_provider.subscription_current_period_end &&
-          ` · renews ${new Date(service_provider.subscription_current_period_end).toLocaleDateString()}`}
+          ` · ${service_provider.subscription_cancel_at_period_end ? "ends" : "renews"} ${new Date(service_provider.subscription_current_period_end).toLocaleDateString()}`}
+        {/* Stage 9.6: when Stripe last told us anything, and whether the platform lets it bid now. */}
+        {service_provider.subscription_event_at && ` · last billing event ${new Date(service_provider.subscription_event_at).toLocaleString()}`}
+        {` · marketplace: ${service_provider.marketplace_status}`}
       </p>
 
       <ErrorBanner message={error} />

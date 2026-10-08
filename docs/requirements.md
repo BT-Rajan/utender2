@@ -1390,4 +1390,29 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **Migration 0062: `email_failures`:** each failed send is recorded (recipient, subject, error), in its own session, never raising. The overview's email status reads "failing (N in 24h)", "no failures recorded" or "not configured". It is never presented as guaranteed delivery.
   - **Tests:** `tests/test_stage9_5_notifications.py`, covering scenarios A–J.
 
+- **9.6 Billing and subscription operations:**
+  - **Already working:**
+    - **One authoritative state:** `subscription_status` on the provider's profile, set only by Stripe webhooks, which must be signed (missing or bad signature → 400; no client can set it). Stripe statuses fold into active / trialing / past_due / canceled.
+    - **Access:** decided on every request by `is_verified_active`: verified, unsuspended, and (active/trialing or an audited admin override). Owners are never billed.
+    - **Checkout and portal:** both reuse the Stripe customer and are open to approved providers only.
+    - **Failed processing:** returns 500 so Stripe retries, and nothing is half-written.
+    - **No payment details stored:** only Stripe ids. Subscription and marketplace money are separate (Stage 7.12).
+  - **Gaps found:**
+    - **Wrong stakeholder billed (real bug):** checkout recorded the clicking member's own user id. A non-representative member's subscription activated that member's unused personal row; the organisation stayed unpaid, and later webhooks followed the wrong mapping.
+    - **Stale events:** a late, older `customer.subscription.updated` event overwrote a newer state.
+    - **Missing facts for operator and provider:** the plan interval, a scheduled cancellation and the last billing event weren't recorded. The page said "renews" for a subscription about to end.
+    - **No audit:** Stripe-driven status changes left no record.
+  - **Fixed:**
+    - **Billing the right stakeholder:**
+      - checkout passes the billed profile's id (the organisation's);
+      - the webhook resolves the target by the subscription it holds, else by the recorded id mapped to the stakeholder that person acts for;
+      - a subscription an older checkout put on a member's row is moved to the organisation on its next event.
+    - **Migration 0063:** `subscription_interval`, `subscription_cancel_at_period_end` and `subscription_event_at`, on the same profile row (still one state).
+    - **Stale events:** an event older than the last applied one is ignored. Repeats are no-ops, and the 9.5 access notices fire only on a real change.
+    - **Audit:** each status change is recorded (`billing.subscription_status`, previous → new, Stripe event id).
+    - **UI:**
+      - the provider page shows the plan, and "cancelled: access ends <date>" instead of "renews";
+      - the admin provider page shows interval, renews/ends, last billing event and marketplace status.
+  - **Tests:** `tests/test_stage9_6_billing.py` (signed webhook payloads).
+
 _Later Stage 9 steps are added as they are implemented._

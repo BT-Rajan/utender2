@@ -341,6 +341,9 @@ export interface ServiceProviderProfile {
   review_count: number;
   subscription_status: SubscriptionStatus | null;
   subscription_current_period_end: string | null;
+  subscription_interval?: string | null; // Stage 9.6: month / year
+  subscription_cancel_at_period_end?: boolean;
+  subscription_event_at?: string | null; // when the last applied Stripe event happened
   payment_override_active: boolean;
   marketplace_status:
     | "documents_incomplete"

@@ -151,7 +151,10 @@ export function ServiceProviderSubscribePage() {
           {overrideOnly && <p className="text-sm text-steel mt-3">{t("service_provider.subscribe.overrideMessage")}</p>}
           {!overrideOnly && profile.subscription_current_period_end && (
             <p className="text-sm text-steel mt-3">
-              {t("service_provider.subscribe.renews")} {new Date(profile.subscription_current_period_end).toLocaleDateString()}
+              {/* Stage 9.6: a cancellation already scheduled ends access on that date -- it doesn't renew. */}
+              {t(profile.subscription_cancel_at_period_end ? "service_provider.subscribe.ends" : "service_provider.subscribe.renews")}{" "}
+              {new Date(profile.subscription_current_period_end).toLocaleDateString()}
+              {profile.subscription_interval && ` · ${t(profile.subscription_interval === "year" ? "service_provider.subscribe.yearly" : "service_provider.subscribe.monthly")}`}
             </p>
           )}
           {!overrideOnly && (

@@ -1273,6 +1273,9 @@ export interface Dictionary {
       overrideBadge: string;
       overrideMessage: string;
       renews: string;
+      ends: string;
+      monthly: string;
+      yearly: string;
       manageBilling: string;
       checkoutNote: string;
       checkoutError: string;
@@ -2980,6 +2983,9 @@ export const en: Dictionary = {
       overrideBadge: "admin override",
       overrideMessage: "An administrator has granted your account full marketplace access without a paid subscription.",
       renews: "Renews",
+      ends: "Cancelled: access ends",
+      monthly: "monthly",
+      yearly: "yearly",
       manageBilling: "Manage billing",
       checkoutNote: "You'll be redirected to Stripe's secure checkout to complete your subscription.",
       checkoutError: "Could not start checkout. Try again.",
@@ -4693,6 +4699,9 @@ export const ar: Dictionary = {
       overrideBadge: "استثناء إداري",
       overrideMessage: "منحك أحد المسؤولين وصولاً كاملاً للسوق دون اشتراك مدفوع.",
       renews: "يتجدد في",
+      ends: "أُلغي: ينتهي الوصول في",
+      monthly: "شهري",
+      yearly: "سنوي",
       manageBilling: "إدارة الفوترة",
       checkoutNote: "سيتم تحويلك إلى صفحة الدفع الآمنة الخاصة بـ Stripe لإتمام اشتراكك.",
       checkoutError: "تعذر بدء عملية الدفع. حاول مرة أخرى.",
