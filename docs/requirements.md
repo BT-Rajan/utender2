@@ -1182,4 +1182,22 @@ be added as its prompts (5.1, 5.2, …) are delivered.
       - "Providers you've completed work with" on the owner dashboard. Its note says that working with one again means publishing a normal, open requirement.
   - **Tests:** `tests/test_stage8_12_previous_provider.py`.
 
+- **8.13 Previous owners (provider side):**
+  - **Already working:**
+    - **Data:** completed transactions record both organisations.
+    - **Feed:** the provider feed (Stage 4) already surfaces an owner's new requirements to every eligible provider, the previous one included, in the same order and with the same eligibility (3.9/4.5) and suspension rules.
+    - **Notifications:** the `new_requirement` notification already tells eligible providers. No repeat-business notification was added.
+    - **History:** my-bids lists the provider's own transactions.
+    - **Contact:** providers have no channel to contact owners outside a requirement, and none was added.
+  - **Gaps found:**
+    - **No list of past customers:** a provider couldn't see, as an organisation, which owners it had completed work for.
+  - **Fixed (derived from completed transactions; no new table):**
+    - **`services/reputation.previous_owners`:** each owner once (by `project.owner_id`, the organisation), with its completed requirements (title and date).
+    - **Owner name only:** the organisation's legal name or the individual's name, which the provider already saw on award. Never an email, phone or other contact detail.
+    - **Endpoint:** `GET /service-provider/previous-owners` (its own organisation, by current membership).
+    - **UI:** "Owners you've completed work for" on the provider dashboard.
+  - **Deliberately not done:**
+    - **No "previous customer" label on feed items:** owners stay anonymous to providers until award (Stage 7.2), and such a label would reveal whose open requirement it is.
+  - **Tests:** `tests/test_stage8_13_previous_owner.py`.
+
 _Stage 9 onwards is added as it is implemented._

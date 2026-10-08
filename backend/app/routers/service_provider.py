@@ -17,7 +17,7 @@ from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.saved_opportunity import SavedOpportunity
 from app.models.user import User
 from app.schemas.service_provider import ServiceProviderProfileOut, MyBidOut, SubmitForReview
-from app.schemas.review import ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut, ReviewResponseCreate
+from app.schemas.review import PreviousOwnerOut, ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut, ReviewResponseCreate
 from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_response, record_review, review_of
 from app.schemas.document import ServiceProviderDocumentOut, DocumentRequirementOut
 from app.schemas.common import UTCDateTime
@@ -581,6 +581,18 @@ def my_reputation(user: User = Depends(require_service_provider), db: Session = 
     from app.services.reputation import provider_reputation
 
     return provider_reputation(db, get_service_provider_profile(user, db).user_id)
+
+
+@router.get("/previous-owners", response_model=list[PreviousOwnerOut])
+def previous_owners_of_mine(user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
+    """Stage 8.13: the owners this provider organisation has completed U-Tender
+    work for, each once, with those requirements -- its own history, by
+    current membership; no id is taken from the request. Their new
+    requirements reach it only through the normal feed and eligibility,
+    without saying whose they are (the owner is named on award, Stage 7.2)."""
+    from app.services.reputation import previous_owners
+
+    return previous_owners(db, get_service_provider_profile(user, db).user_id)
 
 
 # ---------- Stage 8.4: the winning provider reviews the owner ----------

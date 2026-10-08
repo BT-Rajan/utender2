@@ -289,6 +289,8 @@ export interface Dictionary {
     together: string;
     last: string;
     note: string;
+    ownersHeading: string;
+    ownersNote: string;
   };
   history: {
     heading: string;
@@ -1790,6 +1792,8 @@ export const en: Dictionary = {
     together: "Completed work together: {n}",
     last: "last",
     note: "From your completed U-Tender transactions. To work with a provider again, publish a new requirement: it is open to every eligible provider and is judged like any other.",
+    ownersHeading: "Owners you've completed work for",
+    ownersNote: "From your completed U-Tender transactions. Their new requirements appear in your feed like any others when you're eligible, open to every eligible provider; who posted them is shown on award.",
   },
   history: {
     heading: "History",
@@ -3348,6 +3352,8 @@ export const ar: Dictionary = {
     together: "أعمال مكتملة معًا: {n}",
     last: "آخرها",
     note: "من معاملاتك المكتملة على U-Tender. للعمل مع مقدم خدمة مجددًا، انشر طلبًا جديدًا: يكون مفتوحًا لكل مقدمي الخدمة المؤهلين ويُقيَّم كأي طلب آخر.",
+    ownersHeading: "ملاك أنجزت لهم أعمالًا",
+    ownersNote: "من معاملاتك المكتملة على U-Tender. تظهر طلباتهم الجديدة في قائمة الفرص مثل غيرها عندما تكون مؤهلًا، ومفتوحة لكل مقدمي الخدمة المؤهلين؛ ويُعرف صاحب الطلب عند الترسية.",
   },
   history: {
     heading: "السجل",

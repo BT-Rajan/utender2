@@ -89,3 +89,12 @@ class PreviousProviderOut(BaseModel):
     completed_transactions: int
     last_completed_at: UTCDateTime | None
     transactions: list[PreviousTransactionOut]
+
+
+class PreviousOwnerOut(BaseModel):
+    """Stage 8.13: an owner the provider organisation completed work for --
+    its name and those completed requirements; no contact details."""
+    owner_name: str | None
+    completed_transactions: int
+    last_completed_at: UTCDateTime | None
+    transactions: list[PreviousTransactionOut]

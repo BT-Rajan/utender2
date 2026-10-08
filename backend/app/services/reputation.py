@@ -97,3 +97,30 @@ def previous_providers(db: Session, owner_id: str) -> list[dict]:
         entry["transactions"].append({"project_id": project_id, "title": title, "completed_at": completed_at})
     return [{"company_name": e["company_name"], "completed_transactions": len(e["transactions"]),
              "last_completed_at": e["transactions"][0]["completed_at"], "transactions": e["transactions"]} for e in providers.values()]
+
+
+def previous_owners(db: Session, service_provider_id: str) -> list[dict]:
+    """Stage 8.13: the owners this provider organisation has completed U-Tender
+    work for (Stage 7 completion only), each once, with those requirements
+    (title and date). Names only -- the organisation's legal name or the
+    individual's name it already saw on award (Stage 7.2), never an email,
+    phone or any other contact detail -- and only for that provider."""
+    from app.models.organization import Organization
+    from app.models.user import User
+
+    rows = (
+        db.query(Project.owner_id, Organization.legal_name, User.full_name, Project.id, Project.title, Agreement.completed_at)
+        .join(AwardRecord, AwardRecord.project_id == Project.id)
+        .join(Agreement, Agreement.award_id == AwardRecord.id)
+        .outerjoin(Organization, Organization.id == Project.organization_id)
+        .outerjoin(User, User.id == Project.owner_id)
+        .filter(AwardRecord.service_provider_id == service_provider_id, Agreement.status == "completed")
+        .order_by(Agreement.completed_at.desc(), Project.id)
+        .all()
+    )
+    owners: dict[str, dict] = {}
+    for owner_id, org_name, person, project_id, title, completed_at in rows:
+        entry = owners.setdefault(owner_id, {"owner_name": org_name or person, "transactions": []})
+        entry["transactions"].append({"project_id": project_id, "title": title, "completed_at": completed_at})
+    return [{"owner_name": e["owner_name"], "completed_transactions": len(e["transactions"]),
+             "last_completed_at": e["transactions"][0]["completed_at"], "transactions": e["transactions"]} for e in owners.values()]

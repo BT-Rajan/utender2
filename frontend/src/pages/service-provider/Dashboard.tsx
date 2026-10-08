@@ -4,6 +4,7 @@ import { ProviderServicesPanel } from "@/components/ProviderServices";
 import { apiFetch } from "@/api/client";
 import type { ClosureReason, ServiceProviderProfile, OfferStatus, ProjectStatus } from "@/api/types";
 import { PageLoading } from "@/components/PageLoading";
+import { PreviousOwners } from "@/components/PreviousOwners";
 import { Reputation } from "@/components/Reputation";
 import { useI18n } from "@/i18n/I18nContext";
 import { money } from "@/lib/money";
@@ -150,6 +151,8 @@ export function ServiceProviderDashboardPage() {
       </div>
       {/* Stage 8.7: its own U-Tender track record, as owners weighing its offers see it. */}
       <div className="mb-6 max-w-xl"><Reputation of="provider" own url="/service-provider/reputation" /></div>
+      {/* Stage 8.13: owners it has completed work for -- history, not a contact list. */}
+      <PreviousOwners />
 
       {banner && (
         <div className={`border border-l-4 rounded px-5 py-4 mb-6 flex items-center justify-between flex-wrap gap-3 ${bannerClasses(banner.tone)}`}>
