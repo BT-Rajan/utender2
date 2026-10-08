@@ -9,7 +9,7 @@ import { OrganizationMembers } from "@/components/OrganizationMembers";
 const ROLE_HOME: Record<string, { label: string; href: string }> = {
   owner: { label: "Owner", href: "/owner/dashboard" },
   service_provider: { label: "ServiceProvider", href: "/service-provider/dashboard" },
-  admin: { label: "Site Admin", href: "/admin/requirements" },
+  admin: { label: "Site Admin", href: "/admin/overview" },
 };
 
 function EmailVerifyBanner() {

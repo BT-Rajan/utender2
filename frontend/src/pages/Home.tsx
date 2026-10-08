@@ -129,7 +129,7 @@ export function HomePage() {
   if (loading) return null;
 
   if (user) {
-    if (user.role === "admin") return <Navigate to="/admin/requirements" replace />;
+    if (user.role === "admin") return <Navigate to="/admin/overview" replace />;
     if (user.role === "owner") return <Navigate to="/owner/dashboard" replace />;
     // The service provider dashboard itself branches on marketplace_status —
     // documents incomplete, pending review, payment required, active, or

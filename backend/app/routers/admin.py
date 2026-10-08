@@ -1554,3 +1554,16 @@ def decide_review_report(report_id: str, payload: ModerationDecision, admin: Use
     entry = moderate(db, entry, admin, payload.decision, payload.note)
     review = db.get(Review, entry.review_id)
     return _report_out(db, entry, review, db.get(Project, review.project_id))
+
+
+# ---------- Stage 9.1: operations overview ----------
+
+
+@router.get("/overview")
+def operations_overview(db: Session = Depends(get_db)):
+    """Stage 9.1: the marketplace's current state and what needs attention --
+    grouped counts and the oldest few of each exception, from the
+    authoritative records; a section that can't be computed says so."""
+    from app.services.operations import overview
+
+    return overview(db)

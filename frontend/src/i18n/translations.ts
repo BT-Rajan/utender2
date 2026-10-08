@@ -310,6 +310,55 @@ export interface Dictionary {
     keep: string;
     hide: string;
   };
+  ops: {
+    unavailable: string;
+    asOf: string;
+    refresh: string;
+    loading: string;
+    failed: string;
+    attention: string;
+    nothing: string;
+    open: string;
+    since: string;
+    more: string;
+    background: string;
+    reminders: string;
+    remindersOverdue: string;
+    reminders_ok: string;
+    reminders_not_determinable: string;
+    email: string;
+    notTracked: string;
+    accounts: string;
+    owners: string;
+    ownersActive: string;
+    awaitingReview: string;
+    providers: string;
+    canBid: string;
+    withoutPayment: string;
+    paymentFailed: string;
+    awaitingReviewProviders: string;
+    suspended: string;
+    requirements: string;
+    openWithOffers: string;
+    openWithoutOffers: string;
+    drafts: string;
+    awaitingDecision: string;
+    awarded: string;
+    endedWithoutAward: string;
+    offers: string;
+    onOpen: string;
+    last7: string;
+    withdrawn: string;
+    transactions: string;
+    preparing: string;
+    active: string;
+    onHold: string;
+    completionAwaiting: string;
+    completed: string;
+    terminated: string;
+    awardedLast7: string;
+    kinds: { open_without_offers_closing_24h: string; open_without_offers: string; awaiting_owner_decision: string; completion_awaiting_owner: string; transactions_on_hold: string; agreements_not_in_force: string; providers_awaiting_review: string; owners_awaiting_review: string; provider_payment_failed: string; open_review_reports: string };
+  };
   history: {
     heading: string;
     awarded: string;
@@ -1372,6 +1421,7 @@ export interface Dictionary {
       projects: string;
       cms: string;
       reviewReports: string;
+      overview: string;
     };
     owners: {
       eyebrow: string;
@@ -1831,6 +1881,66 @@ export const en: Dictionary = {
     targetResponse: "response",
     keep: "Keep",
     hide: "Hide",
+  },
+  ops: {
+    unavailable: "Unavailable: this couldn't be loaded, so no figure is shown.",
+    asOf: "As of",
+    refresh: "Refresh",
+    loading: "Loading…",
+    failed: "The overview couldn't be loaded.",
+    attention: "Needs attention",
+    nothing: "Nothing needs attention right now.",
+    open: "Open",
+    since: "since",
+    more: "and {n} more",
+    background: "Background jobs",
+    reminders: "Deadline reminders",
+    remindersOverdue: "Overdue for {n}: the scheduler may not be running",
+    reminders_ok: "Running",
+    reminders_not_determinable: "Can't tell yet (nothing due)",
+    email: "Email delivery",
+    notTracked: "Not tracked",
+    accounts: "Accounts",
+    owners: "Owners",
+    ownersActive: "Owners verified",
+    awaitingReview: "Owners awaiting review",
+    providers: "Service providers",
+    canBid: "Providers able to bid",
+    withoutPayment: "Verified, payment not active",
+    paymentFailed: "Payment failed",
+    awaitingReviewProviders: "Providers awaiting review",
+    suspended: "Suspended",
+    requirements: "Requirements",
+    openWithOffers: "Open with offers",
+    openWithoutOffers: "Open with no offers",
+    drafts: "Drafts",
+    awaitingDecision: "Closed, awaiting owner decision",
+    awarded: "Awarded",
+    endedWithoutAward: "Ended without award",
+    offers: "Offers",
+    onOpen: "On open requirements",
+    last7: "Submitted in the last 7 days",
+    withdrawn: "Withdrawn",
+    transactions: "Transactions",
+    preparing: "Agreement being prepared",
+    active: "In progress",
+    onHold: "On hold",
+    completionAwaiting: "Completion awaiting owner",
+    completed: "Completed",
+    terminated: "Terminated",
+    awardedLast7: "Awarded in the last 7 days",
+    kinds: {
+      open_without_offers_closing_24h: "Open, no offers, closing within 24 hours",
+      open_without_offers: "Open with no offers yet",
+      awaiting_owner_decision: "Closed, awaiting the owner's decision",
+      completion_awaiting_owner: "Completion submitted, awaiting the owner",
+      transactions_on_hold: "Transactions on hold",
+      agreements_not_in_force: "Agreements not yet in force",
+      providers_awaiting_review: "Service providers awaiting verification",
+      owners_awaiting_review: "Owners awaiting verification",
+      provider_payment_failed: "Verified providers whose payment failed",
+      open_review_reports: "Reported reviews to decide",
+    },
   },
   history: {
     heading: "History",
@@ -2948,6 +3058,7 @@ export const en: Dictionary = {
       projects: "All projects",
       cms: "Website content",
       reviewReports: "Reported reviews",
+      overview: "Overview",
     },
     owners: {
       eyebrow: "Admin · Owners",
@@ -3410,6 +3521,66 @@ export const ar: Dictionary = {
     targetResponse: "رد",
     keep: "إبقاء",
     hide: "إخفاء",
+  },
+  ops: {
+    unavailable: "غير متاح: تعذر تحميل هذا القسم، لذا لا يُعرض رقم.",
+    asOf: "حتى",
+    refresh: "تحديث",
+    loading: "جارٍ التحميل…",
+    failed: "تعذر تحميل النظرة العامة.",
+    attention: "يحتاج إلى متابعة",
+    nothing: "لا شيء يحتاج إلى متابعة الآن.",
+    open: "مفتوح",
+    since: "منذ",
+    more: "و{n} أخرى",
+    background: "المهام الخلفية",
+    reminders: "تذكيرات المواعيد النهائية",
+    remindersOverdue: "متأخرة لـ {n}: قد لا يعمل المجدول",
+    reminders_ok: "تعمل",
+    reminders_not_determinable: "لا يمكن التحديد بعد (لا شيء مستحق)",
+    email: "إرسال البريد الإلكتروني",
+    notTracked: "غير متتبَّع",
+    accounts: "الحسابات",
+    owners: "الملاك",
+    ownersActive: "ملاك موثَّقون",
+    awaitingReview: "ملاك بانتظار المراجعة",
+    providers: "مقدمو الخدمة",
+    canBid: "مقدمو خدمة يمكنهم التقديم",
+    withoutPayment: "موثَّقون دون دفع نشط",
+    paymentFailed: "فشل الدفع",
+    awaitingReviewProviders: "مقدمو خدمة بانتظار المراجعة",
+    suspended: "موقوفون",
+    requirements: "الطلبات",
+    openWithOffers: "مفتوحة ولها عروض",
+    openWithoutOffers: "مفتوحة دون عروض",
+    drafts: "مسودات",
+    awaitingDecision: "مغلقة بانتظار قرار المالك",
+    awarded: "مُرساة",
+    endedWithoutAward: "انتهت دون ترسية",
+    offers: "العروض",
+    onOpen: "على طلبات مفتوحة",
+    last7: "قُدمت خلال آخر 7 أيام",
+    withdrawn: "مسحوبة",
+    transactions: "المعاملات",
+    preparing: "الاتفاقية قيد الإعداد",
+    active: "قيد التنفيذ",
+    onHold: "متوقفة مؤقتًا",
+    completionAwaiting: "إنجاز بانتظار المالك",
+    completed: "مكتملة",
+    terminated: "منتهية",
+    awardedLast7: "أُرسيت خلال آخر 7 أيام",
+    kinds: {
+      open_without_offers_closing_24h: "مفتوحة دون عروض وتُغلق خلال 24 ساعة",
+      open_without_offers: "مفتوحة دون عروض حتى الآن",
+      awaiting_owner_decision: "مغلقة بانتظار قرار المالك",
+      completion_awaiting_owner: "إنجاز مُقدَّم بانتظار المالك",
+      transactions_on_hold: "معاملات متوقفة مؤقتًا",
+      agreements_not_in_force: "اتفاقيات لم تدخل حيز التنفيذ بعد",
+      providers_awaiting_review: "مقدمو خدمة بانتظار التوثيق",
+      owners_awaiting_review: "ملاك بانتظار التوثيق",
+      provider_payment_failed: "مقدمو خدمة موثَّقون فشل دفعهم",
+      open_review_reports: "تقييمات مبلغ عنها بانتظار القرار",
+    },
   },
   history: {
     heading: "السجل",
@@ -4527,6 +4698,7 @@ export const ar: Dictionary = {
       projects: "جميع المشاريع",
       cms: "محتوى الموقع",
       reviewReports: "التقييمات المبلغ عنها",
+      overview: "نظرة عامة",
     },
     owners: {
       eyebrow: "المسؤول · الملاك",

@@ -1261,4 +1261,40 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - the old transaction unchanged and closed;
     - termination, cancellation and losing yield nothing, in both directions.
 
-_Stage 9 onwards is added as it is implemented._
+## Stage 9: operations
+
+- **9.1 Business operations and platform health:**
+  - **Already working:**
+    - **Admin lists:** requirements (with offer counts), offers, providers, owners and their details, with suspend controls.
+    - **Review work:** the verification review queue (providers; owners by detail page) and the reported-reviews page (8.15).
+    - **Access:** `/health` (liveness), and `/admin/*` gated server-side by `require_admin`.
+    - **Expiry:** past-deadline requirements are closed or expired on read (`sync_expired_projects`).
+  - **Gaps found:**
+    - **No overview:** the admin landed on the document-requirements settings. Nothing showed the marketplace's state or what needed attention without opening every list.
+    - **No job health:** nothing said whether the hourly deadline-reminder job, called by an external scheduler with no run log, was actually running.
+  - **Fixed:**
+    - **`services/operations.overview`, at `GET /admin/overview`:** runs `sync_expired_projects` first, so nothing expired counts as open. Every section is grouped `COUNT`s plus bounded lists (10, oldest first), never whole tables.
+    - **Stakeholder counting:** organisations and individuals each count once, never member rows.
+    - **Sections:**
+      - **Accounts:** owners and providers, verified, awaiting review, suspended; providers able to bid (the `is_verified_active` gate as SQL), verified without payment, payment failed.
+      - **Requirements:** by status, with "open with / without offers".
+      - **Offers:** counts only, no amounts, bidders or messages.
+      - **Transactions:** by status, on hold, completion awaiting the owner.
+      - **Attention**, each a count with the oldest few and their age:
+        - open requirements with no offers, especially those closing within 24 hours;
+        - closed requirements awaiting the owner's decision;
+        - completion awaiting the owner; transactions on hold; agreements not in force;
+        - providers and owners awaiting verification;
+        - verified providers whose payment failed;
+        - open review reports.
+      - **Background:**
+        - deadline reminders "overdue" when a reminder is still unsent an hour after its requirement entered the job's 24-hour window, "not determinable" when nothing is due;
+        - email delivery "not tracked". Neither is ever claimed healthy without evidence.
+    - **Failure handling:** each section is computed on its own; one that fails is logged and returns `available: false`, never zeros.
+    - **No invented thresholds:** only the reminder job's own window is used; everything else shows its age.
+    - **UI:** an admin "Overview" page, now the admin landing:
+      - "Needs attention" first, linking each item to its admin page, then the state counts;
+      - an "as of" time, a refresh button, and "Unavailable" for a failed section.
+  - **Tests:** `tests/test_stage9_1_operations.py`.
+
+_Later Stage 9 steps are added as they are implemented._
