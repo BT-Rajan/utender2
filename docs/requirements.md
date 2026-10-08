@@ -941,4 +941,22 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **Background:** the expiry sweep leaves a completed transaction alone.
     - **Existing races still pass:** award and decision races (6.15), double start, hold/resume, accept/return/re-deliver, simultaneous proposals and answers, double completion.
 
+- **7.16 Final Stage 7 audit (end to end):**
+  - **The journey, as one test:** `tests/test_stage7_16_end_to_end.py` runs one real transaction through the actual API: annual MEP maintenance of a Sharq tower. A two-member owner organisation awards a two-member facilities company over a cheaper individual bidder.
+    - **Owner and provider steps:** create → publish → provider discovers it in the feed and passes eligibility → two offers → close → review, including the loser's documents → private note → award.
+    - **Handover:** both organisations' four members see the same award, offer, parties and value; the loser sees only the outcome.
+    - **Agreement:** deliverables set out by both owner members, a signed paper and an insurance certificate, PO reference and effective date, in force.
+    - **Execution:** a provider member (not the representative) starts the work and records progress with a photo. A deliverable carries a site report; it is delivered, returned for correction, delivered again and accepted. A change is proposed by the provider (+KWD 2,400, adding a deliverable) and agreed by the owner; the provider can't agree its own. The remaining deliverables are delivered and accepted.
+    - **Closing:** the work is submitted, accepted and completed; the retry is refused.
+  - **Checked at each boundary:**
+    - **Identity:** the same requirement, award, offer, agreement and organisations throughout.
+    - **Documents:** each kept in its own context: offer documents, agreement papers, progress evidence, deliverable evidence.
+    - **Money:** original KWD 18,000, agreed changes +2,400, final 20,400, payments not tracked.
+    - **History:** in order (awarded → in force → started … returned … change agreed … completed once), with the award entry at the original value.
+    - **After completion:** every document still opens; every old action (progress, deliver, evidence, accept, change, submit) is refused.
+    - **Access:** the losing bidder, another organisation and a signed-out user are refused, documents included. The winner can't reach the owner's notes or the losing offer's files, and its responses carry nothing of the losing price or notes. The admin can read.
+    - **Database:** one agreement, one change, three deliverables, every document on this agreement, one unbroken history with no duplicates, and the award and winning offer unchanged.
+  - **Result:** passes on SQLite and MySQL, together with every Stage 7 test (7.1–7.15) and the Stage 6 award and decision race tests.
+  - **No code changes were needed:** the only cross-stage defect found in Stage 7 was the REPEATABLE READ isolation level, fixed in 7.15.
+
 _Stage 7 onwards is added as it is implemented._
