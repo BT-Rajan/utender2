@@ -1000,4 +1000,28 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - **UI:** the owner confirms before submitting ("A review can't be changed afterwards"). The comment box has the limit and a label. A refused submission reloads what's on record.
   - **Tests:** `tests/test_stage8_3_owner_review.py`.
 
+- **8.4 Provider reviews the owner (and the 8.3 notification fix):**
+  - **Audit:**
+    - **Already working:** the owner → provider review (8.3) and its rules: a completed transaction (8.1), the subject taken from the transaction, the requirement lock, an active account, a single atomic save with its audit entry.
+    - **Missing:**
+      - **A review in the other direction:** the review record was one-directional (one per requirement, with `owner_id` holding the reviewing owner user).
+      - **A notification:** neither party was told when reviewed.
+    - **Reused:** the owner party's stable identity, `projects.owner_id` (the owner stakeholder that created the requirement), like `award_records.service_provider_id` for the provider.
+  - **Changed (migration 0057), one review table extended, not a second one:**
+    - **`reviews.direction`** (`owner_to_provider` / `provider_to_owner`) and `reviews.reviewer_id` (the member who wrote it).
+    - **Parties:** `owner_id` and `service_provider_id` always name the transaction's two parties, from the requirement and the award, never from the request. Existing rows keep their writer in `reviewer_id`.
+    - **Uniqueness:** one review per transaction per direction (`uq_review_project_direction` replaces `uq_review_project`).
+    - **`services/reviews.record_review`:** both directions run the same checks:
+      - **eligibility:** a completed transaction;
+      - **duplicates:** an explained 409;
+      - **one transaction:** review, provider rating (owner reviews only), and an audit entry `review.owner_to_provider` / `review.provider_to_owner`;
+      - **notification:** a best-effort `review_received` to the reviewed party's organisation, without the content.
+    - **Endpoints:**
+      - **`POST /service-provider/reviews` and `GET /service-provider/projects/{id}/review`:** any member of the winning provider's side, approved and unsuspended, under the requirement's lock. Losers, other organisations and other transactions get 404; owners get 403.
+      - **Owner endpoint:** reads and writes only the owner's own direction.
+    - **The 8.3 fix:** the provider's organisation is now notified when the owner reviews it.
+    - **Provider rating:** the public average counts owner reviews only.
+  - **UI:** the winner's offer page shows a review of the owner once the transaction is completed: rating and comment, a confirmation, then its own review.
+  - **Tests:** `tests/test_stage8_4_provider_review.py`.
+
 _Stage 9 onwards is added as it is implemented._

@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from fastapi.testclient import TestClient
 
-import app.routers.owner as owner_router
+import app.services.reviews as reviews_service
 from app.main import app
 from app.models.audit_log import AuditLog
 from app.models.award_record import AwardRecord
@@ -52,7 +52,7 @@ def test_a_completed_transaction_is_reviewed_once_about_the_actual_winner(db):
     assert owner.get(f"/owner/projects/{pid}/review").json()["id"] == review["id"]
     profile = provider.get("/service-provider/profile").json()
     assert (float(profile["avg_rating"]), profile["review_count"]) == (4.0, 1)
-    (entry,) = db.query(AuditLog).filter(AuditLog.action == "review.create").all()
+    (entry,) = db.query(AuditLog).filter(AuditLog.action == "review.owner_to_provider").all()
     assert entry.target_id == pid and review["id"] in entry.new_value
     # Once per transaction: a second attempt (a retry, a colleague, another tab) changes nothing.
     again = _review(owner, pid, 1)
@@ -114,7 +114,7 @@ def test_a_failed_save_records_nothing(db, monkeypatch):
     def failing_log(*args, **kwargs):
         raise RuntimeError("database went away")
 
-    monkeypatch.setattr(owner_router, "log_action", failing_log)
+    monkeypatch.setattr(reviews_service.audit, "log_action", failing_log)
     with pytest.raises(RuntimeError):
         _review(owner, pid)
     monkeypatch.undo()

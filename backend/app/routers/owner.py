@@ -21,7 +21,6 @@ from app.models.enums import DocumentStatus, NotificationType, OfferStatus, Proj
 from app.models.offer import Offer, OfferRevision, tendered
 from app.models.owner import OwnerProfile
 from app.models.project import Project, ProjectDrawing, ProjectItem
-from app.models.review import Review
 from app.models.user import User
 from app.schemas.clarification import OfferClarificationAsk, OfferClarificationOut
 from app.schemas.document import DocumentRequirementOut, OwnerDocumentOut
@@ -30,7 +29,7 @@ from app.schemas.owner import OwnerProfileOut
 from app.schemas.project import EligibilityQualification, ProjectOut
 from app.schemas.review import ReviewCreate, ReviewOut
 from app.services.audit import log_action
-from app.services.transactions import completed_transaction
+from app.services.reviews import OWNER_TO_PROVIDER, record_review, review_of
 from app.services.email import notify_provider_requirement_ended, notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify, notify_team
@@ -961,10 +960,12 @@ def discard_draft(project_id: str, user: User = Depends(require_owner), db: Sess
 
 @router.get("/projects/{project_id}/review", response_model=ReviewOut | None)
 def get_review(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """The owner side's own review of the provider (Stage 8.4: never the
+    provider's review of the owner -- who sees reviews is a later step)."""
     project = db.get(Project, project_id)
     if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
-    return db.query(Review).filter(Review.project_id == project_id).first()
+    return review_of(db, project_id, OWNER_TO_PROVIDER)
 
 
 @router.post("/reviews", response_model=ReviewOut)
@@ -973,54 +974,9 @@ def submit_review(payload: ReviewCreate, user: User = Depends(require_owner), db
     transaction is completed (8.1) -- once per transaction. Under the
     requirement's lock and from an active, verified owner account like every
     other owner action; the review, the provider's recomputed public rating
-    and the audit entry are one transaction."""
+    and the audit entry are one transaction (services.reviews)."""
     project = _get_owned_project(payload.project_id, user, db, lock=True)
-    # Stage 8.1: a review rests on completed work -- the transaction closed by
-    # the owner side's acceptance (Stage 7.11) -- never on the award alone.
-    if completed_transaction(db, project.id) is None:
-        raise HTTPException(status_code=400, detail="You can review the service provider once the work has been accepted and the transaction is completed.")
-
-    existing = db.query(Review).filter(Review.project_id == payload.project_id).first()
-    if existing:
-        raise HTTPException(status_code=409, detail="This transaction has already been reviewed (by a colleague or from another tab). This page now shows the latest.")
-
-    # The service provider being reviewed is derived from the project's own
-    # AwardRecord, never trusted from the request body -- payload.service_provider_id
-    # is otherwise a free-text client-supplied ID with only a "some real
-    # service provider exists" FK constraint behind it, letting an owner rate ANY
-    # service provider's public profile under cover of an unrelated awarded
-    # project (a real IDOR, found and fixed in PASS 17's security audit).
-    award = db.query(AwardRecord).filter(AwardRecord.project_id == payload.project_id).first()
-    if not award:
-        raise HTTPException(status_code=400, detail="This project has no award record to review against.")
-
-    review = Review(
-        project_id=payload.project_id,
-        owner_id=user.id,
-        service_provider_id=award.service_provider_id,
-        rating=payload.rating,
-        comment=(payload.comment or "").strip() or None,
-    )
-    db.add(review)
-    db.flush()
-
-    # Recompute the service provider's public average rather than trusting an
-    # incrementally-maintained counter, so it can never drift out of sync.
-    # Uses the same server-derived award.service_provider_id as above — never
-    # payload.service_provider_id.
-    all_reviews = db.query(Review.rating).filter(Review.service_provider_id == award.service_provider_id).all()
-    review_count = len(all_reviews)
-    avg_rating = round(sum(r[0] for r in all_reviews) / review_count, 1) if review_count else 0
-
-    profile = db.get(ServiceProviderProfile, award.service_provider_id)
-    if profile:
-        profile.avg_rating = avg_rating
-        profile.review_count = review_count
-    # log_action commits: the review, the rating and the audit entry land together.
-    log_action(db, actor_id=user.id, action="review.create", target_type="project", target_id=project.id,
-               new_value=f"{review.id} rating:{review.rating} service_provider:{award.service_provider_id}")
-    db.refresh(review)
-    return review
+    return record_review(db, project, OWNER_TO_PROVIDER, user, payload.rating, payload.comment)
 
 
 # ---------- owner verification (mirrors the service provider document-review

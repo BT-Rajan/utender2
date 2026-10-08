@@ -162,6 +162,7 @@ AR: dict[str, str] = {
     "This project has already been awarded, canceled, or has no award.": "تمت ترسية هذا المشروع أو إلغاؤه أو تقرر عدم الترسية بالفعل.",
     "This offer has been suspended by an admin and cannot be awarded.": "علّق المشرف هذا العرض ولا يمكن ترسيته.",
     # Stage 7.3: the agreement
+    "You can review the owner once the work has been accepted and the transaction is completed.": "يمكنك تقييم المالك بعد قبول العمل واكتمال المعاملة.",
     "This transaction has already been reviewed (by a colleague or from another tab).": "تم تقييم هذه المعاملة بالفعل (من زميل أو من علامة تبويب أخرى).",
     "You can review the service provider once the work has been accepted and the transaction is completed.": "يمكنك تقييم مقدم الخدمة بعد قبول العمل واكتمال المعاملة.",
     "This transaction is completed and closed; nothing more can be changed.": "اكتملت هذه المعاملة وأُغلقت؛ لا يمكن تغيير أي شيء بعد الآن.",

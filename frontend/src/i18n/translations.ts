@@ -246,6 +246,16 @@ export interface Dictionary {
     earlierVersion: string;
     confirm: string;
   };
+  ownerReview: {
+    heading: string;
+    theOwner: string;
+    rating: string;
+    comment: string;
+    submit: string;
+    submitted: string;
+    confirmBody: string;
+    error: string;
+  };
   review: {
     confirmTitle: string;
     confirmBody: string;
@@ -1703,6 +1713,16 @@ export const en: Dictionary = {
     confirmBody: "This is your final decision on this requirement: {provider}'s offer of {amount} is accepted as submitted, every other live offer is marked not selected, and every provider is told. It can't be undone. It isn't a contract or a payment.",
     earlierVersion: "Note: this offer was made against version {n} of the requirement, which is now at version {m}, and its provider didn't confirm it since. You'd be awarding it as it stands.",
     confirm: "Award",
+  },
+  ownerReview: {
+    heading: "Review {owner}",
+    theOwner: "the owner",
+    rating: "{n} out of 5",
+    comment: "How was working with this owner? (optional)",
+    submit: "Submit review",
+    submitted: "Submitted on",
+    confirmBody: "Your rating and comment are recorded against this completed transaction. A review can't be changed afterwards.",
+    error: "The review couldn't be submitted.",
   },
   review: {
     confirmTitle: "Submit this review?",
@@ -3218,6 +3238,16 @@ export const ar: Dictionary = {
     confirmBody: "هذا قرارك النهائي في هذا المتطلب: يُقبل عرض {provider} بقيمة {amount} كما قُدّم، ويُعلَّم كل عرض قائم آخر بأنه لم يُختر، ويُبلَّغ كل المزوّدين. لا يمكن التراجع عنه. وهو ليس عقدًا ولا دفعًا.",
     earlierVersion: "ملاحظة: قُدّم هذا العرض على الإصدار {n} من المتطلب، وهو الآن في الإصدار {m}، ولم يؤكده مزوّده منذ ذلك الحين. ستُرسيه كما هو.",
     confirm: "رسِّ",
+  },
+  ownerReview: {
+    heading: "تقييم {owner}",
+    theOwner: "المالك",
+    rating: "{n} من 5",
+    comment: "كيف كان العمل مع هذا المالك؟ (اختياري)",
+    submit: "إرسال التقييم",
+    submitted: "أُرسل في",
+    confirmBody: "يُسجَّل تقييمك وتعليقك على هذه المعاملة المكتملة. لا يمكن تغيير التقييم بعد ذلك.",
+    error: "تعذر إرسال التقييم.",
   },
   review: {
     confirmTitle: "إرسال هذا التقييم؟",
