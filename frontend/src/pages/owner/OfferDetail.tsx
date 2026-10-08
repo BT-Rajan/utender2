@@ -7,7 +7,7 @@ import { OfferHistory, OfferRecord } from "@/components/OfferPreview";
 import { OfferClarifications } from "@/components/OfferClarifications";
 import { EvaluationNotes } from "@/components/EvaluationNotes";
 import { VersionView } from "@/components/PostPublication";
-import { ProviderReputation } from "@/components/ProviderReputation";
+import { Reputation } from "@/components/Reputation";
 import { useI18n } from "@/i18n/I18nContext";
 import { fullDate } from "@/lib/format";
 
@@ -96,7 +96,7 @@ export function OwnerOfferDetailPage() {
       )}
 
       {/* Stage 8.7: the provider's U-Tender track record, for information. */}
-      <ProviderReputation url={`/owner/projects/${requirement.id}/offers/${offer.id}/reputation`} />
+      <Reputation of="provider" url={`/owner/projects/${requirement.id}/offers/${offer.id}/reputation`} />
 
       <OfferRecord
         requirement={requirement}

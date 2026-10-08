@@ -27,7 +27,7 @@ from app.schemas.document import DocumentRequirementOut, OwnerDocumentOut
 from app.schemas.offer import ShortlistOut, EvaluationNoteEdit, EvaluationNoteIn, EvaluationNoteOut, OfferComparisonOut, OfferOut, OfferRevisionOut, OwnerOfferOut
 from app.schemas.owner import OwnerProfileOut
 from app.schemas.project import EligibilityQualification, ProjectOut
-from app.schemas.review import ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut
+from app.schemas.review import OwnerReputationOut, ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut
 from app.services.audit import log_action
 from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_review, review_of
 from app.services.email import notify_provider_requirement_ended, notify_service_provider_offer_decision
@@ -987,6 +987,15 @@ def get_received_review(project_id: str, user: User = Depends(require_owner), db
     if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     return review_of(db, project_id, PROVIDER_TO_OWNER)
+
+
+@router.get("/reputation", response_model=OwnerReputationOut)
+def my_reputation(user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 8.8: this owner side's own U-Tender reputation -- its
+    organisation's, by current membership; no id is taken from the request."""
+    from app.services.reputation import owner_reputation
+
+    return owner_reputation(db, get_owner_profile(user, db).user_id, with_reviews=True)
 
 
 @router.post("/reviews", response_model=ReviewOut)

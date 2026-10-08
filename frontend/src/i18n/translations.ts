@@ -270,6 +270,10 @@ export interface Dictionary {
     noReviews: string;
     verified: string;
     note: string;
+    headingOwner: string;
+    noReviewsOwner: string;
+    verifiedOwner: string;
+    noteOwner: string;
   };
   history: {
     heading: string;
@@ -1749,6 +1753,10 @@ export const en: Dictionary = {
     noReviews: "No owner reviews yet",
     verified: "Owner review · completed U-Tender transaction",
     note: "For information only: it doesn't affect eligibility, verification or award, and offers are never ordered by it.",
+    headingOwner: "The owner's U-Tender track record",
+    noReviewsOwner: "No provider reviews yet",
+    verifiedOwner: "Provider review · completed U-Tender transaction",
+    noteOwner: "From the owner's completed U-Tender transactions and the reviews its providers left. For information only.",
   },
   history: {
     heading: "History",
@@ -3285,6 +3293,10 @@ export const ar: Dictionary = {
     noReviews: "لا توجد تقييمات من الملاك بعد",
     verified: "تقييم مالك · معاملة مكتملة على U-Tender",
     note: "للعلم فقط: لا يؤثر في الأهلية أو التحقق أو الترسية، ولا تُرتَّب العروض بحسبه.",
+    headingOwner: "سجل المالك على U-Tender",
+    noReviewsOwner: "لا توجد تقييمات من مقدمي الخدمة بعد",
+    verifiedOwner: "تقييم مقدم خدمة · معاملة مكتملة على U-Tender",
+    noteOwner: "من معاملات المالك المكتملة على U-Tender والتقييمات التي تركها مقدمو الخدمة. للعلم فقط.",
   },
   history: {
     heading: "السجل",

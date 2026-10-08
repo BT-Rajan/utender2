@@ -6,6 +6,7 @@ import { ParticipationRules } from "@/components/TenderRules";
 import { eligibilitySummary, IneligibleNotice } from "@/components/ProviderEligibility";
 import { outcomeLabel } from "@/components/ClosureOutcome";
 import { AmendmentsList } from "@/components/PostPublication";
+import { Reputation } from "@/components/Reputation";
 import { useI18n } from "@/i18n/I18nContext";
 import { deviceOutsideKuwait, formatDeadline, formatSize, fullDate, timeLeft } from "@/lib/format";
 import { formatWorkTiming } from "@/lib/dates";
@@ -56,6 +57,9 @@ export function ProviderRequirementView({ project, closed }: { project: ProjectD
           </span>
         </div>
       </div>
+
+      {/* Stage 8.8: the owner's U-Tender track record -- counts and average only. */}
+      <div className="mb-6 max-w-xl"><Reputation of="owner" url={`/projects/${project.id}/owner-reputation`} /></div>
 
       {project.paused_at && (
         <div className="border border-amber-dark/40 bg-amber/10 rounded px-4 py-3 mb-6 text-sm text-navy">

@@ -21,6 +21,7 @@ from app.models.project_amendment import ProjectAmendment
 from app.models.user import User
 from app.schemas.amendment import ProjectAmendmentOut, ProjectAmendmentRequest
 from app.schemas.award import AwardRecordOut
+from app.schemas.review import OwnerReputationOut
 from app.config import get_settings
 from app.schemas.project import (
     Participation as ParticipationOut,
@@ -953,6 +954,22 @@ def _owner_name(db: Session, project: Project) -> str | None:
             return org.legal_name
     owner = db.get(User, project.owner_id)
     return (owner.full_name or owner.email) if owner else None
+
+
+@router.get("/{project_id}/owner-reputation", response_model=OwnerReputationOut)
+def get_owner_reputation(project_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Stage 8.8: the U-Tender reputation of the owner behind a requirement,
+    for whoever may open the requirement. The owner is the requirement's,
+    never one named in the request. A provider gets the counts and average
+    only -- it doesn't know whose requirement this is before an award (Stage
+    7.2), and review text could tell it; the owner side and admin get the
+    recent reviews too. Informational only."""
+    from app.services.reputation import owner_reputation
+
+    project = db.get(Project, project_id)
+    if not project or not _can_view_project(user, project, db):
+        raise HTTPException(status_code=404, detail="Project not found.")
+    return owner_reputation(db, project.owner_id, with_reviews=user.role == UserRole.admin or owns(db, user, project))
 
 
 @router.get("/{project_id}/award", response_model=AwardRecordOut)

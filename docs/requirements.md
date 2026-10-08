@@ -1084,4 +1084,24 @@ be added as its prompts (5.1, 5.2, …) are delivered.
       - The offers list shows "No owner reviews yet" instead of 0 stars.
   - **Tests:** `tests/test_stage8_7_provider_reputation.py`.
 
+- **8.8 Owner reputation profile:**
+  - **Already working:**
+    - **Provider reviews of owners** (8.4/8.5) are recorded against `project.owner_id`. That is the owner organisation's acting profile id, never the employee who raised the requirement.
+    - **Completion state** is authoritative (Stage 7).
+  - **Gaps found:**
+    - **No owner reputation anywhere:** no counts, average or reviews for the owner itself, and nothing for providers weighing its requirements.
+  - **Fixed:**
+    - **`services/reputation.owner_reputation`:** shares the 8.7 query helper and reads everything live in constant queries. It returns:
+      - completed agreements on the owner's requirements;
+      - the count and simple average (`None` when there are none) of `provider_to_owner` reviews only;
+      - the five latest reviews (rating, comment, date).
+    - **Endpoints:**
+      - `GET /owner/reputation` (the organisation's, by current membership);
+      - `GET /projects/{id}/owner-reputation`, for whoever may open the requirement (`_can_view_project`). The owner is the requirement's, never one named in the request.
+    - **Owner anonymity:** a provider gets counts and average only, with no review text, because the owner is anonymous to it before award (Stage 7.2) and review text could name it. The owner side and admin also get the recent reviews.
+    - **UI:** the shared `Reputation` component (renamed from 8.7's `ProviderReputation`):
+      - on the owner dashboard: its own record;
+      - on the provider's requirement view: the owner's track record.
+  - **Tests:** `tests/test_stage8_8_owner_reputation.py`.
+
 _Stage 9 onwards is added as it is implemented._

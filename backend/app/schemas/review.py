@@ -50,3 +50,15 @@ class ProviderReputationOut(BaseModel):
     review_count: int
     avg_rating: float | None
     recent_reviews: list[ReceivedReviewOut]
+
+
+class OwnerReputationOut(BaseModel):
+    """Stage 8.8: an owner's reputation from completed U-Tender transactions
+    -- counts and the simple average of provider reviews (None until there is
+    one). recent_reviews is filled only for the owner side itself and admin:
+    providers weighing a requirement don't yet know whose it is (Stage 7.2),
+    and review text could tell them."""
+    completed_transactions: int
+    review_count: int
+    avg_rating: float | None
+    recent_reviews: list[ReceivedReviewOut]
