@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.deps import get_current_user
-from app.models.agreement import AGREEMENT_DOCUMENT_KINDS, Agreement, AgreementDocument
+from app.models.agreement import AGREEMENT_DOCUMENT_KINDS, Agreement, AgreementDocument, ExecutionUpdate
 from app.models.award_record import AwardRecord
 from app.models.common import gen_uuid
 from app.models.enums import NotificationType, ProjectStatus, UserRole
@@ -26,7 +26,7 @@ from app.models.project import Project
 from app.models.service_provider import ServiceProviderProfile
 from app.models.user import User
 from app.routers.owner import _best_effort
-from app.schemas.agreement import AgreementDocumentOut, AgreementOut, AgreementTerminate, AgreementUpdate, WorkStart
+from app.schemas.agreement import AgreementDocumentOut, AgreementOut, AgreementTerminate, AgreementUpdate, ExecutionProgress, ExecutionUpdateOut, WorkStart
 from app.services.audit import log_action
 from app.services.notify import notify_team
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name, sanitize_path_segment
@@ -140,6 +140,14 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
         owner_name=_owner_name(db, project),
         provider_name=provider_name,
         execution_status=_execution_status(agreement),
+        on_hold_since=agreement.on_hold_at if agreement.status != "terminated" else None,
+        execution_history=[
+            ExecutionUpdateOut(
+                sequence=u.sequence, kind=u.kind, party=u.party, note=u.note, created_at=u.created_at,
+                recorded_by_name=_name(db, u.recorded_by, names) if side in (u.party, "admin") else None,
+            )
+            for u in db.query(ExecutionUpdate).filter(ExecutionUpdate.agreement_id == agreement.id).order_by(ExecutionUpdate.sequence.asc())
+        ],
         planned_start_date=planned,
         planned_start_source=source,
         work_started_at=agreement.work_started_at,
@@ -175,7 +183,16 @@ def _execution_status(agreement: Agreement) -> str:
     """Stage 7.5: derived, never stored -- so it can't disagree with the agreement."""
     if agreement.status == "terminated":
         return "terminated"
-    return "in_progress" if agreement.work_started_at else "not_started"
+    if agreement.work_started_at is None:
+        return "not_started"
+    return "on_hold" if agreement.on_hold_at else "in_progress"
+
+
+def _record(db: Session, agreement: Agreement, kind: str, side: str, user: User, note: str | None, at: datetime) -> None:
+    """Stage 7.6: the next entry in the execution history -- numbered under the
+    requirement's lock the caller holds."""
+    last = db.query(ExecutionUpdate.sequence).filter(ExecutionUpdate.agreement_id == agreement.id).order_by(ExecutionUpdate.sequence.desc()).first()
+    db.add(ExecutionUpdate(agreement_id=agreement.id, sequence=(last[0] if last else 0) + 1, kind=kind, party=side, recorded_by=user.id, note=note, created_at=at))
 
 
 @router.get("", response_model=AgreementOut)
@@ -264,6 +281,7 @@ def start_work(
     agreement.work_started_at = datetime.utcnow().replace(microsecond=0)
     agreement.work_started_party, agreement.work_started_by = side, user.id
     agreement.work_start_note = (payload.note or "").strip() or None
+    _record(db, agreement, "started", side, user, agreement.work_start_note, agreement.work_started_at)
     _touch(agreement, user)
     # log_action commits: the start and its audit entry land together.
     log_action(db, actor_id=user.id, action="agreement.start_work", target_type="agreement", target_id=agreement.id,
@@ -280,6 +298,59 @@ def start_work(
                         organization_id=project.organization_id, project_title=project.title)
 
     _best_effort(db, tell, f"work-started notifications for {project_id}")
+    db.refresh(agreement)
+    return _out(db, project, agreement, award, winner, side)
+
+
+@router.post("/progress", response_model=AgreementOut)
+def record_progress(
+    project_id: str, payload: ExecutionProgress, if_match: str | None = Header(None, alias="If-Match"),
+    user: User = Depends(get_current_user), db: Session = Depends(get_db),
+):
+    """Stage 7.6: either party, once the work has started and while the
+    agreement stands, records a short progress note, puts the work on hold,
+    or resumes it. The award, the winning offer and the requirement never
+    change. Putting on hold and resuming tell the other party."""
+    project, agreement, award, winner, side = _load(db, project_id, user, lock=True)
+    if agreement.status == "terminated":
+        raise HTTPException(status_code=400, detail="This agreement has been terminated.")
+    if agreement.work_started_at is None:
+        raise HTTPException(status_code=400, detail="The work hasn't started yet. Record its start first.")
+    note = (payload.note or "").strip() or None
+    if payload.action == "update" and not note:
+        raise HTTPException(status_code=400, detail="Write a short progress note.")
+    if payload.action == "hold" and agreement.on_hold_at is not None:
+        raise HTTPException(status_code=400, detail="The work is already on hold.")
+    if payload.action == "resume" and agreement.on_hold_at is None:
+        raise HTTPException(status_code=400, detail="The work isn't on hold.")
+    _check_version(agreement, if_match)
+    now = datetime.utcnow().replace(microsecond=0)
+    before = _execution_status(agreement)
+    if payload.action == "hold":
+        agreement.on_hold_at = now
+    elif payload.action == "resume":
+        agreement.on_hold_at = None
+    kind = {"update": "progress", "hold": "on_hold", "resume": "resumed"}[payload.action]
+    _record(db, agreement, kind, side, user, note, now)
+    _touch(agreement, user)
+    # log_action commits: the change, its history entry and the audit row land together.
+    log_action(db, actor_id=user.id, action=f"agreement.execution_{kind}", target_type="agreement", target_id=agreement.id,
+               previous_value=before, new_value=_execution_status(agreement), reason=note)
+
+    if payload.action != "update":
+        state, state_ar = ("put on hold", "تم إيقاف") if payload.action == "hold" else ("resumed", "تم استئناف")
+
+        def tell():
+            if side == "owner":
+                notify_team(db, db.get(User, winner.service_provider_id), NotificationType.execution_updated,
+                            link=f"/service-provider/projects/{project_id}/offer", organization_id=winner.organization_id,
+                            project_title=project.title, state=state, state_ar=state_ar)
+            else:
+                notify_team(db, db.get(User, project.owner_id), NotificationType.execution_updated,
+                            link=f"/owner/projects/{project_id}", organization_id=project.organization_id,
+                            project_title=project.title, state=state, state_ar=state_ar)
+
+        _best_effort(db, tell, f"execution notifications for {project_id}")
     db.refresh(agreement)
     return _out(db, project, agreement, award, winner, side)
 

@@ -248,7 +248,7 @@ export interface Dictionary {
   };
   execution: {
     heading: string;
-    status: { not_started: string; in_progress: string; terminated: string };
+    status: { not_started: string; in_progress: string; on_hold: string; terminated: string };
     planned: string;
     source: { offer: string; requirement: string };
     actual: string;
@@ -260,6 +260,13 @@ export interface Dictionary {
     noteLabel: string;
     confirmHelp: string;
     confirm: string;
+    onHoldSince: string;
+    kind: { started: string; progress: string; on_hold: string; resumed: string };
+    addUpdate: string;
+    hold: string;
+    resume: string;
+    progressLabel: string;
+    submit: { update: string; hold: string; resume: string };
   };
   agreement: {
     heading: string;
@@ -1595,7 +1602,7 @@ export const en: Dictionary = {
   },
   execution: {
     heading: "Execution",
-    status: { not_started: "Not started", in_progress: "In progress", terminated: "Terminated" },
+    status: { not_started: "Not started", in_progress: "In progress", on_hold: "On hold", terminated: "Terminated" },
     planned: "Planned start",
     source: { offer: "as committed in the awarded offer", requirement: "as expected in the requirement" },
     actual: "Started",
@@ -1607,6 +1614,13 @@ export const en: Dictionary = {
     noteLabel: "Note (optional)",
     confirmHelp: "The start is recorded at the current time and can't be changed afterwards.",
     confirm: "Work has started",
+    onHoldSince: "On hold since",
+    kind: { started: "Work started", progress: "Progress", on_hold: "Put on hold", resumed: "Resumed" },
+    addUpdate: "Add a progress note",
+    hold: "Put the work on hold",
+    resume: "Resume the work",
+    progressLabel: "Progress note",
+    submit: { update: "Add note", hold: "Put on hold", resume: "Resume" },
   },
   agreement: {
     heading: "Agreement",
@@ -2982,7 +2996,7 @@ export const ar: Dictionary = {
   },
   execution: {
     heading: "التنفيذ",
-    status: { not_started: "لم يبدأ", in_progress: "قيد التنفيذ", terminated: "منتهٍ" },
+    status: { not_started: "لم يبدأ", in_progress: "قيد التنفيذ", on_hold: "متوقف مؤقتاً", terminated: "منتهٍ" },
     planned: "البدء المخطط",
     source: { offer: "كما التزم به العرض الفائز", requirement: "كما هو متوقع في المتطلب" },
     actual: "تاريخ البدء",
@@ -2994,6 +3008,13 @@ export const ar: Dictionary = {
     noteLabel: "ملاحظة (اختياري)",
     confirmHelp: "يُسجَّل البدء بالوقت الحالي ولا يمكن تغييره بعد ذلك.",
     confirm: "بدأ العمل",
+    onHoldSince: "متوقف منذ",
+    kind: { started: "بدأ العمل", progress: "سير العمل", on_hold: "إيقاف مؤقت", resumed: "استئناف" },
+    addUpdate: "إضافة ملاحظة عن سير العمل",
+    hold: "إيقاف العمل مؤقتاً",
+    resume: "استئناف العمل",
+    progressLabel: "ملاحظة عن سير العمل",
+    submit: { update: "إضافة الملاحظة", hold: "إيقاف مؤقت", resume: "استئناف" },
   },
   agreement: {
     heading: "الاتفاقية",

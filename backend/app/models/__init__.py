@@ -1,4 +1,4 @@
-from app.models.agreement import Agreement, AgreementDocument
+from app.models.agreement import Agreement, AgreementDocument, ExecutionUpdate
 from app.models.audit_log import AuditLog
 from app.models.auth_token import AuthToken
 from app.models.award_record import AwardRecord
@@ -23,6 +23,7 @@ from app.models.user import User
 __all__ = [
     "Agreement",
     "AgreementDocument",
+    "ExecutionUpdate",
     "User",
     "AuthToken",
     "ServiceProviderProfile",

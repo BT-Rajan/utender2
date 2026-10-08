@@ -704,4 +704,29 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - the note;
     - the "Record that work has started" action.
 
+- **7.6 Execution progress:**
+  - **Audit:**
+    - **Already working:** 7.5's start record and its derived status (not started, in progress, terminated) on the award's agreement. Lock, If-Match versioning, audit and best-effort notifications were reusable.
+    - **Missing:** "on hold", progress notes, and a history the parties can read.
+    - **Not applicable:** percentage progress, since requirements aren't measured that way, and completion, which is a later stage.
+    - **Why a small table:** the admin audit log keeps recording every event. It is moderation-only and doesn't record which party acted, so it can't be the parties' history.
+  - **Added (migration 0050):**
+    - **`execution_updates`:** an add-only history, never edited: started (backfilled from 7.5), progress notes, put on hold, resumed. Each entry records the side, the member, a note and server time. Entries are numbered 1, 2, 3… per agreement under the requirement's lock, with a unique (agreement, number) pair, so order never depends on timestamps.
+    - **`agreements.on_hold_at`:** the current hold.
+    - **Status:** still derived, now not started, in progress, on hold or terminated. Both parties read the same state and the same history.
+  - **Recording (`POST /projects/{id}/agreement/progress`):**
+    - **Actions:** `update` (a note is required), `hold` and `resume` (note optional). Either party may record them, as any member of its side.
+    - **Allowed when:** only after the start and while the agreement isn't terminated. A hold when already on hold, or a resume when not on hold, is refused with 400. Stale pages get 409.
+    - **Refused outright:** anything without an award (404) and admin changes (403).
+    - **Termination while on hold:** allowed. The status becomes terminated, the history stays, and nothing resumes it.
+    - **Unaffected:** the award, the winning offer, the requirement, the agreement and its documents.
+  - **Notification:** `execution_updated` goes to the other side when the work is put on hold or resumed. Progress notes don't notify. It is sent best-effort; repeated unread notices merge into one.
+  - **Audit:** `agreement.execution_progress`, `…_on_hold` and `…_resumed`, each with the previous and new status, the actor and the note.
+  - **UI:** the Execution section shows:
+    - the status;
+    - on hold since;
+    - the history, oldest first (the member's name for one's own side);
+    - add a progress note;
+    - put on hold or resume.
+
 _Stage 7 onwards is added as it is implemented._

@@ -17,6 +17,15 @@ interface AgreementDocument {
   url: string;
 }
 
+interface ExecutionUpdate {
+  sequence: number;
+  kind: "started" | "progress" | "on_hold" | "resumed";
+  party: "owner" | "provider";
+  recorded_by_name: string | null;
+  note: string | null;
+  created_at: string;
+}
+
 interface Agreement {
   id: string;
   status: "preparing" | "active" | "terminated";
@@ -34,7 +43,9 @@ interface Agreement {
   owner_name: string | null;
   provider_name: string | null;
   // Stage 7.5: execution
-  execution_status: "not_started" | "in_progress" | "terminated";
+  execution_status: "not_started" | "in_progress" | "on_hold" | "terminated";
+  on_hold_since: string | null;
+  execution_history: ExecutionUpdate[];
   planned_start_date: string | null;
   planned_start_source: "offer" | "requirement" | null;
   work_started_at: string | null;
@@ -62,6 +73,7 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
   const [details, setDetails] = useState<{ reference: string; effective_date: string } | null>(null);
   const [ending, setEnding] = useState<string | null>(null);
   const [starting, setStarting] = useState<string | null>(null);
+  const [update, setUpdate] = useState<{ action: "update" | "hold" | "resume"; note: string } | null>(null);
   const [kind, setKind] = useState<string>("signed_agreement");
   const [file, setFile] = useState<File | null>(null);
   const [fileKey, setFileKey] = useState(0);
@@ -90,6 +102,12 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
     onSuccess: (next) => { setStarting(null); done(next); },
     onError: failed,
   });
+  const progress = useMutation({
+    mutationFn: (u: { action: "update" | "hold" | "resume"; note: string }) =>
+      apiFetch<Agreement>(`${base}/progress`, { method: "POST", body: { action: u.action, note: u.note || null }, headers: ifMatch() }),
+    onSuccess: (next) => { setUpdate(null); done(next); },
+    onError: failed,
+  });
   const upload = useMutation({
     mutationFn: () => {
       const form = new FormData();
@@ -110,10 +128,11 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
   const c = "agreement";
   const owner = a.side === "owner";
   const party = a.side !== "admin";
-  const busy = save.isPending || activate.isPending || terminate.isPending || startWork.isPending;
+  const busy = save.isPending || activate.isPending || terminate.isPending || startWork.isPending || progress.isPending;
   const e = "execution";
   const day = (d: string) => fullDate(`${d}T12:00:00Z`, language, false);
   const execTone = a.execution_status === "in_progress" ? "text-green" : a.execution_status === "terminated" ? "text-red" : "text-amber-dark";
+  const live = party && (a.execution_status === "in_progress" || a.execution_status === "on_hold");
   const tone = a.status === "active" ? "text-green" : a.status === "terminated" ? "text-red" : "text-amber-dark";
 
   return (
@@ -216,13 +235,52 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
               <dd>{t(`${e}.party.${a.work_started_party}`)}{a.work_started_by_name ? ` (${a.work_started_by_name})` : ""}</dd>
             </>
           )}
-          {a.work_start_note && (
+          {a.on_hold_since && (
             <>
-              <dt className="text-steel">{t(`${e}.note`)}</dt>
-              <dd dir="auto" className="whitespace-pre-wrap break-words">{a.work_start_note}</dd>
+              <dt className="text-steel">{t(`${e}.onHoldSince`)}</dt>
+              <dd>{fullDate(a.on_hold_since, language)}</dd>
             </>
           )}
         </dl>
+        {/* Stage 7.6: what the parties recorded since the work started. */}
+        {a.execution_history.length > 0 && (
+          <ol className="grid gap-1 mt-2 border-s-2 border-border ps-3" data-testid="execution-history">
+            {a.execution_history.map((h) => (
+              <li key={h.sequence} className="text-[13px]">
+                <span className="font-mono text-[10px] text-steel">
+                  {fullDate(h.created_at, language)} · {t(`${e}.party.${h.party}`)}{h.recorded_by_name ? ` (${h.recorded_by_name})` : ""}
+                </span>
+                <div>
+                  <span className="font-semibold">{t(`${e}.kind.${h.kind}`)}</span>
+                  {h.note && <span dir="auto" className="whitespace-pre-wrap break-words"> — {h.note}</span>}
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+        {live && (update ? (
+          <form className="grid gap-1 mt-2 max-w-md" onSubmit={(ev) => { ev.preventDefault(); progress.mutate({ ...update, note: update.note.trim() }); }}>
+            <label className="grid gap-0.5 text-xs text-steel" htmlFor="execution-progress-note">
+              {t(update.action === "update" ? `${e}.progressLabel` : `${e}.noteLabel`)}
+              <textarea id="execution-progress-note" value={update.note} onChange={(ev) => setUpdate({ ...update, note: ev.target.value })} maxLength={2000} rows={2} dir="auto" className="border border-border rounded px-2 py-1 text-sm text-ink" />
+            </label>
+            <div className="flex gap-2">
+              <button type="submit" disabled={busy || (update.action === "update" && !update.note.trim())} className="bg-navy text-white text-xs font-semibold rounded px-3 py-1.5 disabled:opacity-60">
+                {t(`${e}.submit.${update.action}`)}
+              </button>
+              <button type="button" onClick={() => setUpdate(null)} className="text-xs text-steel underline">{t(`${c}.cancel`)}</button>
+            </div>
+          </form>
+        ) : (
+          <div className="flex flex-wrap gap-3 mt-2">
+            <button type="button" disabled={busy} onClick={() => setUpdate({ action: "update", note: "" })} className="text-xs text-blue underline" data-testid="execution-update">{t(`${e}.addUpdate`)}</button>
+            {a.execution_status === "in_progress" ? (
+              <button type="button" disabled={busy} onClick={() => setUpdate({ action: "hold", note: "" })} className="text-xs text-amber-dark underline" data-testid="execution-hold">{t(`${e}.hold`)}</button>
+            ) : (
+              <button type="button" disabled={busy} onClick={() => setUpdate({ action: "resume", note: "" })} className="text-xs text-green underline" data-testid="execution-resume">{t(`${e}.resume`)}</button>
+            )}
+          </div>
+        ))}
         {party && a.execution_status === "not_started" && (starting === null ? (
           <>
             <p className="text-xs text-steel mt-2">{t(`${e}.next`)}</p>

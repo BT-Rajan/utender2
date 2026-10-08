@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -40,6 +40,9 @@ class Agreement(Base):
     work_started_party: Mapped[str | None] = mapped_column(String(16), nullable=True)
     work_started_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     work_start_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Stage 7.6: set while the work is on hold (server time it was put on
+    # hold); cleared when it resumes. The status stays derived from these.
+    on_hold_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Stage 3.11's rule: a change sent from a page showing an older version
     # (another tab, another member) is refused, not silently applied.
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
@@ -64,3 +67,26 @@ class AgreementDocument(Base):
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     uploaded_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+
+
+# Stage 7.6: what the parties have recorded about the work since it started --
+# the start itself (7.5), short progress notes, putting it on hold and
+# resuming -- in order, never edited. The parties' own history of the
+# execution; the admin audit log records the same events for moderation.
+EXECUTION_UPDATE_KINDS = ("started", "progress", "on_hold", "resumed")
+
+
+class ExecutionUpdate(Base):
+    __tablename__ = "execution_updates"
+    __table_args__ = (UniqueConstraint("agreement_id", "sequence", name="uq_execution_update_sequence"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    agreement_id: Mapped[str] = mapped_column(String(36), ForeignKey("agreements.id", ondelete="CASCADE"), nullable=False, index=True)
+    # 1, 2, 3... per agreement, taken under the requirement's lock: the order
+    # of events never depends on two rows sharing a second.
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    party: Mapped[str] = mapped_column(String(16), nullable=False)
+    recorded_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
