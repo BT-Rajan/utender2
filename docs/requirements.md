@@ -619,4 +619,17 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **Winner's page:** it now says when the offer was awarded.
     - **Document upload:** an awarded (or otherwise ended) requirement's page no longer offers to add documents, which the server refuses once a requirement isn't open.
 
+- **7.2 Post-award transaction record:**
+  - **Already working:** the award record is the transaction record, so no second entity was added.
+    - It says "owner X awarded requirement Y to provider Z on offer W": requirement, winning offer, provider, amount, offer revision, requirement revision, who awarded it, and when (UTC).
+    - It is created in the same transaction as the award, under the requirement's lock, and is unique per requirement, so a retry, double-click or second tab can't make a second record.
+    - Its server-generated id is the stable reference.
+    - The post-award status is the requirement's status (Awarded) and the winning offer's (Awarded).
+    - The currency is the requirement's.
+  - **Fixed:**
+    - **Who awarded it:** the winner can now see who awarded it, as the owner's organisation legal name or the individual owner's name (`owner_name`). Only the owner side, admins and the winner get it.
+    - **Award reference:** the owner's award summary and the winner's offer page show the award reference (the record's id).
+    - **Losers:** losing bidders no longer get the record's id.
+    - **Winner deletion:** an admin can no longer delete a provider that has won an award. The delete would have cascaded away the awarded offer and left the award record broken. Suspend the account instead, as already applies to deleting the awarded offer itself.
+
 _Stage 7 onwards is added as it is implemented._

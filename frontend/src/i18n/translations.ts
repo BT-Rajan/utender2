@@ -254,6 +254,8 @@ export interface Dictionary {
     version: string;
     view: string;
     yourOn: string;
+    reference: string;
+    by: string;
   };
   ownerOffer: {
     open: string;
@@ -1554,6 +1556,8 @@ export const en: Dictionary = {
     version: "Requirement version answered",
     view: "View the awarded offer",
     yourOn: "on {date}",
+    reference: "Award reference",
+    by: "Awarded by {owner}",
   },
   ownerOffer: {
     open: "View offer",
@@ -2879,6 +2883,8 @@ export const ar: Dictionary = {
     version: "إصدار المتطلب المجاب عليه",
     view: "اعرض العرض الفائز",
     yourOn: "في {date}",
+    reference: "مرجع الترسية",
+    by: "الترسية من {owner}",
   },
   ownerOffer: {
     open: "عرض العرض",

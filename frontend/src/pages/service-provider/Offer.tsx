@@ -19,6 +19,8 @@ import { fullDate, timeLeft } from "@/lib/format";
 import { formatArea } from "@/lib/location";
 
 interface AwardRecord {
+  id: string | null; // Stage 7.2: the award reference -- the winner's side only
+  owner_name: string | null; // Stage 7.2: who awarded it -- the winner's side only
   amount: string | null; // Stage 6.16: the winner's own side only
   service_provider_company_name: string | null;
   created_at: string;
@@ -42,6 +44,14 @@ function AwardOutcome({ projectId }: { projectId: string }) {
       {award.mine
         ? `${t("service_provider.offer.yourOfferAwarded")} ${money(award.amount)} ${t("awardHandover.yourOn").replace("{date}", fullDate(award.created_at, language))}`
         : t("service_provider.offer.awardedToOther")}
+      {award.mine && award.owner_name && (
+        <span className="block" dir="auto" data-testid="award-owner">{t("awardHandover.by").replace("{owner}", award.owner_name)}</span>
+      )}
+      {award.mine && award.id && (
+        <span className="block text-steel" data-testid="award-reference">
+          {t("awardHandover.reference")}: <span className="break-all">{award.id}</span>
+        </span>
+      )}
     </p>
   );
 }

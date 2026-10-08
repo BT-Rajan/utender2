@@ -11,6 +11,7 @@ from app.deps import get_current_user, require_approved_service_provider, requir
 from app.models.award_record import AwardRecord
 from app.models.service_provider import ServiceProviderProfile
 from app.models.enums import NotificationType, OfferStatus, PricingBasis, ProjectStatus, TenderType, UserRole
+from app.models.organization import Organization
 from app.models.offer import Offer, tendered
 from app.models.owner import OwnerProfile
 from app.models.clarification import Clarification
@@ -943,6 +944,17 @@ def participate(project_id: str, user: User = Depends(require_service_provider),
     return verdict
 
 
+def _owner_name(db: Session, project: Project) -> str | None:
+    """Stage 7.2: who stands behind the requirement -- its organization, or the
+    individual owner. Providers learn it only once they've been awarded."""
+    if project.organization_id:
+        org = db.get(Organization, project.organization_id)
+        if org:
+            return org.legal_name
+    owner = db.get(User, project.owner_id)
+    return (owner.full_name or owner.email) if owner else None
+
+
 @router.get("/{project_id}/award", response_model=AwardRecordOut)
 def get_award(project_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     project = db.get(Project, project_id)
@@ -969,13 +981,14 @@ def get_award(project_id: str, user: User = Depends(get_current_user), db: Sessi
         service_provider_company_name=cp.company_name if cp else None,
         mine=mine,
         material_revision=winner.based_on_material_revision if winner else None,
+        owner_name=_owner_name(db, project),
     )
     # Stage 6.16: another bidder learns only that the requirement was awarded
     # to a successful bidder -- not who, nor the winning offer's price, id or
     # anything else of it.
     if user.role != UserRole.admin and not owns(db, user, project) and not mine:
         out.offer_id = out.service_provider_id = out.amount = out.offer_revision = out.awarded_by = None
-        out.service_provider_company_name = out.material_revision = None
+        out.service_provider_company_name = out.material_revision = out.owner_name = out.id = None
     return out
 
 

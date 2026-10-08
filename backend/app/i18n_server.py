@@ -162,6 +162,7 @@ AR: dict[str, str] = {
     "This project has already been awarded, canceled, or has no award.": "تمت ترسية هذا المشروع أو إلغاؤه أو تقرر عدم الترسية بالفعل.",
     "This offer has been suspended by an admin and cannot be awarded.": "علّق المشرف هذا العرض ولا يمكن ترسيته.",
     "This offer was awarded and has a permanent award record on file.": "تمت ترسية هذا العرض وله سجل ترسية دائم.",
+    "This service provider has been awarded a requirement and its award record is on file.": "تمت ترسية متطلب على مقدم الخدمة هذا وسجل الترسية محفوظ.",
     "A review already exists for this project.": "يوجد تقييم لهذا المشروع بالفعل.",
     "You can only review a project after it's awarded.": "يمكنك تقييم المشروع بعد ترسيته فقط.",
     "This project has not been awarded.": "لم تتم ترسية هذا المشروع.",

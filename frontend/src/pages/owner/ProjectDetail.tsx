@@ -40,6 +40,7 @@ interface Review {
 // Stage 7.1: the award handover -- read from the permanent award record, the
 // one authoritative statement of who was selected for this requirement.
 interface AwardRecordView {
+  id: string | null;
   offer_id: string | null;
   amount: string | null;
   created_at: string;
@@ -69,6 +70,12 @@ function AwardSummary({ projectId, currency }: { projectId: string; currency: st
           <>
             <dt className="text-steel">{t("awardHandover.version")}</dt>
             <dd>{t("versions.version").replace("{n}", String(award.material_revision))}</dd>
+          </>
+        )}
+        {award.id && (
+          <>
+            <dt className="text-steel">{t("awardHandover.reference")}</dt>
+            <dd className="font-mono text-xs break-all" data-testid="award-reference">{award.id}</dd>
           </>
         )}
       </dl>

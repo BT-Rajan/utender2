@@ -758,6 +758,14 @@ def delete_service_provider(service_provider_id: str, db: Session = Depends(get_
             detail="This service provider has completed projects with reviews on record. Suspend the account instead of deleting it, to keep that history intact.",
         )
 
+    # Stage 7.2: an award record is the permanent post-award record of a
+    # requirement; deleting its winner would cascade away the awarded offer.
+    if db.query(AwardRecord).filter(AwardRecord.service_provider_id == service_provider_id).first():
+        raise HTTPException(
+            status_code=400,
+            detail="This service provider has been awarded a requirement and its award record is on file. Suspend the account instead of deleting it.",
+        )
+
     docs_with_files = (
         db.query(ServiceProviderDocument.file_path)
         .filter(ServiceProviderDocument.service_provider_id == service_provider_id, ServiceProviderDocument.file_path.isnot(None))

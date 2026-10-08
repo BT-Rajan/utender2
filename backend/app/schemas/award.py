@@ -8,7 +8,7 @@ from app.schemas.common import UTCDateTime
 class AwardRecordOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
+    id: str | None  # Stage 7.2: the award's reference -- for the owner side, admins and the winner
     project_id: str
     # Stage 6.16: the winning offer's id, provider and price go to the owner's
     # side, admins and the winner -- never to the other bidders.
@@ -23,3 +23,6 @@ class AwardRecordOut(BaseModel):
     mine: bool = False  # Stage 6.16: the reader's side won it
     # Stage 7.1: the requirement version the awarded offer answered.
     material_revision: int | None = None
+    # Stage 7.2: who awarded it -- the owner's organization, or the individual
+    # owner -- for the owner side, admins and the winner (the counterparty).
+    owner_name: str | None = None
