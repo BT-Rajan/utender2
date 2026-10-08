@@ -923,4 +923,22 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - after completion.
   - **Known, unchanged (existing design):** an access token stays valid for its short lifetime (30 minutes) after logout if replayed outside the browser. Logout clears the browser's cookies and revokes the refresh token.
 
+- **7.15 Post-award integrity under concurrent actions:**
+  - **Audit:**
+    - **Serialized decisions (working):** every post-award change (agreement, documents, start, progress, deliverables, changes, completion, termination) and every Stage 6 decision runs under one row lock on the requirement (`lock_project`, `SELECT … FOR UPDATE`), with the state checked under it. Stale pages get the agreement, deliverable or change version check (409), with the explanation and refresh from 7.6.
+    - **Once-only records (working):** backed by unique constraints: one award per requirement, one agreement per award and per requirement, history numbers unique per agreement, change numbers unique per agreement.
+    - **History in the same transaction (working):** each history entry and audit row commits together with its state change, so a refused or failed change writes none.
+    - **Notifications (working):** best-effort after the commit, never undoing it, and unread ones merge.
+    - **Background jobs (working):** the expiry sweep moves only open or draft requirements and skips locked rows; the cron job only sends reminders for open requirements. Neither touches awarded or post-award records.
+    - **No payment records exist**, so there are none to duplicate (7.12).
+    - **Gap — invalid in production:** the app's MySQL connections ran at the default REPEATABLE READ. InnoDB fixes a transaction's snapshot at its first plain read. A request that had read anything (its user, during authentication) before waiting for the requirement lock therefore went on reading the agreement, deliverables and changes from that earlier snapshot once it had the lock. It could judge "already accepted?" or "already completed?" on state another request had just committed, which allows a double acceptance, a decision on a settled change, or a duplicate history entry.
+    - **Why tests missed it:** the MySQL test setup replaces the app's engine with a READ COMMITTED one, so tests never ran the production setting.
+  - **Fixed:**
+    - `app/db.py` now opens MySQL connections at READ COMMITTED (`engine_options`). Every statement sees the latest committed data, so a check made under the lock sees what the previous holder committed. Production now matches what the race tests verify. SQLite is unchanged.
+  - **Tests (`tests/test_stage7_15_integrity.py`):**
+    - **Regression:** a request built with the production settings reads first, waits for the lock while another owner accepts, then must see accepted and completed. It fails at REPEATABLE READ and passes with the fix.
+    - **Races:** completion racing termination (three rounds), and a change proposal racing the completion submission. Exactly one stands, and the history records the one outcome.
+    - **Background:** the expiry sweep leaves a completed transaction alone.
+    - **Existing races still pass:** award and decision races (6.15), double start, hold/resume, accept/return/re-deliver, simultaneous proposals and answers, double completion.
+
 _Stage 7 onwards is added as it is implemented._
