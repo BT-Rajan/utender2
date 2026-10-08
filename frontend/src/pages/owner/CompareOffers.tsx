@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { TrackRecord } from "@/components/TrackRecord";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
@@ -137,6 +138,8 @@ export function OwnerCompareOffersPage() {
                   <Link to={`/owner/projects/${id}/offers/${o.id}`} dir="auto" className="font-display font-semibold text-[13px] text-navy underline">
                     {o.service_provider_company_name ?? t("owner.projectDetail.serviceProviderCol")}
                   </Link>
+                  {/* Stage 8.14: its track record, for information -- the columns stay in the order chosen. */}
+                  <TrackRecord offer={o} />
                 </th>
               ))}
             </tr>

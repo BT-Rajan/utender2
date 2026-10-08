@@ -22,6 +22,7 @@ import { QualityCheck, type QualityReport } from "@/components/QualityCheck";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { AgreementPanel } from "@/components/AgreementPanel";
 import { ReceivedReview, ReviewResponse } from "@/components/ReceivedReview";
+import { TrackRecord } from "@/components/TrackRecord";
 import { ClosureOutcome, EndRequirement, StartAgain, outcomeLabel } from "@/components/ClosureOutcome";
 import { AmendPublishedForm, AmendmentsList, PauseControl } from "@/components/PostPublication";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
@@ -882,12 +883,8 @@ export function OwnerProjectDetailPage() {
                     <td className="py-3 px-2.5">
                       <div className="font-display font-semibold text-[13.5px]">
                         {o.service_provider_company_name ?? t("owner.projectDetail.serviceProviderCol")}
-                        {/* Stage 8.12: completed U-Tender work with this provider before -- for information, never an advantage. */}
-                        {!!o.completed_with_you && (
-                          <span className="block font-mono text-[10px] text-green font-normal" data-testid="completed-together">
-                            {t("previous.together").replace("{n}", String(o.completed_with_you))}
-                          </span>
-                        )}
+                        {/* Stage 8.12/8.14: its U-Tender track record and work with you -- for information, never an advantage. */}
+                        <TrackRecord offer={o} />
                         {o.status === "submitted" && (o.based_on_material_revision ?? 0) < (project.material_revision ?? 0) && (
                           <span className="block font-mono text-[10px] uppercase text-amber-dark font-normal">{t("postPub.outdatedOwner")}</span>
                         )}
@@ -931,11 +928,13 @@ export function OwnerProjectDetailPage() {
                       <OfferResponseDetails offer={o} project={project} />
                     </td>
                     <td className="py-3 px-2.5">
-                      {/* Stage 8.7: no reviews reads as "none yet", never as 0 stars. */}
+                      {/* Stage 8.7/8.14: no reviews reads as "none yet", never as 0 stars; an average comes with its count. */}
                       {o.service_provider_review_count ? (
                         <>
                           <span className="text-amber text-[11px] tracking-tight">{stars(Number(o.service_provider_avg_rating ?? 0))}</span>{" "}
-                          <span className="font-mono text-[11px] text-steel">({o.service_provider_review_count})</span>
+                          <span className="font-mono text-[11px] text-steel">
+                            {t("reputation.summary").replace("{avg}", Number(o.service_provider_avg_rating ?? 0).toFixed(1)).replace("{n}", String(o.service_provider_review_count))}
+                          </span>
                         </>
                       ) : (
                         <span className="font-mono text-[11px] text-steel">{t("reputation.noReviews")}</span>

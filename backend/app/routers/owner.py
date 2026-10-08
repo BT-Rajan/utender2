@@ -187,13 +187,6 @@ def list_offers(
             for o, _cp in offers
         ]
 
-    # Stage 8.12: which bidders the owner organisation has completed work
-    # with before -- one grouped query, shown beside each offer; it never
-    # changes the order above or anything the offers are judged on.
-    from app.services.reputation import completed_together
-
-    together = completed_together(db, project.owner_id, (o.service_provider_id for o, _cp in offers))
-
     # Stage 6.2: a withdrawn offer is no longer one the owner may consider --
     # they see who withdrew and when, never its content. Otherwise a sealed
     # offer withdrawn before the deadline would be opened at the deadline.
@@ -219,7 +212,21 @@ def list_offers(
         else _owner_offer_out(db, project, o, cp)
         for o, cp in offers
     ]
+    return _with_track_record(db, project, out)
+
+
+def _with_track_record(db: Session, project: Project, out: list[OfferOut]) -> list[OfferOut]:
+    """Stage 8.12/8.14: beside each unsealed offer, its provider's completed
+    U-Tender transactions and those completed with this owner organisation
+    -- two grouped queries for the whole page, from the authoritative
+    records. Information for the owner only: it never changes which offers
+    are shown, their order, or anything they are judged on."""
+    from app.services.reputation import completed_counts, completed_together
+
+    ids = [o.service_provider_id for o in out if o.service_provider_id]
+    completed, together = completed_counts(db, ids), completed_together(db, project.owner_id, ids)
     for o in out:
+        o.service_provider_completed_transactions = completed.get(o.service_provider_id, 0)
         o.completed_with_you = together.get(o.service_provider_id, 0)
     return out
 
@@ -277,7 +284,7 @@ def compare_offers(
     }
     return OfferComparisonOut(
         requirement=preview_requirement(db, project),
-        offers=[_owner_offer_out(db, project, *rows[i]) for i in wanted if i in rows],
+        offers=_with_track_record(db, project, [_owner_offer_out(db, project, *rows[i]) for i in wanted if i in rows]),
         unavailable=[i for i in wanted if i not in rows],
     )
 

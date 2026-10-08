@@ -168,6 +168,9 @@ class OfferOut(BaseModel):
     # Stage 8.12: owner view only, never while sealed -- transactions the
     # owner organisation completed with this provider. Informational only.
     completed_with_you: int | None = None
+    # Stage 8.14: owner view only, never while sealed -- the provider's
+    # completed U-Tender transactions, beside its rating. Informational only.
+    service_provider_completed_transactions: int | None = None
     # Stage 6.12: on the owner's shortlist -- set for the owner's side only
     # (None everywhere else, providers included).
     shortlisted: bool | None = None

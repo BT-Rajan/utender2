@@ -1200,4 +1200,21 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **No "previous customer" label on feed items:** owners stay anonymous to providers until award (Stage 7.2), and such a label would reveal whose open requirement it is.
   - **Tests:** `tests/test_stage8_13_previous_owner.py`.
 
+- **8.14 Trust signals during a competition:**
+  - **Already working:**
+    - **Offers list (8.7/8.12):** the provider's stored average and review count (which equal the live figures since 8.10), and "Completed work together".
+    - **Offer page (8.7):** the full track record.
+    - **Providers weighing an owner (8.8):** counts and average only.
+    - **No effect on the competition:** offers are ordered by submission (comparison: the owner's chosen order). Eligibility, validity, pricing and award ignore reputation, and there is no score or recommendation anywhere.
+    - **While sealed:** every trust field is withheld.
+  - **Gaps found:**
+    - **Comparison (Stage 6.6):** the main decision view showed no trust information at all.
+    - **No completed count beside offers:** neither the list nor the comparison showed a provider's completed transactions.
+    - **Average without its count:** the list showed stars with a bare `(n)`.
+  - **Fixed:**
+    - **`_with_track_record`:** shared by the inbox and the comparison. It fills `service_provider_completed_transactions` and `completed_with_you` with two grouped queries per page (`completed_counts`, `completed_together`): no N+1, never while sealed, and nothing taken from the request.
+    - **`TrackRecord` component:** beside each offer in both views, it shows "N completed U-Tender transactions · avg / 5 · n reviews". A provider with no history shows "No completed U-Tender transactions yet". "Completed work together" appears where it applies.
+    - **List rating:** now reads "avg / 5 · n reviews".
+  - **Tests:** `tests/test_stage8_14_trust_signals.py`.
+
 _Stage 9 onwards is added as it is implemented._

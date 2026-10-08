@@ -124,3 +124,18 @@ def previous_owners(db: Session, service_provider_id: str) -> list[dict]:
         entry["transactions"].append({"project_id": project_id, "title": title, "completed_at": completed_at})
     return [{"owner_name": e["owner_name"], "completed_transactions": len(e["transactions"]),
              "last_completed_at": e["transactions"][0]["completed_at"], "transactions": e["transactions"]} for e in owners.values()]
+
+
+def completed_counts(db: Session, provider_ids) -> dict[str, int]:
+    """Stage 8.14: each provider's completed U-Tender transactions (the same
+    count as provider_reputation), for a page of offers in one grouped query."""
+    ids = list(set(provider_ids))
+    if not ids:
+        return {}
+    return dict(
+        db.query(AwardRecord.service_provider_id, func.count(Agreement.id))
+        .join(Agreement, Agreement.award_id == AwardRecord.id)
+        .filter(AwardRecord.service_provider_id.in_(ids), Agreement.status == "completed")
+        .group_by(AwardRecord.service_provider_id)
+        .all()
+    )
