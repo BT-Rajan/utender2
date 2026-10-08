@@ -33,7 +33,7 @@ def test_the_overview_follows_the_marketplace(db, monkeypatch):
     body = admin.get("/admin/overview").json()
     assert all(body[s]["available"] for s in ("accounts", "requirements", "offers", "transactions", "attention", "background"))
     assert body["requirements"]["data"]["by_status"]["open"] == 0 and body["attention"]["data"] == []
-    assert body["background"]["data"] == {"billing_webhook": "not_configured", "last_billing_event_at": None, "deadline_reminders": "not_determinable", "deadline_reminders_overdue": 0, "email_delivery": "not_configured", "email_failures_24h": 0}
+    assert body["background"]["data"] == {"billing_webhook": "not_configured", "last_billing_event_at": None, "deadline_reminders": "not_determinable", "deadline_reminders_overdue": 0, "email_delivery": "not_configured", "email_failures_24h": 0, "backup": "not_configured", "last_backup_at": None, "backup_failed_step": None}
 
     # Accounts: an organisation of two counts once.
     owner, _colleague, _, _ = _organization(db, "owner", "Gulf Holdings W.L.L.", "fahad@gulf.example", "noura@gulf.example")

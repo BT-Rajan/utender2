@@ -71,6 +71,8 @@ if [ -n "${DB_USER:-}" ]; then
     set_env DATABASE_URL "mysql+pymysql://$(urlenc "$DB_USER"):$(urlenc "$DB_PASSWORD")@${DB_HOST:-127.0.0.1}:${DB_PORT:-3306}/${DB_NAME:-utender}"
     ok "Database: ${DB_USER}@${DB_HOST:-127.0.0.1}:${DB_PORT:-3306}/${DB_NAME:-utender}"
 fi
+# Stage 9.12: where backup.sh writes; the admin overview reads its outcome from here.
+[ -n "$(get_env BACKUP_DIR)" ] || set_env BACKUP_DIR /var/backups/utender
 
 # Ports: explicit APP_PORT/API_PORT, else what backend/.env remembers, else
 # the first free port from 8080 up (only on the first run).
@@ -134,8 +136,34 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
 
+# Stage 9.12: a daily backup (database, uploaded files, configuration) -- see
+# backup.sh and docs/disaster-recovery.md.
+cat > /etc/systemd/system/utender-backup.service <<EOF
+[Unit]
+Description=U-Tender backup
+After=mariadb.service mysql.service
+
+[Service]
+Type=oneshot
+ExecStart=$repo_root/backup.sh
+EOF
+
+cat > /etc/systemd/system/utender-backup.timer <<EOF
+[Unit]
+Description=Daily U-Tender backup
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
 systemctl daemon-reload
 systemctl enable --quiet utender-backend utender-frontend
+systemctl enable --quiet --now utender-backup.timer
 systemctl restart utender-backend utender-frontend
 
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
@@ -161,3 +189,4 @@ echo
 echo "Logs:     journalctl -u utender-backend -f"
 echo "Restart:  systemctl restart utender-backend utender-frontend"
 echo "Update:   git pull && ./deploy.sh"
+echo "Backup:   daily (systemctl list-timers utender-backup) -- run now: ./backup.sh; restore: see docs/disaster-recovery.md"

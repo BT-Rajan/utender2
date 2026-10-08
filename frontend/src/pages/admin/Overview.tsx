@@ -22,7 +22,7 @@ interface Overview {
   offers: Section<{ by_status: Counts; submitted_last_7_days: number; on_open_requirements: number }>;
   transactions: Section<{ by_status: Counts; on_hold: number; completion_awaiting_owner: number; awarded_last_7_days: number }>;
   attention: Section<Attention[]>;
-  background: Section<{ deadline_reminders: "ok" | "overdue" | "not_determinable"; deadline_reminders_overdue: number; email_delivery: "failing" | "no_failures_recorded" | "not_configured"; email_failures_24h: number; billing_webhook: "configured" | "not_configured"; last_billing_event_at: string | null }>;
+  background: Section<{ deadline_reminders: "ok" | "overdue" | "not_determinable"; deadline_reminders_overdue: number; email_delivery: "failing" | "no_failures_recorded" | "not_configured"; email_failures_24h: number; billing_webhook: "configured" | "not_configured"; last_billing_event_at: string | null; backup: "not_configured" | "never_run" | "failing" | "overdue" | "recent"; last_backup_at: string | null; backup_failed_step: string | null }>;
 }
 
 function Block({ title, section, children }: { title: string; section: Section<unknown>; children: React.ReactNode }) {
@@ -122,6 +122,12 @@ export function AdminOverviewPage() {
                     [t("ops.email"), data.background.data.email_delivery === "failing"
                       ? t("ops.emailFailing").replace("{n}", String(data.background.data.email_failures_24h))
                       : t(`ops.email_${data.background.data.email_delivery}`)],
+                    // Stage 9.12: the latest backup run's outcome -- a recent backup isn't proof it restores.
+                    [t("ops.backup"), data.background.data.backup === "failing"
+                      ? t("ops.backupFailing").replace("{step}", data.background.data.backup_failed_step ?? "?")
+                      : data.background.data.backup === "overdue" || data.background.data.backup === "recent"
+                        ? `${t(data.background.data.backup === "overdue" ? "ops.backupOverdue" : "ops.backupRecent")} ${data.background.data.last_backup_at ? fullDate(data.background.data.last_backup_at, language) : ""}`
+                        : t(`ops.backup_${data.background.data.backup}`)],
                   ]}
                 />
               )}

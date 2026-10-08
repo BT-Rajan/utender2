@@ -333,6 +333,12 @@ export interface Dictionary {
     billingNotConfigured: string;
     lastBillingEvent: string;
     noBillingEvents: string;
+    backup: string;
+    backup_not_configured: string;
+    backup_never_run: string;
+    backupFailing: string;
+    backupOverdue: string;
+    backupRecent: string;
     email_no_failures_recorded: string;
     email_not_configured: string;
     accounts: string;
@@ -2003,6 +2009,12 @@ export const en: Dictionary = {
     billingNotConfigured: "Not configured: subscription changes won't arrive",
     lastBillingEvent: "Last event received",
     noBillingEvents: "Configured; no event received yet",
+    backup: "Backups",
+    backup_not_configured: "Not configured (BACKUP_DIR unset)",
+    backup_never_run: "No backup recorded yet",
+    backupFailing: "Last run failed at: {step}",
+    backupOverdue: "Overdue -- last success",
+    backupRecent: "Last success",
     email_no_failures_recorded: "No failures recorded",
     email_not_configured: "Not configured: no emails are sent",
     accounts: "Accounts",
@@ -3762,6 +3774,12 @@ export const ar: Dictionary = {
     billingNotConfigured: "غير مُعَدّة: لن تصل تغييرات الاشتراك",
     lastBillingEvent: "آخر حدث مستلم",
     noBillingEvents: "مُعَدّة؛ لم يصل أي حدث بعد",
+    backup: "النسخ الاحتياطي",
+    backup_not_configured: "غير مُعَدّ (BACKUP_DIR غير محدد)",
+    backup_never_run: "لم تُسجَّل أي نسخة احتياطية بعد",
+    backupFailing: "فشل التشغيل الأخير عند: {step}",
+    backupOverdue: "متأخر -- آخر نجاح",
+    backupRecent: "آخر نجاح",
     email_no_failures_recorded: "لا إخفاقات مسجلة",
     email_not_configured: "غير مُعَدّ: لا تُرسل رسائل بريد",
     accounts: "الحسابات",

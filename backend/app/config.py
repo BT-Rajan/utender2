@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     storage_backend: str = "local"  # "local" | "s3"
     storage_root: str = "./storage"
     storage_signing_secret: str = "change-me-in-production"
+    # Stage 9.12: where backup.sh records each run's outcome (last-success /
+    # last-failure); the admin overview reads it. Unset = backups not configured.
+    backup_dir: str | None = None
 
     s3_bucket_drawings: str = "project-drawings"
     s3_bucket_documents: str = "service-provider-documents"

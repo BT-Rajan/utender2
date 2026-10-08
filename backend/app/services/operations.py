@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 LIST_LIMIT = 10
 REMINDER_WINDOW = timedelta(hours=24)  # the deadline-reminder job's window (routers/cron.py)
 REMINDER_GRACE = timedelta(hours=1)  # it is meant to run roughly hourly
+BACKUP_STALE_AFTER = timedelta(hours=26)  # the backup timer runs daily (deploy.sh), with slack
 
 
 def _by(db: Session, column, *where) -> dict:
@@ -183,6 +184,43 @@ def _attention(db: Session, now: datetime) -> list[dict]:
     return out
 
 
+def _backup_status(backup_dir: str | None, now: datetime) -> dict:
+    """Stage 9.12: backup.sh writes last-success / last-failure into
+    BACKUP_DIR. Read from there: not configured, never run, failing (the
+    latest run failed), overdue (no success within a day and a bit), or
+    recent -- a recent backup isn't proof it restores, so never "healthy"."""
+    import json
+    import os
+
+    def read(name):
+        try:
+            with open(os.path.join(backup_dir, name)) as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return None
+
+    def when(record):
+        try:
+            return datetime.fromisoformat(record["at"].replace("Z", "+00:00")).replace(tzinfo=None)
+        except (TypeError, KeyError, ValueError, AttributeError):
+            return None
+
+    if not backup_dir:
+        return {"backup": "not_configured", "last_backup_at": None, "backup_failed_step": None}
+    success, failure = read("last-success"), read("last-failure")
+    success_at, failure_at = when(success), when(failure)
+    if failure_at and (not success_at or failure_at >= success_at):
+        status = "failing"
+    elif not success_at:
+        status = "never_run"
+    elif now - success_at > BACKUP_STALE_AFTER:
+        status = "overdue"
+    else:
+        status = "recent"
+    return {"backup": status, "last_backup_at": success_at,
+            "backup_failed_step": failure.get("step") if status == "failing" and isinstance(failure, dict) else None}
+
+
 def _background(db: Session, now: datetime) -> dict:
     """The deadline-reminder job is called by an external scheduler and keeps
     no run log, so its health is read from what it should have done: a
@@ -218,6 +256,7 @@ def _background(db: Session, now: datetime) -> dict:
         "deadline_reminders_overdue": due,
         "email_delivery": email,
         "email_failures_24h": failures,
+        **_backup_status(settings.backup_dir, now),
     }
 
 

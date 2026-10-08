@@ -1533,4 +1533,30 @@ be added as its prompts (5.1, 5.2, …) are delivered.
       - warns loudly about development database credentials and plain-http (non-Secure cookie) deployment. `deploy.sh` deploys over http today, so this is a warning, not a refusal.
   - **Tests:** `tests/test_stage9_11_production.py`. The Stage 2 production-settings test was updated for the localhost rule.
 
+- **9.12 Backup, restore and disaster recovery:**
+  - **Already in place:**
+    - all state in MySQL (Alembic-managed, head `0064`), the uploaded files under `STORAGE_ROOT`, and configuration in `backend/.env` (mode 600, generated secrets);
+    - Stripe is authoritative for billing, and its webhooks are idempotent and ignore stale events (9.6).
+  - **Gaps found:**
+    - **No backup at all:** there was no database dump, no copy of the uploaded files or the configuration, and nothing scheduled.
+    - **No restore procedure** and no way to tell that backups had stopped.
+  - **Fixed:**
+    - **`backup.sh`** takes a consistent `mysqldump --single-transaction`, the file store and `.env`, plus the code and schema versions.
+      - It is root-only (0700/0600) and keeps credentials off the command line.
+      - Optional AES-256 encryption (`BACKUP_ENCRYPTION_KEY_FILE`) and an optional off-server rsync (`BACKUP_RSYNC_TARGET`).
+      - Retention is `BACKUP_KEEP_DAYS` (default 14).
+      - Each run records `last-success` or `last-failure` (with the failed step). A partial run is removed, but a run that only failed to copy off-server is kept.
+    - **`restore.sh`** restores the database, then the files, then optionally the configuration, then runs `alembic upgrade head`, restarts and health-checks.
+      - It needs `RESTORE_CONFIRM=yes` and moves the current files aside.
+      - `ENV_FILE` rehearses into a scratch database without touching the live service.
+    - **`deploy.sh`** sets `BACKUP_DIR` and installs a daily `utender-backup.timer` (02:30, persistent).
+    - **Admin Overview → Background → Backups** shows: not configured, never run, failing (with the step), overdue (no success for 26 h), or last success. It is never "healthy".
+    - **`docs/disaster-recovery.md`**: the recovery order, secrets handling, external services (Stripe, Resend, DNS), RPO up to 24 h, RTO about 1–2 h by hand, and the limitations.
+  - **Rehearsed** on a non-production MySQL copy with encryption on:
+    - 39/39 tables with identical row counts, and identical SHA-256 for every stored file;
+    - schema at head; sign-in works;
+    - the private agreement document opens via its signed link, a tampered link gets 403, and an unrelated organisation gets 404;
+    - a wrong-credential run and a failed off-server copy were both detected.
+  - **Tests:** `tests/test_stage9_12_backup_status.py`. The Stage 9.1 overview test was updated for the new background fields.
+
 _Later Stage 9 steps are added as they are implemented._
