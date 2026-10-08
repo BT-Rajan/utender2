@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { apiFetch } from "@/api/client";
@@ -34,12 +35,12 @@ function Block({ title, section, children }: { title: string; section: Section<u
   );
 }
 
-function Rows({ rows }: { rows: [string, number | string][] }) {
+function Rows({ rows }: { rows: ([string, number | string] | [string, number | string, string | undefined])[] }) {
   return (
     <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
-      {rows.map(([label, value]) => (
+      {rows.map(([label, value, help]) => (
         <div key={label} className="contents">
-          <dt className="text-steel">{label}</dt>
+          <dt className="text-steel" title={help}>{label}</dt>
           <dd className="font-mono text-navy text-end">{value}</dd>
         </div>
       ))}
@@ -101,6 +102,7 @@ export function AdminOverviewPage() {
               <p className="text-sm text-green">{t("ops.nothing")}</p>
             )}
           </Block>
+          <MarketplaceMetrics />
           <div className="grid gap-4 sm:grid-cols-2">
             <Block title={t("ops.background")} section={data.background}>
               {data.background.data && (
@@ -179,5 +181,102 @@ export function AdminOverviewPage() {
         </div>
       )}
     </main>
+  );
+}
+
+
+type Counts9 = Record<string, number | null>;
+interface Metrics {
+  since: string | null;
+  definitions: Record<string, string>;
+  activity: Section<Counts9>;
+  requirement_funnel: Section<Counts9>;
+  provider_funnel: Section<Counts9>;
+  subscriptions: Section<Counts9>;
+}
+
+const PERIODS = ["today", "7d", "30d", "month", "all"] as const;
+
+// Stage 9.9: what happened in a period (UTC, server clock), the period's
+// requirement and provider funnels, and today's subscription picture -- counts
+// from the records, each with its definition on hover. No prices or names.
+export function MarketplaceMetrics() {
+  const { t, language } = useI18n();
+  const [period, setPeriod] = useState<(typeof PERIODS)[number]>("30d");
+  const { data, error } = useQuery({ queryKey: ["admin-metrics", period], queryFn: () => apiFetch<Metrics>(`/admin/metrics?period=${period}`) });
+  const pct = (n: number | null | undefined, of: number | null | undefined) => (n == null ? "—" : of ? `${n} (${Math.round((100 * n) / of)}%)` : String(n));
+  const d = data?.definitions ?? {};
+  return (
+    <section className="grid gap-4" data-testid="marketplace-metrics">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="font-display text-lg font-semibold text-navy">{t("metrics.heading")}</h2>
+        <div className="flex gap-1" role="group" aria-label={t("metrics.period")}>
+          {PERIODS.map((p) => (
+            <button key={p} type="button" onClick={() => setPeriod(p)} aria-pressed={period === p}
+              className={`font-mono text-[11px] rounded px-2.5 py-1 border ${period === p ? "border-navy bg-navy text-white" : "border-border text-steel"}`}>
+              {t(`metrics.periods.${p}`)}
+            </button>
+          ))}
+        </div>
+      </div>
+      {data?.since && <p className="text-xs text-steel">{t("metrics.since")} {fullDate(data.since, language)} (UTC)</p>}
+      {error && <ErrorBanner message={t("ops.failed")} />}
+      {data && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Block title={t("metrics.activity")} section={data.activity}>
+            {data.activity.data && (
+              <Rows rows={[
+                [t("metrics.newAccounts"), data.activity.data.new_accounts ?? "—", d.new_accounts],
+                [t("metrics.published"), data.activity.data.requirements_published ?? "—", d.requirements_published],
+                [t("metrics.offers"), data.activity.data.offers_submitted ?? "—", d.offers_submitted],
+                [t("metrics.awards"), data.activity.data.awards ?? "—", d.awards],
+                [t("metrics.completed"), data.activity.data.transactions_completed ?? "—", d.transactions_completed],
+                [t("metrics.reviews"), data.activity.data.reviews ?? "—", d.reviews],
+                [t("metrics.activePeople"), data.activity.data.active_people ?? "—", d.active_people],
+                [t("metrics.returning"), data.activity.data.returning_people ?? "—", d.returning_people],
+              ]} />
+            )}
+          </Block>
+          <Block title={t("metrics.requirementFunnel")} section={data.requirement_funnel}>
+            {data.requirement_funnel.data && (() => {
+              const f = data.requirement_funnel.data;
+              return (
+                <Rows rows={[
+                  [t("metrics.published"), f.published ?? "—", d.requirement_funnel],
+                  [t("metrics.receivedOffers"), pct(f.received_offers, f.published)],
+                  [t("metrics.awarded"), pct(f.awarded, f.published)],
+                  [t("metrics.completed"), pct(f.completed, f.published)],
+                  [t("metrics.endedWithoutAward"), pct(f.ended_without_award, f.published)],
+                ]} />
+              );
+            })()}
+          </Block>
+          <Block title={t("metrics.providerFunnel")} section={data.provider_funnel}>
+            {data.provider_funnel.data && (() => {
+              const f = data.provider_funnel.data;
+              return (
+                <Rows rows={[
+                  [t("metrics.registered"), f.registered ?? "—", d.provider_funnel],
+                  [t("metrics.verified"), pct(f.verified, f.registered)],
+                  [t("metrics.ableToBid"), pct(f.able_to_bid, f.registered)],
+                  [t("metrics.participated"), pct(f.submitted_an_offer, f.registered)],
+                ]} />
+              );
+            })()}
+          </Block>
+          <Block title={t("metrics.subscriptions")} section={data.subscriptions}>
+            {data.subscriptions.data && (
+              <Rows rows={[
+                [t("metrics.paying"), data.subscriptions.data.paying ?? "—", d.subscriptions],
+                [t("metrics.overrideOnly"), data.subscriptions.data.override_only ?? "—"],
+                [t("metrics.pastDue"), data.subscriptions.data.past_due ?? "—"],
+                [t("metrics.cancelled"), data.subscriptions.data.cancelled_or_expired ?? "—"],
+                [t("metrics.neverSubscribed"), data.subscriptions.data.never_subscribed ?? "—"],
+              ]} />
+            )}
+          </Block>
+        </div>
+      )}
+    </section>
   );
 }

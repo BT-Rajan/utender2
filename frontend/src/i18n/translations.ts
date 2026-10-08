@@ -420,6 +420,36 @@ export interface Dictionary {
     unavailable: string;
     system: string;
   };
+  metrics: {
+    heading: string;
+    period: string;
+    since: string;
+    activity: string;
+    newAccounts: string;
+    published: string;
+    offers: string;
+    awards: string;
+    completed: string;
+    reviews: string;
+    activePeople: string;
+    returning: string;
+    requirementFunnel: string;
+    receivedOffers: string;
+    awarded: string;
+    endedWithoutAward: string;
+    providerFunnel: string;
+    registered: string;
+    verified: string;
+    ableToBid: string;
+    participated: string;
+    subscriptions: string;
+    paying: string;
+    overrideOnly: string;
+    pastDue: string;
+    cancelled: string;
+    neverSubscribed: string;
+    periods: { today: string; "7d": string; "30d": string; month: string; all: string };
+  };
   history: {
     heading: string;
     awarded: string;
@@ -2084,6 +2114,36 @@ export const en: Dictionary = {
     empty: "Nothing recorded yet.",
     unavailable: "The history couldn't be loaded.",
     system: "System",
+  },
+  metrics: {
+    heading: "Marketplace activity",
+    period: "Period",
+    since: "From",
+    activity: "In this period",
+    newAccounts: "New accounts",
+    published: "Requirements published",
+    offers: "Offers submitted",
+    awards: "Awards",
+    completed: "Transactions completed",
+    reviews: "Reviews",
+    activePeople: "Active people",
+    returning: "Returning people",
+    requirementFunnel: "Requirements published in this period",
+    receivedOffers: "Received offers",
+    awarded: "Awarded",
+    endedWithoutAward: "Ended without award",
+    providerFunnel: "Providers registered in this period",
+    registered: "Registered",
+    verified: "Verified",
+    ableToBid: "Able to bid now",
+    participated: "Submitted an offer",
+    subscriptions: "Subscriptions now",
+    paying: "Paying",
+    overrideOnly: "Admin override only",
+    pastDue: "Past due",
+    cancelled: "Cancelled or expired",
+    neverSubscribed: "Never subscribed",
+    periods: { "today": "Today", "7d": "7 days", "30d": "30 days", "month": "This month", "all": "All time" },
   },
   history: {
     heading: "History",
@@ -3806,6 +3866,36 @@ export const ar: Dictionary = {
     empty: "لا شيء مسجل بعد.",
     unavailable: "تعذر تحميل السجل.",
     system: "النظام",
+  },
+  metrics: {
+    heading: "نشاط السوق",
+    period: "الفترة",
+    since: "من",
+    activity: "في هذه الفترة",
+    newAccounts: "حسابات جديدة",
+    published: "طلبات منشورة",
+    offers: "عروض مقدمة",
+    awards: "ترسيات",
+    completed: "معاملات مكتملة",
+    reviews: "تقييمات",
+    activePeople: "أشخاص نشطون",
+    returning: "أشخاص عائدون",
+    requirementFunnel: "الطلبات المنشورة في هذه الفترة",
+    receivedOffers: "تلقت عروضًا",
+    awarded: "أُرسيت",
+    endedWithoutAward: "انتهت دون ترسية",
+    providerFunnel: "مقدمو الخدمة المسجلون في هذه الفترة",
+    registered: "مسجلون",
+    verified: "موثَّقون",
+    ableToBid: "يمكنهم التقديم الآن",
+    participated: "قدموا عرضًا",
+    subscriptions: "الاشتراكات الآن",
+    paying: "يدفعون",
+    overrideOnly: "تجاوز إداري فقط",
+    pastDue: "متأخر الدفع",
+    cancelled: "ملغى أو منتهٍ",
+    neverSubscribed: "لم يشتركوا قط",
+    periods: { "today": "اليوم", "7d": "7 أيام", "30d": "30 يومًا", "month": "هذا الشهر", "all": "كل الوقت" },
   },
   history: {
     heading: "السجل",

@@ -1454,4 +1454,32 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - a failing notice with changes still pending.
     - It also covers a duplicate submission and another owner's award attempt.
 
+- **9.9 Business metrics:**
+  - **Already working (9.1 overview):** the current state, from authoritative records, with grouped counts only.
+    - **Stakeholders** (organisations or individuals, never member rows): verified, awaiting review, suspended, able to bid, payment failed.
+    - **Requirements** by real lifecycle status, open with and without offers.
+    - **Offers** (counts only, no prices).
+    - **Transactions** by status.
+    - **The attention list.**
+    - **Accuracy:** amendments are a separate table, so a requirement counts once; each offer is one row (revisions are kept apart); expiry is applied before counting; each section fails visibly ("Unavailable"), never as zero.
+  - **Gaps found:**
+    - **No time dimension:** nothing showed activity over a period, the requirement funnel (published → offers → award → completion), the provider funnel (registered → verified → able to bid → participated), whether people come back, or a subscription breakdown.
+    - **No index for period queries on the audit trail.**
+  - **Fixed:**
+    - **`GET /admin/metrics?period=today|7d|30d|month|all`** (`services/operations.metrics`), with UTC boundaries from the server clock. Other period values are refused (422).
+    - **Activity in the period:**
+      - new accounts;
+      - requirements first published;
+      - offers first submitted (`submitted_at` is the first submission, so revisions don't count);
+      - awards;
+      - transactions completed (owner acceptance, never just awarded);
+      - shown reviews;
+      - active people (distinct non-admin actors on the audit trail) and returning people (active, and registered before the period).
+    - **Funnels:** the requirement funnel for the period's published cohort, and the provider funnel for the period's registered stakeholders.
+    - **Subscriptions now** (Stripe's state, 9.6): paying, override only, past due, cancelled or expired, never subscribed.
+    - **Definitions:** every figure carries a written definition in the response, shown on hover. No prices, names or documents; admin-only.
+    - **Migration 0064:** an index on `audit_logs.created_at`.
+    - **UI:** "Marketplace activity" on the admin overview, with a period selector and simple percentages within each funnel.
+  - **Tests:** `tests/test_stage9_9_metrics.py`, covering scenarios A–H.
+
 _Later Stage 9 steps are added as they are implemented._

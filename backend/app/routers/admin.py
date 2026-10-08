@@ -1876,3 +1876,18 @@ def account_audit(user_id: str, db: Session = Depends(get_db), limit: int = Quer
     orgs = [o for (o,) in db.query(OrganizationMembership.organization_id).filter(OrganizationMembership.user_id == user_id)]
     return _audit_rows(db, [("user", [user_id]), ("owner_profile", [user_id]), ("service_provider_profile", [user_id]),
                             ("organization", orgs)], limit)
+
+
+# ---------- Stage 9.9: marketplace metrics ----------
+
+
+@router.get("/metrics")
+def marketplace_metrics(period: str = Query("30d", pattern="^(today|7d|30d|month|all)$"), db: Session = Depends(get_db)):
+    """Stage 9.9: what happened on the marketplace in a period (UTC, server
+    clock), the requirement and provider funnels for that period's cohort, and
+    the current subscription picture -- grouped counts from the authoritative
+    records, each with its definition. Platform-wide, admin-only; no prices,
+    names or documents."""
+    from app.services.operations import metrics
+
+    return metrics(db, period)

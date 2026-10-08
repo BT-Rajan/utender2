@@ -213,3 +213,114 @@ def overview(db: Session) -> dict:
             logger.exception("Operations overview: section %s failed", name)
             out[name] = {"available": False, "data": None}
     return out
+
+
+# ---------- Stage 9.9: activity over a period, funnels, subscriptions ----------
+
+PERIODS = ("today", "7d", "30d", "month", "all")
+
+DEFINITIONS = {
+    "new_accounts": "People who signed up in the period (owner and provider accounts; admins excluded).",
+    "requirements_published": "Requirements first published in the period (an amendment is not a new requirement).",
+    "offers_submitted": "Offers first submitted in the period (a revision is not a new offer; drafts never count).",
+    "awards": "Awards made in the period (one per requirement).",
+    "transactions_completed": "Transactions whose completion the owner accepted in the period (Stage 7.11) -- not merely awarded.",
+    "reviews": "Reviews written in the period, either direction, excluding any an admin hid.",
+    "active_people": "Non-admin people who did anything recorded on the audit trail in the period.",
+    "returning_people": "Active people whose account existed before the period began.",
+    "requirement_funnel": "Of the requirements published in the period: how many received at least one offer, were awarded, were completed, or ended without an award.",
+    "provider_funnel": "Of the provider stakeholders (organisations or individuals) registered in the period: verified, able to bid now, and submitted at least one offer.",
+    "subscriptions": "Provider stakeholders by their current subscription state (Stripe, 9.6) -- now, not for the period. Subscription money is never mixed with tender or transaction values.",
+}
+
+
+def period_start(now: datetime, period: str) -> datetime | None:
+    """UTC boundaries from the server's clock: today from midnight, this
+    month from the 1st, 7d/30d rolling, all time unbounded."""
+    if period == "today":
+        return now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if period == "month":
+        return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if period in ("7d", "30d"):
+        return now - timedelta(days=7 if period == "7d" else 30)
+    return None
+
+
+def metrics(db: Session, period: str) -> dict:
+    from app.models.audit_log import AuditLog
+    from app.models.award_record import AwardRecord
+    from app.models.enums import UserRole
+    from app.models.review import Review
+    from app.models.user import User
+
+    sync_expired_projects(db)
+    now = db_now(db)
+    since = period_start(now, period)
+
+    def within(column):
+        return (column >= since,) if since else (column.isnot(None),)
+
+    out: dict = {"period": period, "since": since, "as_of": now, "definitions": DEFINITIONS}
+
+    def section(name, compute):
+        try:
+            out[name] = {"available": True, "data": compute()}
+        except Exception:  # noqa: BLE001 -- a failing section says so; the others still load
+            db.rollback()
+            logger.exception("Metrics: section %s failed", name)
+            out[name] = {"available": False, "data": None}
+
+    def activity():
+        people = (User.role != UserRole.admin,)
+        active = db.query(AuditLog.actor_id).join(User, User.id == AuditLog.actor_id).filter(*within(AuditLog.created_at), *people).distinct()
+        return {
+            "new_accounts": db.query(func.count(User.id)).filter(*within(User.created_at), *people).scalar(),
+            "requirements_published": db.query(func.count(Project.id)).filter(*within(Project.published_at)).scalar(),
+            "offers_submitted": db.query(func.count(Offer.id)).filter(tendered(), *within(Offer.submitted_at)).scalar(),
+            "awards": db.query(func.count(AwardRecord.id)).filter(*within(AwardRecord.created_at)).scalar(),
+            "transactions_completed": db.query(func.count(Agreement.id)).filter(Agreement.status == "completed", *within(Agreement.completed_at)).scalar(),
+            "reviews": db.query(func.count(Review.id)).filter(Review.hidden_at.is_(None), *within(Review.created_at)).scalar(),
+            "active_people": active.count(),
+            "returning_people": (db.query(func.count(User.id)).filter(User.id.in_(active), User.created_at < since).scalar() if since else None),
+        }
+
+    def requirement_funnel():
+        cohort = db.query(Project.id).filter(*within(Project.published_at))
+        offered = db.query(Offer.project_id).filter(tendered()).distinct()
+        return {
+            "published": cohort.count(),
+            "received_offers": cohort.filter(Project.id.in_(offered)).count(),
+            "awarded": db.query(func.count(AwardRecord.id)).filter(AwardRecord.project_id.in_(cohort)).scalar(),
+            "completed": db.query(func.count(Agreement.id)).filter(Agreement.project_id.in_(cohort), Agreement.status == "completed").scalar(),
+            "ended_without_award": cohort.filter(Project.status.in_([ProjectStatus.no_award, ProjectStatus.canceled, ProjectStatus.expired])).count(),
+        }
+
+    def provider_funnel():
+        sp = ServiceProviderProfile
+        cohort = db.query(sp.user_id).filter(_stakeholders(sp), *within(sp.created_at))
+        paying = sp.subscription_status.in_([SubscriptionStatus.active, SubscriptionStatus.trialing])
+        approved = cohort.filter(sp.verification_status == VerificationStatus.approved, sp.is_suspended.is_(False))
+        return {
+            "registered": cohort.count(),
+            "verified": approved.count(),
+            "able_to_bid": approved.filter(or_(paying, sp.payment_override_active.is_(True))).count(),
+            "submitted_an_offer": cohort.filter(sp.user_id.in_(db.query(Offer.service_provider_id).filter(tendered()))).count(),
+        }
+
+    def subscriptions():
+        sp = ServiceProviderProfile
+        base = (_stakeholders(sp),)
+        by = _by(db, sp.subscription_status, *base)
+        return {
+            "paying": by.get("active", 0) + by.get("trialing", 0),
+            "override_only": db.query(func.count(sp.user_id)).filter(*base, sp.payment_override_active.is_(True),
+                                                                    or_(sp.subscription_status.is_(None), sp.subscription_status.notin_([SubscriptionStatus.active, SubscriptionStatus.trialing]))).scalar(),
+            "past_due": by.get("past_due", 0) + by.get("failed", 0),
+            "cancelled_or_expired": by.get("canceled", 0) + by.get("expired", 0),
+            "never_subscribed": by.get(None, 0) + by.get("not_started", 0) + by.get("pending", 0),
+        }
+
+    for name, compute in (("activity", activity), ("requirement_funnel", requirement_funnel),
+                          ("provider_funnel", provider_funnel), ("subscriptions", subscriptions)):
+        section(name, compute)
+    return out
