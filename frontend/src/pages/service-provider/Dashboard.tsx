@@ -125,15 +125,18 @@ export function ServiceProviderDashboardPage() {
     enabled: !!profile && profile.verification_status === "approved",
   });
 
+  // Counted by the server over every offer (the list itself is paged). Hooks
+  // stay above the early return below: React needs the same hooks every render.
+  const { data: summary } = useQuery({
+    queryKey: ["service-provider-my-bids-summary"],
+    queryFn: () => apiFetch<{ total: number; active: number; won: number }>("/service-provider/my-bids/summary"),
+    enabled: !!profile,
+  });
+
   if (!profile) return <PageLoading />;
 
   const banner = statusBanner(t)[profile.marketplace_status];
   const isActive = profile.marketplace_status === "verified_active";
-  // Counted by the server over every offer (the list itself is paged).
-  const { data: summary } = useQuery({
-    queryKey: ["service-provider-my-bids-summary"],
-    queryFn: () => apiFetch<{ total: number; active: number; won: number }>("/service-provider/my-bids/summary"),
-  });
   const activeBids = summary?.active ?? 0;
   const won = summary?.won ?? 0;
   const totalBids = summary?.total ?? 0;

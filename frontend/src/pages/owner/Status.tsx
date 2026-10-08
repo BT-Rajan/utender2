@@ -1,3 +1,4 @@
+import { Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/api/client";
 import type { OwnerDocument, OwnerProfile } from "@/api/types";
@@ -31,6 +32,11 @@ export function OwnerStatusPage() {
   });
 
   if (!profile) return <PageLoading />;
+
+  // Nothing submitted yet: the next step is the verification form itself
+  // (who the account represents, the documents, "Submit for review") -- not
+  // a status that would say it is under review.
+  if (profile.verification_status === "incomplete") return <Navigate to="/owner/verify" replace />;
 
   if (profile.is_suspended) {
     return (
