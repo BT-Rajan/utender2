@@ -968,13 +968,14 @@ def get_award(project_id: str, user: User = Depends(get_current_user), db: Sessi
         created_at=record.created_at,
         service_provider_company_name=cp.company_name if cp else None,
         mine=mine,
+        material_revision=winner.based_on_material_revision if winner else None,
     )
     # Stage 6.16: another bidder learns only that the requirement was awarded
     # to a successful bidder -- not who, nor the winning offer's price, id or
     # anything else of it.
     if user.role != UserRole.admin and not owns(db, user, project) and not mine:
         out.offer_id = out.service_provider_id = out.amount = out.offer_revision = out.awarded_by = None
-        out.service_provider_company_name = None
+        out.service_provider_company_name = out.material_revision = None
     return out
 
 

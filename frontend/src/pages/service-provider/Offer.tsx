@@ -29,7 +29,7 @@ interface AwardRecord {
 // their offer was awarded, and at what; every other bidder sees only that the
 // requirement was awarded to a successful bidder -- not who, nor at what.
 function AwardOutcome({ projectId }: { projectId: string }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { data: award } = useQuery({
     queryKey: ["award", projectId],
     queryFn: () => apiFetch<AwardRecord>(`/projects/${projectId}/award`),
@@ -40,7 +40,7 @@ function AwardOutcome({ projectId }: { projectId: string }) {
   return (
     <p className="mt-3 font-mono text-xs text-navy" data-testid="award-outcome">
       {award.mine
-        ? `${t("service_provider.offer.yourOfferAwarded")} ${money(award.amount)}`
+        ? `${t("service_provider.offer.yourOfferAwarded")} ${money(award.amount)} ${t("awardHandover.yourOn").replace("{date}", fullDate(award.created_at, language))}`
         : t("service_provider.offer.awardedToOther")}
     </p>
   );

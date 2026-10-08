@@ -37,6 +37,50 @@ interface Review {
   created_at: string;
 }
 
+// Stage 7.1: the award handover -- read from the permanent award record, the
+// one authoritative statement of who was selected for this requirement.
+interface AwardRecordView {
+  offer_id: string | null;
+  amount: string | null;
+  created_at: string;
+  service_provider_company_name: string | null;
+  material_revision: number | null;
+}
+
+function AwardSummary({ projectId, currency }: { projectId: string; currency: string }) {
+  const { t, language } = useI18n();
+  const { data: award } = useQuery({
+    queryKey: ["award", projectId],
+    queryFn: () => apiFetch<AwardRecordView>(`/projects/${projectId}/award`),
+  });
+  if (!award) return null;
+  return (
+    <section className="bg-white border border-green border-l-4 rounded px-5 py-4 mb-5" data-testid="award-summary">
+      <div className="font-mono text-[10.5px] uppercase tracking-widest text-green mb-1">{t("awardHandover.heading")}</div>
+      <div className="font-display font-semibold text-navy" dir="auto">
+        {t("awardHandover.to").replace("{provider}", award.service_provider_company_name ?? t("owner.projectDetail.theServiceProvider"))}
+      </div>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-[13px] mt-2">
+        <dt className="text-steel">{t("awardHandover.value")}</dt>
+        <dd className="font-mono text-navy">{money(award.amount, currency)}</dd>
+        <dt className="text-steel">{t("awardHandover.on")}</dt>
+        <dd>{fullDate(award.created_at, language)}</dd>
+        {award.material_revision != null && (
+          <>
+            <dt className="text-steel">{t("awardHandover.version")}</dt>
+            <dd>{t("versions.version").replace("{n}", String(award.material_revision))}</dd>
+          </>
+        )}
+      </dl>
+      {award.offer_id && (
+        <Link to={`/owner/projects/${projectId}/offers/${award.offer_id}`} className="inline-block mt-2 font-mono text-xs text-blue underline">
+          {t("awardHandover.view")}
+        </Link>
+      )}
+    </section>
+  );
+}
+
 // Stage 6.3: how many offers came in, and where each stands -- counted from
 // the server's list, never kept in the page.
 function InboxCounts({ offers, t }: { offers: Offer[]; t: (key: string) => string }) {
@@ -520,6 +564,8 @@ export function OwnerProjectDetailPage() {
       {/* Stage 3.15: controlling the published requirement. */}
       {project.status === "open" && <PauseControl project={project} />}
       {project.status === "open" && <AmendPublishedForm project={project} />}
+      {/* Stage 7.1: the award, as recorded -- who, which offer, what value, when, on which version. */}
+      {project.status === "awarded" && <AwardSummary projectId={project.id} currency={project.currency} />}
       {project.closed_at && project.status !== "open" && (
         <p className="text-[12.5px] text-steel mb-4">{t("postPub.closedEarly").replace("{date}", formatDeadline(project.closed_at))}</p>
       )}
@@ -682,6 +728,8 @@ export function OwnerProjectDetailPage() {
           {showHistory && <DrawingHistory projectId={project.id} t={t} />}
 
           {editableDraft && <DocumentsNeeded project={project} />}
+          {/* Documents can be added only while the requirement is a draft or open (the server refuses otherwise). */}
+          {(project.status === "draft" || project.status === "open") && (
           <form
             id="section-documents"
             ref={drawingsFormRef}
@@ -714,6 +762,7 @@ export function OwnerProjectDetailPage() {
               {t("owner.projectDetail.addDrawings")}
             </button>
           </form>
+          )}
           <p className="text-[11px] text-steel-light mt-1.5">{t("documents.uploadHint")}</p>
           <p className="text-[10.5px] text-steel-light mt-1">{t("owner.projectDetail.zipHint")}</p>
           <div

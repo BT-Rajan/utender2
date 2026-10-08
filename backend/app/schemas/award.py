@@ -1,7 +1,8 @@
-from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict
+
+from app.schemas.common import UTCDateTime
 
 
 class AwardRecordOut(BaseModel):
@@ -17,6 +18,8 @@ class AwardRecordOut(BaseModel):
     project_revision: int
     offer_revision: int | None
     awarded_by: str | None
-    created_at: datetime
+    created_at: UTCDateTime  # Stage 7.1: when it was awarded (UTC)
     service_provider_company_name: str | None = None
     mine: bool = False  # Stage 6.16: the reader's side won it
+    # Stage 7.1: the requirement version the awarded offer answered.
+    material_revision: int | None = None

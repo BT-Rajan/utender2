@@ -246,6 +246,15 @@ export interface Dictionary {
     earlierVersion: string;
     confirm: string;
   };
+  awardHandover: {
+    heading: string;
+    to: string;
+    value: string;
+    on: string;
+    version: string;
+    view: string;
+    yourOn: string;
+  };
   ownerOffer: {
     open: string;
     back: string;
@@ -1536,6 +1545,15 @@ export const en: Dictionary = {
     confirmBody: "This is your final decision on this requirement: {provider}'s offer of {amount} is accepted as submitted, every other live offer is marked not selected, and every provider is told. It can't be undone. It isn't a contract or a payment.",
     earlierVersion: "Note: this offer was made against version {n} of the requirement, which is now at version {m}, and its provider didn't confirm it since. You'd be awarding it as it stands.",
     confirm: "Award",
+  },
+  awardHandover: {
+    heading: "Awarded",
+    to: "Awarded to {provider}",
+    value: "Awarded value",
+    on: "Awarded on",
+    version: "Requirement version answered",
+    view: "View the awarded offer",
+    yourOn: "on {date}",
   },
   ownerOffer: {
     open: "View offer",
@@ -2852,6 +2870,15 @@ export const ar: Dictionary = {
     confirmBody: "هذا قرارك النهائي في هذا المتطلب: يُقبل عرض {provider} بقيمة {amount} كما قُدّم، ويُعلَّم كل عرض قائم آخر بأنه لم يُختر، ويُبلَّغ كل المزوّدين. لا يمكن التراجع عنه. وهو ليس عقدًا ولا دفعًا.",
     earlierVersion: "ملاحظة: قُدّم هذا العرض على الإصدار {n} من المتطلب، وهو الآن في الإصدار {m}، ولم يؤكده مزوّده منذ ذلك الحين. ستُرسيه كما هو.",
     confirm: "رسِّ",
+  },
+  awardHandover: {
+    heading: "تمت الترسية",
+    to: "تمت الترسية على {provider}",
+    value: "قيمة الترسية",
+    on: "تاريخ الترسية",
+    version: "إصدار المتطلب المجاب عليه",
+    view: "اعرض العرض الفائز",
+    yourOn: "في {date}",
   },
   ownerOffer: {
     open: "عرض العرض",

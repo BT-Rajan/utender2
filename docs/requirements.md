@@ -602,4 +602,21 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - The owner's page reloads the requirement and its offers after a refused ending, close or start of evaluation, as it already did after a refused award. Before, a page refused because a colleague had already decided kept showing the old state and actions. (A draft being edited is never reloaded under the owner.)
   - **Verdict:** Stage 6 ready.
 
+## Stage 7 — Post-award
+
+- **7.1 Award handover:**
+  - **Already working:** the award is one permanent record (`award_records`, one per requirement).
+    - **What it records:** the requirement, the winning offer and its provider, the amount, the offer's revision, who awarded it and when.
+    - **What it sets:** in the same transaction the winning offer becomes approved ("Awarded"), the other live offers rejected ("Not selected"), and the requirement awarded.
+    - **Unchanged history:** withdrawn offers stay withdrawn, and revisions, shortlist, notes, amendments and documents are untouched. The post-award view is the same record, not a copy.
+    - **Notification:** the winner's links to its own offer page.
+    - **Nothing reopens it:** new or changed offers, another award, endings, closing, amendments and the expiry sweep are all refused or skip it.
+    - **Access:** losing bidders learn only that it was awarded to a successful bidder; outsiders and other owners get nothing.
+  - **Fixed:**
+    - **Award time:** `GET /projects/{id}/award` now sends its time as UTC (`…Z`); it was a bare local time that pages would misread.
+    - **Version:** it also gives the requirement version the awarded offer answered (`material_revision`), to the owner side, admins and the winner only.
+    - **Owner page:** an awarded requirement shows an award summary (who, value, when, which version) with a link to the awarded offer.
+    - **Winner's page:** it now says when the offer was awarded.
+    - **Document upload:** an awarded (or otherwise ended) requirement's page no longer offers to add documents, which the server refuses once a requirement isn't open.
+
 _Stage 7 onwards is added as it is implemented._
