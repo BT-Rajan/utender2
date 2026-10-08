@@ -154,3 +154,4 @@ class NotificationType(str, enum.Enum):
     clarification_shared = "clarification_shared"
     offer_clarification_requested = "offer_clarification_requested"
     offer_clarification_answered = "offer_clarification_answered"
+    work_started = "work_started"  # Stage 7.5: to the other party of the agreement

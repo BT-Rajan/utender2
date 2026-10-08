@@ -33,6 +33,14 @@ interface Agreement {
   currency: string;
   owner_name: string | null;
   provider_name: string | null;
+  // Stage 7.5: execution
+  execution_status: "not_started" | "in_progress" | "terminated";
+  planned_start_date: string | null;
+  planned_start_source: "offer" | "requirement" | null;
+  work_started_at: string | null;
+  work_started_party: "owner" | "provider" | null;
+  work_started_by_name: string | null;
+  work_start_note: string | null;
   side: "owner" | "provider" | "admin";
   documents: AgreementDocument[];
 }
@@ -53,6 +61,7 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [details, setDetails] = useState<{ reference: string; effective_date: string } | null>(null);
   const [ending, setEnding] = useState<string | null>(null);
+  const [starting, setStarting] = useState<string | null>(null);
   const [kind, setKind] = useState<string>("signed_agreement");
   const [file, setFile] = useState<File | null>(null);
   const [fileKey, setFileKey] = useState(0);
@@ -76,6 +85,11 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
     onSuccess: (next) => { setEnding(null); done(next); },
     onError: failed,
   });
+  const startWork = useMutation({
+    mutationFn: (note: string) => apiFetch<Agreement>(`${base}/start-work`, { method: "POST", body: { note: note || null }, headers: ifMatch() }),
+    onSuccess: (next) => { setStarting(null); done(next); },
+    onError: failed,
+  });
   const upload = useMutation({
     mutationFn: () => {
       const form = new FormData();
@@ -96,7 +110,10 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
   const c = "agreement";
   const owner = a.side === "owner";
   const party = a.side !== "admin";
-  const busy = save.isPending || activate.isPending || terminate.isPending;
+  const busy = save.isPending || activate.isPending || terminate.isPending || startWork.isPending;
+  const e = "execution";
+  const day = (d: string) => fullDate(`${d}T12:00:00Z`, language, false);
+  const execTone = a.execution_status === "in_progress" ? "text-green" : a.execution_status === "terminated" ? "text-red" : "text-amber-dark";
   const tone = a.status === "active" ? "text-green" : a.status === "terminated" ? "text-red" : "text-amber-dark";
 
   return (
@@ -178,6 +195,55 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
           </div>
         </form>
       ))}
+
+      {/* Stage 7.5: whether the awarded work has started. */}
+      <div className="border-t border-border mt-4 pt-3" data-testid="execution">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
+          <div className="font-mono text-[11px] uppercase tracking-wide text-navy">{t(`${e}.heading`)}</div>
+          <span className={`font-mono text-[11px] font-semibold ${execTone}`} data-testid="execution-status">{t(`${e}.status.${a.execution_status}`)}</span>
+        </div>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-[13px]">
+          <dt className="text-steel">{t(`${e}.planned`)}</dt>
+          <dd>
+            {a.planned_start_date ? day(a.planned_start_date) : "—"}
+            {a.planned_start_source && <span className="text-xs text-steel"> · {t(`${e}.source.${a.planned_start_source}`)}</span>}
+          </dd>
+          <dt className="text-steel">{t(`${e}.actual`)}</dt>
+          <dd data-testid="execution-started">{a.work_started_at ? fullDate(a.work_started_at, language) : "—"}</dd>
+          {a.work_started_party && (
+            <>
+              <dt className="text-steel">{t(`${e}.recordedBy`)}</dt>
+              <dd>{t(`${e}.party.${a.work_started_party}`)}{a.work_started_by_name ? ` (${a.work_started_by_name})` : ""}</dd>
+            </>
+          )}
+          {a.work_start_note && (
+            <>
+              <dt className="text-steel">{t(`${e}.note`)}</dt>
+              <dd dir="auto" className="whitespace-pre-wrap break-words">{a.work_start_note}</dd>
+            </>
+          )}
+        </dl>
+        {party && a.execution_status === "not_started" && (starting === null ? (
+          <>
+            <p className="text-xs text-steel mt-2">{t(`${e}.next`)}</p>
+            <button type="button" disabled={busy} onClick={() => setStarting("")} className="mt-1 bg-navy text-white text-xs font-semibold rounded px-3 py-1.5 disabled:opacity-60" data-testid="execution-start">
+              {t(`${e}.start`)}
+            </button>
+          </>
+        ) : (
+          <form className="grid gap-1 mt-2 max-w-md" onSubmit={(ev) => { ev.preventDefault(); startWork.mutate(starting.trim()); }}>
+            <label className="grid gap-0.5 text-xs text-steel" htmlFor="execution-note">
+              {t(`${e}.noteLabel`)}
+              <textarea id="execution-note" value={starting} onChange={(ev) => setStarting(ev.target.value)} maxLength={2000} rows={2} dir="auto" className="border border-border rounded px-2 py-1 text-sm text-ink" />
+            </label>
+            <p className="text-xs text-steel">{t(`${e}.confirmHelp`)}</p>
+            <div className="flex gap-2">
+              <button type="submit" disabled={busy} className="bg-green text-white text-xs font-semibold rounded px-3 py-1.5 disabled:opacity-60">{t(`${e}.confirm`)}</button>
+              <button type="button" onClick={() => setStarting(null)} className="text-xs text-steel underline">{t(`${c}.cancel`)}</button>
+            </div>
+          </form>
+        ))}
+      </div>
 
       <div className="font-mono text-[11px] uppercase tracking-wide text-navy mt-4 mb-1">{t(`${c}.documents`)}</div>
       {a.documents.length === 0 ? (

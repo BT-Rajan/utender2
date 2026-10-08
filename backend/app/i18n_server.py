@@ -162,6 +162,7 @@ AR: dict[str, str] = {
     "This project has already been awarded, canceled, or has no award.": "تمت ترسية هذا المشروع أو إلغاؤه أو تقرر عدم الترسية بالفعل.",
     "This offer has been suspended by an admin and cannot be awarded.": "علّق المشرف هذا العرض ولا يمكن ترسيته.",
     # Stage 7.3: the agreement
+    "The start of the work has already been recorded.": "تم تسجيل بدء العمل بالفعل.",
     "Agreement not found.": "لم يتم العثور على الاتفاقية.",
     "Choose what kind of document this is.": "اختر نوع هذا المستند.",
     "Documents of an agreement in force or terminated stay on record.": "تبقى مستندات الاتفاقية السارية أو المنتهية محفوظة في السجل.",

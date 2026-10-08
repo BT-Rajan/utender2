@@ -246,6 +246,21 @@ export interface Dictionary {
     earlierVersion: string;
     confirm: string;
   };
+  execution: {
+    heading: string;
+    status: { not_started: string; in_progress: string; terminated: string };
+    planned: string;
+    source: { offer: string; requirement: string };
+    actual: string;
+    recordedBy: string;
+    party: { owner: string; provider: string };
+    note: string;
+    next: string;
+    start: string;
+    noteLabel: string;
+    confirmHelp: string;
+    confirm: string;
+  };
   agreement: {
     heading: string;
     status: { preparing: string; preparingHelp: string; active: string; activeHelp: string; terminated: string; terminatedHelp: string };
@@ -1577,6 +1592,21 @@ export const en: Dictionary = {
     confirmBody: "This is your final decision on this requirement: {provider}'s offer of {amount} is accepted as submitted, every other live offer is marked not selected, and every provider is told. It can't be undone. It isn't a contract or a payment.",
     earlierVersion: "Note: this offer was made against version {n} of the requirement, which is now at version {m}, and its provider didn't confirm it since. You'd be awarding it as it stands.",
     confirm: "Award",
+  },
+  execution: {
+    heading: "Execution",
+    status: { not_started: "Not started", in_progress: "In progress", terminated: "Terminated" },
+    planned: "Planned start",
+    source: { offer: "as committed in the awarded offer", requirement: "as expected in the requirement" },
+    actual: "Started",
+    recordedBy: "Recorded by",
+    party: { owner: "the owner", provider: "the service provider" },
+    note: "Note",
+    next: "When the work begins, either party records it here. The other party is told.",
+    start: "Record that work has started",
+    noteLabel: "Note (optional)",
+    confirmHelp: "The start is recorded at the current time and can't be changed afterwards.",
+    confirm: "Work has started",
   },
   agreement: {
     heading: "Agreement",
@@ -2949,6 +2979,21 @@ export const ar: Dictionary = {
     confirmBody: "هذا قرارك النهائي في هذا المتطلب: يُقبل عرض {provider} بقيمة {amount} كما قُدّم، ويُعلَّم كل عرض قائم آخر بأنه لم يُختر، ويُبلَّغ كل المزوّدين. لا يمكن التراجع عنه. وهو ليس عقدًا ولا دفعًا.",
     earlierVersion: "ملاحظة: قُدّم هذا العرض على الإصدار {n} من المتطلب، وهو الآن في الإصدار {m}، ولم يؤكده مزوّده منذ ذلك الحين. ستُرسيه كما هو.",
     confirm: "رسِّ",
+  },
+  execution: {
+    heading: "التنفيذ",
+    status: { not_started: "لم يبدأ", in_progress: "قيد التنفيذ", terminated: "منتهٍ" },
+    planned: "البدء المخطط",
+    source: { offer: "كما التزم به العرض الفائز", requirement: "كما هو متوقع في المتطلب" },
+    actual: "تاريخ البدء",
+    recordedBy: "سجّله",
+    party: { owner: "المالك", provider: "مقدم الخدمة" },
+    note: "ملاحظة",
+    next: "عند بدء العمل، يسجله أي من الطرفين هنا، ويتم إبلاغ الطرف الآخر.",
+    start: "تسجيل بدء العمل",
+    noteLabel: "ملاحظة (اختياري)",
+    confirmHelp: "يُسجَّل البدء بالوقت الحالي ولا يمكن تغييره بعد ذلك.",
+    confirm: "بدأ العمل",
   },
   agreement: {
     heading: "الاتفاقية",

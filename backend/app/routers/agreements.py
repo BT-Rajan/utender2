@@ -19,14 +19,16 @@ from app.deps import get_current_user
 from app.models.agreement import AGREEMENT_DOCUMENT_KINDS, Agreement, AgreementDocument
 from app.models.award_record import AwardRecord
 from app.models.common import gen_uuid
-from app.models.enums import ProjectStatus, UserRole
+from app.models.enums import NotificationType, ProjectStatus, UserRole
 from app.models.offer import Offer
 from app.models.organization import Organization
 from app.models.project import Project
 from app.models.service_provider import ServiceProviderProfile
 from app.models.user import User
-from app.schemas.agreement import AgreementDocumentOut, AgreementOut, AgreementTerminate, AgreementUpdate
+from app.routers.owner import _best_effort
+from app.schemas.agreement import AgreementDocumentOut, AgreementOut, AgreementTerminate, AgreementUpdate, WorkStart
 from app.services.audit import log_action
+from app.services.notify import notify_team
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name, sanitize_path_segment
 from app.services.offer_response import OPEN_LINK_SECONDS, _api
 from app.services.storage import get_storage
@@ -109,6 +111,11 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
     # Stage 7.4: who attached each paper -- the member's name for the caller's
     # own side; the other party sees which side it came from.
     names = {}
+    planned, source = None, None
+    if winner and winner.proposed_start_date:
+        planned, source = winner.proposed_start_date, "offer"
+    elif project.expected_start_date:
+        planned, source = project.expected_start_date, "requirement"
     docs = db.query(AgreementDocument).filter(AgreementDocument.agreement_id == agreement.id).order_by(AgreementDocument.uploaded_at.asc(), AgreementDocument.id.asc())
     return AgreementOut(
         id=agreement.id,
@@ -132,6 +139,13 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
         currency=get_settings().marketplace_currency,
         owner_name=_owner_name(db, project),
         provider_name=provider_name,
+        execution_status=_execution_status(agreement),
+        planned_start_date=planned,
+        planned_start_source=source,
+        work_started_at=agreement.work_started_at,
+        work_started_party=agreement.work_started_party,
+        work_started_by_name=_name(db, agreement.work_started_by, names) if side in (agreement.work_started_party, "admin") else None,
+        work_start_note=agreement.work_start_note,
         side=side,
         documents=[
             AgreementDocumentOut(
@@ -144,13 +158,24 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
     )
 
 
-def _uploader(db: Session, doc: AgreementDocument, side: str, cache: dict) -> str | None:
-    if not doc.uploaded_by or side not in (doc.party, "admin"):
+def _name(db: Session, user_id: str | None, cache: dict) -> str | None:
+    if not user_id:
         return None
-    if doc.uploaded_by not in cache:
-        u = db.get(User, doc.uploaded_by)
-        cache[doc.uploaded_by] = (u.full_name or u.email) if u else None
-    return cache[doc.uploaded_by]
+    if user_id not in cache:
+        u = db.get(User, user_id)
+        cache[user_id] = (u.full_name or u.email) if u else None
+    return cache[user_id]
+
+
+def _uploader(db: Session, doc: AgreementDocument, side: str, cache: dict) -> str | None:
+    return _name(db, doc.uploaded_by, cache) if side in (doc.party, "admin") else None
+
+
+def _execution_status(agreement: Agreement) -> str:
+    """Stage 7.5: derived, never stored -- so it can't disagree with the agreement."""
+    if agreement.status == "terminated":
+        return "terminated"
+    return "in_progress" if agreement.work_started_at else "not_started"
 
 
 @router.get("", response_model=AgreementOut)
@@ -220,6 +245,42 @@ def terminate_agreement(
     _touch(agreement, user)
     log_action(db, actor_id=user.id, action="agreement.terminate", target_type="agreement", target_id=agreement.id,
                previous_value=previous, new_value="terminated", reason=reason)
+    return _out(db, project, agreement, award, winner, side)
+
+
+@router.post("/start-work", response_model=AgreementOut)
+def start_work(
+    project_id: str, payload: WorkStart, if_match: str | None = Header(None, alias="If-Match"),
+    user: User = Depends(get_current_user), db: Session = Depends(get_db),
+):
+    """Stage 7.5: either party records that the awarded work has started --
+    once, at the server's time. The other party is told."""
+    project, agreement, award, winner, side = _load(db, project_id, user, lock=True)
+    if agreement.status == "terminated":
+        raise HTTPException(status_code=400, detail="This agreement has been terminated.")
+    if agreement.work_started_at is not None:
+        raise HTTPException(status_code=400, detail="The start of the work has already been recorded.")
+    _check_version(agreement, if_match)
+    agreement.work_started_at = datetime.utcnow().replace(microsecond=0)
+    agreement.work_started_party, agreement.work_started_by = side, user.id
+    agreement.work_start_note = (payload.note or "").strip() or None
+    _touch(agreement, user)
+    # log_action commits: the start and its audit entry land together.
+    log_action(db, actor_id=user.id, action="agreement.start_work", target_type="agreement", target_id=agreement.id,
+               previous_value="not_started", new_value="in_progress", reason=agreement.work_start_note)
+
+    def tell():
+        if side == "owner":
+            first = db.get(User, winner.service_provider_id)
+            notify_team(db, first, NotificationType.work_started, link=f"/service-provider/projects/{project_id}/offer",
+                        organization_id=winner.organization_id, project_title=project.title)
+        else:
+            first = db.get(User, project.owner_id)
+            notify_team(db, first, NotificationType.work_started, link=f"/owner/projects/{project_id}",
+                        organization_id=project.organization_id, project_title=project.title)
+
+    _best_effort(db, tell, f"work-started notifications for {project_id}")
+    db.refresh(agreement)
     return _out(db, project, agreement, award, winner, side)
 
 

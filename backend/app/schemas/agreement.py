@@ -43,6 +43,16 @@ class AgreementOut(BaseModel):
     currency: str
     owner_name: str | None
     provider_name: str | None
+    # Stage 7.5: execution. The planned start is the winning offer's own
+    # commitment, else the requirement's expected start; the actual start is
+    # server time, recorded once.
+    execution_status: Literal["not_started", "in_progress", "terminated"]
+    planned_start_date: date | None
+    planned_start_source: Literal["offer", "requirement"] | None
+    work_started_at: UTCDateTime | None
+    work_started_party: str | None
+    work_started_by_name: str | None  # the recording side's own members (and admins) only
+    work_start_note: str | None
     side: Literal["owner", "provider", "admin"]
     documents: list[AgreementDocumentOut]
 
@@ -54,3 +64,7 @@ class AgreementUpdate(BaseModel):
 
 class AgreementTerminate(BaseModel):
     reason: str = Field(min_length=1, max_length=2000)
+
+
+class WorkStart(BaseModel):
+    note: str | None = Field(default=None, max_length=2000)

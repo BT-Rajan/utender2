@@ -54,6 +54,10 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.en: ("Clarification answered on {project_title}", "A provider answered your clarification request on {project_title}."),
         Language.ar: ("تمت الإجابة على طلب التوضيح في {project_title}", "أجاب أحد مزوّدي الخدمات على طلب التوضيح في {project_title}."),
     },
+    NotificationType.work_started: {
+        Language.en: ("Work started on {project_title}", "The work awarded on {project_title} has started."),
+        Language.ar: ("بدأ العمل في {project_title}", "بدأ تنفيذ العمل المُرسى في {project_title}."),
+    },
     NotificationType.new_requirement: {
         Language.en: ("New opportunity: {project_title}", "A new {trade} requirement in {area} is open for offers until {deadline}. You meet its conditions."),
         Language.ar: ("فرصة جديدة: {project_title}", "طلب جديد لأعمال {trade} في {area} مفتوح للعروض حتى {deadline}. أنت تستوفي شروطه."),

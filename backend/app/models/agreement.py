@@ -31,6 +31,15 @@ class Agreement(Base):
     activated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     terminated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     termination_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Stage 7.5: execution start -- when the work actually began (server
+    # time, recorded once), by which side and member, with an optional note.
+    # The execution status is derived: not started / in progress / terminated.
+    # The planned start is the winning offer's commitment (or the
+    # requirement's expected start) and is read from there, never copied.
+    work_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    work_started_party: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    work_started_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    work_start_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Stage 3.11's rule: a change sent from a page showing an older version
     # (another tab, another member) is refused, not silently applied.
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")

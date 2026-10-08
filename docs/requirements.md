@@ -679,4 +679,29 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **Certificate type:** added "Certificate" as a document type.
     - **Who uploaded it:** each document now shows the uploading member's name to that member's own side (and admins). The other party still sees only which side it came from.
 
+- **7.5 Execution start:**
+  - **Audit:**
+    - **Already working:** the planned start existed already: the winning offer's committed start date (Stage 5), or the requirement's expected start. Award, agreement, organisation access, lock, audit and notification were all reusable.
+    - **Missing:** any record that the work had started, and any execution status.
+    - **Not applicable:** a provider acknowledgement step. None exists, and the agreement (7.3) is where the parties' agreement is recorded.
+  - **Added, on the award's agreement (migration 0049):** no new entity.
+    - **Start record:** `work_started_at` (server time), `work_started_party`, `work_started_by` and an optional note.
+    - **Derived status:** not started, in progress, or terminated, read from the agreement and never stored, so it can't disagree with it.
+    - **Planned start:** read from the winning offer, else the requirement, never copied.
+  - **Recording the start (`POST /projects/{id}/agreement/start-work`):**
+    - **Who:** either party may record it, as any member of the owner's side or of the winning provider's side.
+    - **When:** once, at the server's time, under the requirement's lock, with If-Match against stale pages.
+    - **Refused:** a repeat or the other party's later attempt (400), a terminated agreement, and anything without an award (404: open, cancelled, never awarded). Admins can only read it.
+    - **Termination:** the agreement can still be terminated after the start. The start stays on record and the status becomes terminated.
+    - **The award is untouched:** the requirement stays awarded and the award record and winning offer are unchanged.
+  - **Notification:** `work_started` goes to the other party's side, linking to its own page. It is sent best-effort after the commit; a failure never undoes the start. Losing bidders get nothing.
+  - **Audit:** `agreement.start_work`, recording not_started → in_progress, the actor, the time and the note.
+  - **UI:** an Execution section in the agreement panel, for both parties:
+    - the status;
+    - the planned start, and where it comes from;
+    - the actual start;
+    - who recorded it (the member's name for their own side);
+    - the note;
+    - the "Record that work has started" action.
+
 _Stage 7 onwards is added as it is implemented._
