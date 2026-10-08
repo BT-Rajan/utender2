@@ -17,8 +17,8 @@ from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.saved_opportunity import SavedOpportunity
 from app.models.user import User
 from app.schemas.service_provider import ServiceProviderProfileOut, MyBidOut, SubmitForReview
-from app.schemas.review import ReviewCreate, ReviewOut
-from app.services.reviews import PROVIDER_TO_OWNER, record_review, review_of
+from app.schemas.review import ReceivedReviewOut, ReviewCreate, ReviewOut
+from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_review, review_of
 from app.schemas.document import ServiceProviderDocumentOut, DocumentRequirementOut
 from app.schemas.common import UTCDateTime
 from app.schemas.project import FeedPage, ProjectOut
@@ -599,6 +599,15 @@ def my_review_of_the_owner(project_id: str, user: User = Depends(require_approve
     """The provider side's own review of the owner, if it has written one."""
     _winning_side(db, user, project_id)
     return review_of(db, project_id, PROVIDER_TO_OWNER)
+
+
+@router.get("/projects/{project_id}/review/received", response_model=ReceivedReviewOut | None)
+def review_received_from_the_owner(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """Stage 8.6: the owner side's review of this winning provider side, once
+    recorded -- to the winner's side only, as rating, comment and date. Other
+    providers see only the aggregate rating owners already see on offers."""
+    _winning_side(db, user, project_id)
+    return review_of(db, project_id, OWNER_TO_PROVIDER)
 
 
 @router.post("/reviews", response_model=ReviewOut)

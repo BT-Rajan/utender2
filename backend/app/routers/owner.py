@@ -27,9 +27,9 @@ from app.schemas.document import DocumentRequirementOut, OwnerDocumentOut
 from app.schemas.offer import ShortlistOut, EvaluationNoteEdit, EvaluationNoteIn, EvaluationNoteOut, OfferComparisonOut, OfferOut, OfferRevisionOut, OwnerOfferOut
 from app.schemas.owner import OwnerProfileOut
 from app.schemas.project import EligibilityQualification, ProjectOut
-from app.schemas.review import ReviewCreate, ReviewOut
+from app.schemas.review import ReceivedReviewOut, ReviewCreate, ReviewOut
 from app.services.audit import log_action
-from app.services.reviews import OWNER_TO_PROVIDER, record_review, review_of
+from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_review, review_of
 from app.services.email import notify_provider_requirement_ended, notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify, notify_team
@@ -960,12 +960,22 @@ def discard_draft(project_id: str, user: User = Depends(require_owner), db: Sess
 
 @router.get("/projects/{project_id}/review", response_model=ReviewOut | None)
 def get_review(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
-    """The owner side's own review of the provider (Stage 8.4: never the
-    provider's review of the owner -- who sees reviews is a later step)."""
+    """The owner side's own review of the provider."""
     project = db.get(Project, project_id)
     if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     return review_of(db, project_id, OWNER_TO_PROVIDER)
+
+
+@router.get("/projects/{project_id}/review/received", response_model=ReceivedReviewOut | None)
+def get_received_review(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 8.6: the winning provider's review of this owner side, once
+    recorded -- to the requirement's owner side only, as rating, comment and
+    date (never ids or the reviewer's account)."""
+    project = db.get(Project, project_id)
+    if not project or not owns(db, user, project):
+        raise HTTPException(status_code=404, detail="Project not found.")
+    return review_of(db, project_id, PROVIDER_TO_OWNER)
 
 
 @router.post("/reviews", response_model=ReviewOut)

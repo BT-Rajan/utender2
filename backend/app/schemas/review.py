@@ -28,3 +28,14 @@ class ReviewOut(BaseModel):
     comment: str | None
     direction: str  # Stage 8.4: owner_to_provider / provider_to_owner
     created_at: UTCDateTime
+
+
+class ReceivedReviewOut(BaseModel):
+    """Stage 8.6: the review a party received, as that party sees it -- the
+    rating, comment and date only. No ids, no reviewer account, nothing of the
+    transaction: the reviewed party already knows its counterparty."""
+    model_config = ConfigDict(from_attributes=True)
+
+    rating: int
+    comment: str | None
+    created_at: UTCDateTime

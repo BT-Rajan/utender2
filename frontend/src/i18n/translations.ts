@@ -259,6 +259,8 @@ export interface Dictionary {
   review: {
     confirmTitle: string;
     confirmBody: string;
+    receivedHeading: string;
+    receivedOn: string;
   };
   history: {
     heading: string;
@@ -1727,6 +1729,8 @@ export const en: Dictionary = {
   review: {
     confirmTitle: "Submit this review?",
     confirmBody: "Your rating and comment are recorded against this completed transaction and count towards the service provider's public rating. A review can't be changed afterwards.",
+    receivedHeading: "{party}'s review of you",
+    receivedOn: "Received on",
   },
   history: {
     heading: "History",
@@ -3252,6 +3256,8 @@ export const ar: Dictionary = {
   review: {
     confirmTitle: "إرسال هذا التقييم؟",
     confirmBody: "يُسجَّل تقييمك وتعليقك على هذه المعاملة المكتملة ويُحتسب ضمن التقييم العام لمقدم الخدمة. لا يمكن تغيير التقييم بعد ذلك.",
+    receivedHeading: "تقييم {party} لك",
+    receivedOn: "استُلم في",
   },
   history: {
     heading: "السجل",

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiFetch } from "@/api/client";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { ReceivedReview } from "@/components/ReceivedReview";
 import { RatingInput } from "@/components/RatingInput";
 import { useI18n } from "@/i18n/I18nContext";
 import { fullDate } from "@/lib/format";
@@ -15,8 +16,8 @@ interface ReviewRecord {
 }
 
 // Stage 8.4: the winning provider reviews the owner -- once the transaction is
-// completed, once per transaction. Its own review is shown once recorded; the
-// owner's review of it isn't shown here (who sees reviews is a later step).
+// completed, once per transaction. Its own review is shown once recorded, and
+// the owner's review of it once the owner has written one (Stage 8.6).
 export function OwnerReview({ projectId }: { projectId: string }) {
   const { t, language } = useI18n();
   const confirm = useConfirm();
@@ -80,6 +81,7 @@ export function OwnerReview({ projectId }: { projectId: string }) {
           </button>
         </form>
       )}
+      <ReceivedReview url={`/service-provider/projects/${projectId}/review/received`} from={name} />
     </section>
   );
 }

@@ -78,7 +78,8 @@ def record_review(db: Session, project: Project, direction: str, reviewer: User,
 def _tell(db: Session, project: Project, award: AwardRecord, direction: str) -> None:
     """The reviewed party is told a review was recorded -- best-effort, after
     the commit; a failure never undoes the review. Its content isn't in the
-    notification (who sees reviews is a later step)."""
+    notification; the reviewed side reads it from its
+    transaction page (Stage 8.6)."""
     try:
         if direction == OWNER_TO_PROVIDER:
             winner = db.get(Offer, award.offer_id)

@@ -1046,4 +1046,20 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **Standing:** a removed member and a suspended requirement are refused.
     - **Database:** refuses an invalid direction, the same party on both sides, an out-of-range rating, and a second review in one direction, even when written directly.
 
+- **8.6 Review visibility:**
+  - **Visibility model (authenticated only; nothing public):**
+    - **Reviewer's side:** sees the review it wrote (`GET …/review`).
+    - **Reviewed side:** sees the review it received (`GET …/review/received`). The whole organisation sees it, by current membership.
+    - **Owners evaluating a provider:** see only the aggregate already on offers (`service_provider_avg_rating` and `service_provider_review_count`). They never see review text or the earlier transaction. The provider's detailed profile is 8.7.
+    - **Owner reputation for future providers:** none yet; that is 8.8.
+    - **Admin:** keeps aggregates and audit entries; there is no review-content endpoint.
+    - **Everyone else:** losing providers, unrelated users, former members and visitors with no session get 404, 403 or 401.
+    - **Timing:** a review is visible as soon as it is committed, never before. A refused or duplicate submission shows nothing new.
+  - **Gap found:** the reviewed party couldn't read the review it received in either direction, although 8.3/8.4 notified it of the review.
+  - **Fixed:**
+    - **Endpoints:** `GET /owner/projects/{id}/review/received` and `GET /service-provider/projects/{id}/review/received`, behind each side's existing transaction gate (`owns()` / `_winning_side`).
+    - **Response:** returns `ReceivedReviewOut` with only `rating`, `comment` and `created_at`. It has no ids and no reviewer account; the counterparty organisation is already named on the page.
+    - **UI:** a `ReceivedReview` block on the owner's requirement page and on the winner's offer page.
+  - **Tests:** `tests/test_stage8_6_review_visibility.py`.
+
 _Stage 9 onwards is added as it is implemented._
