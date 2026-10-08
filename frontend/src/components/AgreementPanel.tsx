@@ -37,6 +37,32 @@ export interface ExecutionUpdate {
   milestone_title: string | null;
 }
 
+export interface TimelineEntry {
+  at: string;
+  kind: string;
+  party: "owner" | "provider" | null;
+  actor_name: string | null;
+  note: string | null;
+  milestone_title: string | null;
+  variation_number: number | null;
+  amount: string | null;
+  resulting_amount: string | null;
+  document_kind: string | null;
+  document_name: string | null;
+  execution_update_id: string | null;
+}
+
+// Stage 7.13: what each history entry says.
+function historyLabel(t: (k: string) => string, h: TimelineEntry): string {
+  if (["delivered", "accepted", "returned"].includes(h.kind)) {
+    return h.milestone_title ? t(`execution.kind.${h.kind}`) : t(`completion.history.${h.kind}`);
+  }
+  if (["started", "progress", "on_hold", "resumed"].includes(h.kind)) return t(`execution.kind.${h.kind}`);
+  if (h.kind.startsWith("change_")) return t(`history.${h.kind}`).replace("{n}", String(h.variation_number ?? ""));
+  if (h.kind === "document") return h.document_kind ? `${t("history.document")}: ${t(`agreement.kind.${h.document_kind}`)}` : t("history.document");
+  return t(`history.${h.kind}`);
+}
+
 export interface Milestone {
   id: string;
   position: number;
@@ -105,6 +131,7 @@ export interface Agreement {
   on_hold_since: string | null;
   execution_history: ExecutionUpdate[];
   milestones: Milestone[];
+  timeline: TimelineEntry[]; // Stage 7.13
   original_amount: string;
   current_amount: string;
   agreed_changes_total: string; // Stage 7.12: net of the agreed changes
@@ -356,26 +383,29 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
             </>
           )}
         </dl>
-        {/* Stage 7.6: what the parties recorded since the work started. */}
-        {a.execution_history.length > 0 && (
-          <ol className="grid gap-1 mt-2 border-s-2 border-border ps-3" data-testid="execution-history">
-            {a.execution_history.map((h) => (
-              <li key={h.sequence} className="text-[13px]">
-                <span className="font-mono text-[10px] text-steel">
-                  {fullDate(h.created_at, language)} · {t(`${e}.party.${h.party}`)}{h.recorded_by_name ? ` (${h.recorded_by_name})` : ""}
-                </span>
-                <div>
-                  <span className="font-semibold">
-                    {!h.milestone_id && ["delivered", "accepted", "returned"].includes(h.kind) ? t(`completion.history.${h.kind}`) : t(`${e}.kind.${h.kind}`)}
-                  </span>
-                  {h.milestone_title && <span dir="auto"> · {h.milestone_title}</span>}
-                  {h.note && <span dir="auto" className="whitespace-pre-wrap break-words"> — {h.note}</span>}
-                </div>
-                <EvidenceList docs={a.documents.filter((d) => d.execution_update_id === h.id)} />
-              </li>
-            ))}
-          </ol>
-        )}
+        {/* Stage 7.13: the transaction's history, in the order it happened. */}
+        <div className="font-mono text-[11px] uppercase tracking-wide text-navy mt-3">{t("history.heading")}</div>
+        <ol className="grid gap-1 mt-1 border-s-2 border-border ps-3" data-testid="execution-history">
+          {a.timeline.map((h, n) => (
+            <li key={`${h.kind}-${n}`} className="text-[13px]" data-testid="history-entry">
+              <span className="font-mono text-[10px] text-steel">
+                {fullDate(h.at, language)}
+                {h.party && <> · {t(`${e}.party.${h.party}`)}{h.actor_name ? ` (${h.actor_name})` : ""}</>}
+              </span>
+              <div>
+                <span className="font-semibold">{historyLabel(t, h)}</span>
+                {h.milestone_title && <span dir="auto"> · {h.milestone_title}</span>}
+                {h.document_name && <span dir="auto"> · {h.document_name}</span>}
+                {h.amount && h.kind === "awarded" && <span className="font-mono"> · {money(h.amount, a.currency)}</span>}
+                {h.amount && h.kind.startsWith("change_") && (
+                  <span className="font-mono"> · {Number(h.amount) > 0 ? "+" : ""}{money(h.amount, a.currency)}{h.resulting_amount ? ` → ${money(h.resulting_amount, a.currency)}` : ""}</span>
+                )}
+                {h.note && <span dir="auto" className="whitespace-pre-wrap break-words"> — {h.note}</span>}
+              </div>
+              {h.execution_update_id && <EvidenceList docs={a.documents.filter((d) => d.execution_update_id === h.execution_update_id)} />}
+            </li>
+          ))}
+        </ol>
         {live && (update ? (
           <form className="grid gap-1 mt-2 max-w-md" onSubmit={(ev) => { ev.preventDefault(); progress.mutate({ ...update, note: update.note.trim() }); }}>
             <label className="grid gap-0.5 text-xs text-steel" htmlFor="execution-progress-note">

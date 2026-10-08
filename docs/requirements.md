@@ -876,4 +876,29 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **Subscription billing** never appears in a transaction response.
     - **No request can set a value.** Values are always derived, and extra fields are ignored.
 
+- **7.13 Transaction history:**
+  - **Audit:**
+    - **Already working:**
+      - requirement versions and amendments (Stage 3) and offer revisions (Stage 5), each readable by its own side;
+      - the award record (winning offer, its revision, the requirement version answered, value, time, who awarded);
+      - the agreement's write-once times;
+      - the add-only execution history (start, progress, hold, resume, deliverable and whole-work delivered / accepted / returned);
+      - variations with their before and after values;
+      - document metadata;
+      - the admin audit log.
+    - **Partly there:** the parties' history covered execution only. The award, the agreement coming into force, its papers, changes, termination and completion lived in separate records with no shared order, and second-resolution timestamps from separate tables can't order same-second events.
+  - **Fixed (migration 0056):**
+    - **One ordered log.** The other business events (`in_force`, `document` for the agreement's own papers, `change_proposed` / `agreed` / `rejected` / `withdrawn` / `lapsed`, `terminated`, `completed`) are now written to the same execution-history log, in the same request as the event itself.
+    - **Numbering:** the log is already numbered under the requirement's lock, so its order is the order the server applied events.
+    - **Links:** `execution_updates.variation_id` and `document_id`.
+    - **Backfill:** existing agreements get these events from the times already recorded, and each agreement's log is renumbered in time order.
+    - **`timeline`** on the agreement response: the award first, with its original value, then the log. Each entry gives its server time, the party, the member's name (own side and admins only), the note, the deliverable, the change number with its value change and resulting value, or the document.
+    - **What stays unchanged:** `execution_history` still lists execution entries only. Evidence stays on its entry or deliverable and doesn't become a timeline event.
+  - **Integrity:**
+    - Every entry is written once and never edited.
+    - A retried or concurrent request that is refused (completed, already decided, stale) writes nothing, so the history has no duplicates.
+    - Current values never rewrite it: the award entry keeps the original value.
+    - The timeline is part of the agreement response, so only the parties and admins read it.
+  - **UI:** the Execution section's list is now the full History. Each line shows the date, party and event (amounts for the award and changes, the document name), and progress entries keep their evidence.
+
 _Stage 7 onwards is added as it is implemented._

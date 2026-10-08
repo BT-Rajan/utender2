@@ -68,9 +68,11 @@ def test_progress_hold_and_resume_seen_alike_by_both(db):
     for client in (owner, _relogin("owner@example.com"), _admin(db)):
         seen = client.get(f"/projects/{pid}/agreement").json()
         assert seen["execution_status"] == "on_hold"
-        assert [(h["sequence"], h["kind"], h["party"], h["note"]) for h in seen["execution_history"]] == [
-            (1, "started", "provider", "On site."), (2, "progress", "provider", "Foundations poured."), (3, "on_hold", "provider", "Waiting for permit."),
+        assert [(h["kind"], h["party"], h["note"]) for h in seen["execution_history"]] == [
+            ("started", "provider", "On site."), ("progress", "provider", "Foundations poured."), ("on_hold", "provider", "Waiting for permit."),
         ]
+        sequences = [h["sequence"] for h in seen["execution_history"]]
+        assert sequences == sorted(sequences)  # numbered in the order they happened
     # On hold: everything else stands -- documents open, notes can still be added.
     assert owner.get(f"/projects/{pid}/agreement/documents/{doc}/file", follow_redirects=False).status_code == 303
     assert _progress(owner, pid, "update", "Permit applied for.").json()["execution_status"] == "on_hold"

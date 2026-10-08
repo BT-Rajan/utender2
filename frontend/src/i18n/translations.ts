@@ -246,6 +246,19 @@ export interface Dictionary {
     earlierVersion: string;
     confirm: string;
   };
+  history: {
+    heading: string;
+    awarded: string;
+    in_force: string;
+    document: string;
+    change_proposed: string;
+    change_agreed: string;
+    change_rejected: string;
+    change_withdrawn: string;
+    change_lapsed: string;
+    terminated: string;
+    completed: string;
+  };
   finance: {
     finalValue: string;
     changes: string;
@@ -1686,6 +1699,19 @@ export const en: Dictionary = {
     confirmBody: "This is your final decision on this requirement: {provider}'s offer of {amount} is accepted as submitted, every other live offer is marked not selected, and every provider is told. It can't be undone. It isn't a contract or a payment.",
     earlierVersion: "Note: this offer was made against version {n} of the requirement, which is now at version {m}, and its provider didn't confirm it since. You'd be awarding it as it stands.",
     confirm: "Award",
+  },
+  history: {
+    heading: "History",
+    awarded: "Awarded",
+    in_force: "Agreement in force",
+    document: "Document added",
+    change_proposed: "Change {n} proposed",
+    change_agreed: "Change {n} agreed",
+    change_rejected: "Change {n} rejected",
+    change_withdrawn: "Change {n} withdrawn",
+    change_lapsed: "Change {n} closed (agreement ended)",
+    terminated: "Agreement terminated",
+    completed: "Transaction completed",
   },
   finance: {
     finalValue: "Final agreed value",
@@ -3184,6 +3210,19 @@ export const ar: Dictionary = {
     confirmBody: "هذا قرارك النهائي في هذا المتطلب: يُقبل عرض {provider} بقيمة {amount} كما قُدّم، ويُعلَّم كل عرض قائم آخر بأنه لم يُختر، ويُبلَّغ كل المزوّدين. لا يمكن التراجع عنه. وهو ليس عقدًا ولا دفعًا.",
     earlierVersion: "ملاحظة: قُدّم هذا العرض على الإصدار {n} من المتطلب، وهو الآن في الإصدار {m}، ولم يؤكده مزوّده منذ ذلك الحين. ستُرسيه كما هو.",
     confirm: "رسِّ",
+  },
+  history: {
+    heading: "السجل",
+    awarded: "تمت الترسية",
+    in_force: "سريان الاتفاقية",
+    document: "أُضيف مستند",
+    change_proposed: "اقتُرح التغيير {n}",
+    change_agreed: "تمت الموافقة على التغيير {n}",
+    change_rejected: "رُفض التغيير {n}",
+    change_withdrawn: "سُحب التغيير {n}",
+    change_lapsed: "أُغلق التغيير {n} (انتهت الاتفاقية)",
+    terminated: "تم إنهاء الاتفاقية",
+    completed: "اكتملت المعاملة",
   },
   finance: {
     finalValue: "القيمة النهائية المتفق عليها",

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.deps import get_current_user
-from app.models.agreement import AGREEMENT_DOCUMENT_KINDS, EVIDENCE_KINDS, Agreement, AgreementDocument, ExecutionUpdate, Milestone, Variation
+from app.models.agreement import AGREEMENT_DOCUMENT_KINDS, EVIDENCE_KINDS, TRANSACTION_EVENT_KINDS, Agreement, AgreementDocument, ExecutionUpdate, Milestone, Variation
 from app.models.award_record import AwardRecord
 from app.models.common import gen_uuid
 from app.models.enums import NotificationType, ProjectStatus, UserRole
@@ -26,7 +26,7 @@ from app.models.project import Project, ProjectItem
 from app.models.service_provider import ServiceProviderProfile
 from app.models.user import User
 from app.routers.owner import _best_effort
-from app.schemas.agreement import AgreementDocumentOut, AgreementOut, AgreementTerminate, AgreementUpdate, ExecutionProgress, ExecutionUpdateOut, MilestoneOut, VariationOut, WorkStart
+from app.schemas.agreement import AgreementDocumentOut, AgreementOut, AgreementTerminate, AgreementUpdate, ExecutionProgress, ExecutionUpdateOut, MilestoneOut, TimelineEntry, VariationOut, WorkStart
 from app.services.audit import log_action
 from app.services.notify import notify_team
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name, sanitize_path_segment
@@ -129,7 +129,8 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
     original_completion, completion_source = planned_completion(project, winner)
     current_amount, current_completion = current_terms(award, original_completion, variations)
     items = {i.id: i for i in db.query(ProjectItem).filter(ProjectItem.project_id == project.id)} if any(m.project_item_id for m in milestones) else {}
-    docs = db.query(AgreementDocument).filter(AgreementDocument.agreement_id == agreement.id).order_by(AgreementDocument.uploaded_at.asc(), AgreementDocument.id.asc())
+    docs = db.query(AgreementDocument).filter(AgreementDocument.agreement_id == agreement.id).order_by(AgreementDocument.uploaded_at.asc(), AgreementDocument.id.asc()).all()
+    updates = db.query(ExecutionUpdate).filter(ExecutionUpdate.agreement_id == agreement.id).order_by(ExecutionUpdate.sequence.asc()).all()
     return AgreementOut(
         id=agreement.id,
         status=agreement.status,
@@ -167,12 +168,13 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
                 recorded_by_name=_name(db, u.recorded_by, names) if side in (u.party, "admin") else None,
                 milestone_id=u.milestone_id, milestone_title=titles.get(u.milestone_id),
             )
-            for u in db.query(ExecutionUpdate).filter(ExecutionUpdate.agreement_id == agreement.id).order_by(ExecutionUpdate.sequence.asc())
+            for u in updates if u.kind not in TRANSACTION_EVENT_KINDS
         ],
         milestones=[_milestone_out(m, items, numbers) for m in milestones],
         original_amount=award.amount,
         current_amount=current_amount,
         agreed_changes_total=current_amount - award.amount,
+        timeline=_timeline(db, agreement, award, updates, variations, docs, titles, side, names),
         original_completion_date=original_completion,
         original_completion_source=completion_source,
         current_completion_date=current_completion,
@@ -194,6 +196,37 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
             for d in docs
         ],
     )
+
+
+def _timeline(db: Session, agreement: Agreement, award: AwardRecord, updates, variations, docs, titles: dict, side: str, names: dict) -> list[TimelineEntry]:
+    """Stage 7.13: the transaction's business history. The award opens it;
+    then the numbered log every post-award event is written to under the
+    requirement's lock (7.6) -- coming into force, the agreement's papers, the
+    execution, deliverables, changes, termination, completion -- in exactly
+    the order the server applied them. Each entry is written once and never changed: a retried request
+    adds none, and no later state rewrites one. Evidence stays on its entry
+    and deliverable rather than becoming an event of its own."""
+    def who(party, user_id):
+        return _name(db, user_id, names) if user_id and side in (party, "admin") else None
+
+    by_id = {v.id: v for v in variations}
+    by_doc = {d.id: d for d in docs}
+    out = [TimelineEntry(at=award.created_at, kind="awarded", party="owner", actor_name=who("owner", award.awarded_by), amount=award.amount)]
+    for u in updates:
+        v = by_id.get(u.variation_id)
+        entry = TimelineEntry(
+            at=u.created_at, kind=u.kind, party=u.party, actor_name=who(u.party, u.recorded_by), note=u.note,
+            milestone_title=titles.get(u.milestone_id), execution_update_id=u.id if u.kind not in TRANSACTION_EVENT_KINDS else None,
+        )
+        if v:
+            entry.variation_number, entry.amount = v.number, v.value_change
+            if u.kind == "change_agreed":
+                entry.resulting_amount = v.resulting_amount
+        if u.kind == "document":
+            d = by_doc.get(u.document_id)
+            entry.note, entry.document_name, entry.document_kind = None, u.note, d.kind if d else None
+        out.append(entry)
+    return out
 
 
 def _milestone_out(m: Milestone, items: dict, numbers: dict) -> MilestoneOut:
@@ -268,11 +301,13 @@ def _execution_status(agreement: Agreement) -> str:
     return "on_hold" if agreement.on_hold_at else "in_progress"
 
 
-def _record(db: Session, agreement: Agreement, kind: str, side: str, user: User, note: str | None, at: datetime, milestone_id: str | None = None) -> None:
+def _record(db: Session, agreement: Agreement, kind: str, side: str | None, user: User | None, note: str | None, at: datetime,
+            milestone_id: str | None = None, variation_id: str | None = None, document_id: str | None = None) -> None:
     """Stage 7.6: the next entry in the execution history -- numbered under the
     requirement's lock the caller holds."""
     last = db.query(ExecutionUpdate.sequence).filter(ExecutionUpdate.agreement_id == agreement.id).order_by(ExecutionUpdate.sequence.desc()).first()
-    db.add(ExecutionUpdate(agreement_id=agreement.id, sequence=(last[0] if last else 0) + 1, kind=kind, party=side, recorded_by=user.id, note=note, created_at=at, milestone_id=milestone_id))
+    db.add(ExecutionUpdate(agreement_id=agreement.id, sequence=(last[0] if last else 0) + 1, kind=kind, party=side, recorded_by=user.id if user else None, note=note, created_at=at, milestone_id=milestone_id, variation_id=variation_id, document_id=document_id))
+    db.flush()  # the next entry in this request numbers after this one
 
 
 @router.get("", response_model=AgreementOut)
@@ -316,6 +351,7 @@ def activate_agreement(
     if agreement.effective_date is None:
         raise HTTPException(status_code=400, detail="Enter the date the agreement takes effect first.")
     agreement.status, agreement.activated_at = "active", datetime.utcnow().replace(microsecond=0)
+    _record(db, agreement, "in_force", side, user, None, agreement.activated_at)
     _touch(agreement, user)
     log_action(db, actor_id=user.id, action="agreement.activate", target_type="agreement", target_id=agreement.id,
                previous_value="preparing", new_value="active")
@@ -344,6 +380,8 @@ def terminate_agreement(
     # Stage 7.8: an open proposal can no longer be agreed; it lapses (never silently agreed).
     for v in db.query(Variation).filter(Variation.agreement_id == agreement.id, Variation.status == "proposed"):
         v.status, v.version = "lapsed", v.version + 1
+        _record(db, agreement, "change_lapsed", side, user, None, agreement.terminated_at, variation_id=v.id)
+    _record(db, agreement, "terminated", side, user, reason, agreement.terminated_at)
     _touch(agreement, user)
     log_action(db, actor_id=user.id, action="agreement.terminate", target_type="agreement", target_id=agreement.id,
                previous_value=previous, new_value="terminated", reason=reason)
@@ -495,6 +533,9 @@ async def attach_agreement_document(
     db.add(doc)
     try:
         db.flush()
+        if not (milestone_id or variation_id or execution_update_id) and kind not in EVIDENCE_KINDS:
+            # Stage 7.13: the agreement's own papers are part of its history.
+            _record(db, agreement, "document", side, user, doc.file_name, doc.uploaded_at or datetime.utcnow().replace(microsecond=0), document_id=doc.id)
         # log_action commits: the document and its audit entry land together.
         log_action(db, actor_id=user.id, action="agreement.document_add", target_type="agreement", target_id=agreement.id, new_value=f"{doc.id}:{kind}")
     except Exception:  # never leave a stored file no record points to
