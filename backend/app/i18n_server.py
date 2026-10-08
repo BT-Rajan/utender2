@@ -162,6 +162,10 @@ AR: dict[str, str] = {
     "This project has already been awarded, canceled, or has no award.": "تمت ترسية هذا المشروع أو إلغاؤه أو تقرر عدم الترسية بالفعل.",
     "This offer has been suspended by an admin and cannot be awarded.": "علّق المشرف هذا العرض ولا يمكن ترسيته.",
     # Stage 7.3: the agreement
+    # Stage 7.9: execution evidence
+    "A document can relate to one deliverable, change or progress update, not several.": "يمكن أن يتعلق المستند بمُخرَج واحد أو تغيير واحد أو تحديث واحد لسير العمل، وليس بأكثر من ذلك.",
+    "Progress update not found.": "لم يتم العثور على تحديث سير العمل.",
+    "Execution evidence can be added once the work has started.": "يمكن إضافة إثباتات التنفيذ بعد بدء العمل.",
     # Stage 7.8: variations
     "Change not found.": "لم يتم العثور على التغيير.",
     "Changes are recorded once the agreement is in force.": "تُسجَّل التغييرات بعد سريان الاتفاقية.",

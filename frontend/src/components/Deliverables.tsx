@@ -61,7 +61,7 @@ export function Deliverables({
   const attach = useMutation({
     mutationFn: (x: { id: string; file: File }) => {
       const form = new FormData();
-      form.append("kind", "other");
+      form.append("kind", "delivery_record");
       form.append("milestone_id", x.id);
       form.append("file", x.file);
       return apiFetch<Agreement>(`/projects/${projectId}/agreement/documents`, { method: "POST", formData: form });

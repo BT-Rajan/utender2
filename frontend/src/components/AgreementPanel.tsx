@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiFetch } from "@/api/client";
 import { Deliverables } from "@/components/Deliverables";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { Evidence, EvidenceList } from "@/components/Evidence";
 import { Variations } from "@/components/Variations";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useI18n } from "@/i18n/I18nContext";
@@ -18,10 +19,13 @@ export interface AgreementDocument {
   uploaded_by_name: string | null; // Stage 7.4: the viewer's own side's documents only
   milestone_id: string | null; // Stage 7.7: evidence for this deliverable
   variation_id: string | null; // Stage 7.8: a paper of this change
+  execution_update_id: string | null; // Stage 7.9: evidence for this progress update
+  evidence: boolean; // Stage 7.9: execution evidence, not a paper of the agreement
   url: string;
 }
 
 export interface ExecutionUpdate {
+  id: string;
   sequence: number;
   kind: "started" | "progress" | "on_hold" | "resumed" | "delivered" | "accepted" | "returned";
   party: "owner" | "provider";
@@ -110,6 +114,8 @@ export interface Agreement {
 }
 
 export const KINDS = ["signed_agreement", "work_order", "purchase_order", "final_quotation", "agreed_scope", "certificate", "change_order", "revised_agreement", "revised_quotation", "revised_specification", "approval", "other"] as const;
+// Stage 7.9: what shows the work being done or delivered.
+export const EVIDENCE_KINDS = ["progress_photo", "site_report", "delivery_record", "completion_report", "inspection_report", "test_result", "certificate", "other"] as const;
 
 // Stage 7.3: the agreement governing an awarded requirement. The parties agree
 // outside U-Tender and attach the papers here; the owner side records when it
@@ -196,7 +202,7 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
   const day = (d: string) => fullDate(`${d}T12:00:00Z`, language, false);
   const execTone = a.execution_status === "in_progress" ? "text-green" : a.execution_status === "terminated" ? "text-red" : "text-amber-dark";
   const live = party && (a.execution_status === "in_progress" || a.execution_status === "on_hold");
-  const general = a.documents.filter((d) => !d.milestone_id && !d.variation_id);
+  const general = a.documents.filter((d) => !d.evidence && !d.variation_id);
   const tone = a.status === "active" ? "text-green" : a.status === "terminated" ? "text-red" : "text-amber-dark";
 
   return (
@@ -341,6 +347,7 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
                   {h.milestone_title && <span dir="auto"> · {h.milestone_title}</span>}
                   {h.note && <span dir="auto" className="whitespace-pre-wrap break-words"> — {h.note}</span>}
                 </div>
+                <EvidenceList docs={a.documents.filter((d) => d.execution_update_id === h.id)} />
               </li>
             ))}
           </ol>
@@ -390,6 +397,7 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
         ))}
       </div>
 
+      <Evidence projectId={projectId} agreement={a} onDone={done} onFailed={failed} />
       <Deliverables projectId={projectId} agreement={a} onDone={done} onFailed={failed} />
       <Variations projectId={projectId} agreement={a} onDone={done} onFailed={failed} />
 

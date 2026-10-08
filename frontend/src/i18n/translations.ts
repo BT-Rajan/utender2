@@ -246,6 +246,15 @@ export interface Dictionary {
     earlierVersion: string;
     confirm: string;
   };
+  evidence: {
+    heading: string;
+    help: string;
+    none: string;
+    kind: string;
+    relatesTo: string;
+    wholeWork: string;
+    add: string;
+  };
   variations: {
     heading: string;
     help: string;
@@ -350,7 +359,7 @@ export interface Dictionary {
     documents: string;
     noDocuments: string;
     kindLabel: string;
-    kind: { signed_agreement: string; work_order: string; purchase_order: string; final_quotation: string; agreed_scope: string; certificate: string; change_order: string; revised_agreement: string; revised_quotation: string; revised_specification: string; approval: string; other: string };
+    kind: { signed_agreement: string; work_order: string; purchase_order: string; final_quotation: string; agreed_scope: string; certificate: string; change_order: string; revised_agreement: string; revised_quotation: string; revised_specification: string; approval: string; progress_photo: string; site_report: string; delivery_record: string; completion_report: string; inspection_report: string; test_result: string; other: string };
     by: { owner: string; provider: string };
     file: string;
     attach: string;
@@ -1658,6 +1667,15 @@ export const en: Dictionary = {
     earlierVersion: "Note: this offer was made against version {n} of the requirement, which is now at version {m}, and its provider didn't confirm it since. You'd be awarding it as it stands.",
     confirm: "Award",
   },
+  evidence: {
+    heading: "Execution evidence",
+    help: "Photographs, site, delivery, completion and inspection reports, and test results that show the work being done. Either party can add them; they stay on record. Deliverables keep their own.",
+    none: "No evidence for the work as a whole yet.",
+    kind: "Evidence",
+    relatesTo: "Relates to",
+    wholeWork: "The work as a whole",
+    add: "Add evidence",
+  },
   variations: {
     heading: "Changes",
     help: "Changes to the agreed work once the agreement is in force. Either party proposes one; it takes effect only when the other party agrees. The original award and agreement stay on record.",
@@ -1781,6 +1799,12 @@ export const en: Dictionary = {
       revised_quotation: "Revised quotation",
       revised_specification: "Revised specification",
       approval: "Approval",
+      progress_photo: "Progress photograph",
+      site_report: "Site report",
+      delivery_record: "Delivery record",
+      completion_report: "Completion report",
+      inspection_report: "Inspection report",
+      test_result: "Test results",
       other: "Other",
     },
     by: { owner: "from the owner", provider: "from the service provider" },
@@ -3115,6 +3139,15 @@ export const ar: Dictionary = {
     earlierVersion: "ملاحظة: قُدّم هذا العرض على الإصدار {n} من المتطلب، وهو الآن في الإصدار {m}، ولم يؤكده مزوّده منذ ذلك الحين. ستُرسيه كما هو.",
     confirm: "رسِّ",
   },
+  evidence: {
+    heading: "إثباتات التنفيذ",
+    help: "صور وتقارير الموقع والتسليم والإنجاز والفحص ونتائج الاختبارات التي تُظهر تنفيذ العمل. يمكن لأي من الطرفين إضافتها، وتبقى في السجل. للمخرجات إثباتاتها الخاصة.",
+    none: "لا توجد إثباتات للعمل ككل بعد.",
+    kind: "الإثبات",
+    relatesTo: "يتعلق بـ",
+    wholeWork: "العمل ككل",
+    add: "إضافة إثبات",
+  },
   variations: {
     heading: "التغييرات",
     help: "تغييرات على العمل المتفق عليه بعد سريان الاتفاقية. يقترحها أي من الطرفين، ولا تسري إلا بموافقة الطرف الآخر. تبقى الترسية والاتفاقية الأصليتان في السجل.",
@@ -3238,6 +3271,12 @@ export const ar: Dictionary = {
       revised_quotation: "عرض سعر معدّل",
       revised_specification: "مواصفات معدّلة",
       approval: "موافقة",
+      progress_photo: "صورة سير العمل",
+      site_report: "تقرير الموقع",
+      delivery_record: "سجل التسليم",
+      completion_report: "تقرير الإنجاز",
+      inspection_report: "تقرير الفحص",
+      test_result: "نتائج الاختبار",
       other: "أخرى",
     },
     by: { owner: "من المالك", provider: "من مقدم الخدمة" },

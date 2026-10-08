@@ -16,10 +16,13 @@ class AgreementDocumentOut(BaseModel):
     uploaded_by_name: str | None = None  # Stage 7.4: the caller's own side's documents only
     milestone_id: str | None = None  # Stage 7.7: evidence for this deliverable
     variation_id: str | None = None  # Stage 7.8: a paper of this variation
+    execution_update_id: str | None = None  # Stage 7.9: evidence for this progress update
+    evidence: bool = False  # Stage 7.9: execution evidence, not a paper of the agreement
     url: str
 
 
 class ExecutionUpdateOut(BaseModel):
+    id: str  # Stage 7.9: evidence can point at it
     sequence: int
     kind: Literal["started", "progress", "on_hold", "resumed", "delivered", "accepted", "returned"]
     party: str

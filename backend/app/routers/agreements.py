@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.deps import get_current_user
-from app.models.agreement import AGREEMENT_DOCUMENT_KINDS, Agreement, AgreementDocument, ExecutionUpdate, Milestone, Variation
+from app.models.agreement import AGREEMENT_DOCUMENT_KINDS, EVIDENCE_KINDS, Agreement, AgreementDocument, ExecutionUpdate, Milestone, Variation
 from app.models.award_record import AwardRecord
 from app.models.common import gen_uuid
 from app.models.enums import NotificationType, ProjectStatus, UserRole
@@ -150,7 +150,7 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
         on_hold_since=agreement.on_hold_at if agreement.status != "terminated" else None,
         execution_history=[
             ExecutionUpdateOut(
-                sequence=u.sequence, kind=u.kind, party=u.party, note=u.note, created_at=u.created_at,
+                id=u.id, sequence=u.sequence, kind=u.kind, party=u.party, note=u.note, created_at=u.created_at,
                 recorded_by_name=_name(db, u.recorded_by, names) if side in (u.party, "admin") else None,
                 milestone_id=u.milestone_id, milestone_title=titles.get(u.milestone_id),
             )
@@ -173,7 +173,8 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
         documents=[
             AgreementDocumentOut(
                 id=d.id, kind=d.kind, party=d.party, file_name=d.file_name, uploaded_at=d.uploaded_at,
-                uploaded_by_name=_uploader(db, d, side, names), milestone_id=d.milestone_id, variation_id=d.variation_id,
+                uploaded_by_name=_uploader(db, d, side, names), milestone_id=d.milestone_id, variation_id=d.variation_id, execution_update_id=d.execution_update_id,
+                evidence=d.kind in EVIDENCE_KINDS or bool(d.milestone_id or d.execution_update_id),
                 url=_api(f"/projects/{project.id}/agreement/documents/{d.id}/file"),
             )
             for d in docs
@@ -424,12 +425,20 @@ def record_progress(
 @router.post("/documents", response_model=AgreementOut)
 async def attach_agreement_document(
     project_id: str, kind: str = Form(...), file: UploadFile = File(...), milestone_id: str | None = Form(None), variation_id: str | None = Form(None),
+    execution_update_id: str | None = Form(None),
     user: User = Depends(get_current_user), db: Session = Depends(get_db),
 ):
     """Either party attaches a paper of the agreement -- the signed agreement,
-    a work or purchase order, the final quotation, the agreed scope."""
+    a work or purchase order, the final quotation, the agreed scope -- or,
+    once the work has started, execution evidence (Stage 7.9): photographs,
+    site, delivery, completion and inspection reports, test results. A
+    document may belong to one deliverable, one variation or one progress
+    update of this agreement -- never two, never another agreement's."""
     if kind not in AGREEMENT_DOCUMENT_KINDS:
         raise HTTPException(status_code=400, detail="Choose what kind of document this is.")
+    milestone_id, variation_id, execution_update_id = milestone_id or None, variation_id or None, execution_update_id or None
+    if sum(x is not None for x in (milestone_id, variation_id, execution_update_id)) > 1:
+        raise HTTPException(status_code=400, detail="A document can relate to one deliverable, change or progress update, not several.")
     assert_allowed_extension(file.filename, ALLOWED_DRAWING_EXTENSIONS - {"zip"})
     content = await file.read()
     if not content:
@@ -447,6 +456,12 @@ async def attach_agreement_document(
         variation = db.get(Variation, variation_id)
         if not variation or variation.agreement_id != agreement.id:
             raise HTTPException(status_code=404, detail="Change not found.")
+    if execution_update_id:  # Stage 7.9: evidence for one of this agreement's own progress updates
+        update = db.get(ExecutionUpdate, execution_update_id)
+        if not update or update.agreement_id != agreement.id:
+            raise HTTPException(status_code=404, detail="Progress update not found.")
+    if (kind in EVIDENCE_KINDS or execution_update_id) and agreement.work_started_at is None:
+        raise HTTPException(status_code=400, detail="Execution evidence can be added once the work has started.")
     storage = get_storage()
     # Stage 7.4: keyed by the document's own id, so two uploads of the same
     # name at the same moment (owner and provider, or a repeated submit) never
@@ -454,7 +469,7 @@ async def attach_agreement_document(
     doc_id = gen_uuid()
     path = f"{project_id}/{agreement.id}/{doc_id}/{sanitize_path_segment(file.filename)}"
     storage.save(AGREEMENT_BUCKET, path, content, file.content_type or "application/octet-stream")
-    doc = AgreementDocument(id=doc_id, agreement_id=agreement.id, kind=kind, party=side, file_path=path, file_name=safe_relative_name(file.filename), uploaded_by=user.id, milestone_id=milestone_id or None, variation_id=variation_id or None)
+    doc = AgreementDocument(id=doc_id, agreement_id=agreement.id, kind=kind, party=side, file_path=path, file_name=safe_relative_name(file.filename), uploaded_by=user.id, milestone_id=milestone_id, variation_id=variation_id, execution_update_id=execution_update_id)
     db.add(doc)
     try:
         db.flush()

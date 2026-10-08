@@ -56,8 +56,13 @@ AGREEMENT_DOCUMENT_KINDS = (
     "signed_agreement", "work_order", "purchase_order", "final_quotation", "agreed_scope", "certificate",
     # Stage 7.8: a variation's papers
     "change_order", "revised_agreement", "revised_quotation", "revised_specification", "approval",
+    # Stage 7.9: execution evidence
+    "progress_photo", "site_report", "delivery_record", "completion_report", "inspection_report", "test_result",
     "other",
 )
+# Stage 7.9: what shows the work being done or delivered -- as opposed to the
+# papers that govern it. Evidence needs the work to have started.
+EVIDENCE_KINDS = ("progress_photo", "site_report", "delivery_record", "completion_report", "inspection_report", "test_result")
 
 
 class AgreementDocument(Base):
@@ -75,6 +80,9 @@ class AgreementDocument(Base):
     milestone_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("milestones.id", ondelete="SET NULL"), nullable=True, index=True)
     # Stage 7.8: a paper of one variation of this same agreement, if any.
     variation_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("variations.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Stage 7.9: evidence for one progress update of this same agreement, if any.
+    # A document belongs to at most one of: a deliverable, a variation, a progress update.
+    execution_update_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("execution_updates.id", ondelete="SET NULL"), nullable=True, index=True)
     uploaded_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 

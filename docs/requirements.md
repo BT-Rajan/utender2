@@ -788,4 +788,34 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **Summary:** the agreement shows the current agreed value, with the originally awarded value beside it, and the completion date with the original.
     - **Changes section:** the list with from → to for each change, propose / agree / reject / withdraw, and change documents.
 
+- **7.9 Execution documents & evidence:**
+  - **Audit:**
+    - **Already working:**
+      - secure private storage keyed by unguessable ids;
+      - the existing file-type, size and safe-name checks;
+      - access checked on every open, then a one-minute signed link (tampered or unsigned links are refused);
+      - deliverable evidence (7.7) and change papers (7.8);
+      - the uploading side, member and time;
+      - documents fixed once the agreement is in force;
+      - orphan-free failures.
+    - **Partly there:** execution evidence wasn't distinguishable from the agreement's own papers: no evidence types, one list.
+    - **Missing:** evidence for one progress update.
+    - **Invalid:** a file could be linked to a deliverable and a change at once.
+  - **Fixed (migration 0053):**
+    - **Evidence types:** progress photograph, site report, delivery record, completion report, inspection report and test results. They are values of the existing kind column.
+    - **Progress-update link:** `agreement_documents.execution_update_id`, which must be one of this agreement's progress updates.
+    - **One context per file:** a document relates to at most one deliverable, change or progress update.
+    - **Timing:** execution evidence (an evidence type or a progress-update link) can be added only once the work has started.
+    - **Response:** `evidence` marks each document, and progress-history entries carry their id.
+  - **Rules kept:**
+    - **Who:** either party may add evidence (the provider's progress and delivery records, the owner's inspection reports), including while on hold. None can be added after termination, and evidence stays readable by the parties only.
+    - **Removal:** the existing rule: only the attaching side, only while the agreement is being prepared. Afterwards evidence is on record.
+    - **No side effects:** uploading changes no status, history entry, deliverable, change, award or requirement.
+    - **Notifications:** none for evidence, matching progress notes. A delivery already notifies the owner, and the evidence shows on the deliverable and the progress history.
+  - **UI:**
+    - **Execution evidence section:** evidence for the work as a whole, plus an upload form with type and an optional "relates to" progress update.
+    - **Progress history:** each entry lists its own evidence.
+    - **Deliverables:** keep their evidence, now typed as delivery records.
+    - **Agreement documents:** now list only the agreement's own papers.
+
 _Stage 7 onwards is added as it is implemented._
