@@ -20,10 +20,26 @@ def _send(to: str, subject: str, html: str) -> None:
         import resend
 
         resend.api_key = settings.resend_api_key
-        resend.Emails.send({"from": settings.email_from, "to": to, "subject": subject, "html": html})
+        # Stage 9.11: the provider's SDK sets no network timeout, and emails go
+        # out inside the request -- so a hung provider would hold an offer or
+        # an award open indefinitely. Bounded here; a timeout is a recorded failure.
+        _pool().submit(resend.Emails.send, {"from": settings.email_from, "to": to, "subject": subject, "html": html}).result(timeout=SEND_TIMEOUT_SECONDS)
     except Exception as exc:
         logger.exception('failed to send "%s" to %s', subject, to)
         _record_failure(to, subject, exc)
+
+
+SEND_TIMEOUT_SECONDS = 10
+_executor = None
+
+
+def _pool():
+    global _executor
+    if _executor is None:
+        from concurrent.futures import ThreadPoolExecutor
+
+        _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="email")
+    return _executor
 
 
 def _deactivated(to: str) -> bool:

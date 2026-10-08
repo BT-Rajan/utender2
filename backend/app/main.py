@@ -26,12 +26,27 @@ from app.routers.public import router as public_router
 
 settings = get_settings()
 
-app = FastAPI(title="U-Tender API")
+_production = settings.environment.strip().lower() == "production"
+# Stage 9.11: the interactive API description is a development aid, not part of the product.
+app = FastAPI(title="U-Tender API", docs_url=None if _production else "/docs", redoc_url=None if _production else "/redoc",
+              openapi_url=None if _production else "/openapi.json")
 
 register_error_handlers(app)
 
 app.add_middleware(MaxBodySizeMiddleware, max_body_bytes=settings.max_upload_mb * 1024 * 1024)
 app.add_middleware(LanguageMiddleware)
+
+
+# Stage 9.11: baseline browser protections on every API response -- no type
+# sniffing, never framed, and no Referer carrying a signed file link's query
+# string to another site. (The file route sets its own content headers too.)
+@app.middleware("http")
+async def security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
 
 
 # Stage 4.3 follow-up: the server's clock on every response, so the interface

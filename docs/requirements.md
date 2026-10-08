@@ -1505,4 +1505,32 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **Names:** verification items carry the provider's company name or the owner organisation's legal name.
   - **Tests:** `tests/test_stage9_10_dashboard.py`, covering scenarios A–I.
 
+- **9.11 Production security and reliability:**
+  - **Already working:**
+    - **Authentication:**
+      - bcrypt passwords (8–72 characters); JWT with a pinned algorithm in httpOnly, `SameSite=Lax` cookies (cross-site writes don't carry them), `Secure` on https;
+      - short access tokens checked against the password fingerprint and the account's state on every request; rotating, revocable refresh tokens;
+      - single-use reset tokens; a non-enumerating forgotten-password flow; login throttling; deactivation (9.2).
+    - **Authorization:** server-side on every object (role dependencies, `owns`/`can_access`, `_winning_side`, `_can_view_project`, `require_admin` on the whole admin router), proven by the Stage 5.12, 7.14 and PASS 17 suites.
+    - **Files:**
+      - extension allow-lists (no HTML or SVG); stored under sanitised names;
+      - served only through expiring HMAC-signed links (the file name is signed too) with `nosniff` and `no-store`; inline only for PDFs and images.
+    - **Request limits:** a 50 MB request cap (413).
+    - **Webhooks:** Stripe signed and idempotent (9.6); cron behind a shared secret.
+    - **No secrets committed:** only `.env.example`; the frontend's only variable is `VITE_API_URL`.
+    - **Startup:** no automatic schema changes (Alembic only); 500s carry no internals; production refused placeholder secrets.
+  - **Gaps found:**
+    - **Email could hang a request:** the email SDK calls `requests` with no timeout, inside the request, so a hung provider could hold an offer submission or award open indefinitely.
+    - **No browser security headers on API responses:** no `nosniff`, no frame protection, and no referrer policy (signed file links carry their signature in the URL).
+    - **API docs public in production:** `/docs` and `/openapi.json` were served.
+    - **Production accepted development defaults:** localhost URLs, development database credentials and non-Secure cookies, silently.
+  - **Fixed:**
+    - **Email timeout:** a send is bounded at 10 s (a small worker pool); a timeout is recorded as an email failure (9.5).
+    - **Headers on every API response:** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`.
+    - **Production:** the docs and OpenAPI are off.
+    - **Production startup:**
+      - refuses localhost APP/API/CORS URLs;
+      - warns loudly about development database credentials and plain-http (non-Secure cookie) deployment. `deploy.sh` deploys over http today, so this is a warning, not a refusal.
+  - **Tests:** `tests/test_stage9_11_production.py`. The Stage 2 production-settings test was updated for the localhost rule.
+
 _Later Stage 9 steps are added as they are implemented._
