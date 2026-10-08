@@ -89,3 +89,13 @@ def acting_profile(db: Session, user: User):
 def acting_id(db: Session, user: User) -> str:
     profile = acting_profile(db, user)
     return profile.user_id if profile else user.id
+
+
+def stakeholder_rows(model):
+    """SQL condition: profile rows that stand for a stakeholder -- an
+    organisation's, or an individual's. A member's own row is not one: members
+    act as their organisation (acting_profile). Used wherever stakeholders are
+    listed or counted, so a ten-person organisation is one stakeholder."""
+    from sqlalchemy import select
+
+    return or_(model.organization_id.isnot(None), model.user_id.notin_(select(OrganizationMembership.user_id)))

@@ -1297,4 +1297,32 @@ be added as its prompts (5.1, 5.2, …) are delivered.
       - an "as of" time, a refresh button, and "Unavailable" for a failed section.
   - **Tests:** `tests/test_stage9_1_operations.py`.
 
+- **9.2 Users and organisations through their lifecycle:**
+  - **Already working:**
+    - **Identity model:** person (`users`) → organisation (`organizations`) → membership (`organization_memberships`, representative or member). Authority is derived per request from current membership (`acting_profile`, `can_access`). Records are kept under the organisation's profile id, so they never follow a person.
+    - **Membership:**
+      - the representative invites, and only the invited email can accept;
+      - the representative removes members; a removed member loses the organisation at once while it, its other members and its records stay;
+      - the representative can't remove itself; all of this is audited.
+    - **Stakeholder state:** admin suspends or reactivates an organisation or individual (audited). New actions are refused and history stays readable.
+    - **Verification and eligibility (Stage 4):** enforced on every request, never cached in the client.
+    - **Sessions:**
+      - access tokens are short-lived and checked per request;
+      - refresh tokens rotate and are revocable at logout;
+      - a password change or reset kills older tokens;
+      - forgotten passwords can be reset.
+  - **Gaps found:**
+    - **No way to stop one person:** a compromised login, or someone who left while the representative is unavailable, could only be stopped by suspending the whole organisation.
+    - **Admins couldn't see an organisation's members:** only the representative and a count.
+    - **Member rows shown as stakeholders:** admin lists showed members' own (unused) profile rows, and suspending or verifying one did nothing.
+    - **Suspension notices:** they reached the representative only, so the other members were blocked without being told.
+  - **Fixed:**
+    - **Migration 0061:** `users.deactivated_at`.
+    - **Enforcement:** `get_current_user` refuses a deactivated account on every request (so every live session stops at once), and login and refresh refuse it with a clear message.
+    - **Admin endpoints:** `POST /admin/users/{id}/deactivate|reactivate`. They are admin-only, row-locked and idempotent (audited once), and never touch admin accounts. Memberships stay, so reactivation restores exactly the same organisation and rights.
+    - **Admin detail pages:** owner and provider pages list the organisation's members (representative first), with Deactivate/Reactivate (`AdminOrganizationMembers`).
+    - **Admin lists:** owner and provider lists show stakeholders only (`team.stakeholder_rows`, shared with 9.1). Admin actions on a member's own row are refused (409) with a pointer to the organisation.
+    - **Suspension:** suspend and reactivate notify everyone acting for the stakeholder (`notify_team`).
+  - **Tests:** `tests/test_stage9_2_account_lifecycle.py`.
+
 _Later Stage 9 steps are added as they are implemented._

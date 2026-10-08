@@ -4,6 +4,7 @@ import { apiFetch, ApiError } from "@/api/client";
 import type { AdminProject, OwnerDocument, OwnerProfile } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { ApplicationDecisionControls, DocumentDecisionControls, type DocumentDecision } from "@/components/AdminReviewControls";
+import { AdminOrganizationMembers, type Member } from "@/components/AdminOrganizationMembers";
 import { StakeholderSummary, type Stakeholder } from "@/components/Stakeholder";
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
@@ -31,7 +32,7 @@ export function AdminOwnerDetailPage() {
 
   const { data: detail } = useQuery({
     queryKey: ["admin-owner", id],
-    queryFn: () => apiFetch<{ owner: OwnerProfile; stakeholder: Stakeholder; documents: OwnerDocument[] }>(`/admin/owners/${id}`),
+    queryFn: () => apiFetch<{ owner: OwnerProfile; stakeholder: Stakeholder; members: Member[]; documents: OwnerDocument[] }>(`/admin/owners/${id}`),
     enabled: !!id,
   });
 
@@ -103,6 +104,7 @@ export function AdminOwnerDetailPage() {
         <div className="bg-white border border-border rounded px-5 py-4.5 mb-6">
           <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-3">{t("stakeholder.adminHeading")}</h3>
           <StakeholderSummary stakeholder={detail.stakeholder} viewerIsAdmin />
+          <AdminOrganizationMembers members={detail.members ?? []} queryKey={["admin-owner", id]} />
         </div>
       )}
 

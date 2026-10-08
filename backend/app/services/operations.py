@@ -9,17 +9,17 @@ its age for the operator to judge."""
 import logging
 from datetime import datetime, timedelta
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models.agreement import Agreement
 from app.models.enums import ProjectStatus, SubscriptionStatus, VerificationStatus
 from app.models.offer import Offer, tendered
-from app.models.organization import OrganizationMembership
 from app.models.owner import OwnerProfile
 from app.models.project import Project
 from app.models.review import ReviewReport
 from app.models.service_provider import ServiceProviderProfile
+from app.services.team import stakeholder_rows as _stakeholders
 from app.services.tender_lifecycle import db_now, sync_expired_projects
 
 logger = logging.getLogger(__name__)
@@ -27,12 +27,6 @@ logger = logging.getLogger(__name__)
 LIST_LIMIT = 10
 REMINDER_WINDOW = timedelta(hours=24)  # the deadline-reminder job's window (routers/cron.py)
 REMINDER_GRACE = timedelta(hours=1)  # it is meant to run roughly hourly
-
-
-def _stakeholders(model):
-    """Profiles that stand for a stakeholder: an organisation's, or an
-    individual's -- never a member's own row (members act as the organisation)."""
-    return or_(model.organization_id.isnot(None), model.user_id.notin_(select(OrganizationMembership.user_id)))
 
 
 def _by(db: Session, column, *where) -> dict:

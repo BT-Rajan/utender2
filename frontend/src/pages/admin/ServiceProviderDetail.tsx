@@ -6,6 +6,7 @@ import type { AuditLogEntry, ServiceProviderProfile, PaymentOverrideRecord } fro
 import { stars } from "@/lib/format";
 import { DeleteServiceProviderForm } from "@/components/DeleteServiceProviderForm";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { AdminOrganizationMembers, type Member } from "@/components/AdminOrganizationMembers";
 import { StakeholderSummary, type Stakeholder } from "@/components/Stakeholder";
 import { useI18n } from "@/i18n/I18nContext";
 import { PageLoading } from "@/components/PageLoading";
@@ -179,7 +180,7 @@ export function AdminServiceProviderDetailPage() {
 
   const { data: detail } = useQuery({
     queryKey: ["admin-service-provider", id],
-    queryFn: () => apiFetch<{ service_provider: ServiceProviderProfile; stakeholder: Stakeholder }>(`/admin/service-providers/${id}`),
+    queryFn: () => apiFetch<{ service_provider: ServiceProviderProfile; stakeholder: Stakeholder; members: Member[] }>(`/admin/service-providers/${id}`),
     enabled: !!id,
   });
   const service_provider = detail?.service_provider;
@@ -252,6 +253,7 @@ export function AdminServiceProviderDetailPage() {
         <div className="bg-white border border-border rounded px-5 py-4.5 mb-6">
           <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-3">{t("stakeholder.adminHeading")}</h3>
           <StakeholderSummary stakeholder={detail.stakeholder} viewerIsAdmin />
+          <AdminOrganizationMembers members={detail.members ?? []} queryKey={["admin-service-provider", id]} />
         </div>
       )}
 

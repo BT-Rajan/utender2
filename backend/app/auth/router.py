@@ -143,6 +143,10 @@ def login(payload: LoginRequest, request: Request, response: Response, db: Sessi
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
 
     login_throttle.record_success(client_ip, email)
+    if user.deactivated_at is not None:  # Stage 9.2: right password, but no session for a deactivated account
+        from app.deps import DEACTIVATED
+
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=DEACTIVATED)
     _set_auth_cookies(response, user)
     return user
 
@@ -157,6 +161,8 @@ def refresh(response: Response, refresh_token: str | None = Cookie(default=None)
     if not payload or not user or not token_matches_password(payload, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
     if db.get(RevokedToken, payload.jti):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
+    if user.deactivated_at is not None:  # Stage 9.2
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
 
     # Rotate: the token just used to refresh is retired immediately, so a

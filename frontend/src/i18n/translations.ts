@@ -359,6 +359,19 @@ export interface Dictionary {
     awardedLast7: string;
     kinds: { open_without_offers_closing_24h: string; open_without_offers: string; awaiting_owner_decision: string; completion_awaiting_owner: string; transactions_on_hold: string; agreements_not_in_force: string; providers_awaiting_review: string; owners_awaiting_review: string; provider_payment_failed: string; open_review_reports: string };
   };
+  members: {
+    heading: string;
+    representative: string;
+    member: string;
+    deactivatedOn: string;
+    deactivate: string;
+    reactivate: string;
+    deactivateTitle: string;
+    deactivateBody: string;
+    reactivateTitle: string;
+    reactivateBody: string;
+    error: string;
+  };
   history: {
     heading: string;
     awarded: string;
@@ -1941,6 +1954,19 @@ export const en: Dictionary = {
       provider_payment_failed: "Verified providers whose payment failed",
       open_review_reports: "Reported reviews to decide",
     },
+  },
+  members: {
+    heading: "People acting for it",
+    representative: "representative",
+    member: "member",
+    deactivatedOn: "deactivated",
+    deactivate: "Deactivate account",
+    reactivate: "Reactivate account",
+    deactivateTitle: "Deactivate this person's account?",
+    deactivateBody: "They are signed out everywhere at once and can't sign in. The organization, its other members and everything recorded stay as they are. You can reactivate the account later.",
+    reactivateTitle: "Reactivate this person's account?",
+    reactivateBody: "They can sign in again, with exactly the organization and rights they had before.",
+    error: "The account couldn't be changed.",
   },
   history: {
     heading: "History",
@@ -3581,6 +3607,19 @@ export const ar: Dictionary = {
       provider_payment_failed: "مقدمو خدمة موثَّقون فشل دفعهم",
       open_review_reports: "تقييمات مبلغ عنها بانتظار القرار",
     },
+  },
+  members: {
+    heading: "الأشخاص الذين يعملون باسمها",
+    representative: "الممثل",
+    member: "عضو",
+    deactivatedOn: "مُعطَّل منذ",
+    deactivate: "تعطيل الحساب",
+    reactivate: "إعادة تفعيل الحساب",
+    deactivateTitle: "تعطيل حساب هذا الشخص؟",
+    deactivateBody: "يُسجَّل خروجه من كل مكان فورًا ولا يمكنه تسجيل الدخول. تبقى المنظمة وأعضاؤها الآخرون وكل ما سُجّل كما هو. يمكنك إعادة تفعيل الحساب لاحقًا.",
+    reactivateTitle: "إعادة تفعيل حساب هذا الشخص؟",
+    reactivateBody: "يمكنه تسجيل الدخول مجددًا، بالمنظمة والصلاحيات نفسها التي كانت لديه تمامًا.",
+    error: "تعذر تغيير الحساب.",
   },
   history: {
     heading: "السجل",

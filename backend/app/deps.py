@@ -10,6 +10,9 @@ from app.models.owner import OwnerProfile
 from app.models.user import User
 
 
+DEACTIVATED = "This account has been deactivated. Contact U-Tender if you think this is a mistake."
+
+
 # Mirrors src/middleware.ts's first check: is there a valid session at all.
 # Reads the access token from an httpOnly cookie set at login, same as the
 # original app relied on Supabase's auth cookie rather than a header token
@@ -34,6 +37,10 @@ def get_current_user(
     # A token issued before the user's last password change/reset is dead.
     if not user or not token_matches_password(token, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    # Stage 9.2: a deactivated account stops at once -- every live session
+    # and token included, since this is read on each request.
+    if user.deactivated_at is not None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=DEACTIVATED)
 
     return user
 

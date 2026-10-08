@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
@@ -39,6 +39,7 @@ from app.services.audit import log_action
 from app.services.stakeholder import describe as describe_stakeholder
 from app.services.verification import assert_ready_to_approve, checklist, document_out_fields, is_added_qualification, profile_state_fields
 from app.services.notify import notify, notify_team
+from app.services.team import stakeholder_rows
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import is_sealed_and_open, lock_project, sync_expired_projects
 from app.models.category import ServiceCategory
@@ -424,7 +425,38 @@ def _get_active_service_provider_profile(db: Session, service_provider_id: str) 
     user = db.get(User, service_provider_id)
     if not cp or not user or user.role != UserRole.service_provider:
         raise HTTPException(status_code=404, detail="Service provider not found.")
+    _not_a_member_row(db, cp)
     return cp
+
+
+def _not_a_member_row(db: Session, profile) -> None:
+    """Stage 9.2: a member's own profile row is not a stakeholder -- the
+    member acts as its organisation -- so suspending or verifying it would do
+    nothing. The organisation's page is where its people are managed."""
+    from app.models.organization import OrganizationMembership
+
+    if profile.organization_id is None and db.query(OrganizationMembership.id).filter(OrganizationMembership.user_id == profile.user_id).first():
+        raise HTTPException(status_code=409, detail="This account acts for an organization. Manage it from the organization's page.")
+
+
+def _members(db: Session, profile) -> list[dict]:
+    """Stage 9.2: the organisation's current members, for an admin -- who
+    they are, their role and whether their account is deactivated."""
+    from app.models.enums import MembershipRole
+    from app.models.organization import OrganizationMembership
+
+    if profile.organization_id is None:
+        return []
+    rows = (
+        db.query(OrganizationMembership, User)
+        .join(User, User.id == OrganizationMembership.user_id)
+        .filter(OrganizationMembership.organization_id == profile.organization_id)
+        # the representative first, then members as they joined
+        .order_by(case((OrganizationMembership.role == MembershipRole.admin, 0), else_=1), OrganizationMembership.created_at.asc(), User.id)
+        .all()
+    )
+    return [{"user_id": u.id, "full_name": u.full_name, "email": u.email, "role": m.role.value, "position": m.position,
+             "joined_at": m.created_at, "deactivated_at": u.deactivated_at} for m, u in rows]
 
 
 @router.get("/service-providers", response_model=list[ServiceProviderProfileOut])
@@ -432,7 +464,7 @@ def list_service_providers(db: Session = Depends(get_db)):
     rows = (
         db.query(ServiceProviderProfile, User)
         .join(User, ServiceProviderProfile.user_id == User.id)
-        .filter(User.role == UserRole.service_provider)
+        .filter(User.role == UserRole.service_provider, stakeholder_rows(ServiceProviderProfile))  # Stage 9.2: not members' own rows
         .all()
     )
     return [ServiceProviderProfileOut(**_profile_fields(cp), email=u.email) for cp, u in rows]
@@ -448,6 +480,7 @@ def service_provider_detail(service_provider_id: str, db: Session = Depends(get_
     return {
         "service_provider": ServiceProviderProfileOut(**_profile_fields(cp), email=user.email if user else None),
         "stakeholder": describe_stakeholder(cp, user, db) if user else None,
+        "members": _members(db, cp),  # Stage 9.2
         "documents": [
             {
                 **ServiceProviderDocumentOut(**document_out_fields(d, r)).model_dump(),
@@ -529,11 +562,13 @@ def set_suspended(
     )
     service_provider_user = db.get(User, service_provider_id)
     if service_provider_user:
-        notify(
+        # Stage 9.2: everyone who acts for it is told, not only its representative.
+        notify_team(
             db,
             service_provider_user,
             NotificationType.service_provider_suspended if payload.suspended else NotificationType.service_provider_reactivated,
             link="/service-provider/dashboard",
+            organization_id=cp.organization_id,
         )
     return cp
 
@@ -816,6 +851,7 @@ def _get_active_owner_profile(db: Session, owner_id: str) -> OwnerProfile:
     user = db.get(User, owner_id)
     if not op or not user or user.role != UserRole.owner:
         raise HTTPException(status_code=404, detail="Owner not found.")
+    _not_a_member_row(db, op)
     return op
 
 
@@ -844,7 +880,7 @@ def list_owners(db: Session = Depends(get_db)):
     rows = (
         db.query(OwnerProfile, User)
         .join(User, OwnerProfile.user_id == User.id)
-        .filter(User.role == UserRole.owner)
+        .filter(User.role == UserRole.owner, stakeholder_rows(OwnerProfile))  # Stage 9.2: not members' own rows
         .all()
     )
     project_counts = dict(db.query(Project.owner_id, func.count(Project.id)).group_by(Project.owner_id).all())
@@ -855,14 +891,13 @@ def list_owners(db: Session = Depends(get_db)):
 
 @router.get("/owners/{owner_id}")
 def owner_detail(owner_id: str, db: Session = Depends(get_db)):
-    op = db.get(OwnerProfile, owner_id)
+    op = _get_active_owner_profile(db, owner_id)
     user = db.get(User, owner_id)
-    if not op or not user or user.role != UserRole.owner:
-        raise HTTPException(status_code=404, detail="Owner not found.")
     project_count = db.query(Project).filter(Project.owner_id == owner_id).count()
     return {
         "owner": OwnerProfileOut(**_owner_fields(op, user), project_count=project_count),
         "stakeholder": describe_stakeholder(op, user, db),
+        "members": _members(db, op),  # Stage 9.2
         "documents": _owner_documents(db, owner_id),
     }
 
@@ -945,11 +980,13 @@ def set_owner_suspended(
     )
     owner_user = db.get(User, owner_id)
     if owner_user:
-        notify(
+        # Stage 9.2: everyone who acts for it is told, not only its representative.
+        notify_team(
             db,
             owner_user,
             NotificationType.owner_suspended if payload.suspended else NotificationType.owner_reactivated,
             link="/owner/dashboard",
+            organization_id=op.organization_id,
         )
     return OwnerProfileOut(**_owner_fields(op, owner_user))
 
@@ -1567,3 +1604,45 @@ def operations_overview(db: Session = Depends(get_db)):
     from app.services.operations import overview
 
     return overview(db)
+
+
+# ---------- Stage 9.2: one person's account ----------
+
+
+class AccountStatePatch(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)
+
+
+def _account_target(db: Session, user_id: str, admin: User) -> User:
+    target = db.query(User).filter(User.id == user_id).with_for_update().first()
+    if target is None or target.role == UserRole.admin:
+        raise HTTPException(status_code=404, detail="Account not found.")
+    return target
+
+
+@router.post("/users/{user_id}/deactivate")
+def deactivate_account(user_id: str, payload: AccountStatePatch | None = None, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Stage 9.2: stop one person -- every session at once (checked on each
+    request), and no sign-in -- without touching the organisation they act
+    for, its other members, or anything recorded. Admin accounts aren't
+    managed here. Repeating it changes nothing."""
+    target = _account_target(db, user_id, admin)
+    if target.deactivated_at is None:
+        target.deactivated_at = datetime.utcnow().replace(microsecond=0)
+        log_action(db, actor_id=admin.id, action="account.deactivate", target_type="user", target_id=target.id,
+                   new_value=(payload.reason if payload and payload.reason else None))
+    db.commit()
+    return {"user_id": target.id, "deactivated_at": target.deactivated_at}
+
+
+@router.post("/users/{user_id}/reactivate")
+def reactivate_account(user_id: str, payload: AccountStatePatch | None = None, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Stage 9.2: let the person back in, exactly as they were -- the same
+    memberships and rights, nothing more. Repeating it changes nothing."""
+    target = _account_target(db, user_id, admin)
+    if target.deactivated_at is not None:
+        log_action(db, actor_id=admin.id, action="account.reactivate", target_type="user", target_id=target.id,
+                   previous_value=str(target.deactivated_at), new_value=(payload.reason if payload and payload.reason else None))
+        target.deactivated_at = None
+    db.commit()
+    return {"user_id": target.id, "deactivated_at": None}
