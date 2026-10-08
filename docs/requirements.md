@@ -1325,4 +1325,23 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **Suspension:** suspend and reactivate notify everyone acting for the stakeholder (`notify_team`).
   - **Tests:** `tests/test_stage9_2_account_lifecycle.py`.
 
+- **9.3 Operator view of a requirement's life:**
+  - **Already working:**
+    - **Admin detail:** the requirement with its offers. Sealed offers are visible to admins as platform oversight; owners stay sealed.
+    - **Admin edits** follow the owner's amendment rules (draft/open only, recorded amendments).
+    - **Suspend and delete:** admins can suspend requirements and offers. Deleting is refused once offers or an award exist (suspend instead); all of this is audited.
+    - **Read-only history:** admins can already read `/projects/{id}/amendments` and the agreement (timeline, deliverables, changes) and can change none of it.
+  - **Gaps found:**
+    - **Stale status:** the admin requirement list and detail didn't apply deadline expiry first, so a requirement past its deadline could show "open".
+    - **The trace stopped at the offers:** no version, no award, no resulting transaction or its history. Offers didn't show which requirement version they priced.
+  - **Fixed:**
+    - **Expiry first:** `sync_expired_projects` runs before the admin lists and detail.
+    - **`_decision_trace` in the admin detail:**
+      - `version` (material revision, amendment count);
+      - `award` (offer, provider, amount, date, and `offer_priced_on`, the material version the winning offer priced; `project_revision` is the requirement's edit counter, not its version);
+      - `transaction` (status, key dates, hold, completion awaiting, termination reason).
+    - **Admin offers:** each carries `based_on_material_revision` and `submitted_at`.
+    - **UI:** an `AdminDecisionTrace` section on the admin requirement page: version, award, transaction status and the transaction's own history from the existing agreement endpoint (read-only). Offers show "priced on vN", flagged when it's an earlier version.
+  - **Tests:** `tests/test_stage9_3_requirement_trace.py`, covering scenarios A–H.
+
 _Later Stage 9 steps are added as they are implemented._

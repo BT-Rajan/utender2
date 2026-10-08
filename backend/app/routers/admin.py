@@ -1109,6 +1109,8 @@ def _offer_admin_fields(o: Offer, p: Project | None, cp: ServiceProviderProfile 
         "status": o.status,
         "is_suspended": o.is_suspended,
         "revision": o.revision,
+        "based_on_material_revision": o.based_on_material_revision,  # Stage 9.3: the requirement version it priced
+        "submitted_at": o.submitted_at,
         "created_at": o.created_at,
         "updated_at": o.updated_at,
     }
@@ -1116,6 +1118,7 @@ def _offer_admin_fields(o: Offer, p: Project | None, cp: ServiceProviderProfile 
 
 @router.get("/projects")
 def list_all_projects(db: Session = Depends(get_db)):
+    sync_expired_projects(db)  # Stage 9.3: no requirement listed "open" past its deadline
     rows = db.query(Project, User).join(User, Project.owner_id == User.id).order_by(Project.created_at.desc()).all()
     offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(tendered()).group_by(Offer.project_id).all())
     return [{**_project_admin_fields(p, u), "offer_count": offer_counts.get(p.id, 0)} for p, u in rows]
@@ -1126,6 +1129,7 @@ def list_owner_projects(owner_id: str, db: Session = Depends(get_db)):
     """Every project a given owner has posted — the drill-down from the
     owner detail page into what they've actually put on the marketplace,
     each one with a link into its own offers below."""
+    sync_expired_projects(db)  # Stage 9.3
     _get_active_owner_profile(db, owner_id)  # 404s outright for a since-promoted admin account
     owner_user = db.get(User, owner_id)
     rows = db.query(Project).filter(Project.owner_id == owner_id).order_by(Project.created_at.desc()).all()
@@ -1135,6 +1139,9 @@ def list_owner_projects(owner_id: str, db: Session = Depends(get_db)):
 
 @router.get("/projects/{project_id}")
 def admin_project_detail(project_id: str, db: Session = Depends(get_db)):
+    # Stage 9.3: a deadline that has passed is applied first, so a requirement
+    # is never shown "open" after it closed (as every other read does).
+    sync_expired_projects(db)
     project = db.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found.")
@@ -1153,6 +1160,48 @@ def admin_project_detail(project_id: str, db: Session = Depends(get_db)):
         # correction can follow it.
         "pricing_basis": project.pricing_basis,
         "items": [{"id": i.id, "position": i.position, "description": i.description, "quantity": str(i.quantity) if i.quantity is not None else None, "unit": i.unit} for i in project.items],
+        **_decision_trace(db, project),
+    }
+
+
+def _decision_trace(db: Session, project: Project) -> dict:
+    """Stage 9.3: the rest of the chain, from the authoritative records --
+    the requirement's version (Stage 3.17), the award if any, and the
+    transaction it started (Stage 7), with nothing recalculated."""
+    from app.models.agreement import Agreement
+    from app.models.project_amendment import ProjectAmendment
+
+    award = db.query(AwardRecord).filter(AwardRecord.project_id == project.id).first()
+    winner = db.get(ServiceProviderProfile, award.service_provider_id) if award else None
+    winning_offer = db.get(Offer, award.offer_id) if award else None
+    agreement = db.query(Agreement).filter(Agreement.project_id == project.id).first()
+    return {
+        "version": {
+            "material_revision": project.material_revision,
+            "amendments": db.query(func.count(ProjectAmendment.id)).filter(ProjectAmendment.project_id == project.id).scalar(),
+        },
+        "award": {
+            "offer_id": award.offer_id,
+            "service_provider_id": award.service_provider_id,
+            "service_provider_company_name": winner.company_name if winner else None,
+            "amount": str(award.amount) if award.amount is not None else None,
+            "project_revision": award.project_revision,  # the requirement's edit counter at award (not its material version)
+            "offer_revision": award.offer_revision,
+            # the material version (Stage 3.17) the winning offer priced
+            "offer_priced_on": winning_offer.based_on_material_revision if winning_offer else None,
+            "created_at": award.created_at,
+        } if award else None,
+        "transaction": {
+            "status": agreement.status,
+            "created_at": agreement.created_at,
+            "activated_at": agreement.activated_at,
+            "work_started_at": agreement.work_started_at,
+            "on_hold_at": agreement.on_hold_at,
+            "completion_status": agreement.completion_status,
+            "completed_at": agreement.completed_at,
+            "terminated_at": agreement.terminated_at,
+            "termination_reason": agreement.termination_reason,
+        } if agreement else None,
     }
 
 

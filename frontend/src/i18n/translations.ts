@@ -372,6 +372,22 @@ export interface Dictionary {
     reactivateBody: string;
     error: string;
   };
+  trace: {
+    heading: string;
+    version: string;
+    amendments: string;
+    awardedTo: string;
+    pricedOn: string;
+    earlierVersion: string;
+    noAward: string;
+    transaction: string;
+    onHold: string;
+    completionSubmitted: string;
+    owner: string;
+    provider: string;
+    status: { preparing: string; active: string; completed: string; terminated: string };
+    kinds: { awarded: string; in_force: string; document: string; started: string; progress: string; on_hold: string; resumed: string; delivered: string; accepted: string; returned: string; change_proposed: string; change_agreed: string; change_rejected: string; change_withdrawn: string; change_lapsed: string; terminated: string; completed: string };
+  };
   history: {
     heading: string;
     awarded: string;
@@ -1967,6 +1983,40 @@ export const en: Dictionary = {
     reactivateTitle: "Reactivate this person's account?",
     reactivateBody: "They can sign in again, with exactly the organization and rights they had before.",
     error: "The account couldn't be changed.",
+  },
+  trace: {
+    heading: "Decision and transaction",
+    version: "Current version: v{n}",
+    amendments: "{n} amendments",
+    awardedTo: "Awarded to",
+    pricedOn: "priced on v{n}",
+    earlierVersion: "an earlier version",
+    noAward: "No award.",
+    transaction: "Transaction",
+    onHold: "on hold since",
+    completionSubmitted: "completion submitted, awaiting the owner",
+    owner: "owner",
+    provider: "provider",
+    status: { preparing: "agreement being prepared", active: "in progress", completed: "completed", terminated: "terminated" },
+    kinds: {
+      awarded: "Awarded",
+      in_force: "Agreement in force",
+      document: "Document added",
+      started: "Work started",
+      progress: "Progress update",
+      on_hold: "Put on hold",
+      resumed: "Resumed",
+      delivered: "Deliverable submitted",
+      accepted: "Deliverable accepted",
+      returned: "Deliverable returned",
+      change_proposed: "Change proposed",
+      change_agreed: "Change agreed",
+      change_rejected: "Change rejected",
+      change_withdrawn: "Change withdrawn",
+      change_lapsed: "Change lapsed",
+      terminated: "Terminated",
+      completed: "Completed",
+    },
   },
   history: {
     heading: "History",
@@ -3620,6 +3670,40 @@ export const ar: Dictionary = {
     reactivateTitle: "إعادة تفعيل حساب هذا الشخص؟",
     reactivateBody: "يمكنه تسجيل الدخول مجددًا، بالمنظمة والصلاحيات نفسها التي كانت لديه تمامًا.",
     error: "تعذر تغيير الحساب.",
+  },
+  trace: {
+    heading: "القرار والمعاملة",
+    version: "الإصدار الحالي: v{n}",
+    amendments: "{n} تعديلات",
+    awardedTo: "أُرسي على",
+    pricedOn: "مُسعَّر على v{n}",
+    earlierVersion: "إصدار سابق",
+    noAward: "لا ترسية.",
+    transaction: "المعاملة",
+    onHold: "متوقفة منذ",
+    completionSubmitted: "قُدِّم الإنجاز وبانتظار المالك",
+    owner: "المالك",
+    provider: "مقدم الخدمة",
+    status: { preparing: "الاتفاقية قيد الإعداد", active: "قيد التنفيذ", completed: "مكتملة", terminated: "منتهية" },
+    kinds: {
+      awarded: "الترسية",
+      in_force: "سريان الاتفاقية",
+      document: "إضافة مستند",
+      started: "بدء العمل",
+      progress: "تحديث التقدم",
+      on_hold: "إيقاف مؤقت",
+      resumed: "استئناف",
+      delivered: "تسليم مخرج",
+      accepted: "قبول مخرج",
+      returned: "إعادة مخرج",
+      change_proposed: "اقتراح تغيير",
+      change_agreed: "الموافقة على تغيير",
+      change_rejected: "رفض تغيير",
+      change_withdrawn: "سحب تغيير",
+      change_lapsed: "سقوط تغيير",
+      terminated: "إنهاء",
+      completed: "اكتمال",
+    },
   },
   history: {
     heading: "السجل",

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import type { AdminOffer, AdminProjectDetail } from "@/api/types";
+import { AdminDecisionTrace } from "@/components/AdminDecisionTrace";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
@@ -24,7 +25,7 @@ const OFFER_STATUS_BADGE: Record<string, string> = {
 
 type AdminItems = NonNullable<AdminProjectDetail["items"]>;
 
-function OfferRow({ offer, projectId, items, t }: { offer: AdminOffer; projectId: string; items: AdminItems | null; t: (k: string) => string }) {
+function OfferRow({ offer, projectId, items, t, currentRevision }: { offer: AdminOffer; projectId: string; items: AdminItems | null; t: (k: string) => string; currentRevision: number }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [amount, setAmount] = useState(offer.amount ?? "");
@@ -143,6 +144,12 @@ function OfferRow({ offer, projectId, items, t }: { offer: AdminOffer; projectId
     <tr className="border-b border-border">
       <td className="py-3 px-2.5">
         <div className="text-[13px]">{offer.service_provider_company_name ?? "—"}</div>
+        {/* Stage 9.3: which version of the requirement it priced, and when it was submitted. */}
+        <div className="font-mono text-[10px] text-steel">
+          {t("trace.pricedOn").replace("{n}", String(offer.based_on_material_revision ?? 0))}
+          {(offer.based_on_material_revision ?? 0) < currentRevision && <span className="text-amber-dark"> · {t("trace.earlierVersion")}</span>}
+          {offer.submitted_at && ` · ${new Date(offer.submitted_at).toLocaleString()}`}
+        </div>
         {offer.is_suspended && (
           <span className="font-mono text-[10px] uppercase px-2 py-0.5 rounded-full bg-red-tint text-red">
             {t("admin.projectDetail.offerSuspendedBadge")}
@@ -318,6 +325,8 @@ export function AdminProjectDetailPage() {
           </p>
         </div>
 
+        <AdminDecisionTrace projectId={id!} detail={detail} />
+
         <div className="bg-white border border-border rounded px-5 py-4.5">
           <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-3">
             {t("admin.projectDetail.offersHeading")} ({offers.length})
@@ -338,7 +347,7 @@ export function AdminProjectDetailPage() {
                 </thead>
                 <tbody>
                   {offers.map((o) => (
-                    <OfferRow key={o.id} offer={o} projectId={id!} items={detail.pricing_basis === "per_item" ? detail.items ?? [] : null} t={t} />
+                    <OfferRow key={o.id} offer={o} projectId={id!} items={detail.pricing_basis === "per_item" ? detail.items ?? [] : null} t={t} currentRevision={detail.version?.material_revision ?? 0} />
                   ))}
                 </tbody>
               </table>
