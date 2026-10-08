@@ -42,14 +42,15 @@ def test_each_side_sees_what_it_wrote_and_what_it_received_and_no_one_else_does(
     assert colleague.get(f"/owner/projects/{pid}/review").json()["comment"] == OWNER_TEXT
     for client in (amal, sami):
         assert _received(client, "service-provider", pid).json() == {
-            "rating": 5, "comment": OWNER_TEXT, "created_at": db.query(Review).one().created_at.isoformat() + "Z"}
+            "rating": 5, "comment": OWNER_TEXT, "created_at": db.query(Review).one().created_at.isoformat() + "Z",
+            "response": None, "response_at": None}
     # Provider -> owner, symmetrically.
     assert owner.get(f"/owner/projects/{pid}/review/received").json() is None
     assert sami.post("/service-provider/reviews", json={"project_id": pid, "rating": 4, "comment": PROVIDER_TEXT}).status_code == 200
     assert amal.get(f"/service-provider/projects/{pid}/review").json()["comment"] == PROVIDER_TEXT
     for client in (owner, colleague):
         got = _received(client, "owner", pid).json()
-        assert set(got) == {"rating", "comment", "created_at"} and (got["rating"], got["comment"]) == (4, PROVIDER_TEXT)
+        assert set(got) == {"rating", "comment", "created_at", "response", "response_at"} and (got["rating"], got["comment"]) == (4, PROVIDER_TEXT)
 
     # Everyone else: the losing provider, an unrelated owner and provider, a role mismatch, no session.
     other_owner = _account(db, "owner", "other@example.com")

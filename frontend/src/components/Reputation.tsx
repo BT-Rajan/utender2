@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/api/client";
+import { ReviewResponse } from "@/components/ReceivedReview";
 import { useI18n } from "@/i18n/I18nContext";
 import { fullDate } from "@/lib/format";
 
@@ -7,7 +8,7 @@ interface Reputation {
   completed_transactions: number;
   review_count: number;
   avg_rating: number | null;
-  recent_reviews: { rating: number; comment: string | null; created_at: string }[];
+  recent_reviews: { rating: number; comment: string | null; created_at: string; response: string | null; response_at: string | null }[];
 }
 
 // Stage 8.7/8.8: a provider's or an owner's U-Tender track record -- completed
@@ -41,6 +42,7 @@ export function Reputation({ url, of, own = false }: { url: string; of: "provide
                   </span>
                   {r.comment && <p className="text-sm text-steel mt-1 whitespace-pre-wrap break-words" dir="auto">{r.comment}</p>}
                   <div className="font-mono text-[10px] text-steel mt-1">{k("verified")} · {fullDate(r.created_at, language)}</div>
+                  <ReviewResponse response={r.response} at={r.response_at} label={t(own ? "review.yourResponse" : of === "owner" ? "review.ownerResponse" : "review.providerResponse")} />
                 </li>
               ))}
             </ul>

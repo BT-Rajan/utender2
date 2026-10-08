@@ -17,8 +17,8 @@ from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.saved_opportunity import SavedOpportunity
 from app.models.user import User
 from app.schemas.service_provider import ServiceProviderProfileOut, MyBidOut, SubmitForReview
-from app.schemas.review import ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut
-from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_review, review_of
+from app.schemas.review import ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut, ReviewResponseCreate
+from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_response, record_review, review_of
 from app.schemas.document import ServiceProviderDocumentOut, DocumentRequirementOut
 from app.schemas.common import UTCDateTime
 from app.schemas.project import FeedPage, ProjectOut
@@ -617,6 +617,15 @@ def review_received_from_the_owner(project_id: str, user: User = Depends(require
     providers see only the aggregate rating owners already see on offers."""
     _winning_side(db, user, project_id)
     return review_of(db, project_id, OWNER_TO_PROVIDER)
+
+
+@router.post("/projects/{project_id}/review/received/response", response_model=ReceivedReviewOut)
+def respond_to_the_owners_review(project_id: str, payload: ReviewResponseCreate, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """Stage 8.9: the winning provider side's one, final response to the
+    owner's review of it -- from an approved, unsuspended account, under the
+    requirement's lock."""
+    project = _winning_side(db, user, project_id, lock=True)
+    return record_response(db, project, OWNER_TO_PROVIDER, user, payload.response)
 
 
 @router.post("/reviews", response_model=ReviewOut)

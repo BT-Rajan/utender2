@@ -27,9 +27,9 @@ from app.schemas.document import DocumentRequirementOut, OwnerDocumentOut
 from app.schemas.offer import ShortlistOut, EvaluationNoteEdit, EvaluationNoteIn, EvaluationNoteOut, OfferComparisonOut, OfferOut, OfferRevisionOut, OwnerOfferOut
 from app.schemas.owner import OwnerProfileOut
 from app.schemas.project import EligibilityQualification, ProjectOut
-from app.schemas.review import OwnerReputationOut, ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut
+from app.schemas.review import OwnerReputationOut, ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut, ReviewResponseCreate
 from app.services.audit import log_action
-from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_review, review_of
+from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_response, record_review, review_of
 from app.services.email import notify_provider_requirement_ended, notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify, notify_team
@@ -987,6 +987,15 @@ def get_received_review(project_id: str, user: User = Depends(require_owner), db
     if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     return review_of(db, project_id, PROVIDER_TO_OWNER)
+
+
+@router.post("/projects/{project_id}/review/received/response", response_model=ReceivedReviewOut)
+def respond_to_received_review(project_id: str, payload: ReviewResponseCreate, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 8.9: the owner side's one, final response to the winning
+    provider's review of it -- from an active, verified owner account, under
+    the requirement's lock, like every other owner action."""
+    project = _get_owned_project(project_id, user, db, lock=True)
+    return record_response(db, project, PROVIDER_TO_OWNER, user, payload.response)
 
 
 @router.get("/reputation", response_model=OwnerReputationOut)

@@ -17,6 +17,11 @@ class ReviewCreate(BaseModel):
     comment: str | None = Field(default=None, max_length=2000)
 
 
+class ReviewResponseCreate(BaseModel):
+    """Stage 8.9: only the text -- the review, the responding side and the time all come from the server."""
+    response: str = Field(min_length=1, max_length=2000)
+
+
 class ReviewOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -28,6 +33,8 @@ class ReviewOut(BaseModel):
     comment: str | None
     direction: str  # Stage 8.4: owner_to_provider / provider_to_owner
     created_at: UTCDateTime
+    response: str | None = None  # Stage 8.9: the reviewed side's response, if any
+    response_at: UTCDateTime | None = None
 
 
 class ReceivedReviewOut(BaseModel):
@@ -39,6 +46,8 @@ class ReceivedReviewOut(BaseModel):
     rating: int
     comment: str | None
     created_at: UTCDateTime
+    response: str | None = None  # Stage 8.9: the reviewed side's response, beside the review
+    response_at: UTCDateTime | None = None
 
 
 class ProviderReputationOut(BaseModel):

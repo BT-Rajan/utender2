@@ -261,6 +261,15 @@ export interface Dictionary {
     confirmBody: string;
     receivedHeading: string;
     receivedOn: string;
+    respond: string;
+    responsePlaceholder: string;
+    respondConfirmTitle: string;
+    respondConfirmBody: string;
+    responseError: string;
+    yourResponse: string;
+    theirResponse: string;
+    ownerResponse: string;
+    providerResponse: string;
   };
   reputation: {
     heading: string;
@@ -1744,6 +1753,15 @@ export const en: Dictionary = {
     confirmBody: "Your rating and comment are recorded against this completed transaction and count towards the service provider's public rating. A review can't be changed afterwards.",
     receivedHeading: "{party}'s review of you",
     receivedOn: "Received on",
+    respond: "Respond",
+    responsePlaceholder: "Respond to this review (optional)",
+    respondConfirmTitle: "Post this response?",
+    respondConfirmBody: "Your response is shown with this review wherever the review is shown. It doesn't change the review or its rating, and it can't be changed afterwards.",
+    responseError: "The response couldn't be posted.",
+    yourResponse: "Your response",
+    theirResponse: "Their response",
+    ownerResponse: "The owner's response",
+    providerResponse: "The provider's response",
   },
   reputation: {
     heading: "U-Tender track record",
@@ -3284,6 +3302,15 @@ export const ar: Dictionary = {
     confirmBody: "يُسجَّل تقييمك وتعليقك على هذه المعاملة المكتملة ويُحتسب ضمن التقييم العام لمقدم الخدمة. لا يمكن تغيير التقييم بعد ذلك.",
     receivedHeading: "تقييم {party} لك",
     receivedOn: "استُلم في",
+    respond: "رد",
+    responsePlaceholder: "رد على هذا التقييم (اختياري)",
+    respondConfirmTitle: "نشر هذا الرد؟",
+    respondConfirmBody: "يظهر ردك مع هذا التقييم أينما ظهر التقييم. لا يغيّر التقييم أو درجته، ولا يمكن تغييره بعد ذلك.",
+    responseError: "تعذر نشر الرد.",
+    yourResponse: "ردك",
+    theirResponse: "ردهم",
+    ownerResponse: "رد المالك",
+    providerResponse: "رد مقدم الخدمة",
   },
   reputation: {
     heading: "السجل على U-Tender",

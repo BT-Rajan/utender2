@@ -1104,4 +1104,30 @@ be added as its prompts (5.1, 5.2, …) are delivered.
       - on the provider's requirement view: the owner's track record.
   - **Tests:** `tests/test_stage8_8_owner_reputation.py`.
 
+- **8.9 Review responses (reviews stay immutable):**
+  - **Already working:**
+    - **Reviews are immutable by design (8.5):** there is no edit, delete or by-id path, a resubmission gets 409, and the UI states it before submission. Correction is therefore intentionally not supported, and none was added.
+    - **Reputation (8.7/8.8)** reads the authoritative review rows.
+  - **Gaps found:**
+    - **No response:** the reviewed party had no way to answer a review.
+  - **Fixed:**
+    - **Storage (migration 0059):** the reviewed side's one, final response is kept on the review row: `response`, `response_at` (server time), `responded_by` (the member).
+      - `ck_review_response_complete` requires the text and the time together.
+      - The `review_response` notification type is added.
+    - **`services/reviews.record_response`:** sets only the response fields, never rating, comment, reviewer or parties, so no reputation changes. It refuses:
+      - a suspended requirement (400);
+      - no review (404);
+      - an existing response (409, explained);
+      - blank text (400).
+      - It also writes an audit entry (`review.response.<direction>`) in the same transaction, and tells the reviewer's organisation after the commit (no loop).
+    - **Endpoints:**
+      - `POST /owner/projects/{id}/review/received/response`, under the owner-side lock gate;
+      - `POST /service-provider/projects/{id}/review/received/response`, under `_winning_side(lock=True)`, approved accounts only.
+      - The responding party is the review's subject, from the transaction; the reviewer, other organisations, losers and former members are refused (403/404).
+    - **Visibility (8.6):** the response travels only with its review (`ReviewOut`, `ReceivedReviewOut`, reputation `recent_reviews`). Providers weighing an owner still see counts only.
+    - **UI:**
+      - `ReceivedReview` takes a response, with a confirmation first.
+      - `ReviewResponse` shows it under the review on both sides and in the reputation lists.
+  - **Tests:** `tests/test_stage8_9_review_response.py`.
+
 _Stage 9 onwards is added as it is implemented._

@@ -5,6 +5,7 @@ lock; this records the review against the transaction's own parties (never
 ids from the request), keeps the provider's public rating in step, writes the
 audit entry in the same transaction, and tells the reviewed party."""
 import logging
+from datetime import datetime
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -71,26 +72,55 @@ def record_review(db: Session, project: Project, direction: str, reviewer: User,
     audit.log_action(db, actor_id=reviewer.id, action=f"review.{direction}", target_type="project", target_id=project.id,
                      new_value=f"{review.id} rating:{review.rating} owner:{review.owner_id} service_provider:{review.service_provider_id}")
     db.refresh(review)
-    _tell(db, project, award, direction)
+    _tell(db, project, award, to_provider=direction == OWNER_TO_PROVIDER, kind=NotificationType.review_received)
     return review
 
 
-def _tell(db: Session, project: Project, award: AwardRecord, direction: str) -> None:
-    """The reviewed party is told a review was recorded -- best-effort, after
-    the commit; a failure never undoes the review. Its content isn't in the
-    notification; the reviewed side reads it from its
-    transaction page (Stage 8.6)."""
+def record_response(db: Session, project: Project, direction: str, responder: User, text: str) -> Review:
+    """Stage 8.9: the reviewed side's one, final response to the review in
+    `direction` -- beside the review, never changing its rating, comment or
+    parties, so neither side's reputation moves. Callers authorize the
+    reviewed side and hold the requirement's lock; the responding party is
+    the review's own subject, never one named in the request."""
+    if project.is_suspended:
+        raise HTTPException(status_code=400, detail="This requirement is suspended.")
+    review = review_of(db, project.id, direction)
+    if review is None:
+        raise HTTPException(status_code=404, detail="There is no review to respond to.")
+    if review.response is not None:
+        raise HTTPException(status_code=409, detail="This review already has a response (from a colleague or another tab). This page now shows the latest.")
+    text = (text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Write a response first.")
+    review.response = text
+    review.response_at = datetime.utcnow().replace(microsecond=0)
+    review.responded_by = responder.id
+    # log_action commits: the response and its audit entry land together.
+    audit.log_action(db, actor_id=responder.id, action=f"review.response.{direction}", target_type="project", target_id=project.id,
+                     new_value=f"{review.id}")
+    db.refresh(review)
+    award = db.query(AwardRecord).filter(AwardRecord.project_id == project.id).first()
+    # The reviewer's side is told; the reviewed side wrote it, so no loop.
+    _tell(db, project, award, to_provider=direction == PROVIDER_TO_OWNER, kind=NotificationType.review_response)
+    return review
+
+
+def _tell(db: Session, project: Project, award: AwardRecord, *, to_provider: bool, kind: NotificationType) -> None:
+    """The other side is told a review (or a response, 8.9) was recorded --
+    best-effort, after the commit; a failure never undoes it. Its content
+    isn't in the notification; each side reads it on its transaction page
+    (Stage 8.6)."""
     try:
-        if direction == OWNER_TO_PROVIDER:
+        if to_provider:
             winner = db.get(Offer, award.offer_id)
             notify_service.notify_team(
-                db, db.get(User, award.service_provider_id), NotificationType.review_received,
+                db, db.get(User, award.service_provider_id), kind,
                 link=f"/service-provider/projects/{project.id}/offer", organization_id=winner.organization_id if winner else None,
                 project_title=project.title, party="owner", party_ar="المالك",
             )
         else:
             notify_service.notify_team(
-                db, db.get(User, project.owner_id), NotificationType.review_received,
+                db, db.get(User, project.owner_id), kind,
                 link=f"/owner/projects/{project.id}", organization_id=project.organization_id,
                 project_title=project.title, party="service provider", party_ar="مقدم الخدمة",
             )

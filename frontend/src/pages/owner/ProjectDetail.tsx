@@ -21,7 +21,7 @@ import { TenderRulesEditor } from "@/components/TenderRules";
 import { QualityCheck, type QualityReport } from "@/components/QualityCheck";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { AgreementPanel } from "@/components/AgreementPanel";
-import { ReceivedReview } from "@/components/ReceivedReview";
+import { ReceivedReview, ReviewResponse } from "@/components/ReceivedReview";
 import { ClosureOutcome, EndRequirement, StartAgain, outcomeLabel } from "@/components/ClosureOutcome";
 import { AmendPublishedForm, AmendmentsList, PauseControl } from "@/components/PostPublication";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
@@ -37,6 +37,8 @@ interface Review {
   rating: number;
   comment: string | null;
   created_at: string;
+  response?: string | null;  // Stage 8.9: the provider's response, if any
+  response_at?: string | null;
 }
 
 // Stage 7.1: the award handover -- read from the permanent award record, the
@@ -1002,6 +1004,7 @@ export function OwnerProjectDetailPage() {
               <p className="font-mono text-[10.5px] text-steel-light mt-2">
                 {t("owner.projectDetail.submittedOn")} {new Date(existingReview.created_at).toLocaleDateString()}
               </p>
+              <ReviewResponse response={existingReview.response} at={existingReview.response_at} label={t("review.theirResponse")} />
             </div>
           ) : (
             <form

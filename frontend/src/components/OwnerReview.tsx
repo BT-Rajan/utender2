@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiFetch } from "@/api/client";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { ErrorBanner } from "@/components/ErrorBanner";
-import { ReceivedReview } from "@/components/ReceivedReview";
+import { ReceivedReview, ReviewResponse } from "@/components/ReceivedReview";
 import { RatingInput } from "@/components/RatingInput";
 import { useI18n } from "@/i18n/I18nContext";
 import { fullDate } from "@/lib/format";
@@ -13,6 +13,8 @@ interface ReviewRecord {
   rating: number;
   comment: string | null;
   created_at: string;
+  response?: string | null;
+  response_at?: string | null;
 }
 
 // Stage 8.4: the winning provider reviews the owner -- once the transaction is
@@ -56,6 +58,7 @@ export function OwnerReview({ projectId }: { projectId: string }) {
           </span>
           {review.comment && <p className="text-sm text-steel mt-1 whitespace-pre-wrap break-words" dir="auto">{review.comment}</p>}
           <div className="font-mono text-[10px] text-steel mt-1">{t("ownerReview.submitted")} {fullDate(review.created_at, language)}</div>
+          <ReviewResponse response={review.response} at={review.response_at} label={t("review.theirResponse")} />
         </div>
       ) : (
         <form

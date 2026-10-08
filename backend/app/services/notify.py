@@ -74,6 +74,10 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.en: ("New review on {project_title}", "The {party} reviewed the completed work on {project_title}."),
         Language.ar: ("تقييم جديد على {project_title}", "قيّم {party_ar} العمل المكتمل في {project_title}."),
     },
+    NotificationType.review_response: {
+        Language.en: ("Response to your review on {project_title}", "The {party} responded to your review of the completed work on {project_title}."),
+        Language.ar: ("رد على تقييمك في {project_title}", "ردّ {party_ar} على تقييمك للعمل المكتمل في {project_title}."),
+    },
     NotificationType.new_requirement: {
         Language.en: ("New opportunity: {project_title}", "A new {trade} requirement in {area} is open for offers until {deadline}. You meet its conditions."),
         Language.ar: ("فرصة جديدة: {project_title}", "طلب جديد لأعمال {trade} في {area} مفتوح للعروض حتى {deadline}. أنت تستوفي شروطه."),

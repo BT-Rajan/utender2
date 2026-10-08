@@ -53,7 +53,7 @@ def test_reputation_follows_completed_work_and_owner_reviews_only(db):
     r = mine()
     assert (r["completed_transactions"], r["review_count"], r["avg_rating"]) == (2, 2, 4.5)
     assert [(x["rating"], x["comment"]) for x in r["recent_reviews"]] in ([(5, "Excellent."), (4, "Solid work.")], [(4, "Solid work."), (5, "Excellent.")])
-    assert all(set(x) == {"rating", "comment", "created_at"} for x in r["recent_reviews"])
+    assert all(set(x) == {"rating", "comment", "created_at", "response", "response_at"} for x in r["recent_reviews"])
 
     # 8-9. A cancelled requirement, a lost tender and an awarded-but-unfinished one add nothing.
     p3 = _tender(owner, title="Cancelled job")

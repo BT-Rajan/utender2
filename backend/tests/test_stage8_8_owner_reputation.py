@@ -46,7 +46,7 @@ def test_owner_reputation_follows_completed_work_and_provider_reviews_only(db):
     r = mine()
     assert (r["completed_transactions"], r["review_count"], r["avg_rating"]) == (2, 2, 4.5)
     assert sorted(x["rating"] for x in r["recent_reviews"]) == [4, 5]
-    assert all(set(x) == {"rating", "comment", "created_at"} for x in r["recent_reviews"])
+    assert all(set(x) == {"rating", "comment", "created_at", "response", "response_at"} for x in r["recent_reviews"])
 
     # 8-9. A cancelled requirement and an unfinished award add nothing; a non-participant's review and a replay are refused.
     p3 = _tender(owner, title="Cancelled job")

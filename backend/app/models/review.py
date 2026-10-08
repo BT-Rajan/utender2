@@ -16,6 +16,9 @@ class Review(Base):
         # Stage 8.5: a review is one of the two directions, between two different parties.
         CheckConstraint("direction IN ('owner_to_provider', 'provider_to_owner')", name="ck_review_direction"),
         CheckConstraint("owner_id <> service_provider_id", name="ck_review_two_parties"),
+        # Stage 8.9: a response is whole -- its text and its time together, or neither.
+        CheckConstraint("(response IS NULL AND response_at IS NULL) OR (response IS NOT NULL AND response_at IS NOT NULL)",
+                        name="ck_review_response_complete"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
@@ -32,3 +35,8 @@ class Review(Base):
     rating: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # Stage 8.9: the reviewed side's one, final response -- beside the review,
+    # never changing it (rating, comment and parties stay as written).
+    response: Mapped[str | None] = mapped_column(Text, nullable=True)
+    response_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    responded_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
