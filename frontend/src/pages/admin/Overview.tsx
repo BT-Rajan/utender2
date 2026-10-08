@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { apiFetch } from "@/api/client";
+import { FindPerson } from "@/components/AdminSupport";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
 import { fullDate } from "@/lib/format";
@@ -67,6 +68,7 @@ export function AdminOverviewPage() {
           </button>
         </div>
       </div>
+      <div className="mb-4"><FindPerson /></div>
       {isPending && <p className="text-sm text-steel">{t("ops.loading")}</p>}
       {error && <ErrorBanner message={t("ops.failed")} />}
       {data && (

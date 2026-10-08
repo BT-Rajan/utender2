@@ -380,6 +380,7 @@ AR: dict[str, str] = {
     "This account has been deactivated. Contact U-Tender if you think this is a mistake.": "تم تعطيل هذا الحساب. تواصل مع U-Tender إذا كنت تعتقد أن هذا خطأ.",
     "This account acts for an organization. Manage it from the organization's page.": "هذا الحساب يعمل باسم منظمة. أدِره من صفحة المنظمة.",
     "Account not found.": "الحساب غير موجود.",
+    "This account has a history on record. Deactivate it instead, which keeps that history.": "لهذا الحساب سجل محفوظ. عطّله بدلًا من ذلك، فيبقى السجل محفوظًا.",
     "Your offer draft was changed somewhere else (another tab, device or team member) since you opened it.": "تغيّرت مسودة عرضك في مكان آخر (علامة تبويب أو جهاز آخر أو عضو في الفريق) منذ فتحتها.",
     "Reload to see the latest, then make your change again.": "أعد التحميل لرؤية أحدث نسخة، ثم أعد إجراء التعديل.",
     "This requirement is temporarily unavailable.": "هذا الطلب غير متاح مؤقتًا.",

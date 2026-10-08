@@ -1344,4 +1344,31 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **UI:** an `AdminDecisionTrace` section on the admin requirement page: version, award, transaction status and the transaction's own history from the existing agreement endpoint (read-only). Offers show "priced on vN", flagged when it's an earlier version.
   - **Tests:** `tests/test_stage9_3_requirement_trace.py`, covering scenarios A–H.
 
+- **9.4 Supporting a customer:**
+  - **Already working:**
+    - **Each layer has its record:** the person (9.2: account state, membership), the organisation (`describe`: verification, eligibility, marketplace status), billing (provider detail: subscription status, override history), the requirement → award → transaction trace (9.3), and the overview's exceptions (9.1).
+    - **Customer-facing refusals:** every refusal tells the customer the business reason (eligibility reasons, explained 4xx), never "try again".
+    - **Safe admin actions:** verification decisions, document review, suspend, deactivate, moderation and the amendment-ruled edit. None can force a state, an offer or an award.
+  - **Gaps found:**
+    - **No diagnosis of other people's blockers:**
+      - an admin couldn't find a person by email (organisation members weren't listed after 9.2);
+      - nor see why a provider can't respond to a requirement, or where its offer stands;
+      - nor see what blocks a draft's publication. Those answers existed only for the customer themselves.
+    - **Unaudited changes to business state:** admin account deletion, admin edits to a provider's record, and changes to a document's expiry.
+    - **Deletion bug (MySQL only):** deleting any account that had ever acted failed with a server error (the audit log's foreign key).
+  - **Fixed (diagnostics are read-only, from the rules the marketplace enforces):**
+    - **`GET /admin/users?email=`:** the person, the stakeholder they act for, their role in it, and the state of both. No password, token or session data.
+    - **`GET /admin/projects/{id}/provider-check/{provider}`:** `participation()` and `ineligibility_reasons()` (exactly what the offer endpoints enforce), plus the provider's own offer: state, version priced, won.
+    - **`GET /admin/projects/{id}/quality`:** `requirement_quality.check` (what the Publish button runs), plus whether the owner may publish at all.
+    - **Audit entries:**
+      - admin provider-record edits (`service_provider.admin_edit`, with before/after);
+      - document expiry (`document.expiry_set`);
+      - account deletion (`owner.delete` / `service_provider.delete`, with who it was).
+    - **Deletion:** an account with recorded history isn't deleted (that would fail, or erase who did what); the admin is pointed to deactivation (9.2), which keeps the history. The more specific existing guards still answer first.
+    - **UI:**
+      - "Find a person" on the admin overview;
+      - "What blocks publishing" on a draft's admin page;
+      - "Why can't a provider respond?" (by email) on an open requirement's admin page.
+  - **Tests:** `tests/test_stage9_4_support_diagnostics.py`.
+
 _Later Stage 9 steps are added as they are implemented._

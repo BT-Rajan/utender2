@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import type { AdminOffer, AdminProjectDetail } from "@/api/types";
 import { AdminDecisionTrace } from "@/components/AdminDecisionTrace";
+import { ProviderCheck, PublishCheck } from "@/components/AdminSupport";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
@@ -326,6 +327,9 @@ export function AdminProjectDetailPage() {
         </div>
 
         <AdminDecisionTrace projectId={id!} detail={detail} />
+        {/* Stage 9.4: support checks, from the same rules the marketplace enforces. */}
+        {detail.project.status === "draft" && <PublishCheck projectId={id!} />}
+        {detail.project.status === "open" && <ProviderCheck projectId={id!} />}
 
         <div className="bg-white border border-border rounded px-5 py-4.5">
           <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-3">

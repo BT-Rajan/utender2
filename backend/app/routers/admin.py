@@ -362,11 +362,15 @@ def review_document(payload: ReviewDocumentDecision, admin: User = Depends(requi
 
 
 @router.patch("/documents/{document_id}/expiry", response_model=ServiceProviderDocumentOut)
-def set_document_expiry(document_id: str, payload: DocumentExpiryUpdate, db: Session = Depends(get_db)):
+def set_document_expiry(document_id: str, payload: DocumentExpiryUpdate, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     doc = db.get(ServiceProviderDocument, document_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
+    previous = doc.expires_on
     doc.expires_on = payload.expires_on
+    if previous != doc.expires_on:  # Stage 9.4: a qualification's validity decides eligibility -- audited
+        log_action(db, actor_id=admin.id, action="document.expiry_set", target_type="service_provider_document", target_id=doc.id,
+                   previous_value=str(previous) if previous else None, new_value=str(doc.expires_on) if doc.expires_on else None)
     db.commit()
     db.refresh(doc)
     requirement = db.get(DocumentRequirement, doc.requirement_id)
@@ -427,6 +431,17 @@ def _get_active_service_provider_profile(db: Session, service_provider_id: str) 
         raise HTTPException(status_code=404, detail="Service provider not found.")
     _not_a_member_row(db, cp)
     return cp
+
+
+def _no_recorded_history(db: Session, user_id: str) -> None:
+    """Stage 9.4: an account that has acted on the platform is part of its
+    audit trail, which names it; deleting it would either fail on that record
+    or erase who did what. Deactivating (Stage 9.2) stops the person and keeps
+    the history; deletion is for accounts that never did anything."""
+    from app.models.audit_log import AuditLog
+
+    if db.query(AuditLog.id).filter(AuditLog.actor_id == user_id).first():
+        raise HTTPException(status_code=400, detail="This account has a history on record. Deactivate it instead, which keeps that history.")
 
 
 def _not_a_member_row(db: Session, profile) -> None:
@@ -492,15 +507,22 @@ def service_provider_detail(service_provider_id: str, db: Session = Depends(get_
 
 
 @router.patch("/service-providers/{service_provider_id}", response_model=ServiceProviderProfileOut)
-def update_service_provider(service_provider_id: str, payload: ServiceProviderProfileUpdate, db: Session = Depends(get_db)):
+def update_service_provider(service_provider_id: str, payload: ServiceProviderProfileUpdate, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     cp = _get_active_service_provider_profile(db, service_provider_id)
     if not payload.company_name.strip():
         raise HTTPException(status_code=400, detail="Company name is required.")
 
+    fields = ("company_name", "license_number", "primary_trade", "service_area")
+    before = {f: getattr(cp, f) for f in fields}
     cp.company_name = payload.company_name.strip()
     cp.license_number = payload.license_number or None
     cp.primary_trade = payload.primary_trade or None
     cp.service_area = payload.service_area or None
+    after = {f: getattr(cp, f) for f in fields}
+    if after != before:  # Stage 9.4: an admin's correction of a provider's record is on the audit trail
+        log_action(db, actor_id=admin.id, action="service_provider.admin_edit", target_type="service_provider_profile", target_id=service_provider_id,
+                   previous_value=json.dumps({f: v for f, v in before.items() if before[f] != after[f]}),
+                   new_value=json.dumps({f: v for f, v in after.items() if before[f] != after[f]}))
     db.commit()
     db.refresh(cp)
     user = db.get(User, service_provider_id)
@@ -784,7 +806,7 @@ def reset_cms(key: str, language: Language, admin: User = Depends(require_admin)
 # has no cascade by design, so a hard delete would otherwise violate that
 # foreign key. Suspend instead to preserve history while cutting access.
 @router.delete("/service-providers/{service_provider_id}", status_code=204)
-def delete_service_provider(service_provider_id: str, db: Session = Depends(get_db)):
+def delete_service_provider(service_provider_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     _get_active_service_provider_profile(db, service_provider_id)  # 404s outright for a since-promoted admin account
 
     review_count = db.query(Review).filter(Review.service_provider_id == service_provider_id).count()
@@ -814,11 +836,14 @@ def delete_service_provider(service_provider_id: str, db: Session = Depends(get_
     user = db.get(User, service_provider_id)
     if not user:
         raise HTTPException(status_code=404, detail="Service provider not found.")
+    _no_recorded_history(db, service_provider_id)  # after the more specific guards above
     from app.models.saved_opportunity import SavedOpportunity
 
     db.query(SavedOpportunity).filter(SavedOpportunity.service_provider_id == service_provider_id).delete(synchronize_session=False)  # Stage 4.8
+    snapshot = json.dumps({"email": user.email, "company_name": user.service_provider_profile.company_name if getattr(user, "service_provider_profile", None) else None})
     db.delete(user)  # cascades to service_provider_profiles -> service_provider_documents/offers
-    db.commit()
+    # Stage 9.4: removing an account is on the audit trail, with who it was (log_action commits the deletion with it).
+    log_action(db, actor_id=admin.id, action="service_provider.delete", target_type="user", target_id=service_provider_id, previous_value=snapshot)
     return None
 
 
@@ -1001,7 +1026,7 @@ def set_owner_suspended(
 # routine "remove this account" action, so deletion is blocked outright
 # once the owner has posted anything; suspend instead.
 @router.delete("/owners/{owner_id}", status_code=204)
-def delete_owner(owner_id: str, db: Session = Depends(get_db)):
+def delete_owner(owner_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     _get_active_owner_profile(db, owner_id)  # 404s outright for a since-promoted admin account
 
     project_count = db.query(Project).filter(Project.owner_id == owner_id).count()
@@ -1010,6 +1035,7 @@ def delete_owner(owner_id: str, db: Session = Depends(get_db)):
             status_code=400,
             detail="This owner has posted projects. Suspend the account instead of deleting it, to keep that project and offer history intact for the service providers involved.",
         )
+    _no_recorded_history(db, owner_id)  # after the more specific guards above
 
     docs_with_files = (
         db.query(OwnerDocument.file_path)
@@ -1023,8 +1049,10 @@ def delete_owner(owner_id: str, db: Session = Depends(get_db)):
     user = db.get(User, owner_id)
     if not user:
         raise HTTPException(status_code=404, detail="Owner not found.")
+    snapshot = json.dumps({"email": user.email, "full_name": user.full_name})
     db.delete(user)  # cascades to owner_profiles -> owner_documents
-    db.commit()
+    # Stage 9.4: removing an account is on the audit trail (log_action commits the deletion with it).
+    log_action(db, actor_id=admin.id, action="owner.delete", target_type="user", target_id=owner_id, previous_value=snapshot)
     return None
 
 
@@ -1695,3 +1723,91 @@ def reactivate_account(user_id: str, payload: AccountStatePatch | None = None, a
         target.deactivated_at = None
     db.commit()
     return {"user_id": target.id, "deactivated_at": None}
+
+
+# ---------- Stage 9.4: support diagnostics (read-only) ----------
+# What an operator needs to answer "why can't they...?" from the same rules
+# the marketplace enforces -- never a way around them. Nothing here writes.
+
+
+@router.get("/users")
+def find_account(email: str = Query(..., min_length=3, max_length=255), db: Session = Depends(get_db)):
+    """Find one person by their exact email: who they are, which stakeholder
+    they act for (their organisation's, or their own), their place in it, and
+    the state of both. No password, token or session data."""
+    from app.services.stakeholder import describe
+    from app.services.team import acting_profile, org_of
+
+    user = db.query(User).filter(User.email == email.strip().lower()).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Account not found.")
+    profile = acting_profile(db, user)
+    membership = None
+    if org_of(db, user.id):
+        from app.models.organization import OrganizationMembership
+
+        m = db.query(OrganizationMembership).filter(OrganizationMembership.user_id == user.id).first()
+        membership = {"role": m.role.value, "position": m.position, "joined_at": m.created_at}
+    standing = None
+    if isinstance(profile, ServiceProviderProfile):
+        standing = {"verification_status": profile.verification_status.value, "suspended": profile.is_suspended,
+                    "subscription_status": profile.subscription_status.value if profile.subscription_status else None,
+                    "payment_override_active": profile.payment_override_active, "can_bid": profile.is_verified_active}
+    elif isinstance(profile, OwnerProfile):
+        standing = {"verification_status": profile.verification_status.value, "suspended": profile.is_suspended,
+                    "can_publish": profile.is_verified_active}
+    return {
+        "user": {"id": user.id, "email": user.email, "full_name": user.full_name, "role": user.role.value,
+                 "email_verified": user.email_verified, "created_at": user.created_at, "deactivated_at": user.deactivated_at},
+        "acts_for": {"stakeholder_id": profile.user_id, **describe(profile, user, db, viewer_id=user.id), "standing": standing} if profile else None,
+        "membership": membership,
+    }
+
+
+@router.get("/projects/{project_id}/provider-check/{service_provider_id}")
+def provider_check(project_id: str, service_provider_id: str, db: Session = Depends(get_db)):
+    """Why a provider can or can't take part in a requirement -- the same
+    participation and eligibility checks the offer endpoints enforce -- and
+    where its own offer stands (draft, submitted, withdrawn...), against which
+    version of the requirement. The provider is its stakeholder id (an
+    organisation's, or an individual's)."""
+    from app.services.eligibility import ineligibility_reasons, participation
+
+    sync_expired_projects(db)
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    profile = _get_active_service_provider_profile(db, service_provider_id)
+    reasons = ineligibility_reasons(db, project, profile)
+    offer = db.query(Offer).filter(Offer.project_id == project_id, Offer.service_provider_id == service_provider_id).first()
+    award = db.query(AwardRecord).filter(AwardRecord.project_id == project_id).first()
+    return {
+        "project": {"status": project.status.value, "suspended": project.is_suspended, "bid_deadline": utc_iso(project.bid_deadline),
+                    "paused": project.paused_at is not None, "material_revision": project.material_revision},
+        "participation": participation(db, project, profile, reasons).model_dump(),
+        "ineligibility_reasons": [r.model_dump() for r in reasons],
+        "offer": {"id": offer.id, "status": offer.status.value, "suspended": offer.is_suspended, "revision": offer.revision,
+                  "based_on_material_revision": offer.based_on_material_revision, "submitted_at": offer.submitted_at,
+                  "updated_at": offer.updated_at, "won": bool(award and award.offer_id == offer.id)} if offer else None,
+    }
+
+
+@router.get("/projects/{project_id}/quality")
+def project_quality(project_id: str, db: Session = Depends(get_db)):
+    """What blocks a requirement's publication (errors) or weakens it
+    (warnings) -- the same check the owner's Publish button runs -- and
+    whether its owner may publish at all."""
+    from app.services import requirement_quality
+
+    sync_expired_projects(db)
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    owner_profile = db.get(OwnerProfile, project.owner_id)
+    return {
+        "status": project.status.value,
+        "owner_can_publish": bool(owner_profile and owner_profile.is_verified_active),
+        "owner_verification_status": owner_profile.verification_status.value if owner_profile else None,
+        "owner_suspended": owner_profile.is_suspended if owner_profile else None,
+        **requirement_quality.check(db, project).as_dict(),
+    }

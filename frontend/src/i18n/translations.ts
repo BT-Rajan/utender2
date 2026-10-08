@@ -388,6 +388,29 @@ export interface Dictionary {
     status: { preparing: string; active: string; completed: string; terminated: string };
     kinds: { awarded: string; in_force: string; document: string; started: string; progress: string; on_hold: string; resumed: string; delivered: string; accepted: string; returned: string; change_proposed: string; change_agreed: string; change_rejected: string; change_withdrawn: string; change_lapsed: string; terminated: string; completed: string };
   };
+  support: {
+    find: string;
+    email: string;
+    search: string;
+    notFound: string;
+    person: string;
+    deactivated: string;
+    emailUnverified: string;
+    actsFor: string;
+    notEstablished: string;
+    standing: string;
+    checkProvider: string;
+    providerEmail: string;
+    check: string;
+    notAProvider: string;
+    failed: string;
+    participation: string;
+    offer: string;
+    noOffer: string;
+    publishCheck: string;
+    ownerCannotPublish: string;
+    noBlockers: string;
+  };
   history: {
     heading: string;
     awarded: string;
@@ -2017,6 +2040,29 @@ export const en: Dictionary = {
       terminated: "Terminated",
       completed: "Completed",
     },
+  },
+  support: {
+    find: "Find a person",
+    email: "Email address",
+    search: "Find",
+    notFound: "No account with that email.",
+    person: "Person",
+    deactivated: "deactivated",
+    emailUnverified: "email not verified",
+    actsFor: "Acts for",
+    notEstablished: "not set up as an owner or provider yet",
+    standing: "Standing",
+    checkProvider: "Why can't a provider respond?",
+    providerEmail: "The provider's email",
+    check: "Check",
+    notAProvider: "That email isn't a service provider's account.",
+    failed: "The check couldn't be run.",
+    participation: "Can take part",
+    offer: "Its offer here",
+    noOffer: "none",
+    publishCheck: "What blocks publishing",
+    ownerCannotPublish: "The owner's account can't publish (not verified, or suspended).",
+    noBlockers: "Nothing blocks publishing.",
   },
   history: {
     heading: "History",
@@ -3704,6 +3750,29 @@ export const ar: Dictionary = {
       terminated: "إنهاء",
       completed: "اكتمال",
     },
+  },
+  support: {
+    find: "البحث عن شخص",
+    email: "البريد الإلكتروني",
+    search: "بحث",
+    notFound: "لا يوجد حساب بهذا البريد.",
+    person: "الشخص",
+    deactivated: "مُعطَّل",
+    emailUnverified: "البريد غير موثَّق",
+    actsFor: "يعمل باسم",
+    notEstablished: "لم يُعدّ كمالك أو مقدم خدمة بعد",
+    standing: "الوضع",
+    checkProvider: "لماذا لا يستطيع مقدم الخدمة التقديم؟",
+    providerEmail: "بريد مقدم الخدمة",
+    check: "تحقق",
+    notAProvider: "هذا البريد ليس لحساب مقدم خدمة.",
+    failed: "تعذر إجراء التحقق.",
+    participation: "إمكانية المشاركة",
+    offer: "عرضه هنا",
+    noOffer: "لا يوجد",
+    publishCheck: "ما يمنع النشر",
+    ownerCannotPublish: "لا يمكن لحساب المالك النشر (غير موثَّق أو موقوف).",
+    noBlockers: "لا شيء يمنع النشر.",
   },
   history: {
     heading: "السجل",
