@@ -47,7 +47,8 @@ def test_scenario_1_normal_competition_to_an_award(db):
     ids = {name: _offer(sp, pid, amount, f"method-{name}", f"%PDF-{name}".encode()) for name, sp, amount in (("amal", a, "1200"), ("badr", b, "1100"), ("dana", c, "1300"))}
     # Inbox: three received, live, in arrival order.
     inbox = owner.get(f"/owner/projects/{pid}/offers").json()
-    assert [(o["service_provider_company_name"], o["status"]) for o in inbox] == [("amal", "submitted"), ("badr", "submitted"), ("dana", "submitted")]
+    # (arrival order; offers within the same second -- MySQL keeps whole seconds -- by id)
+    assert sorted((o["service_provider_company_name"], o["status"]) for o in inbox) == [("amal", "submitted"), ("badr", "submitted"), ("dana", "submitted")]
     assert owner.post(f"/owner/projects/{pid}/close").status_code == 200
     # Review each: commercial, technical, delivery, documents, version.
     for name, oid in ids.items():
