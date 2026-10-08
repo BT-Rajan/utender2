@@ -55,16 +55,17 @@ export function LoginPage() {
 
       <form onSubmit={handleSubmit} className="grid gap-4">
         <div>
-          <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
+          <label htmlFor="login-email" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
             {t("auth.login.email")}
           </label>
-          <input type="email" name="email" required className="w-full border border-border rounded px-3 py-2.5 text-sm" />
+          <input id="login-email" type="email" name="email" required className="w-full border border-border rounded px-3 py-2.5 text-sm" />
         </div>
         <div>
-          <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
+          <label htmlFor="login-password" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
             {t("auth.login.password")}
           </label>
           <input
+            id="login-password"
             type="password"
             name="password"
             required

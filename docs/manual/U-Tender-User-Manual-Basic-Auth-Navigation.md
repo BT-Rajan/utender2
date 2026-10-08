@@ -207,7 +207,7 @@ If you leave before submitting, you come back to this page the next time you log
 
 ![Owner awaiting approval](screenshots/28-owner-pending.png)
 
-Once approved, the same page says **"You're approved — Head to your dashboard to post a project."** Use the **U-TENDER** logo at the top left to get there.
+Once approved, the same page says **"You're approved — Head to your dashboard to post a project."** Click **Go to your dashboard**.
 
 ![Approved owner status](screenshots/23-owner-status.png)
 
@@ -311,7 +311,7 @@ Back: the **U-TENDER** logo returns to your dashboard.
 
 ### Step 7.5 — Verification status
 
-**Visit URL:** `{APP}/service-provider/status`, also opened by **View submission**. It shows your application and document statuses, or "You're approved" once approved.
+**Visit URL:** `{APP}/service-provider/status`, also opened by **View submission**. It shows your application and document statuses. Once you're approved, it says "You're approved" with a **Go to your dashboard** button.
 
 ![Provider status (approved)](screenshots/35-provider-status.png)
 
@@ -432,9 +432,7 @@ These are test accounts, not production credentials. Never use the demo password
 
 These were found during the walkthrough:
 1. **Email links need configured email.** Password reset and email confirmation depend on outgoing email (`RESEND_API_KEY`). Without it, the links never arrive, so a successful reset or verification couldn't be demonstrated here.
-2. **No link on the "You're approved" message.** It says "Head to your dashboard" but has no link; the **U-TENDER** logo gets you there.
-3. **Form labels aren't linked to their fields** on login, sign-up and password pages. Typing and clicking work normally, but screen readers don't announce the field names.
-4. **The demo data has no service categories,** so a provider's **Your services** panel says "The platform has no service categories yet." An admin adds them under **Categories**.
+2. **The demo data has no service categories,** so a provider's **Your services** panel says "The platform has no service categories yet." An admin adds them under **Categories**.
 
 ---
 
@@ -471,8 +469,8 @@ No page logged a script error. The only console messages were the expected "401 
 |---|---|---|---|---|---|
 | 1 | Provider dashboard `/service-provider/dashboard` | **A completely blank page** for every service provider after logging in. React crashed with "Rendered more hooks than during the previous render." | Log in as any service provider | **Blocking** | **Yes** |
 | 2 | Owner / provider status `/…/status` | A new account that hadn't submitted yet was sent here at its next login, saw "Application under review — Submitted <date>" next to "Action needed", and had no way back to **Verify your account**, so onboarding couldn't be finished | Sign up as an owner, leave without submitting, log in again | **Blocking** (onboarding) | **Yes** |
-| 3 | Approved status pages | "Head to your dashboard" has no link | Log in as an approved owner, open `/owner/status` | Minor | No (logo works) |
-| 4 | Login, sign-up, password forms | Labels aren't linked to their inputs (accessibility) | Inspect the form with a screen reader | Minor | No |
+| 3 | Approved status pages | "Head to your dashboard" has no link | Log in as an approved owner, open `/owner/status` | Minor | **Yes** |
+| 4 | Login, sign-up, password and account forms | Labels aren't linked to their inputs, so screen readers can't announce the field names | Inspect the form with a screen reader | Minor (accessibility) | **Yes** |
 
 ## Fixes made
 
@@ -483,6 +481,8 @@ No page logged a script error. The only console messages were the expected "401 
 2. **Unfinished verification** (`frontend/src/pages/owner/Status.tsx` and `frontend/src/pages/service-provider/Status.tsx`).
    - **Fix:** an account that has never submitted (`incomplete`) is now sent to its **Verify your account** page instead of a status page claiming it's under review.
    - Submitted, approved, rejected and suspended accounts behave as before.
+3. **"You're approved" link** (both status pages): a **Go to your dashboard** button, in English and Arabic.
+4. **Form labels** (login, sign-up, forgot password, reset password, change password): each label is now linked to its field. Playwright found every field by its label, and a login using only the labelled fields succeeded.
 
 ## Not tested
 

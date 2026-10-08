@@ -56,10 +56,11 @@ export function ResetPasswordPage() {
           {token && (
             <form onSubmit={handleSubmit} className="grid gap-4">
               <div>
-                <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
+                <label htmlFor="reset-new-password" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
                   {t("auth.resetPassword.newPassword")}
                 </label>
                 <input
+                  id="reset-new-password"
                   type="password"
                   name="new_password"
                   required

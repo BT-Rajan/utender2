@@ -154,22 +154,23 @@ export function SignupPage() {
         <RoleFields role={role} setRole={setRole} clearRole={clearRole} />
 
         <div>
-          <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
+          <label htmlFor="signup-full-name" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
             {t("auth.signup.fullName")}
           </label>
-          <input name="full_name" required className="w-full border border-border rounded px-3 py-2.5 text-sm" />
+          <input id="signup-full-name" name="full_name" required className="w-full border border-border rounded px-3 py-2.5 text-sm" />
         </div>
         <div>
-          <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
+          <label htmlFor="signup-email" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
             {t("auth.signup.email")}
           </label>
-          <input type="email" name="email" required defaultValue={invitedEmail} className="w-full border border-border rounded px-3 py-2.5 text-sm" />
+          <input id="signup-email" type="email" name="email" required defaultValue={invitedEmail} className="w-full border border-border rounded px-3 py-2.5 text-sm" />
         </div>
         <div>
-          <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
+          <label htmlFor="signup-password" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
             {t("auth.signup.password")}
           </label>
           <input
+            id="signup-password"
             type="password"
             name="password"
             required

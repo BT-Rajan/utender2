@@ -890,6 +890,7 @@ export interface Dictionary {
       suspendedBody: string;
       approvedTitle: string;
       approvedBody: string;
+      dashboardLink: string;
       eyebrow: string;
       heading: string;
       changesRequestedTitle: string;
@@ -1113,6 +1114,7 @@ export interface Dictionary {
       suspendedBody: string;
       approvedTitle: string;
       approvedBody: string;
+      dashboardLink: string;
       eyebrow: string;
       heading: string;
       changesRequestedTitle: string;
@@ -2197,6 +2199,7 @@ export const en: Dictionary = {
         "Your account has been suspended by a site admin. You can't view new projects or submit offers while suspended. Contact support if you believe this is a mistake.",
       approvedTitle: "You're approved",
       approvedBody: "Head to your dashboard to browse open projects.",
+      dashboardLink: "Go to your dashboard",
       eyebrow: "Service provider · Account verification",
       heading: "Application status",
       changesRequestedTitle: "Changes requested — one or more documents need to be re-uploaded",
@@ -2423,6 +2426,7 @@ export const en: Dictionary = {
         "Your account has been suspended by a site admin. You can't post or manage projects while suspended. Contact support if you believe this is a mistake.",
       approvedTitle: "You're approved",
       approvedBody: "Head to your dashboard to post a project.",
+      dashboardLink: "Go to your dashboard",
       eyebrow: "Owner · Account verification",
       heading: "Application status",
       changesRequestedTitle: "Changes requested — one or more documents need to be re-uploaded",
@@ -3511,6 +3515,7 @@ export const ar: Dictionary = {
         "تم إيقاف حسابك من قبل مسؤول الموقع. لا يمكنك عرض مشاريع جديدة أو تقديم عروض أثناء الإيقاف. تواصل مع الدعم إذا كنت تعتقد أن هذا خطأ.",
       approvedTitle: "تمت الموافقة عليك",
       approvedBody: "توجه إلى لوحة التحكم لتصفح المشاريع المفتوحة.",
+      dashboardLink: "انتقل إلى لوحة التحكم",
       eyebrow: "مزوّد خدمة · التحقق من الحساب",
       heading: "حالة الطلب",
       changesRequestedTitle: "تم طلب تعديلات — يجب إعادة رفع مستند واحد أو أكثر",
@@ -3737,6 +3742,7 @@ export const ar: Dictionary = {
         "تم إيقاف حسابك من قبل مسؤول الموقع. لا يمكنك نشر أو إدارة المشاريع أثناء الإيقاف. تواصل مع الدعم إذا كنت تعتقد أن هذا خطأ.",
       approvedTitle: "تمت الموافقة عليك",
       approvedBody: "توجه إلى لوحة التحكم لنشر مشروع.",
+      dashboardLink: "انتقل إلى لوحة التحكم",
       eyebrow: "مالك · التحقق من الحساب",
       heading: "حالة الطلب",
       changesRequestedTitle: "تم طلب تعديلات — يجب إعادة رفع مستند واحد أو أكثر",

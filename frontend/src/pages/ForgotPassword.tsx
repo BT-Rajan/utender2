@@ -43,10 +43,10 @@ export function ForgotPasswordPage() {
       ) : (
         <form onSubmit={handleSubmit} className="grid gap-4">
           <div>
-            <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
+            <label htmlFor="forgot-email" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
               {t("auth.forgotPassword.email")}
             </label>
-            <input type="email" name="email" required className="w-full border border-border rounded px-3 py-2.5 text-sm" />
+            <input id="forgot-email" type="email" name="email" required className="w-full border border-border rounded px-3 py-2.5 text-sm" />
           </div>
           <button
             type="submit"

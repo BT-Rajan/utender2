@@ -1,4 +1,4 @@
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/api/client";
 import type { OwnerDocument, OwnerProfile } from "@/api/types";
@@ -55,6 +55,9 @@ export function OwnerStatusPage() {
         <div className="bg-white border border-green border-l-4 rounded px-5 py-4">
           <div className="font-display font-semibold text-navy">{t("owner.status.approvedTitle")}</div>
           <p className="text-sm text-steel mt-1.5">{t("owner.status.approvedBody")}</p>
+          <Link to="/owner/dashboard" className="inline-block mt-3 bg-navy hover:bg-navy-deep text-white text-xs font-semibold rounded px-4 py-2">
+            {t("owner.status.dashboardLink")}
+          </Link>
         </div>
       </main>
     );

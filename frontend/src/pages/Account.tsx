@@ -83,10 +83,11 @@ function ChangePasswordForm() {
       )}
       <form onSubmit={handleSubmit} className="grid gap-4 max-w-sm">
         <div>
-          <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
+          <label htmlFor="account-current-password" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
             {t("auth.changePassword.currentPassword")}
           </label>
           <input
+            id="account-current-password"
             type="password"
             name="current_password"
             required
@@ -94,10 +95,11 @@ function ChangePasswordForm() {
           />
         </div>
         <div>
-          <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
+          <label htmlFor="account-new-password" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">
             {t("auth.changePassword.newPassword")}
           </label>
           <input
+            id="account-new-password"
             type="password"
             name="new_password"
             required
