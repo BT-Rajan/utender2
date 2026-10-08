@@ -1,32 +1,52 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "@/api/client";
+import { ApiError, apiFetch } from "@/api/client";
+import { Deliverables } from "@/components/Deliverables";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useI18n } from "@/i18n/I18nContext";
 import { fullDate } from "@/lib/format";
 import { money } from "@/lib/money";
 
-interface AgreementDocument {
+export interface AgreementDocument {
   id: string;
   kind: string;
   party: "owner" | "provider";
   file_name: string;
   uploaded_at: string;
   uploaded_by_name: string | null; // Stage 7.4: the viewer's own side's documents only
+  milestone_id: string | null; // Stage 7.7: evidence for this deliverable
   url: string;
 }
 
-interface ExecutionUpdate {
+export interface ExecutionUpdate {
   sequence: number;
-  kind: "started" | "progress" | "on_hold" | "resumed";
+  kind: "started" | "progress" | "on_hold" | "resumed" | "delivered" | "accepted" | "returned";
   party: "owner" | "provider";
   recorded_by_name: string | null;
   note: string | null;
   created_at: string;
+  milestone_id: string | null;
+  milestone_title: string | null;
 }
 
-interface Agreement {
+export interface Milestone {
+  id: string;
+  position: number;
+  title: string;
+  description: string | null;
+  due_date: string | null;
+  project_item_id: string | null;
+  project_item_label: string | null;
+  status: "pending" | "delivered" | "accepted" | "returned";
+  delivered_at: string | null;
+  delivery_note: string | null;
+  decided_at: string | null;
+  decision_note: string | null;
+  version: number;
+}
+
+export interface Agreement {
   id: string;
   status: "preparing" | "active" | "terminated";
   reference: string | null;
@@ -46,6 +66,7 @@ interface Agreement {
   execution_status: "not_started" | "in_progress" | "on_hold" | "terminated";
   on_hold_since: string | null;
   execution_history: ExecutionUpdate[];
+  milestones: Milestone[];
   planned_start_date: string | null;
   planned_start_source: "offer" | "requirement" | null;
   work_started_at: string | null;
@@ -56,7 +77,7 @@ interface Agreement {
   documents: AgreementDocument[];
 }
 
-const KINDS = ["signed_agreement", "work_order", "purchase_order", "final_quotation", "agreed_scope", "certificate", "other"] as const;
+export const KINDS = ["signed_agreement", "work_order", "purchase_order", "final_quotation", "agreed_scope", "certificate", "other"] as const;
 
 // Stage 7.3: the agreement governing an awarded requirement. The parties agree
 // outside U-Tender and attach the papers here; the owner side records when it
@@ -70,6 +91,10 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
   const key = ["agreement", projectId];
   const { data: a } = useQuery({ queryKey: key, queryFn: () => apiFetch<Agreement>(base), refetchOnWindowFocus: true, retry: false });
   const [error, setError] = useState<string | null>(null);
+  // Stage 7.6 follow-up: a refusal because the agreement moved on (another tab,
+  // a colleague, the other party) is explained as a notice once the page has
+  // caught up -- not shown as an unexplained error.
+  const [notice, setNotice] = useState<string | null>(null);
   const [details, setDetails] = useState<{ reference: string; effective_date: string } | null>(null);
   const [ending, setEnding] = useState<string | null>(null);
   const [starting, setStarting] = useState<string | null>(null);
@@ -77,8 +102,14 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
   const [kind, setKind] = useState<string>("signed_agreement");
   const [file, setFile] = useState<File | null>(null);
   const [fileKey, setFileKey] = useState(0);
-  const done = (next: Agreement) => { setError(null); queryClient.setQueryData(key, next); };
-  const failed = (e: Error) => { setError(e.message); queryClient.invalidateQueries({ queryKey: key }); };
+  const done = (next: Agreement) => { setError(null); setNotice(null); queryClient.setQueryData(key, next); };
+  const failed = (e: Error) => {
+    const refused = e instanceof ApiError && (e.status === 400 || e.status === 409);
+    setError(refused ? null : e.message);
+    setNotice(refused ? e.message : null);
+    setDetails(null); setEnding(null); setStarting(null); setUpdate(null);  // forms opened on the old state
+    queryClient.invalidateQueries({ queryKey: key });
+  };
   const ifMatch = () => ({ "If-Match": String(a?.version ?? "") });
 
   const save = useMutation({
@@ -133,6 +164,7 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
   const day = (d: string) => fullDate(`${d}T12:00:00Z`, language, false);
   const execTone = a.execution_status === "in_progress" ? "text-green" : a.execution_status === "terminated" ? "text-red" : "text-amber-dark";
   const live = party && (a.execution_status === "in_progress" || a.execution_status === "on_hold");
+  const general = a.documents.filter((d) => !d.milestone_id);
   const tone = a.status === "active" ? "text-green" : a.status === "terminated" ? "text-red" : "text-amber-dark";
 
   return (
@@ -143,6 +175,11 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
       </div>
       <p className="text-xs text-steel mb-2">{t(`${c}.status.${a.status}Help`)}</p>
       <ErrorBanner message={error} />
+      {notice && (
+        <p role="status" className="text-xs border border-amber-dark/40 bg-amber/10 text-navy rounded px-3 py-2.5 mb-3 max-w-2xl" data-testid="agreement-notice">
+          {notice}
+        </p>
+      )}
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-[13px]">
         <dt className="text-steel">{t(`${c}.owner`)}</dt>
         <dd dir="auto">{a.owner_name ?? "—"}</dd>
@@ -252,6 +289,7 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
                 </span>
                 <div>
                   <span className="font-semibold">{t(`${e}.kind.${h.kind}`)}</span>
+                  {h.milestone_title && <span dir="auto"> · {h.milestone_title}</span>}
                   {h.note && <span dir="auto" className="whitespace-pre-wrap break-words"> — {h.note}</span>}
                 </div>
               </li>
@@ -303,12 +341,14 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
         ))}
       </div>
 
+      <Deliverables projectId={projectId} agreement={a} onDone={done} onFailed={failed} />
+
       <div className="font-mono text-[11px] uppercase tracking-wide text-navy mt-4 mb-1">{t(`${c}.documents`)}</div>
-      {a.documents.length === 0 ? (
+      {general.length === 0 ? (
         <p className="text-xs text-steel">{t(`${c}.noDocuments`)}</p>
       ) : (
         <ul className="grid gap-1" data-testid="agreement-documents">
-          {a.documents.map((d) => (
+          {general.map((d) => (
             <li key={d.id} className="flex flex-wrap items-baseline gap-x-3">
               <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-blue underline break-all">{d.file_name}</a>
               <span className="font-mono text-[10px] text-steel">

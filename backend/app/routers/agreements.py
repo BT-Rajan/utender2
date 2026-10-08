@@ -16,17 +16,17 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.deps import get_current_user
-from app.models.agreement import AGREEMENT_DOCUMENT_KINDS, Agreement, AgreementDocument, ExecutionUpdate
+from app.models.agreement import AGREEMENT_DOCUMENT_KINDS, Agreement, AgreementDocument, ExecutionUpdate, Milestone
 from app.models.award_record import AwardRecord
 from app.models.common import gen_uuid
 from app.models.enums import NotificationType, ProjectStatus, UserRole
 from app.models.offer import Offer
 from app.models.organization import Organization
-from app.models.project import Project
+from app.models.project import Project, ProjectItem
 from app.models.service_provider import ServiceProviderProfile
 from app.models.user import User
 from app.routers.owner import _best_effort
-from app.schemas.agreement import AgreementDocumentOut, AgreementOut, AgreementTerminate, AgreementUpdate, ExecutionProgress, ExecutionUpdateOut, WorkStart
+from app.schemas.agreement import AgreementDocumentOut, AgreementOut, AgreementTerminate, AgreementUpdate, ExecutionProgress, ExecutionUpdateOut, MilestoneOut, WorkStart
 from app.services.audit import log_action
 from app.services.notify import notify_team
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name, sanitize_path_segment
@@ -90,7 +90,7 @@ def _check_version(agreement: Agreement, if_match: str | None) -> None:
     if if_match and if_match.strip('"') != str(agreement.version):
         raise HTTPException(
             status_code=409,
-            detail="This agreement was changed somewhere else (another tab, device or team member) since you opened it. Reload to see the latest, then make your change again.",
+            detail="This agreement was changed by someone else (the other party, a colleague or another tab) while you had it open. This page now shows the latest. Check it, then try again if still needed.",
         )
 
 
@@ -116,6 +116,9 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
         planned, source = winner.proposed_start_date, "offer"
     elif project.expected_start_date:
         planned, source = project.expected_start_date, "requirement"
+    milestones = db.query(Milestone).filter(Milestone.agreement_id == agreement.id).order_by(Milestone.position.asc()).all()
+    titles = {m.id: m.title for m in milestones}
+    items = {i.id: i for i in db.query(ProjectItem).filter(ProjectItem.project_id == project.id)} if any(m.project_item_id for m in milestones) else {}
     docs = db.query(AgreementDocument).filter(AgreementDocument.agreement_id == agreement.id).order_by(AgreementDocument.uploaded_at.asc(), AgreementDocument.id.asc())
     return AgreementOut(
         id=agreement.id,
@@ -145,9 +148,11 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
             ExecutionUpdateOut(
                 sequence=u.sequence, kind=u.kind, party=u.party, note=u.note, created_at=u.created_at,
                 recorded_by_name=_name(db, u.recorded_by, names) if side in (u.party, "admin") else None,
+                milestone_id=u.milestone_id, milestone_title=titles.get(u.milestone_id),
             )
             for u in db.query(ExecutionUpdate).filter(ExecutionUpdate.agreement_id == agreement.id).order_by(ExecutionUpdate.sequence.asc())
         ],
+        milestones=[_milestone_out(m, items) for m in milestones],
         planned_start_date=planned,
         planned_start_source=source,
         work_started_at=agreement.work_started_at,
@@ -158,11 +163,21 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
         documents=[
             AgreementDocumentOut(
                 id=d.id, kind=d.kind, party=d.party, file_name=d.file_name, uploaded_at=d.uploaded_at,
-                uploaded_by_name=_uploader(db, d, side, names),
+                uploaded_by_name=_uploader(db, d, side, names), milestone_id=d.milestone_id,
                 url=_api(f"/projects/{project.id}/agreement/documents/{d.id}/file"),
             )
             for d in docs
         ],
+    )
+
+
+def _milestone_out(m: Milestone, items: dict) -> MilestoneOut:
+    item = items.get(m.project_item_id) if m.project_item_id else None
+    return MilestoneOut(
+        id=m.id, position=m.position, title=m.title, description=m.description, due_date=m.due_date,
+        project_item_id=m.project_item_id, project_item_label=f"{item.position}. {item.description}" if item else None,
+        status=m.status, delivered_at=m.delivered_at, delivery_note=m.delivery_note,
+        decided_at=m.decided_at, decision_note=m.decision_note, version=m.version,
     )
 
 
@@ -188,11 +203,11 @@ def _execution_status(agreement: Agreement) -> str:
     return "on_hold" if agreement.on_hold_at else "in_progress"
 
 
-def _record(db: Session, agreement: Agreement, kind: str, side: str, user: User, note: str | None, at: datetime) -> None:
+def _record(db: Session, agreement: Agreement, kind: str, side: str, user: User, note: str | None, at: datetime, milestone_id: str | None = None) -> None:
     """Stage 7.6: the next entry in the execution history -- numbered under the
     requirement's lock the caller holds."""
     last = db.query(ExecutionUpdate.sequence).filter(ExecutionUpdate.agreement_id == agreement.id).order_by(ExecutionUpdate.sequence.desc()).first()
-    db.add(ExecutionUpdate(agreement_id=agreement.id, sequence=(last[0] if last else 0) + 1, kind=kind, party=side, recorded_by=user.id, note=note, created_at=at))
+    db.add(ExecutionUpdate(agreement_id=agreement.id, sequence=(last[0] if last else 0) + 1, kind=kind, party=side, recorded_by=user.id, note=note, created_at=at, milestone_id=milestone_id))
 
 
 @router.get("", response_model=AgreementOut)
@@ -211,7 +226,7 @@ def update_agreement(
     project, agreement, award, winner, side = _load(db, project_id, user, lock=True)
     _require_owner(side)
     if agreement.status != "preparing":
-        raise HTTPException(status_code=400, detail="Only an agreement being prepared can be changed.")
+        raise HTTPException(status_code=400, detail="This agreement is no longer being prepared, so its details can't be changed. This page now shows the latest.")
     _check_version(agreement, if_match)
     before = f"reference:{agreement.reference} effective:{agreement.effective_date}"
     agreement.reference = (payload.reference or "").strip() or None
@@ -231,7 +246,7 @@ def activate_agreement(
     project, agreement, award, winner, side = _load(db, project_id, user, lock=True)
     _require_owner(side)
     if agreement.status != "preparing":
-        raise HTTPException(status_code=400, detail="This agreement is already in force or has been terminated.")
+        raise HTTPException(status_code=400, detail="This agreement is already in force or was terminated meanwhile. This page now shows the latest.")
     _check_version(agreement, if_match)
     if agreement.effective_date is None:
         raise HTTPException(status_code=400, detail="Enter the date the agreement takes effect first.")
@@ -252,7 +267,7 @@ def terminate_agreement(
     project, agreement, award, winner, side = _load(db, project_id, user, lock=True)
     _require_owner(side)
     if agreement.status == "terminated":
-        raise HTTPException(status_code=400, detail="This agreement has already been terminated.")
+        raise HTTPException(status_code=400, detail="This agreement was already terminated. This page now shows the latest.")
     _check_version(agreement, if_match)
     reason = payload.reason.strip()
     if not reason:
@@ -274,9 +289,9 @@ def start_work(
     once, at the server's time. The other party is told."""
     project, agreement, award, winner, side = _load(db, project_id, user, lock=True)
     if agreement.status == "terminated":
-        raise HTTPException(status_code=400, detail="This agreement has been terminated.")
+        raise HTTPException(status_code=400, detail="This agreement has been terminated. This page now shows the latest.")
     if agreement.work_started_at is not None:
-        raise HTTPException(status_code=400, detail="The start of the work has already been recorded.")
+        raise HTTPException(status_code=400, detail="The start of the work was already recorded (by the other party, a colleague or another tab). This page now shows the latest.")
     _check_version(agreement, if_match)
     agreement.work_started_at = datetime.utcnow().replace(microsecond=0)
     agreement.work_started_party, agreement.work_started_by = side, user.id
@@ -313,16 +328,16 @@ def record_progress(
     change. Putting on hold and resuming tell the other party."""
     project, agreement, award, winner, side = _load(db, project_id, user, lock=True)
     if agreement.status == "terminated":
-        raise HTTPException(status_code=400, detail="This agreement has been terminated.")
+        raise HTTPException(status_code=400, detail="This agreement has been terminated. This page now shows the latest.")
     if agreement.work_started_at is None:
         raise HTTPException(status_code=400, detail="The work hasn't started yet. Record its start first.")
     note = (payload.note or "").strip() or None
     if payload.action == "update" and not note:
         raise HTTPException(status_code=400, detail="Write a short progress note.")
     if payload.action == "hold" and agreement.on_hold_at is not None:
-        raise HTTPException(status_code=400, detail="The work is already on hold.")
+        raise HTTPException(status_code=400, detail="The work was already put on hold (by the other party, a colleague or another tab). This page now shows the latest.")
     if payload.action == "resume" and agreement.on_hold_at is None:
-        raise HTTPException(status_code=400, detail="The work isn't on hold.")
+        raise HTTPException(status_code=400, detail="The work isn't on hold any more: it was already resumed. This page now shows the latest.")
     _check_version(agreement, if_match)
     now = datetime.utcnow().replace(microsecond=0)
     before = _execution_status(agreement)
@@ -357,7 +372,7 @@ def record_progress(
 
 @router.post("/documents", response_model=AgreementOut)
 async def attach_agreement_document(
-    project_id: str, kind: str = Form(...), file: UploadFile = File(...),
+    project_id: str, kind: str = Form(...), file: UploadFile = File(...), milestone_id: str | None = Form(None),
     user: User = Depends(get_current_user), db: Session = Depends(get_db),
 ):
     """Either party attaches a paper of the agreement -- the signed agreement,
@@ -370,7 +385,13 @@ async def attach_agreement_document(
         raise HTTPException(status_code=400, detail="No file provided.")
     project, agreement, award, winner, side = _load(db, project_id, user, lock=True)
     if agreement.status == "terminated":
-        raise HTTPException(status_code=400, detail="This agreement has been terminated.")
+        raise HTTPException(status_code=400, detail="This agreement has been terminated. This page now shows the latest.")
+    if milestone_id:  # Stage 7.7: evidence for one of this agreement's own deliverables
+        milestone = db.get(Milestone, milestone_id)
+        if not milestone or milestone.agreement_id != agreement.id:
+            raise HTTPException(status_code=404, detail="Deliverable not found.")
+        if milestone.status == "accepted":
+            raise HTTPException(status_code=400, detail="This deliverable was already accepted. This page now shows the latest.")
     storage = get_storage()
     # Stage 7.4: keyed by the document's own id, so two uploads of the same
     # name at the same moment (owner and provider, or a repeated submit) never
@@ -378,7 +399,7 @@ async def attach_agreement_document(
     doc_id = gen_uuid()
     path = f"{project_id}/{agreement.id}/{doc_id}/{sanitize_path_segment(file.filename)}"
     storage.save(AGREEMENT_BUCKET, path, content, file.content_type or "application/octet-stream")
-    doc = AgreementDocument(id=doc_id, agreement_id=agreement.id, kind=kind, party=side, file_path=path, file_name=safe_relative_name(file.filename), uploaded_by=user.id)
+    doc = AgreementDocument(id=doc_id, agreement_id=agreement.id, kind=kind, party=side, file_path=path, file_name=safe_relative_name(file.filename), uploaded_by=user.id, milestone_id=milestone_id or None)
     db.add(doc)
     try:
         db.flush()

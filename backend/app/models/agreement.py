@@ -65,6 +65,8 @@ class AgreementDocument(Base):
     party: Mapped[str] = mapped_column(String(16), nullable=False)
     file_path: Mapped[str] = mapped_column(String(500), nullable=False)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Stage 7.7: evidence for one deliverable of this same agreement, if any.
+    milestone_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("milestones.id", ondelete="SET NULL"), nullable=True, index=True)
     uploaded_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
@@ -73,7 +75,7 @@ class AgreementDocument(Base):
 # the start itself (7.5), short progress notes, putting it on hold and
 # resuming -- in order, never edited. The parties' own history of the
 # execution; the admin audit log records the same events for moderation.
-EXECUTION_UPDATE_KINDS = ("started", "progress", "on_hold", "resumed")
+EXECUTION_UPDATE_KINDS = ("started", "progress", "on_hold", "resumed", "delivered", "accepted", "returned")
 
 
 class ExecutionUpdate(Base):
@@ -89,4 +91,39 @@ class ExecutionUpdate(Base):
     party: Mapped[str] = mapped_column(String(16), nullable=False)
     recorded_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Stage 7.7: delivered / accepted / returned entries name their deliverable.
+    milestone_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("milestones.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+# Stage 7.7: the deliverables of an agreement, where the work naturally has
+# them -- none for a simple one-off service. The owner side sets them out
+# while the agreement is being prepared (optionally from the requirement's own
+# items); once it is in force they are what was agreed and stay as they are.
+# The winning provider delivers each; the owner side accepts it or returns it
+# for correction: delivered is not accepted.
+MILESTONE_STATUSES = ("pending", "delivered", "accepted", "returned")
+
+
+class Milestone(Base):
+    __tablename__ = "milestones"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    agreement_id: Mapped[str] = mapped_column(String(36), ForeignKey("agreements.id", ondelete="CASCADE"), nullable=False, index=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    # The requirement item it delivers, when it comes from one.
+    project_item_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("project_items.id", ondelete="SET NULL"), nullable=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending", server_default="pending")
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    delivered_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    delivery_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    decided_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    decision_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

@@ -14,16 +14,37 @@ class AgreementDocumentOut(BaseModel):
     file_name: str
     uploaded_at: UTCDateTime
     uploaded_by_name: str | None = None  # Stage 7.4: the caller's own side's documents only
+    milestone_id: str | None = None  # Stage 7.7: evidence for this deliverable
     url: str
 
 
 class ExecutionUpdateOut(BaseModel):
     sequence: int
-    kind: Literal["started", "progress", "on_hold", "resumed"]
+    kind: Literal["started", "progress", "on_hold", "resumed", "delivered", "accepted", "returned"]
     party: str
     recorded_by_name: str | None  # the recording side's own members (and admins) only
     note: str | None
     created_at: UTCDateTime
+    milestone_id: str | None = None  # Stage 7.7: delivered / accepted / returned
+    milestone_title: str | None = None
+
+
+class MilestoneOut(BaseModel):
+    """Stage 7.7: one deliverable of the agreement."""
+
+    id: str
+    position: int
+    title: str
+    description: str | None
+    due_date: date | None
+    project_item_id: str | None
+    project_item_label: str | None  # the requirement item it delivers, as the requirement states it
+    status: Literal["pending", "delivered", "accepted", "returned"]
+    delivered_at: UTCDateTime | None
+    delivery_note: str | None
+    decided_at: UTCDateTime | None
+    decision_note: str | None
+    version: int
 
 
 class AgreementOut(BaseModel):
@@ -67,6 +88,8 @@ class AgreementOut(BaseModel):
     documents: list[AgreementDocumentOut]
     # Stage 7.6: what the parties recorded since the work started, oldest first.
     execution_history: list["ExecutionUpdateOut"] = []
+    # Stage 7.7: the agreement's deliverables, in order (none for a simple job).
+    milestones: list[MilestoneOut] = []
 
 
 class AgreementUpdate(BaseModel):
@@ -86,4 +109,15 @@ class ExecutionProgress(BaseModel):
     """Stage 7.6: a short progress note, or putting the work on hold, or resuming it."""
 
     action: Literal["update", "hold", "resume"]
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class MilestoneIn(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=4000)
+    due_date: date | None = None
+    project_item_id: str | None = None
+
+
+class MilestoneNote(BaseModel):
     note: str | None = Field(default=None, max_length=2000)

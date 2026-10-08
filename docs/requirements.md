@@ -729,4 +729,32 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - add a progress note;
     - put on hold or resume.
 
+  - **Follow-up: clearer refusals.**
+    - **What the server says:** every agreement and execution refusal caused by someone else acting first (another tab, a colleague, the other party) now says what happened. Examples: "The work was already put on hold (by the other party, a colleague or another tab). This page now shows the latest."
+    - **What the page does:** it reloads the agreement and shows the refusal as an amber notice, not a red error, and closes any form opened on the old state.
+    - **Repeats:** buttons are disabled while a request is in flight, so double-clicks don't repeat.
+- **7.7 Milestones / deliverables:**
+  - **Audit:**
+    - **Partly there:** requirement items (description, quantity, unit, specification) existed as the scope's measurable parts.
+    - **Missing:** any deliverable record, and any delivered vs accepted distinction.
+    - **Not applicable:** payment stages, which belong to payments.
+  - **Added (migration 0051): `milestones` on the award's agreement.**
+    - **Fields:** position, title, description, due date, an optional link to a requirement item, and status: pending → delivered → accepted, or returned → delivered again. Accepted is final.
+    - **Recorded:** delivery and decision times (server clock), who delivered and who decided, notes, and a version.
+    - **A simple one-off job has none,** and the section is hidden.
+  - **Who does what:**
+    - **Setting out:** the owner side sets deliverables out only while the agreement is being prepared, so the winner sees them before agreeing. Once in force they stay as agreed, and later changes are variations.
+    - **Checks:** a due date can't be before the award, and an item must belong to this requirement. At most 50 per agreement.
+    - **Removing:** only a pending deliverable with no evidence can be removed.
+    - **Delivering:** the winner's side delivers, only after the work has started, not while on hold, and not after termination.
+    - **Deciding:** the owner side accepts, or returns for correction with a note. Delivered is never accepted automatically.
+  - **Reuse:**
+    - **Evidence:** agreement documents (7.4) with a `milestone_id`, which must be one of this agreement's deliverables. None can be added to an accepted one.
+    - **History:** each delivery and decision is a 7.6 execution-history entry naming its deliverable.
+    - **Audit:** `milestone.create`, `update`, `remove`, `deliver`, `accept` and `return`.
+    - **Notification:** `milestone_updated`, to the owner side on delivery and to the winner on a decision. It is best-effort, and unread notices merge.
+  - **Concurrency:** every action runs under the requirement's lock with the deliverable's version, so a stale tab gets 409 and a repeat an explained 409. Simultaneous accept, return and re-deliver always apply one at a time as a valid chain.
+  - **Access:** losing bidders, other organisations, other owners and other transactions' deliverable ids get 404. Admins can only read.
+  - **The rest is untouched:** the requirement, its items, the winning offer and the award never change.
+
 _Stage 7 onwards is added as it is implemented._

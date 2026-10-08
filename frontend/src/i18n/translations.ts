@@ -246,6 +246,31 @@ export interface Dictionary {
     earlierVersion: string;
     confirm: string;
   };
+  deliverables: {
+    heading: string;
+    help: string;
+    helpPreparing: string;
+    status: { pending: string; delivered: string; accepted: string; returned: string };
+    fromItem: string;
+    fromItemLabel: string;
+    noItem: string;
+    due: string;
+    deliveredOn: string;
+    decidedOn: { accepted: string; returned: string };
+    deliveryNote: string;
+    decisionNote: string;
+    noteLabel: { deliver: string; accept: string; return: string };
+    submit: { deliver: string; accept: string; return: string };
+    deliver: string;
+    accept: string;
+    return: string;
+    addEvidence: string;
+    evidenceFile: string;
+    title: string;
+    description: string;
+    add: string;
+    new: string;
+  };
   execution: {
     heading: string;
     status: { not_started: string; in_progress: string; on_hold: string; terminated: string };
@@ -261,7 +286,7 @@ export interface Dictionary {
     confirmHelp: string;
     confirm: string;
     onHoldSince: string;
-    kind: { started: string; progress: string; on_hold: string; resumed: string };
+    kind: { started: string; progress: string; on_hold: string; resumed: string; delivered: string; accepted: string; returned: string };
     addUpdate: string;
     hold: string;
     resume: string;
@@ -1600,6 +1625,31 @@ export const en: Dictionary = {
     earlierVersion: "Note: this offer was made against version {n} of the requirement, which is now at version {m}, and its provider didn't confirm it since. You'd be awarding it as it stands.",
     confirm: "Award",
   },
+  deliverables: {
+    heading: "Deliverables",
+    help: "What was agreed to be delivered. The service provider delivers each; the owner accepts it or returns it for correction.",
+    helpPreparing: "If the work has deliverables, set them out here before the agreement is in force. A simple job needs none. Once the agreement is in force they stay as agreed.",
+    status: { pending: "Pending", delivered: "Delivered — awaiting review", accepted: "Accepted", returned: "Returned for correction" },
+    fromItem: "Requirement item",
+    fromItemLabel: "From a requirement item (optional)",
+    noItem: "Not tied to an item",
+    due: "Due",
+    deliveredOn: "delivered",
+    decidedOn: { accepted: "accepted", returned: "returned" },
+    deliveryNote: "Delivery note",
+    decisionNote: "Owner's note",
+    noteLabel: { deliver: "Delivery note (optional)", accept: "Note (optional)", return: "What needs correcting?" },
+    submit: { deliver: "Mark as delivered", accept: "Accept", return: "Return for correction" },
+    deliver: "Deliver",
+    accept: "Accept",
+    return: "Return for correction",
+    addEvidence: "Add evidence",
+    evidenceFile: "Evidence file",
+    title: "Deliverable",
+    description: "Description (optional)",
+    add: "Add deliverable",
+    new: "Add a deliverable",
+  },
   execution: {
     heading: "Execution",
     status: { not_started: "Not started", in_progress: "In progress", on_hold: "On hold", terminated: "Terminated" },
@@ -1615,7 +1665,7 @@ export const en: Dictionary = {
     confirmHelp: "The start is recorded at the current time and can't be changed afterwards.",
     confirm: "Work has started",
     onHoldSince: "On hold since",
-    kind: { started: "Work started", progress: "Progress", on_hold: "Put on hold", resumed: "Resumed" },
+    kind: { started: "Work started", progress: "Progress", on_hold: "Put on hold", resumed: "Resumed", delivered: "Delivered", accepted: "Accepted", returned: "Returned for correction" },
     addUpdate: "Add a progress note",
     hold: "Put the work on hold",
     resume: "Resume the work",
@@ -2994,6 +3044,31 @@ export const ar: Dictionary = {
     earlierVersion: "ملاحظة: قُدّم هذا العرض على الإصدار {n} من المتطلب، وهو الآن في الإصدار {m}، ولم يؤكده مزوّده منذ ذلك الحين. ستُرسيه كما هو.",
     confirm: "رسِّ",
   },
+  deliverables: {
+    heading: "المخرجات",
+    help: "ما تم الاتفاق على تسليمه. يسلّم مقدم الخدمة كل مُخرَج، ويقبله المالك أو يعيده للتصحيح.",
+    helpPreparing: "إذا كان للعمل مخرجات، حددها هنا قبل سريان الاتفاقية. لا يحتاج العمل البسيط إلى أي منها. بعد سريان الاتفاقية تبقى كما اتُّفق عليها.",
+    status: { pending: "قيد الانتظار", delivered: "تم التسليم — بانتظار المراجعة", accepted: "مقبول", returned: "أُعيد للتصحيح" },
+    fromItem: "بند المتطلب",
+    fromItemLabel: "من بند في المتطلب (اختياري)",
+    noItem: "غير مرتبط ببند",
+    due: "تاريخ الاستحقاق",
+    deliveredOn: "سُلّم في",
+    decidedOn: { accepted: "قُبل في", returned: "أُعيد في" },
+    deliveryNote: "ملاحظة التسليم",
+    decisionNote: "ملاحظة المالك",
+    noteLabel: { deliver: "ملاحظة التسليم (اختياري)", accept: "ملاحظة (اختياري)", return: "ما الذي يحتاج إلى تصحيح؟" },
+    submit: { deliver: "تحديد كمُسلَّم", accept: "قبول", return: "إعادة للتصحيح" },
+    deliver: "تسليم",
+    accept: "قبول",
+    return: "إعادة للتصحيح",
+    addEvidence: "إضافة إثبات",
+    evidenceFile: "ملف الإثبات",
+    title: "المُخرَج",
+    description: "الوصف (اختياري)",
+    add: "إضافة المُخرَج",
+    new: "إضافة مُخرَج",
+  },
   execution: {
     heading: "التنفيذ",
     status: { not_started: "لم يبدأ", in_progress: "قيد التنفيذ", on_hold: "متوقف مؤقتاً", terminated: "منتهٍ" },
@@ -3009,7 +3084,7 @@ export const ar: Dictionary = {
     confirmHelp: "يُسجَّل البدء بالوقت الحالي ولا يمكن تغييره بعد ذلك.",
     confirm: "بدأ العمل",
     onHoldSince: "متوقف منذ",
-    kind: { started: "بدأ العمل", progress: "سير العمل", on_hold: "إيقاف مؤقت", resumed: "استئناف" },
+    kind: { started: "بدأ العمل", progress: "سير العمل", on_hold: "إيقاف مؤقت", resumed: "استئناف", delivered: "تم التسليم", accepted: "مقبول", returned: "أُعيد للتصحيح" },
     addUpdate: "إضافة ملاحظة عن سير العمل",
     hold: "إيقاف العمل مؤقتاً",
     resume: "استئناف العمل",
