@@ -30,6 +30,7 @@ from app.schemas.owner import OwnerProfileOut
 from app.schemas.project import EligibilityQualification, ProjectOut
 from app.schemas.review import ReviewCreate, ReviewOut
 from app.services.audit import log_action
+from app.services.transactions import completed_transaction
 from app.services.email import notify_provider_requirement_ended, notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify, notify_team
@@ -971,8 +972,10 @@ def submit_review(payload: ReviewCreate, user: User = Depends(require_owner), db
     project = db.get(Project, payload.project_id)
     if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
-    if project.status != ProjectStatus.awarded:
-        raise HTTPException(status_code=400, detail="You can only review a project after it's awarded.")
+    # Stage 8.1: a review rests on completed work -- the transaction closed by
+    # the owner side's acceptance (Stage 7.11) -- never on the award alone.
+    if completed_transaction(db, project.id) is None:
+        raise HTTPException(status_code=400, detail="You can review the service provider once the work has been accepted and the transaction is completed.")
 
     existing = db.query(Review).filter(Review.project_id == payload.project_id).first()
     if existing:

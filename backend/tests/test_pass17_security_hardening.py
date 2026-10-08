@@ -3,6 +3,8 @@ import app.db as db_module  # noqa: E402
 from fastapi.testclient import TestClient
 from app.main import app
 
+from tests.stage7_helpers import complete_transaction
+
 
 def test_pass17_security_hardening():
     results = []
@@ -71,6 +73,10 @@ def test_pass17_security_hardening():
     offer1_id = r.json()["id"]
     owner1.post(f"/owner/projects/{project_id}/close")
     owner1.post(f"/owner/projects/{project_id}/offers/{offer1_id}/approve")
+    # Stage 8.1: a review rests on completed work, not on the award alone.
+    r = owner1.post("/owner/reviews", json={"project_id": project_id, "service_provider_id": c1_id, "rating": 5})
+    check("reviewing an awarded but not yet completed transaction is rejected", r.status_code == 400)
+    complete_transaction(owner1, c1, project_id)
 
     # Attempt: forge a review naming c2 (who never bid on this project) as the reviewed service provider.
     r = owner1.post("/owner/reviews", json={"project_id": project_id, "service_provider_id": c2_id, "rating": 1, "comment": "attack"})

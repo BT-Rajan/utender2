@@ -959,4 +959,29 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - **Result:** passes on SQLite and MySQL, together with every Stage 7 test (7.1–7.15) and the Stage 6 award and decision race tests.
   - **No code changes were needed:** the only cross-stage defect found in Stage 7 was the REPEATABLE READ isolation level, fixed in 7.15.
 
-_Stage 7 onwards is added as it is implemented._
+## Stage 8 — Trust and reputation
+
+- **8.1 Completion boundary:**
+  - **Audit:**
+    - **Already working:** Stage 7 records one authoritative completion: the agreement is closed as `completed` by the owner side's acceptance of the whole work (7.10/7.11), with `completed_at` at server time, written once, never reopened. It appears in the history (7.13), notifies the provider, and is audit-logged.
+    - **Invalid:** the existing owner review of the provider (`POST /owner/reviews`, the rating form on the owner's requirement page) opened as soon as the requirement was awarded, before any work had been done or accepted. The review also feeds the provider's public average rating.
+  - **Fixed:**
+    - **`app/services/transactions.py` → `completed_transaction(db, project_id)`:** the one definition of a completed transaction for Stage 8, namely the completed agreement. It is not a new state or record.
+    - **Review endpoint:** now requires a completed transaction. Awarded, in force, executing, on hold, returned, delivered or submitted awaiting acceptance, terminated, cancelled, no award, expired and closed externally all stay ineligible.
+    - **Owner page:** shows the rating form only once the transaction is completed (an existing review still shows).
+    - **Older tests:** two tests that reviewed straight after the award now complete the transaction first (`tests/stage7_helpers.py`).
+  - **Unchanged:** the review's provider still comes from the award, never the request; one review per requirement.
+- **8.2 Transaction outcome:**
+  - **No new record needed.** The completed Stage 7 transaction already holds the outcome, from authoritative, write-once data:
+    - **requirement:** the agreement's requirement, and the version awarded on (`award_records.project_revision`, the offer's `based_on_material_revision`);
+    - **parties:** the owner organisation (the requirement's) and the provider organisation (the winning offer's);
+    - **winning offer and award;**
+    - **value:** the original awarded value; each agreed variation with its before and after values; the final agreed value, derived and frozen once completed;
+    - **ending and time:** the outcome (agreement `completed`, or `terminated` with its reason) and `completed_at`.
+  - **Other endings:** cancelled, no award, closed externally (no award with its own closure reason) and expired have no agreement, so they can never be taken for completed business.
+  - **Duplicates and staleness:** retries, stale pages and late changes are refused (7.11), so the outcome has no duplicate and can't be rewritten.
+  - **Access:** the parties and admins (read-only) read it; the losing bidder and other organisations can't.
+  - **Payments:** not tracked, and not part of the outcome.
+  - **Tests:** `tests/test_stage8_1_completion_boundary.py` and `tests/test_stage8_2_outcome.py` prove these points.
+
+_Stage 9 onwards is added as it is implemented._

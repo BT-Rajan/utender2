@@ -418,6 +418,15 @@ export function OwnerProjectDetailPage() {
   });
 
   const approvedOffer = offers?.find((o) => o.status === "approved");
+  // Stage 8.1: a review rests on completed work -- the transaction closed by the
+  // owner side's acceptance -- never on the award alone. Same query as the agreement panel.
+  const { data: transaction } = useQuery({
+    queryKey: ["agreement", id],
+    queryFn: () => apiFetch<{ status: string }>(`/projects/${id}/agreement`),
+    enabled: !!id && project?.status === "awarded",
+    retry: false,
+  });
+  const reviewable = transaction?.status === "completed";
 
   const approveMutation = useMutation({
     mutationFn: ({ offerId, acknowledge }: { offerId: string; acknowledge: boolean }) =>
@@ -970,7 +979,7 @@ export function OwnerProjectDetailPage() {
       {/* Stage 6.11: the owner side's own private notes on the requirement. */}
       {project.status !== "draft" && <EvaluationNotes projectId={project.id} />}
 
-      {approvedOffer && (
+      {approvedOffer && (existingReview || reviewable) && (
         <div className="mt-8 max-w-xl">
           <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-2">
             {t("owner.projectDetail.rateServiceProvider")} {approvedOffer.service_provider_company_name ?? t("owner.projectDetail.theServiceProvider")}
