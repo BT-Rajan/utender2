@@ -1130,4 +1130,20 @@ be added as its prompts (5.1, 5.2, …) are delivered.
       - `ReviewResponse` shows it under the review on both sides and in the reputation lists.
   - **Tests:** `tests/test_stage8_9_review_response.py`.
 
+- **8.10 Review and reputation integrity audit (8.1–8.9 re-checked in code):**
+  - **Already working:**
+    - **Chain:** every review rests on an Agreement with status `completed`, checked under the requirement lock that completion also takes.
+    - **Parties come from the server:** the requirement's `owner_id` and the award's provider, both organisation profile ids; the reviewer is the member. Request ids are ignored, and self-review is blocked in the database (`ck_review_two_parties`).
+    - **Duplicates:** at most one review per direction per transaction (lock, `uq_review_project_direction`, explained 409), and one response per review (lock, explained 409).
+    - **Ratings:** whole numbers 1–5 in strict validation and a database check.
+    - **Reputation:** read live from authoritative rows with transparent simple averages; directions are never mixed. Responses never touch ratings, and reviews stay immutable.
+    - **Access:** decided by current membership, so former members lose it. Outsiders, losers, the wrong role, no session and substituted ids all get 401/403/404.
+    - **Data exposure:** review and reputation responses carry only rating, comment, dates and the response. The model has no ORM relationships, so nothing nested can leak, and notifications carry no content.
+    - **Owner anonymity:** providers weighing an owner see counts and average only, preserving Stage 7.2.
+  - **Gap found (MySQL, concurrency):** owners of different requirements reviewing the same provider at the same moment could deadlock on its profile row (one review failed with a server error) or store a stale `review_count`/`avg_rating`, the figures shown on offers. The cause: the recount ran under each requirement's lock only.
+  - **Fixed:** `record_review` locks the provider's profile row (after the requirement lock, always in that order) before inserting an owner review. Concurrent reviews of one provider now queue, and each recount sees the earlier ones.
+  - **Tests:** `tests/test_stage8_10_reputation_integrity.py`:
+    - an end-to-end chain in both directions with responses, forged ids, replays, invalid ratings, outsiders, substituted ids, a former member and a cancelled requirement;
+    - a MySQL concurrency test: four owners reviewing one provider at once, plus two members reviewing and responding at once.
+
 _Stage 9 onwards is added as it is implemented._

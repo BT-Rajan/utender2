@@ -48,6 +48,15 @@ def record_review(db: Session, project: Project, direction: str, reviewer: User,
     # the requirement's owner stakeholder and the award's provider (the PASS 17
     # IDOR fix, now for both directions).
     award = db.query(AwardRecord).filter(AwardRecord.project_id == project.id).first()
+    profile = None
+    if direction == OWNER_TO_PROVIDER:
+        # Stage 8.10: owners of different requirements may review the same
+        # provider at once. Taking its profile row first (after the
+        # requirement's lock, always in that order) queues them, so each
+        # recount below sees the reviews before it -- without it they
+        # deadlocked on the row or stored a stale rating.
+        profile = (db.query(ServiceProviderProfile)
+                   .filter(ServiceProviderProfile.user_id == award.service_provider_id).with_for_update().first())
     review = Review(
         project_id=project.id,
         owner_id=project.owner_id,
@@ -64,7 +73,6 @@ def record_review(db: Session, project: Project, direction: str, reviewer: User,
         # than trusting an incrementally-maintained counter.
         ratings = [r for (r,) in db.query(Review.rating).filter(
             Review.service_provider_id == award.service_provider_id, Review.direction == OWNER_TO_PROVIDER)]
-        profile = db.get(ServiceProviderProfile, award.service_provider_id)
         if profile:
             profile.review_count = len(ratings)
             profile.avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else 0
