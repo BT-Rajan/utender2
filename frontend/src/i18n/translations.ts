@@ -329,6 +329,10 @@ export interface Dictionary {
     email: string;
     notTracked: string;
     emailFailing: string;
+    billing: string;
+    billingNotConfigured: string;
+    lastBillingEvent: string;
+    noBillingEvents: string;
     email_no_failures_recorded: string;
     email_not_configured: string;
     accounts: string;
@@ -360,7 +364,7 @@ export interface Dictionary {
     completed: string;
     terminated: string;
     awardedLast7: string;
-    kinds: { open_without_offers_closing_24h: string; open_without_offers: string; awaiting_owner_decision: string; completion_awaiting_owner: string; transactions_on_hold: string; agreements_not_in_force: string; providers_awaiting_review: string; owners_awaiting_review: string; provider_payment_failed: string; open_review_reports: string };
+    kinds: { open_without_offers_closing_24h: string; open_without_offers: string; awaiting_owner_decision: string; completion_awaiting_owner: string; transactions_on_hold: string; agreements_not_in_force: string; providers_awaiting_review: string; owners_awaiting_review: string; provider_payment_failed: string; open_review_reports: string; deliverables_awaiting_owner: string; changes_awaiting_answer: string; email_failures: string };
   };
   members: {
     heading: string;
@@ -1995,6 +1999,10 @@ export const en: Dictionary = {
     email: "Email delivery",
     notTracked: "Not tracked",
     emailFailing: "{n} failed in the last 24 hours",
+    billing: "Billing webhooks (Stripe)",
+    billingNotConfigured: "Not configured: subscription changes won't arrive",
+    lastBillingEvent: "Last event received",
+    noBillingEvents: "Configured; no event received yet",
     email_no_failures_recorded: "No failures recorded",
     email_not_configured: "Not configured: no emails are sent",
     accounts: "Accounts",
@@ -2037,6 +2045,9 @@ export const en: Dictionary = {
       owners_awaiting_review: "Owners awaiting verification",
       provider_payment_failed: "Verified providers whose payment failed",
       open_review_reports: "Reported reviews to decide",
+      deliverables_awaiting_owner: "Deliverables awaiting the owner's review",
+      changes_awaiting_answer: "Changes awaiting the other party's answer",
+      email_failures: "Emails that couldn't be sent (last 24 hours)",
     },
   },
   members: {
@@ -3747,6 +3758,10 @@ export const ar: Dictionary = {
     email: "إرسال البريد الإلكتروني",
     notTracked: "غير متتبَّع",
     emailFailing: "فشل {n} خلال آخر 24 ساعة",
+    billing: "إشعارات الفوترة (Stripe)",
+    billingNotConfigured: "غير مُعَدّة: لن تصل تغييرات الاشتراك",
+    lastBillingEvent: "آخر حدث مستلم",
+    noBillingEvents: "مُعَدّة؛ لم يصل أي حدث بعد",
     email_no_failures_recorded: "لا إخفاقات مسجلة",
     email_not_configured: "غير مُعَدّ: لا تُرسل رسائل بريد",
     accounts: "الحسابات",
@@ -3789,6 +3804,9 @@ export const ar: Dictionary = {
       owners_awaiting_review: "ملاك بانتظار التوثيق",
       provider_payment_failed: "مقدمو خدمة موثَّقون فشل دفعهم",
       open_review_reports: "تقييمات مبلغ عنها بانتظار القرار",
+      deliverables_awaiting_owner: "مخرجات بانتظار مراجعة المالك",
+      changes_awaiting_answer: "تغييرات بانتظار رد الطرف الآخر",
+      email_failures: "رسائل بريد تعذر إرسالها (آخر 24 ساعة)",
     },
   },
   members: {

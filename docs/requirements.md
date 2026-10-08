@@ -1482,4 +1482,27 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **UI:** "Marketplace activity" on the admin overview, with a period selector and simple percentages within each funnel.
   - **Tests:** `tests/test_stage9_9_metrics.py`, covering scenarios A–H.
 
+- **9.10 Admin operational dashboard:**
+  - **Already working (the overview, built in 9.1/9.4/9.9):**
+    - **Place:** the admin landing page, gated server-side by `require_admin`.
+    - **"Needs attention" first,** each item linked to its existing admin page: open with no offers (and closing within 24 hours), awaiting the owner's decision, completion awaiting the owner, transactions on hold, agreements not in force, verification waiting, payment failed, reports to decide.
+    - **Then information:** state counts and period metrics with definitions.
+    - **Background jobs:** reminders overdue / running / can't tell; email failing / none recorded / not configured.
+    - **Find a person.**
+    - **Freshness:** "as of" time, a refresh button, a 5-minute refetch. Nothing claims to be live.
+    - **Failures:** a failing section shows "Unavailable", never zeros.
+    - **Two API calls,** each made of grouped counts and short, bounded lists.
+  - **Gaps found:**
+    - **Transactions waiting on a party:** deliverables awaiting the owner's review and changes awaiting an answer weren't surfaced.
+    - **Failed emails:** counted but not listed.
+    - **Billing webhooks:** nothing said whether they were configured or when Stripe last reported.
+    - **Unnamed items:** verification items linked correctly but showed no name.
+  - **Fixed** (`services/operations`, no new page):
+    - **New attention items:**
+      - `deliverables_awaiting_owner` and `changes_awaiting_answer`, linked to the requirement's admin page;
+      - `email_failures` (last 24 hours: subject and time, never the recipient; no link, since there is nothing to retry from there).
+    - **Background:** `billing_webhook` (configured / not configured) and `last_billing_event_at`. It shows the last event, never "healthy".
+    - **Names:** verification items carry the provider's company name or the owner organisation's legal name.
+  - **Tests:** `tests/test_stage9_10_dashboard.py`, covering scenarios A–I.
+
 _Later Stage 9 steps are added as they are implemented._

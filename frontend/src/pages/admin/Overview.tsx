@@ -22,7 +22,7 @@ interface Overview {
   offers: Section<{ by_status: Counts; submitted_last_7_days: number; on_open_requirements: number }>;
   transactions: Section<{ by_status: Counts; on_hold: number; completion_awaiting_owner: number; awarded_last_7_days: number }>;
   attention: Section<Attention[]>;
-  background: Section<{ deadline_reminders: "ok" | "overdue" | "not_determinable"; deadline_reminders_overdue: number; email_delivery: "failing" | "no_failures_recorded" | "not_configured"; email_failures_24h: number }>;
+  background: Section<{ deadline_reminders: "ok" | "overdue" | "not_determinable"; deadline_reminders_overdue: number; email_delivery: "failing" | "no_failures_recorded" | "not_configured"; email_failures_24h: number; billing_webhook: "configured" | "not_configured"; last_billing_event_at: string | null }>;
 }
 
 function Block({ title, section, children }: { title: string; section: Section<unknown>; children: React.ReactNode }) {
@@ -85,7 +85,9 @@ export function AdminOverviewPage() {
                     <ul className="text-xs text-steel mt-1 grid gap-0.5">
                       {a.items.map((i, n) => (
                         <li key={i.id ?? n}>
-                          {i.id && a.link.endsWith("/") ? (
+                          {!a.link ? (
+                            <span dir="auto">{i.title ?? "—"}</span>
+                          ) : i.id && a.link.endsWith("/") ? (
                             <Link to={`${a.link}${i.id}`} className="text-blue underline" dir="auto">{i.title ?? t("ops.open")}</Link>
                           ) : (
                             <Link to={a.link} className="text-blue underline">{t("ops.open")}</Link>
@@ -111,6 +113,12 @@ export function AdminOverviewPage() {
                     [t("ops.reminders"), data.background.data.deadline_reminders === "overdue"
                       ? t("ops.remindersOverdue").replace("{n}", String(data.background.data.deadline_reminders_overdue))
                       : t(`ops.reminders_${data.background.data.deadline_reminders}`)],
+                    // Stage 9.10: configured or not, and when Stripe last told us anything -- never "healthy".
+                    [t("ops.billing"), data.background.data.billing_webhook === "not_configured"
+                      ? t("ops.billingNotConfigured")
+                      : data.background.data.last_billing_event_at
+                        ? `${t("ops.lastBillingEvent")} ${fullDate(data.background.data.last_billing_event_at, language)}`
+                        : t("ops.noBillingEvents")],
                     [t("ops.email"), data.background.data.email_delivery === "failing"
                       ? t("ops.emailFailing").replace("{n}", String(data.background.data.email_failures_24h))
                       : t(`ops.email_${data.background.data.email_delivery}`)],

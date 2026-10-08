@@ -12,9 +12,10 @@ from datetime import datetime, timedelta
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from app.models.agreement import Agreement
+from app.models.agreement import Agreement, Milestone, Variation
 from app.models.enums import ProjectStatus, SubscriptionStatus, VerificationStatus
 from app.models.offer import Offer, tendered
+from app.models.organization import Organization
 from app.models.owner import OwnerProfile
 from app.models.project import Project
 from app.models.review import ReviewReport
@@ -139,14 +140,24 @@ def _attention(db: Session, now: datetime) -> list[dict]:
         db.query(Project.id, Project.title, Agreement.created_at).join(Agreement, Agreement.project_id == Project.id).filter(
             Agreement.status == "preparing"),
         Agreement.created_at.asc(), "/admin/projects/")
+    # Stage 9.10: waiting on one of the parties -- the operator can see where, not act for them.
+    add("deliverables_awaiting_owner",
+        db.query(Project.id, Project.title, Milestone.delivered_at).join(Agreement, Agreement.project_id == Project.id)
+        .join(Milestone, Milestone.agreement_id == Agreement.id).filter(Agreement.status == "active", Milestone.status == "delivered"),
+        Milestone.delivered_at.asc(), "/admin/projects/")
+    add("changes_awaiting_answer",
+        db.query(Project.id, Project.title, Variation.proposed_at).join(Agreement, Agreement.project_id == Project.id)
+        .join(Variation, Variation.agreement_id == Agreement.id).filter(Agreement.status == "active", Variation.status == "proposed"),
+        Variation.proposed_at.asc(), "/admin/projects/")
     for model, kind, link in ((ServiceProviderProfile, "providers_awaiting_review", "/admin/service-providers/"),
                               (OwnerProfile, "owners_awaiting_review", "/admin/owners/")):
-        q = db.query(model.user_id, model.user_id, model.verification_submitted_at).filter(
+        name = model.company_name if model is ServiceProviderProfile else Organization.legal_name
+        q = db.query(model.user_id, name, model.verification_submitted_at).outerjoin(Organization, Organization.id == model.organization_id).filter(
             _stakeholders(model), model.is_suspended.is_(False), model.verification_status == VerificationStatus.pending_review)
         count = q.count()
         if count:
             out.append({"kind": kind, "count": count, "link": link,
-                        "items": [{"id": r[0], "title": None, "since": r[2]} for r in q.order_by(model.verification_submitted_at.asc(), model.user_id).limit(LIST_LIMIT)]})
+                        "items": [{"id": r[0], "title": r[1], "since": r[2]} for r in q.order_by(model.verification_submitted_at.asc(), model.user_id).limit(LIST_LIMIT)]})
     failed = db.query(ServiceProviderProfile.user_id, ServiceProviderProfile.company_name, ServiceProviderProfile.subscription_current_period_end).filter(
         _stakeholders(ServiceProviderProfile), ServiceProviderProfile.is_suspended.is_(False),
         ServiceProviderProfile.verification_status == VerificationStatus.approved,
@@ -156,6 +167,15 @@ def _attention(db: Session, now: datetime) -> list[dict]:
     if failed_count:
         out.append({"kind": "provider_payment_failed", "count": failed_count, "link": "/admin/service-providers/",
                     "items": _items(failed.order_by(ServiceProviderProfile.user_id).limit(LIST_LIMIT).all())})
+    # Stage 9.10: emails that couldn't be sent in the last day -- what and when (the business
+    # action they were about is unaffected; 9.5). No link: there is nothing to retry from here.
+    from app.models.email_failure import EmailFailure
+
+    failed_mail = db.query(EmailFailure.id, EmailFailure.subject, EmailFailure.created_at).filter(EmailFailure.created_at >= now - timedelta(hours=24))
+    mail_count = failed_mail.count()
+    if mail_count:
+        out.append({"kind": "email_failures", "count": mail_count, "link": "",
+                    "items": _items(failed_mail.order_by(EmailFailure.created_at.desc(), EmailFailure.id).limit(LIST_LIMIT).all())})
     reports = db.query(func.count(ReviewReport.id)).filter(ReviewReport.status == "open").scalar()
     if reports:
         oldest = db.query(func.min(ReviewReport.created_at)).filter(ReviewReport.status == "open").scalar()
@@ -182,12 +202,18 @@ def _background(db: Session, now: datetime) -> dict:
     from app.config import get_settings
     from app.models.email_failure import EmailFailure
 
+    settings = get_settings()
     failures = db.query(func.count(EmailFailure.id)).filter(EmailFailure.created_at >= now - timedelta(hours=24)).scalar()
-    if not get_settings().resend_api_key:
+    if not settings.resend_api_key:
         email = "not_configured"
     else:
         email = "failing" if failures else "no_failures_recorded"
+    # Stage 9.10: billing webhooks -- configured or not, and when Stripe last told us anything.
+    # Nothing here can prove Stripe is delivering, so it is never called healthy.
+    last_billing_event = db.query(func.max(ServiceProviderProfile.subscription_event_at)).scalar()
     return {
+        "billing_webhook": "configured" if settings.stripe_webhook_secret else "not_configured",
+        "last_billing_event_at": last_billing_event,
         "deadline_reminders": "overdue" if due else ("ok" if in_window else "not_determinable"),
         "deadline_reminders_overdue": due,
         "email_delivery": email,
