@@ -1,6 +1,7 @@
 from datetime import date, datetime
+from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -51,7 +52,12 @@ class Agreement(Base):
     updated_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 
-AGREEMENT_DOCUMENT_KINDS = ("signed_agreement", "work_order", "purchase_order", "final_quotation", "agreed_scope", "certificate", "other")
+AGREEMENT_DOCUMENT_KINDS = (
+    "signed_agreement", "work_order", "purchase_order", "final_quotation", "agreed_scope", "certificate",
+    # Stage 7.8: a variation's papers
+    "change_order", "revised_agreement", "revised_quotation", "revised_specification", "approval",
+    "other",
+)
 
 
 class AgreementDocument(Base):
@@ -67,6 +73,8 @@ class AgreementDocument(Base):
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     # Stage 7.7: evidence for one deliverable of this same agreement, if any.
     milestone_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("milestones.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Stage 7.8: a paper of one variation of this same agreement, if any.
+    variation_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("variations.id", ondelete="SET NULL"), nullable=True, index=True)
     uploaded_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
@@ -127,3 +135,45 @@ class Milestone(Base):
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Stage 7.8: added by this agreed variation (not part of the original agreement).
+    variation_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("variations.id", ondelete="SET NULL"), nullable=True)
+
+
+# Stage 7.8: an agreed change to the work after the agreement is in force.
+# One party proposes it, the other agrees (or rejects it); the proposer may
+# withdraw it while it is open. Only one is open at a time. Nothing in the
+# award, the requirement or the original agreement is ever rewritten: the
+# current agreed state is the original plus the agreed variations, in order --
+# each keeps what it changed from (previous_*) and the result it agreed
+# (resulting_amount). Termination lapses an open proposal.
+VARIATION_STATUSES = ("proposed", "agreed", "rejected", "withdrawn", "lapsed")
+
+
+class Variation(Base):
+    __tablename__ = "variations"
+    __table_args__ = (UniqueConstraint("agreement_id", "number", name="uq_variation_number"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    agreement_id: Mapped[str] = mapped_column(String(36), ForeignKey("agreements.id", ondelete="CASCADE"), nullable=False, index=True)
+    number: Mapped[int] = mapped_column(Integer, nullable=False)  # V1, V2... per agreement, taken under the lock
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="proposed", server_default="proposed")
+    # What changes: the scope, quantities or specification, in words (required).
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    value_change: Mapped[Decimal | None] = mapped_column(Numeric(15, 3), nullable=True)  # + or -
+    completion_date: Mapped[date | None] = mapped_column(Date, nullable=True)  # the revised completion
+    milestone_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("milestones.id", ondelete="SET NULL"), nullable=True)
+    milestone_due_date: Mapped[date | None] = mapped_column(Date, nullable=True)  # its revised due date
+    add_deliverable: Mapped[str | None] = mapped_column(String(200), nullable=True)  # an added deliverable
+    proposed_party: Mapped[str] = mapped_column(String(16), nullable=False)
+    proposed_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    proposed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    decided_party: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    decided_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    decision_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Kept when agreed: what it changed from, and the value it agreed.
+    previous_amount: Mapped[Decimal | None] = mapped_column(Numeric(15, 3), nullable=True)
+    resulting_amount: Mapped[Decimal | None] = mapped_column(Numeric(15, 3), nullable=True)
+    previous_completion_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    previous_milestone_due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")

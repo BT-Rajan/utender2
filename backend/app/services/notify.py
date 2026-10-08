@@ -66,6 +66,10 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.en: ("Deliverable {state} on {project_title}", "A deliverable of the work awarded on {project_title} was {state}."),
         Language.ar: ("{state_ar}: {project_title}", "{state_ar} أحد مخرجات العمل المُرسى في {project_title}."),
     },
+    NotificationType.variation_updated: {
+        Language.en: ("Change {state} on {project_title}", "A change to the work awarded on {project_title} was {state}."),
+        Language.ar: ("{state_ar}: {project_title}", "{state_ar} تغيير على العمل المُرسى في {project_title}."),
+    },
     NotificationType.new_requirement: {
         Language.en: ("New opportunity: {project_title}", "A new {trade} requirement in {area} is open for offers until {deadline}. You meet its conditions."),
         Language.ar: ("فرصة جديدة: {project_title}", "طلب جديد لأعمال {trade} في {area} مفتوح للعروض حتى {deadline}. أنت تستوفي شروطه."),

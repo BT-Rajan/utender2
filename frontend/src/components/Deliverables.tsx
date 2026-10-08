@@ -90,6 +90,7 @@ export function Deliverables({
                 <span className="font-semibold" dir="auto">{m.position}. {m.title}</span>
                 <span className={`font-mono text-[11px] font-semibold ${tone[m.status]}`}>{t(`${d}.status.${m.status}`)}</span>
               </div>
+              {m.variation_number && <div className="text-xs text-steel">{t("variations.addedBy").replace("{n}", String(m.variation_number))}</div>}
               {m.project_item_label && <div className="text-xs text-steel" dir="auto">{t(`${d}.fromItem`)}: {m.project_item_label}</div>}
               {m.description && <p className="text-[13px] whitespace-pre-wrap break-words" dir="auto">{m.description}</p>}
               <div className="text-xs text-steel mt-0.5">

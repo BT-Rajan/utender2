@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiFetch } from "@/api/client";
 import { Deliverables } from "@/components/Deliverables";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { Variations } from "@/components/Variations";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useI18n } from "@/i18n/I18nContext";
 import { fullDate } from "@/lib/format";
@@ -16,6 +17,7 @@ export interface AgreementDocument {
   uploaded_at: string;
   uploaded_by_name: string | null; // Stage 7.4: the viewer's own side's documents only
   milestone_id: string | null; // Stage 7.7: evidence for this deliverable
+  variation_id: string | null; // Stage 7.8: a paper of this change
   url: string;
 }
 
@@ -44,6 +46,30 @@ export interface Milestone {
   decided_at: string | null;
   decision_note: string | null;
   version: number;
+  variation_number: number | null; // Stage 7.8: added by this agreed change
+}
+
+export interface Variation {
+  id: string;
+  number: number;
+  status: "proposed" | "agreed" | "rejected" | "withdrawn" | "lapsed";
+  description: string;
+  value_change: string | null;
+  completion_date: string | null;
+  milestone_id: string | null;
+  milestone_title: string | null;
+  milestone_due_date: string | null;
+  add_deliverable: string | null;
+  proposed_party: "owner" | "provider";
+  proposed_at: string;
+  decided_party: "owner" | "provider" | null;
+  decided_at: string | null;
+  decision_note: string | null;
+  previous_amount: string | null;
+  resulting_amount: string | null;
+  previous_completion_date: string | null;
+  previous_milestone_due_date: string | null;
+  version: number;
 }
 
 export interface Agreement {
@@ -67,6 +93,12 @@ export interface Agreement {
   on_hold_since: string | null;
   execution_history: ExecutionUpdate[];
   milestones: Milestone[];
+  original_amount: string;
+  current_amount: string;
+  original_completion_date: string | null;
+  original_completion_source: "offer" | "requirement" | null;
+  current_completion_date: string | null;
+  variations: Variation[];
   planned_start_date: string | null;
   planned_start_source: "offer" | "requirement" | null;
   work_started_at: string | null;
@@ -77,7 +109,7 @@ export interface Agreement {
   documents: AgreementDocument[];
 }
 
-export const KINDS = ["signed_agreement", "work_order", "purchase_order", "final_quotation", "agreed_scope", "certificate", "other"] as const;
+export const KINDS = ["signed_agreement", "work_order", "purchase_order", "final_quotation", "agreed_scope", "certificate", "change_order", "revised_agreement", "revised_quotation", "revised_specification", "approval", "other"] as const;
 
 // Stage 7.3: the agreement governing an awarded requirement. The parties agree
 // outside U-Tender and attach the papers here; the owner side records when it
@@ -164,7 +196,7 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
   const day = (d: string) => fullDate(`${d}T12:00:00Z`, language, false);
   const execTone = a.execution_status === "in_progress" ? "text-green" : a.execution_status === "terminated" ? "text-red" : "text-amber-dark";
   const live = party && (a.execution_status === "in_progress" || a.execution_status === "on_hold");
-  const general = a.documents.filter((d) => !d.milestone_id);
+  const general = a.documents.filter((d) => !d.milestone_id && !d.variation_id);
   const tone = a.status === "active" ? "text-green" : a.status === "terminated" ? "text-red" : "text-amber-dark";
 
   return (
@@ -186,7 +218,24 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
         <dt className="text-steel">{t(`${c}.provider`)}</dt>
         <dd dir="auto">{a.provider_name ?? "—"}</dd>
         <dt className="text-steel">{t(`${c}.value`)}</dt>
-        <dd className="font-mono text-navy">{money(a.amount, a.currency)}</dd>
+        <dd className="font-mono text-navy" data-testid="agreement-value">{money(a.current_amount, a.currency)}</dd>
+        {a.current_amount !== a.original_amount && (
+          <>
+            <dt className="text-steel">{t("variations.originalValue")}</dt>
+            <dd className="font-mono text-steel">{money(a.original_amount, a.currency)}</dd>
+          </>
+        )}
+        {(a.original_completion_date || a.current_completion_date) && (
+          <>
+            <dt className="text-steel">{t("variations.completion")}</dt>
+            <dd>
+              {a.current_completion_date ? fullDate(`${a.current_completion_date}T12:00:00Z`, language, false) : "—"}
+              {a.current_completion_date !== a.original_completion_date && a.original_completion_date && (
+                <span className="text-xs text-steel"> · {t("variations.originally")} {fullDate(`${a.original_completion_date}T12:00:00Z`, language, false)}</span>
+              )}
+            </dd>
+          </>
+        )}
         <dt className="text-steel">{t(`${c}.awardedOn`)}</dt>
         <dd>{fullDate(a.awarded_at, language)}</dd>
         <dt className="text-steel">{t(`${c}.effective`)}</dt>
@@ -342,6 +391,7 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
       </div>
 
       <Deliverables projectId={projectId} agreement={a} onDone={done} onFailed={failed} />
+      <Variations projectId={projectId} agreement={a} onDone={done} onFailed={failed} />
 
       <div className="font-mono text-[11px] uppercase tracking-wide text-navy mt-4 mb-1">{t(`${c}.documents`)}</div>
       {general.length === 0 ? (

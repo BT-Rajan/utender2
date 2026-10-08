@@ -15,6 +15,7 @@ class AgreementDocumentOut(BaseModel):
     uploaded_at: UTCDateTime
     uploaded_by_name: str | None = None  # Stage 7.4: the caller's own side's documents only
     milestone_id: str | None = None  # Stage 7.7: evidence for this deliverable
+    variation_id: str | None = None  # Stage 7.8: a paper of this variation
     url: str
 
 
@@ -44,6 +45,32 @@ class MilestoneOut(BaseModel):
     delivery_note: str | None
     decided_at: UTCDateTime | None
     decision_note: str | None
+    version: int
+    variation_number: int | None = None  # Stage 7.8: added by this agreed variation
+
+
+class VariationOut(BaseModel):
+    """Stage 7.8: one proposed or agreed change, with what it changed from."""
+
+    id: str
+    number: int
+    status: Literal["proposed", "agreed", "rejected", "withdrawn", "lapsed"]
+    description: str
+    value_change: Decimal | None
+    completion_date: date | None
+    milestone_id: str | None
+    milestone_title: str | None
+    milestone_due_date: date | None
+    add_deliverable: str | None
+    proposed_party: str
+    proposed_at: UTCDateTime
+    decided_party: str | None
+    decided_at: UTCDateTime | None
+    decision_note: str | None
+    previous_amount: Decimal | None
+    resulting_amount: Decimal | None
+    previous_completion_date: date | None
+    previous_milestone_due_date: date | None
     version: int
 
 
@@ -90,6 +117,14 @@ class AgreementOut(BaseModel):
     execution_history: list["ExecutionUpdateOut"] = []
     # Stage 7.7: the agreement's deliverables, in order (none for a simple job).
     milestones: list[MilestoneOut] = []
+    # Stage 7.8: the original award and agreement beside the current agreed
+    # state (original + agreed variations), and every variation in order.
+    original_amount: Decimal | None = None
+    current_amount: Decimal | None = None
+    original_completion_date: date | None = None
+    original_completion_source: Literal["offer", "requirement"] | None = None
+    current_completion_date: date | None = None
+    variations: list[VariationOut] = []
 
 
 class AgreementUpdate(BaseModel):
@@ -121,3 +156,12 @@ class MilestoneIn(BaseModel):
 
 class MilestoneNote(BaseModel):
     note: str | None = Field(default=None, max_length=2000)
+
+
+class VariationIn(BaseModel):
+    description: str = Field(min_length=1, max_length=4000)
+    value_change: Decimal | None = Field(default=None, ge=Decimal("-99999999999"), le=Decimal("99999999999"), decimal_places=3)
+    completion_date: date | None = None
+    milestone_id: str | None = None
+    milestone_due_date: date | None = None
+    add_deliverable: str | None = Field(default=None, max_length=200)

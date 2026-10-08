@@ -246,6 +246,39 @@ export interface Dictionary {
     earlierVersion: string;
     confirm: string;
   };
+  variations: {
+    heading: string;
+    help: string;
+    label: string;
+    status: { proposed: string; agreed: string; rejected: string; withdrawn: string; lapsed: string };
+    valueChange: string;
+    completion: string;
+    deliverableDue: string;
+    adds: string;
+    proposedBy: { owner: string; provider: string };
+    decided: { proposed: string; agreed: string; rejected: string; withdrawn: string; lapsed: string };
+    note: string;
+    noteLabel: string;
+    agreeHelp: string;
+    agree: string;
+    reject: string;
+    withdraw: string;
+    awaiting: string;
+    paper: string;
+    addPaper: string;
+    description: string;
+    valueChangeLabel: string;
+    completionLabel: string;
+    rescheduleLabel: string;
+    newDue: string;
+    addLabel: string;
+    proposeHelp: string;
+    propose: string;
+    new: string;
+    originalValue: string;
+    originally: string;
+    addedBy: string;
+  };
   deliverables: {
     heading: string;
     help: string;
@@ -317,7 +350,7 @@ export interface Dictionary {
     documents: string;
     noDocuments: string;
     kindLabel: string;
-    kind: { signed_agreement: string; work_order: string; purchase_order: string; final_quotation: string; agreed_scope: string; certificate: string; other: string };
+    kind: { signed_agreement: string; work_order: string; purchase_order: string; final_quotation: string; agreed_scope: string; certificate: string; change_order: string; revised_agreement: string; revised_quotation: string; revised_specification: string; approval: string; other: string };
     by: { owner: string; provider: string };
     file: string;
     attach: string;
@@ -1625,6 +1658,39 @@ export const en: Dictionary = {
     earlierVersion: "Note: this offer was made against version {n} of the requirement, which is now at version {m}, and its provider didn't confirm it since. You'd be awarding it as it stands.",
     confirm: "Award",
   },
+  variations: {
+    heading: "Changes",
+    help: "Changes to the agreed work once the agreement is in force. Either party proposes one; it takes effect only when the other party agrees. The original award and agreement stay on record.",
+    label: "Change {n}",
+    status: { proposed: "Proposed — awaiting the other party", agreed: "Agreed", rejected: "Rejected", withdrawn: "Withdrawn", lapsed: "Closed (agreement ended)" },
+    valueChange: "Value",
+    completion: "Completion",
+    deliverableDue: "{title} due",
+    adds: "Adds deliverable",
+    proposedBy: { owner: "Proposed by the owner", provider: "Proposed by the service provider" },
+    decided: { proposed: "", agreed: "agreed by", rejected: "rejected by", withdrawn: "withdrawn by", lapsed: "" },
+    note: "Note",
+    noteLabel: "Note (optional)",
+    agreeHelp: "Agreeing makes this change part of the agreed work from now on.",
+    agree: "Agree",
+    reject: "Reject",
+    withdraw: "Withdraw",
+    awaiting: "Awaiting the other party's answer.",
+    paper: "Change document",
+    addPaper: "Attach a change document",
+    description: "What changes (scope, quantities, specification) and why",
+    valueChangeLabel: "Change to the agreed value, {currency} (optional; negative to reduce)",
+    completionLabel: "Revised completion date (optional)",
+    rescheduleLabel: "Reschedule a deliverable (optional)",
+    newDue: "New due date",
+    addLabel: "Add a deliverable (optional)",
+    proposeHelp: "Nothing changes until the other party agrees.",
+    propose: "Propose change",
+    new: "Propose a change",
+    originalValue: "Originally awarded",
+    originally: "originally",
+    addedBy: "Added by change {n}",
+  },
   deliverables: {
     heading: "Deliverables",
     help: "What was agreed to be delivered. The service provider delivers each; the owner accepts it or returns it for correction.",
@@ -1710,6 +1776,11 @@ export const en: Dictionary = {
       final_quotation: "Final quotation",
       agreed_scope: "Agreed scope",
       certificate: "Certificate",
+      change_order: "Change order",
+      revised_agreement: "Revised agreement",
+      revised_quotation: "Revised quotation",
+      revised_specification: "Revised specification",
+      approval: "Approval",
       other: "Other",
     },
     by: { owner: "from the owner", provider: "from the service provider" },
@@ -3044,6 +3115,39 @@ export const ar: Dictionary = {
     earlierVersion: "ملاحظة: قُدّم هذا العرض على الإصدار {n} من المتطلب، وهو الآن في الإصدار {m}، ولم يؤكده مزوّده منذ ذلك الحين. ستُرسيه كما هو.",
     confirm: "رسِّ",
   },
+  variations: {
+    heading: "التغييرات",
+    help: "تغييرات على العمل المتفق عليه بعد سريان الاتفاقية. يقترحها أي من الطرفين، ولا تسري إلا بموافقة الطرف الآخر. تبقى الترسية والاتفاقية الأصليتان في السجل.",
+    label: "التغيير {n}",
+    status: { proposed: "مقترح — بانتظار الطرف الآخر", agreed: "متفق عليه", rejected: "مرفوض", withdrawn: "مسحوب", lapsed: "مغلق (انتهت الاتفاقية)" },
+    valueChange: "القيمة",
+    completion: "الإنجاز",
+    deliverableDue: "استحقاق {title}",
+    adds: "يضيف مُخرَجاً",
+    proposedBy: { owner: "اقترحه المالك", provider: "اقترحه مقدم الخدمة" },
+    decided: { proposed: "", agreed: "وافق عليه", rejected: "رفضه", withdrawn: "سحبه", lapsed: "" },
+    note: "ملاحظة",
+    noteLabel: "ملاحظة (اختياري)",
+    agreeHelp: "الموافقة تجعل هذا التغيير جزءاً من العمل المتفق عليه من الآن.",
+    agree: "موافقة",
+    reject: "رفض",
+    withdraw: "سحب",
+    awaiting: "بانتظار رد الطرف الآخر.",
+    paper: "مستند التغيير",
+    addPaper: "إرفاق مستند تغيير",
+    description: "ما الذي يتغير (النطاق أو الكميات أو المواصفات) ولماذا",
+    valueChangeLabel: "التغيير في القيمة المتفق عليها، {currency} (اختياري؛ بالسالب للتخفيض)",
+    completionLabel: "تاريخ الإنجاز المعدّل (اختياري)",
+    rescheduleLabel: "إعادة جدولة مُخرَج (اختياري)",
+    newDue: "تاريخ الاستحقاق الجديد",
+    addLabel: "إضافة مُخرَج (اختياري)",
+    proposeHelp: "لا يتغير شيء حتى يوافق الطرف الآخر.",
+    propose: "اقتراح التغيير",
+    new: "اقتراح تغيير",
+    originalValue: "قيمة الترسية الأصلية",
+    originally: "أصلاً",
+    addedBy: "أُضيف بالتغيير {n}",
+  },
   deliverables: {
     heading: "المخرجات",
     help: "ما تم الاتفاق على تسليمه. يسلّم مقدم الخدمة كل مُخرَج، ويقبله المالك أو يعيده للتصحيح.",
@@ -3129,6 +3233,11 @@ export const ar: Dictionary = {
       final_quotation: "عرض السعر النهائي",
       agreed_scope: "النطاق المتفق عليه",
       certificate: "شهادة",
+      change_order: "أمر تغيير",
+      revised_agreement: "اتفاقية معدّلة",
+      revised_quotation: "عرض سعر معدّل",
+      revised_specification: "مواصفات معدّلة",
+      approval: "موافقة",
       other: "أخرى",
     },
     by: { owner: "من المالك", provider: "من مقدم الخدمة" },

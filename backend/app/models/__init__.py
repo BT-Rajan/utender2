@@ -1,4 +1,4 @@
-from app.models.agreement import Agreement, AgreementDocument, ExecutionUpdate, Milestone
+from app.models.agreement import Agreement, AgreementDocument, ExecutionUpdate, Milestone, Variation
 from app.models.audit_log import AuditLog
 from app.models.auth_token import AuthToken
 from app.models.award_record import AwardRecord
@@ -25,6 +25,7 @@ __all__ = [
     "AgreementDocument",
     "ExecutionUpdate",
     "Milestone",
+    "Variation",
     "User",
     "AuthToken",
     "ServiceProviderProfile",

@@ -7,7 +7,7 @@ side records when it takes effect and, if it ends early, that it was
 terminated. Read by the requirement's owner side, the winning provider's side
 and admins (the award's own audience); everyone else gets a 404, whatever id
 they send. Completion, payments and variations are later stages."""
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import RedirectResponse
@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.deps import get_current_user
-from app.models.agreement import AGREEMENT_DOCUMENT_KINDS, Agreement, AgreementDocument, ExecutionUpdate, Milestone
+from app.models.agreement import AGREEMENT_DOCUMENT_KINDS, Agreement, AgreementDocument, ExecutionUpdate, Milestone, Variation
 from app.models.award_record import AwardRecord
 from app.models.common import gen_uuid
 from app.models.enums import NotificationType, ProjectStatus, UserRole
@@ -26,7 +26,7 @@ from app.models.project import Project, ProjectItem
 from app.models.service_provider import ServiceProviderProfile
 from app.models.user import User
 from app.routers.owner import _best_effort
-from app.schemas.agreement import AgreementDocumentOut, AgreementOut, AgreementTerminate, AgreementUpdate, ExecutionProgress, ExecutionUpdateOut, MilestoneOut, WorkStart
+from app.schemas.agreement import AgreementDocumentOut, AgreementOut, AgreementTerminate, AgreementUpdate, ExecutionProgress, ExecutionUpdateOut, MilestoneOut, VariationOut, WorkStart
 from app.services.audit import log_action
 from app.services.notify import notify_team
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name, sanitize_path_segment
@@ -118,6 +118,10 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
         planned, source = project.expected_start_date, "requirement"
     milestones = db.query(Milestone).filter(Milestone.agreement_id == agreement.id).order_by(Milestone.position.asc()).all()
     titles = {m.id: m.title for m in milestones}
+    variations = db.query(Variation).filter(Variation.agreement_id == agreement.id).order_by(Variation.number.asc()).all()
+    numbers = {v.id: v.number for v in variations}
+    original_completion, completion_source = planned_completion(project, winner)
+    current_amount, current_completion = current_terms(award, original_completion, variations)
     items = {i.id: i for i in db.query(ProjectItem).filter(ProjectItem.project_id == project.id)} if any(m.project_item_id for m in milestones) else {}
     docs = db.query(AgreementDocument).filter(AgreementDocument.agreement_id == agreement.id).order_by(AgreementDocument.uploaded_at.asc(), AgreementDocument.id.asc())
     return AgreementOut(
@@ -152,7 +156,13 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
             )
             for u in db.query(ExecutionUpdate).filter(ExecutionUpdate.agreement_id == agreement.id).order_by(ExecutionUpdate.sequence.asc())
         ],
-        milestones=[_milestone_out(m, items) for m in milestones],
+        milestones=[_milestone_out(m, items, numbers) for m in milestones],
+        original_amount=award.amount,
+        current_amount=current_amount,
+        original_completion_date=original_completion,
+        original_completion_source=completion_source,
+        current_completion_date=current_completion,
+        variations=[_variation_out(v, titles) for v in variations],
         planned_start_date=planned,
         planned_start_source=source,
         work_started_at=agreement.work_started_at,
@@ -163,7 +173,7 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
         documents=[
             AgreementDocumentOut(
                 id=d.id, kind=d.kind, party=d.party, file_name=d.file_name, uploaded_at=d.uploaded_at,
-                uploaded_by_name=_uploader(db, d, side, names), milestone_id=d.milestone_id,
+                uploaded_by_name=_uploader(db, d, side, names), milestone_id=d.milestone_id, variation_id=d.variation_id,
                 url=_api(f"/projects/{project.id}/agreement/documents/{d.id}/file"),
             )
             for d in docs
@@ -171,14 +181,52 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
     )
 
 
-def _milestone_out(m: Milestone, items: dict) -> MilestoneOut:
+def _milestone_out(m: Milestone, items: dict, numbers: dict) -> MilestoneOut:
     item = items.get(m.project_item_id) if m.project_item_id else None
     return MilestoneOut(
         id=m.id, position=m.position, title=m.title, description=m.description, due_date=m.due_date,
         project_item_id=m.project_item_id, project_item_label=f"{item.position}. {item.description}" if item else None,
         status=m.status, delivered_at=m.delivered_at, delivery_note=m.delivery_note,
         decided_at=m.decided_at, decision_note=m.decision_note, version=m.version,
+        variation_number=numbers.get(m.variation_id) if m.variation_id else None,
     )
+
+
+def _variation_out(v: Variation, titles: dict) -> VariationOut:
+    return VariationOut(
+        id=v.id, number=v.number, status=v.status, description=v.description, value_change=v.value_change,
+        completion_date=v.completion_date, milestone_id=v.milestone_id, milestone_title=titles.get(v.milestone_id),
+        milestone_due_date=v.milestone_due_date, add_deliverable=v.add_deliverable,
+        proposed_party=v.proposed_party, proposed_at=v.proposed_at, decided_party=v.decided_party, decided_at=v.decided_at,
+        decision_note=v.decision_note, previous_amount=v.previous_amount, resulting_amount=v.resulting_amount,
+        previous_completion_date=v.previous_completion_date, previous_milestone_due_date=v.previous_milestone_due_date,
+        version=v.version,
+    )
+
+
+def planned_completion(project: Project, winner: Offer | None):
+    """Stage 7.8: the originally planned completion -- the winning offer's own
+    commitment, else the requirement's expected completion."""
+    def finish(completion, start, days):
+        return completion or (start + timedelta(days=days) if start and days else None)
+
+    if winner:
+        when = finish(winner.proposed_completion_date, winner.proposed_start_date, winner.proposed_duration_days)
+        if when:
+            return when, "offer"
+    when = finish(project.expected_completion_date, project.expected_start_date, project.expected_duration_days)
+    return (when, "requirement") if when else (None, None)
+
+
+def current_terms(award: AwardRecord, original_completion, variations):
+    """Stage 7.8: the current agreed value and completion -- the original award
+    plus each agreed variation, in order. Never stored over the original."""
+    amount, completion = award.amount, original_completion
+    for v in variations:
+        if v.status == "agreed":
+            amount += v.value_change or 0
+            completion = v.completion_date or completion
+    return amount, completion
 
 
 def _name(db: Session, user_id: str | None, cache: dict) -> str | None:
@@ -274,6 +322,9 @@ def terminate_agreement(
         raise HTTPException(status_code=400, detail="Give the reason the agreement was terminated.")
     previous = agreement.status
     agreement.status, agreement.terminated_at, agreement.termination_reason = "terminated", datetime.utcnow().replace(microsecond=0), reason
+    # Stage 7.8: an open proposal can no longer be agreed; it lapses (never silently agreed).
+    for v in db.query(Variation).filter(Variation.agreement_id == agreement.id, Variation.status == "proposed"):
+        v.status, v.version = "lapsed", v.version + 1
     _touch(agreement, user)
     log_action(db, actor_id=user.id, action="agreement.terminate", target_type="agreement", target_id=agreement.id,
                previous_value=previous, new_value="terminated", reason=reason)
@@ -372,7 +423,7 @@ def record_progress(
 
 @router.post("/documents", response_model=AgreementOut)
 async def attach_agreement_document(
-    project_id: str, kind: str = Form(...), file: UploadFile = File(...), milestone_id: str | None = Form(None),
+    project_id: str, kind: str = Form(...), file: UploadFile = File(...), milestone_id: str | None = Form(None), variation_id: str | None = Form(None),
     user: User = Depends(get_current_user), db: Session = Depends(get_db),
 ):
     """Either party attaches a paper of the agreement -- the signed agreement,
@@ -392,6 +443,10 @@ async def attach_agreement_document(
             raise HTTPException(status_code=404, detail="Deliverable not found.")
         if milestone.status == "accepted":
             raise HTTPException(status_code=400, detail="This deliverable was already accepted. This page now shows the latest.")
+    if variation_id:  # Stage 7.8: a paper of one of this agreement's own variations
+        variation = db.get(Variation, variation_id)
+        if not variation or variation.agreement_id != agreement.id:
+            raise HTTPException(status_code=404, detail="Change not found.")
     storage = get_storage()
     # Stage 7.4: keyed by the document's own id, so two uploads of the same
     # name at the same moment (owner and provider, or a repeated submit) never
@@ -399,7 +454,7 @@ async def attach_agreement_document(
     doc_id = gen_uuid()
     path = f"{project_id}/{agreement.id}/{doc_id}/{sanitize_path_segment(file.filename)}"
     storage.save(AGREEMENT_BUCKET, path, content, file.content_type or "application/octet-stream")
-    doc = AgreementDocument(id=doc_id, agreement_id=agreement.id, kind=kind, party=side, file_path=path, file_name=safe_relative_name(file.filename), uploaded_by=user.id, milestone_id=milestone_id or None)
+    doc = AgreementDocument(id=doc_id, agreement_id=agreement.id, kind=kind, party=side, file_path=path, file_name=safe_relative_name(file.filename), uploaded_by=user.id, milestone_id=milestone_id or None, variation_id=variation_id or None)
     db.add(doc)
     try:
         db.flush()

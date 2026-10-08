@@ -157,3 +157,4 @@ class NotificationType(str, enum.Enum):
     work_started = "work_started"  # Stage 7.5: to the other party of the agreement
     execution_updated = "execution_updated"  # Stage 7.6: put on hold / resumed, to the other party
     milestone_updated = "milestone_updated"  # Stage 7.7: delivered (to the owner side), accepted / returned (to the winner)
+    variation_updated = "variation_updated"  # Stage 7.8: proposed / agreed / rejected / withdrawn, to the other party

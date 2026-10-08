@@ -757,4 +757,35 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - **Access:** losing bidders, other organisations, other owners and other transactions' deliverable ids get 404. Admins can only read.
   - **The rest is untouched:** the requirement, its items, the winning offer and the award never change.
 
+- **7.8 Change / variation during execution:**
+  - **Audit:**
+    - **Not applicable:** requirement amendments and offer revisions are pre-award mechanisms. Reusing them would rewrite pre-award history.
+    - **Already working:** the award record is immutable, and the agreement's details and deliverables are fixed once in force.
+    - **Missing:** any way to record an agreed post-award change.
+  - **Added (migration 0052): `variations` on the award's agreement.**
+    - **What a proposal holds:**
+      - a description of the scope, quantity or specification change (always required);
+      - optionally a signed value change, a revised completion date, a revised due date for one deliverable, and an added deliverable.
+    - **Lifecycle:** proposed → agreed or rejected by the other party, or withdrawn by the proposer. Termination lapses an open proposal.
+    - **Recorded:** who proposed, who decided, server times and notes. Numbered V1, V2… under the lock.
+  - **Agreement rule:**
+    - **When:** variations can be proposed only while the agreement is in force. While it's being prepared, the agreement and its deliverables are edited directly. After termination, nothing.
+    - **Proposals:** either party may propose; only one may be open at a time.
+    - **Takes effect:** only when the other party agrees. A side can't agree to or reject its own proposal (403). Unilateral edits of in-force terms are refused.
+  - **Current agreed state, derived and never stored over the original:**
+    - **Value:** the award's amount plus agreed value changes, in order. Each agreed variation keeps the value before and after, and the value can't fall to zero or below.
+    - **Completion date:** the latest agreed revised date, else the original planned completion (the winning offer's commitment, or the requirement's).
+    - **Deliverable date:** a revised due date is applied to that deliverable, with its previous date kept on the variation. An accepted deliverable can't be rescheduled; if it's accepted while a proposal is open, agreeing to that proposal is refused.
+    - **Added deliverable:** created pending and marked as added by the variation.
+  - **Untouched:** the award record, the winning offer, the requirement and the original agreement are never modified.
+  - **Reuse:**
+    - **Papers:** change documents are agreement documents with a `variation_id`, which must be one of this agreement's variations. New types: change order, revised agreement, revised quotation, revised specification, approval.
+    - **Audit:** `variation.propose`, `agree`, `reject` and `withdraw`, with before and after values.
+    - **Notification:** `variation_updated` to the other party, best-effort, and unread notices merge.
+  - **Concurrency:** every action runs under the requirement's lock with the variation's version. Simultaneous proposals result in exactly one. A double agreement, or agreement racing withdrawal, results in exactly one decision; the late ones get an explained 409.
+  - **Access:** losing bidders, other organisations, other owners and other transactions' variation ids get 404. Admins can only read.
+  - **UI:**
+    - **Summary:** the agreement shows the current agreed value, with the originally awarded value beside it, and the completion date with the original.
+    - **Changes section:** the list with from → to for each change, propose / agree / reject / withdraw, and change documents.
+
 _Stage 7 onwards is added as it is implemented._
