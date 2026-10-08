@@ -107,6 +107,8 @@ export interface Agreement {
   milestones: Milestone[];
   original_amount: string;
   current_amount: string;
+  agreed_changes_total: string; // Stage 7.12: net of the agreed changes
+  payment_tracking: "not_managed"; // Stage 7.12: payments between the parties aren't tracked here
   original_completion_date: string | null;
   original_completion_source: "offer" | "requirement" | null;
   current_completion_date: string | null;
@@ -232,14 +234,19 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
         <dd dir="auto">{a.owner_name ?? "—"}</dd>
         <dt className="text-steel">{t(`${c}.provider`)}</dt>
         <dd dir="auto">{a.provider_name ?? "—"}</dd>
-        <dt className="text-steel">{t(`${c}.value`)}</dt>
+        {/* Stage 7.12: the financial status U-Tender can state truthfully. */}
+        <dt className="text-steel">{t(a.status === "completed" ? "finance.finalValue" : `${c}.value`)}</dt>
         <dd className="font-mono text-navy" data-testid="agreement-value">{money(a.current_amount, a.currency)}</dd>
-        {a.current_amount !== a.original_amount && (
+        {Number(a.agreed_changes_total) !== 0 && (
           <>
             <dt className="text-steel">{t("variations.originalValue")}</dt>
             <dd className="font-mono text-steel">{money(a.original_amount, a.currency)}</dd>
+            <dt className="text-steel">{t("finance.changes")}</dt>
+            <dd className="font-mono text-steel" data-testid="agreement-changes">{Number(a.agreed_changes_total) > 0 ? "+" : ""}{money(a.agreed_changes_total, a.currency)}</dd>
           </>
         )}
+        <dt className="text-steel">{t("finance.payments")}</dt>
+        <dd className="text-xs text-steel" data-testid="agreement-payments">{t("finance.notManaged")}</dd>
         {(a.original_completion_date || a.current_completion_date) && (
           <>
             <dt className="text-steel">{t("variations.completion")}</dt>

@@ -172,6 +172,7 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
         milestones=[_milestone_out(m, items, numbers) for m in milestones],
         original_amount=award.amount,
         current_amount=current_amount,
+        agreed_changes_total=current_amount - award.amount,
         original_completion_date=original_completion,
         original_completion_source=completion_source,
         current_completion_date=current_completion,

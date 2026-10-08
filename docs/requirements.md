@@ -861,4 +861,19 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **Both parties:** the agreement shows "Completed" with its date, and the execution status shows "Completed".
     - **No edit controls** remain once completed: progress, evidence, papers, changes, termination, deliverables.
 
+- **7.12 Financial status:**
+  - **Audit:**
+    - **Billing is subscription-only.** The existing billing (`routers/billing.py`, `services/stripe_service.py`) is the providers' U-Tender subscription: Stripe checkout, portal and webhook. Nothing records payments, invoices or settlement between owner and provider.
+    - **Not applicable:** amounts paid, outstanding balance and payment status. They can't be derived truthfully, so none are shown.
+    - **Already working:** the immutable awarded amount (award record); the current agreed value as the award plus agreed variations, each keeping its before and after (7.8); one marketplace currency with no conversion; access limited to the parties and admins; losing bidders get no amount.
+    - **Partly there:** no net of agreed changes, and no statement about payments.
+  - **Added:**
+    - **`agreed_changes_total`:** the server-derived net of agreed variations. Original + this = current. Pending proposals don't count.
+    - **`payment_tracking: "not_managed"`.**
+    - **UI:** the agreement summary shows the current value (the "Final agreed value" once completed), the originally awarded value and the agreed changes when they differ. A Payments line says payments are not tracked by U-Tender and are settled directly between the parties.
+  - **Unchanged by design:**
+    - **Completion and payment are independent.** A completed transaction stays completed with no payment state invented.
+    - **Subscription billing** never appears in a transaction response.
+    - **No request can set a value.** Values are always derived, and extra fields are ignored.
+
 _Stage 7 onwards is added as it is implemented._

@@ -135,6 +135,12 @@ class AgreementOut(BaseModel):
     original_completion_date: date | None = None
     original_completion_source: Literal["offer", "requirement"] | None = None
     current_completion_date: date | None = None
+    # Stage 7.12: the financial position U-Tender can state truthfully -- the
+    # net of the agreed changes (current = original + this), and that payments
+    # between the parties are not tracked by U-Tender. Its own billing is the
+    # providers' subscription, never a payment against a transaction.
+    agreed_changes_total: Decimal = Decimal(0)
+    payment_tracking: Literal["not_managed"] = "not_managed"
     variations: list[VariationOut] = []
 
 
