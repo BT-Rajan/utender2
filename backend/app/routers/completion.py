@@ -107,12 +107,18 @@ def _decide(db: Session, project_id: str, user: User, note: str | None, if_match
     kind = "accepted" if accept else "returned"
     agreement.completion_status, agreement.completion_decided_at, agreement.completion_decided_by = kind, now, user.id
     agreement.completion_decision_note = note
+    if accept:
+        # Stage 7.11: acceptance is the owner's completion action. Every
+        # condition for completion was checked when the work was submitted
+        # (started, every deliverable accepted, no change awaiting an answer)
+        # and nothing could change it since; the transaction closes now.
+        agreement.status, agreement.completed_at = "completed", now
     _record(db, agreement, kind, side, user, note, now)
     _touch(agreement, user)
     audit.log_action(db, actor_id=user.id, action=f"completion.{'accept' if accept else 'return'}", target_type="agreement",
-                     target_id=agreement.id, previous_value="submitted", new_value=kind, reason=note)
-    _tell(db, project, winner, "provider", "accepted as complete" if accept else "returned for correction",
-          "تم قبول" if accept else "تمت إعادة")
+                     target_id=agreement.id, previous_value="submitted", new_value="accepted; transaction completed" if accept else kind, reason=note)
+    _tell(db, project, winner, "provider", "accepted as complete and the transaction closed" if accept else "returned for correction",
+          "تم قبول العمل وإغلاق المعاملة" if accept else "تمت إعادة")
     db.refresh(agreement)
     return _out(db, project, agreement, award, winner, side)
 

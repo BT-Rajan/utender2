@@ -85,7 +85,7 @@ def test_simple_work_submitted_returned_resubmitted_accepted(db):
     assert r.status_code == 200
     for client in (owner, a, _admin(db)):
         seen = _a(client, pid)
-        assert (seen["completion_status"], seen["execution_status"], seen["completion_decided_at"].endswith("Z")) == ("accepted", "accepted", True)
+        assert (seen["completion_status"], seen["execution_status"], seen["completion_decided_at"].endswith("Z")) == ("accepted", "completed", True)
         whole = [(h["kind"], h["party"]) for h in seen["execution_history"] if h["milestone_id"] is None and h["kind"] in ("delivered", "accepted", "returned")]
         assert whole == [("delivered", "provider"), ("returned", "owner"), ("delivered", "provider"), ("accepted", "owner")]
         assert any(d["execution_update_id"] == submission for d in seen["documents"])  # the evidence stays on the first submission
@@ -98,7 +98,7 @@ def test_simple_work_submitted_returned_resubmitted_accepted(db):
     assert db.query(Notification).filter(Notification.user_id == b_id).filter(Notification.type == NotificationType.execution_updated).count() == 0
     db.expire_all()
     assert (db.get(Project, pid).status, db.get(Offer, wid).status, db.query(AwardRecord).one().amount) == (ProjectStatus.awarded, OfferStatus.approved, 1000)
-    assert db.query(Agreement).one().status == "active"  # accepted, not yet closed (Stage 7.11)
+    assert db.query(Agreement).one().status == "completed"  # Stage 7.11: acceptance closes the transaction
 
 
 def test_deliverables_gate_the_whole_work(db):

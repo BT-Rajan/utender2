@@ -17,7 +17,10 @@ from app.models.common import gen_uuid
 # from when it takes effect, and the parties' own reference for it (their
 # contract, work order or purchase order number). The parties agree outside
 # U-Tender; the signed papers are attached as AgreementDocument rows.
-AGREEMENT_STATUSES = ("preparing", "active", "terminated")
+# Stage 7.11: "completed" -- the owner accepted the whole work; the
+# transaction is closed and final (completed_at). "terminated" is the other
+# ending: stopped before the work was completed. Neither reopens.
+AGREEMENT_STATUSES = ("preparing", "active", "completed", "terminated")
 
 
 class Agreement(Base):
@@ -56,6 +59,7 @@ class Agreement(Base):
     completion_decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completion_decided_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     completion_decision_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # Stage 7.11: when it closed
     # Stage 3.11's rule: a change sent from a page showing an older version
     # (another tab, another member) is refused, not silently applied.
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")

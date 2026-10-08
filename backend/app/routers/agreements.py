@@ -78,6 +78,12 @@ def _load(db: Session, project_id: str, user: User, *, lock: bool = False):
             raise HTTPException(status_code=403, detail="not_approved")
         if project.is_suspended:
             raise HTTPException(status_code=400, detail="This requirement is suspended.")
+        # Stage 7.11: a completed transaction is final. Every change to it --
+        # progress, deliverables, evidence, changes, completion, termination
+        # -- is refused here, at the one door they all come through, so no
+        # stale page or replayed request can reopen it.
+        if agreement.status == "completed":
+            raise HTTPException(status_code=409, detail="This transaction is completed and closed; nothing more can be changed. This page now shows the latest.")
     return project, agreement, award, winner, side
 
 
@@ -148,6 +154,7 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
         provider_name=provider_name,
         execution_status=_execution_status(agreement),
         completion_status=agreement.completion_status,
+        completed_at=agreement.completed_at,
         completion_submitted_at=agreement.completion_submitted_at,
         completion_note=agreement.completion_note,
         completion_decided_at=agreement.completion_decided_at,
@@ -255,8 +262,8 @@ def _execution_status(agreement: Agreement) -> str:
         return "terminated"
     if agreement.work_started_at is None:
         return "not_started"
-    if agreement.completion_status == "accepted":  # Stage 7.10: the work is done and accepted
-        return "accepted"
+    if agreement.status == "completed" or agreement.completion_status == "accepted":  # Stage 7.11: accepted and closed
+        return "completed"
     return "on_hold" if agreement.on_hold_at else "in_progress"
 
 

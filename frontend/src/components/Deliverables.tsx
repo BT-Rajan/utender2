@@ -132,13 +132,13 @@ export function Deliverables({
                   {provider && working && (m.status === "pending" || m.status === "returned") && (
                     <button type="button" disabled={busy} onClick={() => setAction({ id: m.id, verb: "deliver", note: "" })} className="text-xs text-blue underline" data-testid="deliverable-deliver">{t(`${d}.deliver`)}</button>
                   )}
-                  {owner && m.status === "delivered" && a.status !== "terminated" && (
+                  {owner && m.status === "delivered" && !["terminated", "completed"].includes(a.status) && (
                     <>
                       <button type="button" disabled={busy} onClick={() => setAction({ id: m.id, verb: "accept", note: "" })} className="text-xs text-green underline" data-testid="deliverable-accept">{t(`${d}.accept`)}</button>
                       <button type="button" disabled={busy} onClick={() => setAction({ id: m.id, verb: "return", note: "" })} className="text-xs text-red underline" data-testid="deliverable-return">{t(`${d}.return`)}</button>
                     </>
                   )}
-                  {(owner || provider) && m.status !== "accepted" && a.status !== "terminated" && (
+                  {(owner || provider) && m.status !== "accepted" && !["terminated", "completed"].includes(a.status) && (
                     evidence?.id === m.id ? (
                       <form className="flex flex-wrap items-center gap-2" onSubmit={(ev) => { ev.preventDefault(); if (evidence.file) attach.mutate({ id: m.id, file: evidence.file }); }}>
                         <label className="text-xs text-steel" htmlFor={`deliverable-file-${m.id}`}>{t(`${d}.evidenceFile`)}</label>

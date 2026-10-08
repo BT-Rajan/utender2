@@ -149,7 +149,7 @@ export function Variations({
                   )}
                 </div>
               ))}
-              {party && a.status !== "terminated" && (v.status === "proposed" || v.status === "agreed") && (
+              {party && !["terminated", "completed"].includes(a.status) && (v.status === "proposed" || v.status === "agreed") && (
                 paper?.id === v.id ? (
                   <form className="flex flex-wrap items-center gap-2 mt-1" onSubmit={(ev) => { ev.preventDefault(); if (paper.file) attach.mutate({ id: v.id, file: paper.file }); }}>
                     <label className="text-xs text-steel" htmlFor={`variation-file-${v.id}`}>{t(`${v8}.paper`)}</label>

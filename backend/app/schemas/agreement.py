@@ -106,9 +106,10 @@ class AgreementOut(BaseModel):
     # Stage 7.5: execution. The planned start is the winning offer's own
     # commitment, else the requirement's expected start; the actual start is
     # server time, recorded once.
-    execution_status: Literal["not_started", "in_progress", "on_hold", "accepted", "terminated"]
+    execution_status: Literal["not_started", "in_progress", "on_hold", "completed", "terminated"]
     # Stage 7.10: the whole work's completion and what is still outstanding.
     completion_status: Literal["submitted", "accepted", "returned"] | None = None
+    completed_at: UTCDateTime | None = None  # Stage 7.11: when the transaction closed
     completion_submitted_at: UTCDateTime | None = None
     completion_note: str | None = None
     completion_decided_at: UTCDateTime | None = None

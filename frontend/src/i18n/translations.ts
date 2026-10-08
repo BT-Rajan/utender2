@@ -328,7 +328,7 @@ export interface Dictionary {
   };
   execution: {
     heading: string;
-    status: { not_started: string; in_progress: string; on_hold: string; accepted: string; terminated: string };
+    status: { not_started: string; in_progress: string; on_hold: string; completed: string; terminated: string };
     planned: string;
     source: { offer: string; requirement: string };
     actual: string;
@@ -350,7 +350,8 @@ export interface Dictionary {
   };
   agreement: {
     heading: string;
-    status: { preparing: string; preparingHelp: string; active: string; activeHelp: string; terminated: string; terminatedHelp: string };
+    status: { preparing: string; preparingHelp: string; active: string; activeHelp: string; completed: string; completedHelp: string; terminated: string; terminatedHelp: string };
+    completedOn: string;
     owner: string;
     provider: string;
     value: string;
@@ -1687,11 +1688,11 @@ export const en: Dictionary = {
     openChange: "A proposed change is awaiting an answer; settle it before submitting the work as complete.",
     submittedOn: "Submitted as complete on",
     decidedOn: { accepted: "Accepted on", returned: "Returned on" },
-    acceptedHelp: "The owner has accepted the work as complete.",
+    acceptedHelp: "The owner accepted the work as complete, which closed the transaction.",
     noteLabel: { submit: "Note for the owner (optional)", accept: "Note (optional)", return: "What needs correcting?" },
     confirmHelp: {
       submit: "The owner will review the work and accept it or return it for correction.",
-      accept: "Accepting confirms the work is complete. It can't be undone.",
+      accept: "Accepting confirms the work is complete and closes the transaction. It can't be undone.",
       return: "The service provider will correct it and submit it again.",
     },
     do: { submit: "Submit the work as complete", accept: "Accept the work", return: "Return for correction" },
@@ -1766,7 +1767,7 @@ export const en: Dictionary = {
   },
   execution: {
     heading: "Execution",
-    status: { not_started: "Not started", in_progress: "In progress", on_hold: "On hold", accepted: "Work accepted", terminated: "Terminated" },
+    status: { not_started: "Not started", in_progress: "In progress", on_hold: "On hold", completed: "Completed", terminated: "Terminated" },
     planned: "Planned start",
     source: { offer: "as committed in the awarded offer", requirement: "as expected in the requirement" },
     actual: "Started",
@@ -1793,6 +1794,8 @@ export const en: Dictionary = {
       preparingHelp: "The parties are finalising the agreement outside U-Tender. Attach the signed papers here.",
       active: "In force",
       activeHelp: "The agreement governing this award is in force.",
+      completed: "Completed",
+      completedHelp: "The owner accepted the work as complete. This transaction is closed; its record stays as it is.",
       terminated: "Terminated",
       terminatedHelp: "The agreement was terminated. The award stays on record as it was made.",
     },
@@ -1804,6 +1807,7 @@ export const en: Dictionary = {
     reference: "Contract, work order or PO number",
     id: "Agreement reference",
     terminatedOn: "Terminated on",
+    completedOn: "Completed on",
     reason: "Reason",
     editDetails: "Edit reference and effective date",
     save: "Save",
@@ -3176,11 +3180,11 @@ export const ar: Dictionary = {
     openChange: "يوجد تغيير مقترح بانتظار الرد؛ قم بحسمه قبل تقديم العمل كمكتمل.",
     submittedOn: "قُدّم كمكتمل في",
     decidedOn: { accepted: "قُبل في", returned: "أُعيد في" },
-    acceptedHelp: "قبل المالك العمل كمكتمل.",
+    acceptedHelp: "قبل المالك العمل كمكتمل، وبذلك أُغلقت المعاملة.",
     noteLabel: { submit: "ملاحظة للمالك (اختياري)", accept: "ملاحظة (اختياري)", return: "ما الذي يحتاج إلى تصحيح؟" },
     confirmHelp: {
       submit: "سيراجع المالك العمل ويقبله أو يعيده للتصحيح.",
-      accept: "القبول يؤكد اكتمال العمل ولا يمكن التراجع عنه.",
+      accept: "القبول يؤكد اكتمال العمل ويغلق المعاملة، ولا يمكن التراجع عنه.",
       return: "سيصحح مقدم الخدمة العمل ويقدمه مرة أخرى.",
     },
     do: { submit: "تقديم العمل كمكتمل", accept: "قبول العمل", return: "إعادة للتصحيح" },
@@ -3255,7 +3259,7 @@ export const ar: Dictionary = {
   },
   execution: {
     heading: "التنفيذ",
-    status: { not_started: "لم يبدأ", in_progress: "قيد التنفيذ", on_hold: "متوقف مؤقتاً", accepted: "تم قبول العمل", terminated: "منتهٍ" },
+    status: { not_started: "لم يبدأ", in_progress: "قيد التنفيذ", on_hold: "متوقف مؤقتاً", completed: "مكتمل", terminated: "منتهٍ" },
     planned: "البدء المخطط",
     source: { offer: "كما التزم به العرض الفائز", requirement: "كما هو متوقع في المتطلب" },
     actual: "تاريخ البدء",
@@ -3282,6 +3286,8 @@ export const ar: Dictionary = {
       preparingHelp: "يعمل الطرفان على إتمام الاتفاقية خارج يو-تندر. أرفق المستندات الموقعة هنا.",
       active: "سارية",
       activeHelp: "الاتفاقية التي تحكم هذه الترسية سارية.",
+      completed: "مكتملة",
+      completedHelp: "قبل المالك العمل كمكتمل. أُغلقت هذه المعاملة، ويبقى سجلها كما هو.",
       terminated: "منتهية",
       terminatedHelp: "تم إنهاء الاتفاقية. تبقى الترسية في السجل كما تمت.",
     },
@@ -3293,6 +3299,7 @@ export const ar: Dictionary = {
     reference: "رقم العقد أو أمر العمل أو أمر الشراء",
     id: "مرجع الاتفاقية",
     terminatedOn: "تاريخ الإنهاء",
+    completedOn: "تاريخ الإكمال",
     reason: "السبب",
     editDetails: "تعديل المرجع وتاريخ السريان",
     save: "حفظ",

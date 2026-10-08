@@ -50,7 +50,7 @@ export function Evidence({
 
   const started = a.work_started_at !== null;
   const general = a.documents.filter((d) => d.evidence && !d.milestone_id && !d.execution_update_id);
-  const canAdd = a.side !== "admin" && started && a.status !== "terminated";
+  const canAdd = a.side !== "admin" && started && !["terminated", "completed"].includes(a.status);
   if (!started) return null;
   const x = "evidence";
   // Progress updates, and the whole work's completion submissions (Stage 7.10).

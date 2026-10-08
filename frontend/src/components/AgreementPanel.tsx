@@ -79,7 +79,7 @@ export interface Variation {
 
 export interface Agreement {
   id: string;
-  status: "preparing" | "active" | "terminated";
+  status: "preparing" | "active" | "completed" | "terminated";
   reference: string | null;
   effective_date: string | null;
   activated_at: string | null;
@@ -94,8 +94,9 @@ export interface Agreement {
   owner_name: string | null;
   provider_name: string | null;
   // Stage 7.5: execution
-  execution_status: "not_started" | "in_progress" | "on_hold" | "accepted" | "terminated";
+  execution_status: "not_started" | "in_progress" | "on_hold" | "completed" | "terminated";
   completion_status: "submitted" | "accepted" | "returned" | null;
+  completed_at: string | null; // Stage 7.11: when the transaction closed
   completion_submitted_at: string | null;
   completion_note: string | null;
   completion_decided_at: string | null;
@@ -207,11 +208,11 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
   const busy = save.isPending || activate.isPending || terminate.isPending || startWork.isPending || progress.isPending;
   const e = "execution";
   const day = (d: string) => fullDate(`${d}T12:00:00Z`, language, false);
-  const execTone = a.execution_status === "in_progress" || a.execution_status === "accepted" ? "text-green" : a.execution_status === "terminated" ? "text-red" : "text-amber-dark";
+  const execTone = a.execution_status === "in_progress" || a.execution_status === "completed" ? "text-green" : a.execution_status === "terminated" ? "text-red" : "text-amber-dark";
   const live = party && (a.execution_status === "in_progress" || a.execution_status === "on_hold");
   const reviewing = a.completion_status === "submitted";
   const general = a.documents.filter((d) => !d.evidence && !d.variation_id);
-  const tone = a.status === "active" ? "text-green" : a.status === "terminated" ? "text-red" : "text-amber-dark";
+  const tone = a.status === "active" || a.status === "completed" ? "text-green" : a.status === "terminated" ? "text-red" : "text-amber-dark";
 
   return (
     <section className="bg-white border border-border rounded px-5 py-4 mb-5 text-sm" data-testid="agreement">
@@ -258,6 +259,12 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
         <dd dir="auto">{a.reference ?? "—"}</dd>
         <dt className="text-steel">{t(`${c}.id`)}</dt>
         <dd className="font-mono text-xs break-all">{a.id}</dd>
+        {a.completed_at && (
+          <>
+            <dt className="text-steel">{t(`${c}.completedOn`)}</dt>
+            <dd data-testid="agreement-completed">{fullDate(a.completed_at, language)}</dd>
+          </>
+        )}
         {a.status === "terminated" && (
           <>
             <dt className="text-steel">{t(`${c}.terminatedOn`)}</dt>
@@ -298,7 +305,7 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
           </button>
         </div>
       ))}
-      {owner && a.status !== "terminated" && (ending === null ? (
+      {owner && !["terminated", "completed"].includes(a.status) && (ending === null ? (
         <button type="button" disabled={busy} onClick={() => setEnding("")} className="block mt-2 text-xs text-red underline">
           {t(`${c}.terminate`)}
         </button>
@@ -430,7 +437,7 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
           ))}
         </ul>
       )}
-      {party && a.status !== "terminated" && (
+      {party && !["terminated", "completed"].includes(a.status) && (
         <form className="flex flex-wrap items-end gap-2 mt-2" onSubmit={(e) => { e.preventDefault(); if (file) upload.mutate(); }}>
           <label className="grid gap-0.5 text-xs text-steel" htmlFor="agreement-kind">
             {t(`${c}.kindLabel`)}

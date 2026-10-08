@@ -845,4 +845,20 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - submit, accept and return actions.
     - The history labels whole-work entries, and the submission can be chosen as "relates to" for evidence.
 
+- **7.11 Transaction completion / closure:**
+  - **Audit:**
+    - **Already working:** the owner's acceptance (7.10) is the explicit owner completion action, and its preconditions are the completion rules: an award, the winning provider, an agreement, a recorded start, every deliverable accepted, no correction outstanding, no open change, not terminated.
+    - **Missing:** acceptance left the agreement "active", so there was no final state. Writes after acceptance were refused endpoint by endpoint, and some (evidence uploads, deliverables, papers) were not.
+    - **Not applicable:** a second "complete" action or entity. It would compete with acceptance.
+  - **Fixed (migration 0055):**
+    - **Acceptance closes the transaction.** Owner acceptance of the whole work sets the agreement to `completed` with `completed_at` (server time), in the same transaction and under the same lock. Agreements whose work was already accepted are completed at their acceptance time.
+    - **Final state:** "completed" (work accepted) stays distinct from "terminated" (stopped before completion). The requirement's own outcome stays "awarded". Cancelled, no award and expired stay the requirement's own endings, with no agreement.
+    - **One refusal point:** every change to a completed transaction is refused at the agreement's single write entry point (`_load`) with an explained 409, whether a stale page, a browser retry or a direct request. That covers progress, hold, start, deliverables, evidence and papers, changes, termination, agreement details, and resubmission or a second decision.
+    - **Still readable:** the record, documents, evidence, variations and history stay readable by the parties and admins.
+    - **Execution status:** the derived status shows "completed".
+    - **Audit and notification:** the audit entry records "accepted; transaction completed", and the provider's notification says the work was accepted and the transaction closed.
+  - **UI:**
+    - **Both parties:** the agreement shows "Completed" with its date, and the execution status shows "Completed".
+    - **No edit controls** remain once completed: progress, evidence, papers, changes, termination, deliverables.
+
 _Stage 7 onwards is added as it is implemented._

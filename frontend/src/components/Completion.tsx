@@ -25,7 +25,7 @@ export function Completion({
   if (a.work_started_at === null) return null;
   const c = "completion";
   const status = a.completion_status ?? "none";
-  const live = a.status !== "terminated";
+  const live = !["terminated", "completed"].includes(a.status);
   const openChange = a.variations.some((v) => v.status === "proposed");
   const canSubmit = a.side === "provider" && live && a.execution_status === "in_progress" && (status === "none" || status === "returned")
     && a.outstanding_deliverables === 0 && !openChange;
