@@ -1,3 +1,4 @@
+from app.models.agreement import Agreement, AgreementDocument
 from app.models.audit_log import AuditLog
 from app.models.auth_token import AuthToken
 from app.models.award_record import AwardRecord
@@ -20,6 +21,8 @@ from app.models.revoked_token import RevokedToken
 from app.models.user import User
 
 __all__ = [
+    "Agreement",
+    "AgreementDocument",
     "User",
     "AuthToken",
     "ServiceProviderProfile",

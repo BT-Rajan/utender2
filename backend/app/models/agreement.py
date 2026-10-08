@@ -1,0 +1,57 @@
+from datetime import date, datetime
+
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.db import Base
+from app.models.common import gen_uuid
+
+
+# Stage 7.3: the agreement governing an awarded requirement. One per award,
+# created with it (and backfilled for earlier awards), never re-pointed: the
+# parties, the agreed value, the winning offer and the scope version are the
+# award record's and are read from it, never copied here -- so an agreement
+# can neither drift from nor rewrite the award. It adds only what the award
+# doesn't say: where the agreement stands (preparing / active / terminated),
+# from when it takes effect, and the parties' own reference for it (their
+# contract, work order or purchase order number). The parties agree outside
+# U-Tender; the signed papers are attached as AgreementDocument rows.
+AGREEMENT_STATUSES = ("preparing", "active", "terminated")
+
+
+class Agreement(Base):
+    __tablename__ = "agreements"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    award_id: Mapped[str] = mapped_column(String(36), ForeignKey("award_records.id", ondelete="CASCADE"), nullable=False, unique=True)
+    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, unique=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="preparing", server_default="preparing")
+    reference: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    effective_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    terminated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    termination_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Stage 3.11's rule: a change sent from a page showing an older version
+    # (another tab, another member) is refused, not silently applied.
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    updated_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+
+AGREEMENT_DOCUMENT_KINDS = ("signed_agreement", "work_order", "purchase_order", "final_quotation", "agreed_scope", "other")
+
+
+class AgreementDocument(Base):
+    __tablename__ = "agreement_documents"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    agreement_id: Mapped[str] = mapped_column(String(36), ForeignKey("agreements.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    # Which party attached it -- "owner" or "provider" -- the side, not the
+    # member: any member of that side may remove it while it's being prepared.
+    party: Mapped[str] = mapped_column(String(16), nullable=False)
+    file_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    uploaded_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())

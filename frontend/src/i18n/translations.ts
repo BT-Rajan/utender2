@@ -246,6 +246,36 @@ export interface Dictionary {
     earlierVersion: string;
     confirm: string;
   };
+  agreement: {
+    heading: string;
+    status: { preparing: string; preparingHelp: string; active: string; activeHelp: string; terminated: string; terminatedHelp: string };
+    owner: string;
+    provider: string;
+    value: string;
+    awardedOn: string;
+    effective: string;
+    reference: string;
+    id: string;
+    terminatedOn: string;
+    reason: string;
+    editDetails: string;
+    save: string;
+    cancel: string;
+    activate: string;
+    needsDate: string;
+    activateConfirm: string;
+    activateConfirmBody: string;
+    terminate: string;
+    terminatePrompt: string;
+    documents: string;
+    noDocuments: string;
+    kindLabel: string;
+    kind: { signed_agreement: string; work_order: string; purchase_order: string; final_quotation: string; agreed_scope: string; other: string };
+    by: { owner: string; provider: string };
+    file: string;
+    attach: string;
+    remove: string;
+  };
   awardHandover: {
     heading: string;
     to: string;
@@ -1547,6 +1577,50 @@ export const en: Dictionary = {
     confirmBody: "This is your final decision on this requirement: {provider}'s offer of {amount} is accepted as submitted, every other live offer is marked not selected, and every provider is told. It can't be undone. It isn't a contract or a payment.",
     earlierVersion: "Note: this offer was made against version {n} of the requirement, which is now at version {m}, and its provider didn't confirm it since. You'd be awarding it as it stands.",
     confirm: "Award",
+  },
+  agreement: {
+    heading: "Agreement",
+    status: {
+      preparing: "Being prepared",
+      preparingHelp: "The parties are finalising the agreement outside U-Tender. Attach the signed papers here.",
+      active: "In force",
+      activeHelp: "The agreement governing this award is in force.",
+      terminated: "Terminated",
+      terminatedHelp: "The agreement was terminated. The award stays on record as it was made.",
+    },
+    owner: "Owner",
+    provider: "Service provider",
+    value: "Agreed value",
+    awardedOn: "Awarded on",
+    effective: "Effective from",
+    reference: "Contract, work order or PO number",
+    id: "Agreement reference",
+    terminatedOn: "Terminated on",
+    reason: "Reason",
+    editDetails: "Edit reference and effective date",
+    save: "Save",
+    cancel: "Cancel",
+    activate: "Mark as in force",
+    needsDate: "Enter the effective date first.",
+    activateConfirm: "Mark the agreement as in force?",
+    activateConfirmBody: "Do this once both parties have agreed. Its reference and effective date can't be changed afterwards.",
+    terminate: "Terminate the agreement",
+    terminatePrompt: "Why was the agreement terminated?",
+    documents: "Agreement documents",
+    noDocuments: "No documents attached yet.",
+    kindLabel: "Document",
+    kind: {
+      signed_agreement: "Signed agreement",
+      work_order: "Work order",
+      purchase_order: "Purchase order",
+      final_quotation: "Final quotation",
+      agreed_scope: "Agreed scope",
+      other: "Other",
+    },
+    by: { owner: "from the owner", provider: "from the service provider" },
+    file: "File",
+    attach: "Attach",
+    remove: "Remove",
   },
   awardHandover: {
     heading: "Awarded",
@@ -2874,6 +2948,50 @@ export const ar: Dictionary = {
     confirmBody: "هذا قرارك النهائي في هذا المتطلب: يُقبل عرض {provider} بقيمة {amount} كما قُدّم، ويُعلَّم كل عرض قائم آخر بأنه لم يُختر، ويُبلَّغ كل المزوّدين. لا يمكن التراجع عنه. وهو ليس عقدًا ولا دفعًا.",
     earlierVersion: "ملاحظة: قُدّم هذا العرض على الإصدار {n} من المتطلب، وهو الآن في الإصدار {m}، ولم يؤكده مزوّده منذ ذلك الحين. ستُرسيه كما هو.",
     confirm: "رسِّ",
+  },
+  agreement: {
+    heading: "الاتفاقية",
+    status: {
+      preparing: "قيد الإعداد",
+      preparingHelp: "يعمل الطرفان على إتمام الاتفاقية خارج يو-تندر. أرفق المستندات الموقعة هنا.",
+      active: "سارية",
+      activeHelp: "الاتفاقية التي تحكم هذه الترسية سارية.",
+      terminated: "منتهية",
+      terminatedHelp: "تم إنهاء الاتفاقية. تبقى الترسية في السجل كما تمت.",
+    },
+    owner: "المالك",
+    provider: "مقدم الخدمة",
+    value: "القيمة المتفق عليها",
+    awardedOn: "تاريخ الترسية",
+    effective: "تاريخ السريان",
+    reference: "رقم العقد أو أمر العمل أو أمر الشراء",
+    id: "مرجع الاتفاقية",
+    terminatedOn: "تاريخ الإنهاء",
+    reason: "السبب",
+    editDetails: "تعديل المرجع وتاريخ السريان",
+    save: "حفظ",
+    cancel: "إلغاء",
+    activate: "تحديد كسارية",
+    needsDate: "أدخل تاريخ السريان أولاً.",
+    activateConfirm: "تحديد الاتفاقية كسارية؟",
+    activateConfirmBody: "قم بذلك بعد اتفاق الطرفين. لا يمكن تغيير المرجع وتاريخ السريان بعد ذلك.",
+    terminate: "إنهاء الاتفاقية",
+    terminatePrompt: "لماذا تم إنهاء الاتفاقية؟",
+    documents: "مستندات الاتفاقية",
+    noDocuments: "لم يتم إرفاق أي مستندات بعد.",
+    kindLabel: "المستند",
+    kind: {
+      signed_agreement: "اتفاقية موقعة",
+      work_order: "أمر عمل",
+      purchase_order: "أمر شراء",
+      final_quotation: "عرض السعر النهائي",
+      agreed_scope: "النطاق المتفق عليه",
+      other: "أخرى",
+    },
+    by: { owner: "من المالك", provider: "من مقدم الخدمة" },
+    file: "الملف",
+    attach: "إرفاق",
+    remove: "حذف",
   },
   awardHandover: {
     heading: "تمت الترسية",

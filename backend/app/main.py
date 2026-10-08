@@ -17,6 +17,7 @@ from app.routers.files import router as files_router
 from app.routers.notifications import router as notifications_router
 from app.routers.offers import router as offers_router
 from app.routers.owner import router as owner_router
+from app.routers.agreements import router as agreements_router
 from app.routers.projects import router as projects_router
 from app.routers.public import router as public_router
 
@@ -56,6 +57,7 @@ app.include_router(categories_router)
 app.include_router(clarifications_router)
 app.include_router(offers_router)
 app.include_router(owner_router)
+app.include_router(agreements_router)
 app.include_router(service_provider_router)
 app.include_router(admin_router)
 app.include_router(billing_router)

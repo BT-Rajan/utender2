@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.deps import get_owner_profile, require_owner
+from app.models.agreement import Agreement
 from app.models.award_record import AwardRecord
+from app.models.common import gen_uuid
 from app.models.clarification import Clarification
 from app.models.evaluation_note import EvaluationNote
 from app.models.offer_shortlist import OfferShortlist
@@ -595,8 +597,10 @@ def approve_offer(
     # it stays meaningful even after later amendments or a hypothetical bid
     # edit (bids can't be edited post-close, but the tender's own revision
     # can still move via future passes' evaluation tooling).
+    award_id = gen_uuid()
     db.add(
         AwardRecord(
+            id=award_id,
             project_id=project_id,
             offer_id=winning_offer.id,
             service_provider_id=winning_offer.service_provider_id,
@@ -606,6 +610,11 @@ def approve_offer(
             awarded_by=user.id,
         )
     )
+    db.flush()
+    # Stage 7.3: the agreement governing the award comes into being with it,
+    # being prepared -- in the same transaction, so there is never an award
+    # without its agreement, nor an agreement without its award.
+    db.add(Agreement(award_id=award_id, project_id=project_id))
     # log_action commits: the award, the status changes and the audit row land
     # in ONE transaction, so there is no committed award without its audit entry.
     log_action(

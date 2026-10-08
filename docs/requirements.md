@@ -632,4 +632,37 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **Losers:** losing bidders no longer get the record's id.
     - **Winner deletion:** an admin can no longer delete a provider that has won an award. The delete would have cascaded away the awarded offer and left the award record broken. Suspend the account instead, as already applies to deleting the awarded offer itself.
 
+- **7.3 Contract / agreement:**
+  - **Audit:**
+    - **What already worked (WORKING):** the award record (7.2) already names the parties, the requirement, the winning offer, the value (in the marketplace currency), the scope version and the award reference. Organisation-based access, the requirement lock, audit logging and file storage were all reusable.
+    - **What was missing (MISSING):** any record of the agreement itself: where it stands, when it takes effect, the parties' own contract or PO number, and the signed papers.
+  - **Added: one agreement per award (`agreements`, migration 0048):**
+    - **Creation:** created with the award, in the same transaction as the award record. Every earlier award is backfilled, so no award lacks an agreement and no agreement lacks an award.
+    - **Never moves:** it can't be created through the API, re-pointed, or attached to another requirement, offer or provider. A losing, withdrawn or unawarded offer can never have one.
+    - **What it reads, not copies:** parties, value, offer and scope version come from the award record. The agreement can neither drift from the award nor rewrite it.
+    - **What it holds:**
+      - status: preparing → active ("in force") → terminated, or preparing → terminated;
+      - effective date;
+      - the parties' own reference;
+      - termination reason;
+      - created and updated times and a version.
+    - **Terminating it:** the requirement stays awarded and the award record is unchanged. Completion, variations and payments are later stages.
+  - **Who may change it:**
+    - **Owner side:** any member of the owner's side records the reference and effective date while preparing. It marks the agreement in force, which needs the effective date first, and it can terminate it with a reason. Organisation members share this, not only whoever made the award.
+    - **Stale changes:** a change from a stale tab is refused (409, If-Match on the agreement's version). A repeated activation or termination is refused (400).
+    - **Locking:** every change takes the requirement lock and is audit-logged (`agreement.*`).
+  - **Documents (`agreement_documents`):**
+    - **Who attaches:** either party attaches the signed agreement, a work order, purchase order, final quotation, agreed scope or other paper. These go through the existing storage with the existing file-type checks.
+    - **No orphans:** a failed save deletes the stored file, so no stored file is left without a record.
+    - **Removing:** a side may remove its own papers only while the agreement is being prepared. Once it is in force or terminated, they stay on record.
+    - **Opening:** opened through a one-minute signed link, authorised on every click.
+  - **Access:**
+    - **Endpoints:** `GET/PATCH /projects/{id}/agreement`, `POST …/activate`, `POST …/terminate`, and `POST/DELETE/GET …/documents`.
+    - **Who reads it:** the owner side, the winning provider's side (all members of its organisation) and admins, who can read but not change it.
+    - **Who gets nothing:** losing or withdrawn bidders, outsiders, other owners, a suspended account and providers of a suspended requirement get 404, whatever ids they send. Document ids are checked against the requirement in the path.
+    - **Writes:** need an approved, unsuspended account; a suspended requirement is frozen.
+  - **UI:**
+    - **Agreement panel:** an agreement panel under the award summary on the owner's requirement page, and on the winner's offer page. It shows the parties, value, award date, effective date, references, status and documents.
+    - **Owner controls:** the owner gets the edit, activate and terminate controls. English and Arabic.
+
 _Stage 7 onwards is added as it is implemented._

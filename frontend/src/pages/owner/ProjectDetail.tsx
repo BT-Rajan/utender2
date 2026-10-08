@@ -20,6 +20,7 @@ import { CategoryField } from "@/components/CategoryField";
 import { TenderRulesEditor } from "@/components/TenderRules";
 import { QualityCheck, type QualityReport } from "@/components/QualityCheck";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { AgreementPanel } from "@/components/AgreementPanel";
 import { ClosureOutcome, EndRequirement, StartAgain, outcomeLabel } from "@/components/ClosureOutcome";
 import { AmendPublishedForm, AmendmentsList, PauseControl } from "@/components/PostPublication";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
@@ -573,6 +574,7 @@ export function OwnerProjectDetailPage() {
       {project.status === "open" && <AmendPublishedForm project={project} />}
       {/* Stage 7.1: the award, as recorded -- who, which offer, what value, when, on which version. */}
       {project.status === "awarded" && <AwardSummary projectId={project.id} currency={project.currency} />}
+      {project.status === "awarded" && <AgreementPanel projectId={project.id} />}
       {project.closed_at && project.status !== "open" && (
         <p className="text-[12.5px] text-steel mb-4">{t("postPub.closedEarly").replace("{date}", formatDeadline(project.closed_at))}</p>
       )}
