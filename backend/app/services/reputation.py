@@ -22,7 +22,7 @@ RECENT_REVIEWS = 5
 
 def _reviews(db: Session, party_filter, direction: str, recent: bool):
     """(count, simple average or None, latest reviews) of one party's reviews in one direction."""
-    where = (party_filter, Review.direction == direction)
+    where = (party_filter, Review.direction == direction, Review.hidden_at.is_(None))  # Stage 8.15: hidden reviews don't count
     count, average = db.query(func.count(Review.id), func.avg(Review.rating)).filter(*where).one()
     latest = db.query(Review).filter(*where).order_by(Review.created_at.desc(), Review.id).limit(RECENT_REVIEWS).all() if recent and count else []
     return count, round(float(average), 1) if count else None, latest  # no reviews is "none yet", never 0 stars

@@ -1217,4 +1217,31 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **List rating:** now reads "avg / 5 · n reviews".
   - **Tests:** `tests/test_stage8_14_trust_signals.py`.
 
+- **8.15 Abuse resistance and moderation:**
+  - **Already working:**
+    - **Integrity (8.5/8.10):** reviews come only from the parties to a completed transaction; ids from the client are ignored; self-review, duplicates and concurrent submissions are blocked; ratings are strict 1–5.
+    - **Immutability (8.9):** reviews can't be edited or deleted, and one final response goes to the reviewed side.
+    - **Safe rendering:** all review text is rendered by React as text (no raw HTML anywhere), and notifications carry no content.
+    - **Admin access:** the admin router is gated server-side (`require_admin`).
+  - **Gaps found:**
+    - **No reporting:** nothing let a party report an abusive review or response.
+    - **No moderation:** an admin could not take abusive content out of view or out of ratings.
+  - **Fixed:**
+    - **Migration 0060:**
+      - `review_reports`: review, target (review or response), reporter, reason, optional note, status (open / kept / hidden), the deciding admin, time and note. Unique per review and target.
+      - `reviews.hidden_at` and `reviews.response_hidden_at`.
+    - **Reporting** (`POST /owner|service-provider/projects/{id}/review-reports`): under each side's existing gate.
+      - The reviewed side may report the review about it, and the reviewer side the response to its review.
+      - Each item can be reported once (explained 409).
+      - A report changes nothing and is audited.
+      - The reported party never sees who reported it.
+    - **Moderation** (`GET /admin/review-reports`, `POST /admin/review-reports/{id}/decision`): keep or hide, decided once, under the requirement lock and then the provider lock, and audited.
+      - **A hidden review:** stops being shown (`shown_review_of`) and counted, both in the live reputation and in the stored provider rating (recomputed). It stays on record with its parties and rating, can't be re-submitted and takes no response. Its author sees "hidden" (`ReviewOut.hidden`).
+      - **A hidden response:** stops being shown (`shown_response`) and stays on record.
+      - **Admin view:** only the report, the content and the parties' names.
+    - **UI:**
+      - A "Report this review / response" control (reason and note, explaining that disagreement belongs in a response).
+      - A "Reported reviews" admin page with Keep and Hide.
+  - **Tests:** `tests/test_stage8_15_review_moderation.py`.
+
 _Stage 9 onwards is added as it is implemented._

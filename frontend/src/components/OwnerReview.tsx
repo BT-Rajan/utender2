@@ -15,6 +15,7 @@ interface ReviewRecord {
   created_at: string;
   response?: string | null;
   response_at?: string | null;
+  hidden?: boolean;
 }
 
 // Stage 8.4: the winning provider reviews the owner -- once the transaction is
@@ -58,7 +59,8 @@ export function OwnerReview({ projectId }: { projectId: string }) {
           </span>
           {review.comment && <p className="text-sm text-steel mt-1 whitespace-pre-wrap break-words" dir="auto">{review.comment}</p>}
           <div className="font-mono text-[10px] text-steel mt-1">{t("ownerReview.submitted")} {fullDate(review.created_at, language)}</div>
-          <ReviewResponse response={review.response} at={review.response_at} label={t("review.theirResponse")} />
+          {review.hidden && <p className="text-xs text-amber-dark mt-1">{t("report.hiddenNote")}</p>}
+          <ReviewResponse response={review.response} at={review.response_at} label={t("review.theirResponse")} reportBase={`/service-provider/projects/${projectId}`} />
         </div>
       ) : (
         <form

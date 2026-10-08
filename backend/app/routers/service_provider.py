@@ -17,8 +17,8 @@ from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.saved_opportunity import SavedOpportunity
 from app.models.user import User
 from app.schemas.service_provider import ServiceProviderProfileOut, MyBidOut, SubmitForReview
-from app.schemas.review import PreviousOwnerOut, ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut, ReviewResponseCreate
-from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_response, record_review, review_of
+from app.schemas.review import PreviousOwnerOut, ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut, ReviewReportCreate, ReviewReportOut, ReviewResponseCreate
+from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_response, record_review, report, review_of, shown_review_of
 from app.schemas.document import ServiceProviderDocumentOut, DocumentRequirementOut
 from app.schemas.common import UTCDateTime
 from app.schemas.project import FeedPage, ProjectOut
@@ -628,7 +628,17 @@ def review_received_from_the_owner(project_id: str, user: User = Depends(require
     recorded -- to the winner's side only, as rating, comment and date. Other
     providers see only the aggregate rating owners already see on offers."""
     _winning_side(db, user, project_id)
-    return review_of(db, project_id, OWNER_TO_PROVIDER)
+    return shown_review_of(db, project_id, OWNER_TO_PROVIDER)  # Stage 8.15: not once an admin has hidden it
+
+
+@router.post("/projects/{project_id}/review-reports", response_model=ReviewReportOut, status_code=201)
+def report_review_content(project_id: str, payload: ReviewReportCreate, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """Stage 8.15: the winning provider side reports the owner's review of it,
+    or the owner's response to its own review -- for an admin to look at.
+    Nothing changes until an admin decides."""
+    project = _winning_side(db, user, project_id, lock=True)
+    direction = OWNER_TO_PROVIDER if payload.target == "review" else PROVIDER_TO_OWNER
+    return report(db, project, direction, payload.target, user, payload.reason, payload.note)
 
 
 @router.post("/projects/{project_id}/review/received/response", response_model=ReceivedReviewOut)

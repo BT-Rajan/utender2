@@ -40,3 +40,44 @@ class Review(Base):
     response: Mapped[str | None] = mapped_column(Text, nullable=True)
     response_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     responded_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    # Stage 8.15: an admin's moderation, after a report -- the row stays (who
+    # reviewed whom, what was written) but a hidden review stops being shown or
+    # counted, and a hidden response stops being shown. The audit log says who.
+    hidden_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    response_hidden_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    @property
+    def is_hidden(self) -> bool:
+        return self.hidden_at is not None
+
+    @property
+    def shown_response(self) -> str | None:
+        return None if self.response_hidden_at else self.response
+
+    @property
+    def shown_response_at(self) -> datetime | None:
+        return None if self.response_hidden_at else self.response_at
+
+
+class ReviewReport(Base):
+    """Stage 8.15: a party's report of a review about it, or of the response to
+    its own review -- a signal for an admin, never a change by itself. One per
+    review and target; the admin keeps or hides what was reported."""
+    __tablename__ = "review_reports"
+    __table_args__ = (
+        UniqueConstraint("review_id", "target", name="uq_review_report_target"),
+        CheckConstraint("target IN ('review', 'response')", name="ck_review_report_target"),
+        CheckConstraint("status IN ('open', 'kept', 'hidden')", name="ck_review_report_status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    review_id: Mapped[str] = mapped_column(String(36), ForeignKey("reviews.id", ondelete="CASCADE"), nullable=False)
+    target: Mapped[str] = mapped_column(String(16), nullable=False)  # the review itself, or its response
+    reporter_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reason: Mapped[str] = mapped_column(String(32), nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="open", server_default="open")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    resolved_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolution_note: Mapped[str | None] = mapped_column(Text, nullable=True)

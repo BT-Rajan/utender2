@@ -2,9 +2,9 @@ import json
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -22,6 +22,7 @@ from app.models.project import Project, ProjectDrawing
 from app.models.review import Review
 from app.models.user import User
 from app.schemas.cms import CmsContentOut, CmsContentUpsert
+from app.schemas.review import ModerationDecision, ReviewReportAdminOut
 from app.schemas.service_provider import ServiceProviderProfileOut, ServiceProviderProfileUpdate
 from app.schemas.document import (
     ServiceProviderDocumentOut,
@@ -1497,3 +1498,59 @@ def _profile_fields(cp: ServiceProviderProfile) -> dict:
         created_at=cp.created_at,
         **profile_state_fields(cp),
     )
+
+
+# ---------- Stage 8.15: reported reviews and responses ----------
+
+
+def _report_out(db: Session, entry, review, project) -> ReviewReportAdminOut:
+    from app.models.organization import Organization
+    from app.services.reviews import OWNER_TO_PROVIDER
+
+    org = db.get(Organization, project.organization_id) if project.organization_id else None
+    owner = db.get(User, project.owner_id)
+    cp = db.get(ServiceProviderProfile, review.service_provider_id)
+    # The review is reported by its subject; a response by the review's author.
+    owner_side = (review.direction == OWNER_TO_PROVIDER) == (entry.target == "response")
+    return ReviewReportAdminOut(
+        id=entry.id, target=entry.target, reason=entry.reason, note=entry.note, status=entry.status,
+        created_at=entry.created_at, resolved_at=entry.resolved_at, resolution_note=entry.resolution_note,
+        reported_by="owner" if owner_side else "service_provider",
+        direction=review.direction, rating=review.rating, comment=review.comment, response=review.response,
+        review_hidden=review.hidden_at is not None, response_hidden=review.response_hidden_at is not None,
+        project_title=project.title,
+        owner_name=org.legal_name if org else (owner.full_name if owner else None),
+        provider_name=cp.company_name if cp else None,
+    )
+
+
+@router.get("/review-reports", response_model=list[ReviewReportAdminOut])
+def review_reports(db: Session = Depends(get_db), limit: int = Query(200, ge=1, le=500)):
+    """Stage 8.15: reports on reviews and responses, open ones first -- what
+    was reported, why, and the two parties; nothing else of the transaction."""
+    from app.models.review import ReviewReport
+
+    rows = (
+        db.query(ReviewReport, Review, Project)
+        .join(Review, Review.id == ReviewReport.review_id)
+        .join(Project, Project.id == Review.project_id)
+        .order_by(case((ReviewReport.status == "open", 0), else_=1), ReviewReport.created_at.desc(), ReviewReport.id)
+        .limit(limit)
+        .all()
+    )
+    return [_report_out(db, *row) for row in rows]
+
+
+@router.post("/review-reports/{report_id}/decision", response_model=ReviewReportAdminOut)
+def decide_review_report(report_id: str, payload: ModerationDecision, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Stage 8.15: keep what was reported, or hide it -- the row and the audit
+    remain; a hidden review stops counting towards any rating."""
+    from app.models.review import ReviewReport
+    from app.services.reviews import moderate
+
+    entry = db.get(ReviewReport, report_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    entry = moderate(db, entry, admin, payload.decision, payload.note)
+    review = db.get(Review, entry.review_id)
+    return _report_out(db, entry, review, db.get(Project, review.project_id))

@@ -27,9 +27,9 @@ from app.schemas.document import DocumentRequirementOut, OwnerDocumentOut
 from app.schemas.offer import ShortlistOut, EvaluationNoteEdit, EvaluationNoteIn, EvaluationNoteOut, OfferComparisonOut, OfferOut, OfferRevisionOut, OwnerOfferOut
 from app.schemas.owner import OwnerProfileOut
 from app.schemas.project import EligibilityQualification, ProjectOut
-from app.schemas.review import OwnerReputationOut, PreviousProviderOut, ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut, ReviewResponseCreate
+from app.schemas.review import OwnerReputationOut, PreviousProviderOut, ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut, ReviewReportCreate, ReviewReportOut, ReviewResponseCreate
 from app.services.audit import log_action
-from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_response, record_review, review_of
+from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_response, record_review, report, review_of, shown_review_of
 from app.services.email import notify_provider_requirement_ended, notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify, notify_team
@@ -1030,7 +1030,17 @@ def get_received_review(project_id: str, user: User = Depends(require_owner), db
     project = db.get(Project, project_id)
     if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
-    return review_of(db, project_id, PROVIDER_TO_OWNER)
+    return shown_review_of(db, project_id, PROVIDER_TO_OWNER)  # Stage 8.15: not once an admin has hidden it
+
+
+@router.post("/projects/{project_id}/review-reports", response_model=ReviewReportOut, status_code=201)
+def report_review_content(project_id: str, payload: ReviewReportCreate, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 8.15: the owner side reports the provider's review of it, or the
+    provider's response to its own review -- for an admin to look at. Nothing
+    changes until an admin decides."""
+    project = _get_owned_project(project_id, user, db, lock=True)
+    direction = PROVIDER_TO_OWNER if payload.target == "review" else OWNER_TO_PROVIDER
+    return report(db, project, direction, payload.target, user, payload.reason, payload.note)
 
 
 @router.post("/projects/{project_id}/review/received/response", response_model=ReceivedReviewOut)

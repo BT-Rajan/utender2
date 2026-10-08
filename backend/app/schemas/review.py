@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -33,8 +34,10 @@ class ReviewOut(BaseModel):
     comment: str | None
     direction: str  # Stage 8.4: owner_to_provider / provider_to_owner
     created_at: UTCDateTime
-    response: str | None = None  # Stage 8.9: the reviewed side's response, if any
-    response_at: UTCDateTime | None = None
+    # Stage 8.9: the reviewed side's response, if any -- unless an admin hid it (8.15).
+    response: str | None = Field(default=None, validation_alias="shown_response")
+    response_at: UTCDateTime | None = Field(default=None, validation_alias="shown_response_at")
+    hidden: bool = Field(default=False, validation_alias="is_hidden")  # Stage 8.15: an admin hid this review
 
 
 class ReceivedReviewOut(BaseModel):
@@ -46,8 +49,9 @@ class ReceivedReviewOut(BaseModel):
     rating: int
     comment: str | None
     created_at: UTCDateTime
-    response: str | None = None  # Stage 8.9: the reviewed side's response, beside the review
-    response_at: UTCDateTime | None = None
+    # Stage 8.9: the reviewed side's response, beside the review -- unless an admin hid it (8.15).
+    response: str | None = Field(default=None, validation_alias="shown_response")
+    response_at: UTCDateTime | None = Field(default=None, validation_alias="shown_response_at")
 
 
 class ProviderReputationOut(BaseModel):
@@ -98,3 +102,50 @@ class PreviousOwnerOut(BaseModel):
     completed_transactions: int
     last_completed_at: UTCDateTime | None
     transactions: list[PreviousTransactionOut]
+
+
+class ReviewReportCreate(BaseModel):
+    """Stage 8.15: what is reported (the review your side received, or the
+    response to your side's review), why, and an optional short note. The
+    review and the reporter come from the server."""
+    target: Literal["review", "response"]
+    reason: Literal["abusive", "private_information", "not_about_this_transaction", "other"]
+    note: str | None = Field(default=None, max_length=500)
+
+
+class ReviewReportOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    target: str
+    reason: str
+    status: str
+    created_at: UTCDateTime
+
+
+class ModerationDecision(BaseModel):
+    decision: Literal["keep", "hide"]
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class ReviewReportAdminOut(BaseModel):
+    """Stage 8.15: one report as an admin decides it -- the report, what was
+    reported (as written, even if hidden since), and who the two parties are.
+    Nothing else of the transaction."""
+    id: str
+    target: str
+    reason: str
+    note: str | None
+    status: str
+    created_at: UTCDateTime
+    resolved_at: UTCDateTime | None
+    resolution_note: str | None
+    reported_by: str  # the side: "owner" or "service_provider"
+    direction: str
+    rating: int
+    comment: str | None
+    response: str | None
+    review_hidden: bool
+    response_hidden: bool
+    project_title: str
+    owner_name: str | None
+    provider_name: str | None

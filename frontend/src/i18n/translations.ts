@@ -292,6 +292,24 @@ export interface Dictionary {
     ownersHeading: string;
     ownersNote: string;
   };
+  report: {
+    reportReview: string;
+    reportResponse: string;
+    explain: string;
+    reason: string;
+    reasons: { abusive: string; private_information: string; not_about_this_transaction: string; other: string };
+    note: string;
+    submit: string;
+    cancel: string;
+    sent: string;
+    error: string;
+    hiddenNote: string;
+    adminNone: string;
+    targetReview: string;
+    targetResponse: string;
+    keep: string;
+    hide: string;
+  };
   history: {
     heading: string;
     awarded: string;
@@ -1353,6 +1371,7 @@ export interface Dictionary {
       offers: string;
       projects: string;
       cms: string;
+      reviewReports: string;
     };
     owners: {
       eyebrow: string;
@@ -1794,6 +1813,24 @@ export const en: Dictionary = {
     note: "From your completed U-Tender transactions. To work with a provider again, publish a new requirement: it is open to every eligible provider and is judged like any other.",
     ownersHeading: "Owners you've completed work for",
     ownersNote: "From your completed U-Tender transactions. Their new requirements appear in your feed like any others when you're eligible, open to every eligible provider; who posted them is shown on award.",
+  },
+  report: {
+    reportReview: "Report this review",
+    reportResponse: "Report this response",
+    explain: "For abuse, private details or content that isn't about this work. If you simply disagree, respond instead. Nothing changes until U-Tender decides.",
+    reason: "Reason",
+    reasons: { abusive: "Abusive or threatening", private_information: "Shares private information", not_about_this_transaction: "Not about this work", other: "Other" },
+    note: "Short explanation (optional)",
+    submit: "Send report",
+    cancel: "Cancel",
+    sent: "Reported. U-Tender will look at it; the review stays as it is until then.",
+    error: "The report couldn't be sent.",
+    hiddenNote: "U-Tender has hidden this review: it is no longer shown or counted.",
+    adminNone: "No reports.",
+    targetReview: "review",
+    targetResponse: "response",
+    keep: "Keep",
+    hide: "Hide",
   },
   history: {
     heading: "History",
@@ -2910,6 +2947,7 @@ export const en: Dictionary = {
       offers: "All offers",
       projects: "All projects",
       cms: "Website content",
+      reviewReports: "Reported reviews",
     },
     owners: {
       eyebrow: "Admin · Owners",
@@ -3354,6 +3392,24 @@ export const ar: Dictionary = {
     note: "من معاملاتك المكتملة على U-Tender. للعمل مع مقدم خدمة مجددًا، انشر طلبًا جديدًا: يكون مفتوحًا لكل مقدمي الخدمة المؤهلين ويُقيَّم كأي طلب آخر.",
     ownersHeading: "ملاك أنجزت لهم أعمالًا",
     ownersNote: "من معاملاتك المكتملة على U-Tender. تظهر طلباتهم الجديدة في قائمة الفرص مثل غيرها عندما تكون مؤهلًا، ومفتوحة لكل مقدمي الخدمة المؤهلين؛ ويُعرف صاحب الطلب عند الترسية.",
+  },
+  report: {
+    reportReview: "الإبلاغ عن هذا التقييم",
+    reportResponse: "الإبلاغ عن هذا الرد",
+    explain: "للإساءة أو المعلومات الخاصة أو المحتوى الذي لا يتعلق بهذا العمل. إذا كنت لا تتفق معه فحسب، فردّ عليه بدلًا من ذلك. لا يتغير شيء حتى تقرر U-Tender.",
+    reason: "السبب",
+    reasons: { abusive: "مسيء أو تهديدي", private_information: "يكشف معلومات خاصة", not_about_this_transaction: "لا يتعلق بهذا العمل", other: "أخرى" },
+    note: "توضيح قصير (اختياري)",
+    submit: "إرسال البلاغ",
+    cancel: "إلغاء",
+    sent: "تم الإبلاغ. ستراجعه U-Tender؛ ويبقى التقييم كما هو حتى ذلك الحين.",
+    error: "تعذر إرسال البلاغ.",
+    hiddenNote: "أخفت U-Tender هذا التقييم: لم يعد يظهر أو يُحتسب.",
+    adminNone: "لا توجد بلاغات.",
+    targetReview: "تقييم",
+    targetResponse: "رد",
+    keep: "إبقاء",
+    hide: "إخفاء",
   },
   history: {
     heading: "السجل",
@@ -4470,6 +4526,7 @@ export const ar: Dictionary = {
       offers: "جميع العروض",
       projects: "جميع المشاريع",
       cms: "محتوى الموقع",
+      reviewReports: "التقييمات المبلغ عنها",
     },
     owners: {
       eyebrow: "المسؤول · الملاك",

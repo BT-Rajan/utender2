@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiFetch } from "@/api/client";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { ReportReview } from "@/components/ReportReview";
 import { useI18n } from "@/i18n/I18nContext";
 import { fullDate } from "@/lib/format";
 
@@ -15,7 +16,7 @@ interface Received {
 }
 
 // Stage 8.9: the reviewed side's one, final response, shown under the review it answers.
-export function ReviewResponse({ response, at, label }: { response: string | null | undefined; at: string | null | undefined; label: string }) {
+export function ReviewResponse({ response, at, label, reportBase }: { response: string | null | undefined; at: string | null | undefined; label: string; reportBase?: string }) {
   const { language } = useI18n();
   if (!response) return null;
   return (
@@ -23,6 +24,7 @@ export function ReviewResponse({ response, at, label }: { response: string | nul
       <div className="font-mono text-[10px] uppercase text-steel">{label}</div>
       <p className="text-sm text-steel whitespace-pre-wrap break-words" dir="auto">{response}</p>
       {at && <div className="font-mono text-[10px] text-steel">{fullDate(at, language)}</div>}
+      {reportBase && <ReportReview projectBase={reportBase} target="response" />}
     </div>
   );
 }
@@ -79,6 +81,8 @@ export function ReceivedReview({ url, from }: { url: string; from: string }) {
             </button>
           </form>
         )}
+        {/* Stage 8.15: abuse or private details -- not disagreement -- go to U-Tender. */}
+        <ReportReview projectBase={url.replace(/\/review\/received$/, "")} target="review" />
       </div>
     </section>
   );

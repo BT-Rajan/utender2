@@ -30,6 +30,7 @@ import { OwnerOfferDetailPage } from "@/pages/owner/OfferDetail";
 import { OwnerCompareOffersPage } from "@/pages/owner/CompareOffers";
 import { OwnerProjectPreviewPage } from "@/pages/owner/ProjectPreview";
 import { AdminReviewPage } from "@/pages/admin/Review";
+import { AdminReviewReportsPage } from "@/pages/admin/ReviewReports";
 import { AdminServiceProvidersPage } from "@/pages/admin/ServiceProviders";
 import { AdminServiceProviderDetailPage } from "@/pages/admin/ServiceProviderDetail";
 import { AdminOwnersPage } from "@/pages/admin/Owners";
@@ -150,6 +151,7 @@ export function App() {
           <Route path="requirements" element={<AdminRequirementsPage />} />
           <Route path="categories" element={<AdminCategoriesPage />} />
           <Route path="review" element={<AdminReviewPage />} />
+          <Route path="review-reports" element={<AdminReviewReportsPage />} />
           <Route path="service-providers" element={<AdminServiceProvidersPage />} />
           <Route path="service-providers/:id" element={<AdminServiceProviderDetailPage />} />
           <Route path="owners" element={<AdminOwnersPage />} />

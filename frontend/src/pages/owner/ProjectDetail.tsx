@@ -40,6 +40,7 @@ interface Review {
   created_at: string;
   response?: string | null;  // Stage 8.9: the provider's response, if any
   response_at?: string | null;
+  hidden?: boolean;  // Stage 8.15: an admin hid this review
 }
 
 // Stage 7.1: the award handover -- read from the permanent award record, the
@@ -1011,7 +1012,8 @@ export function OwnerProjectDetailPage() {
               <p className="font-mono text-[10.5px] text-steel-light mt-2">
                 {t("owner.projectDetail.submittedOn")} {new Date(existingReview.created_at).toLocaleDateString()}
               </p>
-              <ReviewResponse response={existingReview.response} at={existingReview.response_at} label={t("review.theirResponse")} />
+              {existingReview.hidden && <p className="text-xs text-amber-dark mt-1">{t("report.hiddenNote")}</p>}
+              <ReviewResponse response={existingReview.response} at={existingReview.response_at} label={t("review.theirResponse")} reportBase={`/owner/projects/${project.id}`} />
             </div>
           ) : (
             <form

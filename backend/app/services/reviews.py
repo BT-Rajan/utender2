@@ -14,7 +14,7 @@ from app.models.award_record import AwardRecord
 from app.models.enums import NotificationType
 from app.models.offer import Offer
 from app.models.project import Project
-from app.models.review import Review
+from app.models.review import Review, ReviewReport
 from app.models.service_provider import ServiceProviderProfile
 from app.models.user import User
 from app.services import audit
@@ -27,8 +27,35 @@ OWNER_TO_PROVIDER = "owner_to_provider"
 PROVIDER_TO_OWNER = "provider_to_owner"
 
 
+# Stage 8.15: why a party may report a review or response -- policy, not disagreement.
+REPORT_REASONS = ("abusive", "private_information", "not_about_this_transaction", "other")
+
+
 def review_of(db: Session, project_id: str, direction: str) -> Review | None:
+    """The review on record in one direction, hidden or not -- what the
+    one-review rule and the reviewer's own view rest on."""
     return db.query(Review).filter(Review.project_id == project_id, Review.direction == direction).first()
+
+
+def shown_review_of(db: Session, project_id: str, direction: str) -> Review | None:
+    """Stage 8.15: the review as others may see it -- none once an admin has hidden it."""
+    review = review_of(db, project_id, direction)
+    return review if review is not None and review.hidden_at is None else None
+
+
+def _recount_provider(db: Session, profile: ServiceProviderProfile | None, service_provider_id: str) -> None:
+    """The provider's stored public rating, recomputed from its shown owner
+    reviews (never an incremental counter). The caller holds the profile row."""
+    if profile is None:
+        return
+    ratings = [r for (r,) in db.query(Review.rating).filter(
+        Review.service_provider_id == service_provider_id, Review.direction == OWNER_TO_PROVIDER, Review.hidden_at.is_(None))]
+    profile.review_count = len(ratings)
+    profile.avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else 0
+
+
+def _lock_provider(db: Session, service_provider_id: str) -> ServiceProviderProfile | None:
+    return db.query(ServiceProviderProfile).filter(ServiceProviderProfile.user_id == service_provider_id).with_for_update().first()
 
 
 def record_review(db: Session, project: Project, direction: str, reviewer: User, rating: int, comment: str | None) -> Review:
@@ -55,8 +82,7 @@ def record_review(db: Session, project: Project, direction: str, reviewer: User,
         # requirement's lock, always in that order) queues them, so each
         # recount below sees the reviews before it -- without it they
         # deadlocked on the row or stored a stale rating.
-        profile = (db.query(ServiceProviderProfile)
-                   .filter(ServiceProviderProfile.user_id == award.service_provider_id).with_for_update().first())
+        profile = _lock_provider(db, award.service_provider_id)
     review = Review(
         project_id=project.id,
         owner_id=project.owner_id,
@@ -71,11 +97,7 @@ def record_review(db: Session, project: Project, direction: str, reviewer: User,
     if direction == OWNER_TO_PROVIDER:
         # Recompute the provider's public average from its owner reviews rather
         # than trusting an incrementally-maintained counter.
-        ratings = [r for (r,) in db.query(Review.rating).filter(
-            Review.service_provider_id == award.service_provider_id, Review.direction == OWNER_TO_PROVIDER)]
-        if profile:
-            profile.review_count = len(ratings)
-            profile.avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else 0
+        _recount_provider(db, profile, award.service_provider_id)
     # log_action commits: the review, the rating and the audit entry land together.
     audit.log_action(db, actor_id=reviewer.id, action=f"review.{direction}", target_type="project", target_id=project.id,
                      new_value=f"{review.id} rating:{review.rating} owner:{review.owner_id} service_provider:{review.service_provider_id}")
@@ -92,7 +114,7 @@ def record_response(db: Session, project: Project, direction: str, responder: Us
     the review's own subject, never one named in the request."""
     if project.is_suspended:
         raise HTTPException(status_code=400, detail="This requirement is suspended.")
-    review = review_of(db, project.id, direction)
+    review = shown_review_of(db, project.id, direction)  # Stage 8.15: not to one an admin has hidden
     if review is None:
         raise HTTPException(status_code=404, detail="There is no review to respond to.")
     if review.response is not None:
@@ -111,6 +133,63 @@ def record_response(db: Session, project: Project, direction: str, responder: Us
     # The reviewer's side is told; the reviewed side wrote it, so no loop.
     _tell(db, project, award, to_provider=direction == PROVIDER_TO_OWNER, kind=NotificationType.review_response)
     return review
+
+
+def report(db: Session, project: Project, direction: str, target: str, reporter: User, reason: str, note: str | None) -> ReviewReport:
+    """Stage 8.15: report the review in `direction` (target "review" -- callers
+    pass the direction their side received) or the response to it (target
+    "response" -- the direction their side wrote). Callers authorize the side
+    and hold the requirement's lock. A report is a signal for an admin only:
+    the review, its response and every rating stay exactly as they are."""
+    if reason not in REPORT_REASONS:
+        raise HTTPException(status_code=400, detail="Choose why you are reporting this.")
+    review = shown_review_of(db, project.id, direction)
+    if review is None or (target == "response" and review.shown_response is None):
+        raise HTTPException(status_code=404, detail="There is nothing to report.")
+    if db.query(ReviewReport.id).filter(ReviewReport.review_id == review.id, ReviewReport.target == target).first():
+        raise HTTPException(status_code=409, detail="This has already been reported; U-Tender is looking at it.")
+    entry = ReviewReport(review_id=review.id, target=target, reporter_id=reporter.id, reason=reason, note=(note or "").strip() or None)
+    db.add(entry)
+    db.flush()
+    audit.log_action(db, actor_id=reporter.id, action=f"review.report.{target}", target_type="project", target_id=project.id,
+                     new_value=f"{entry.id} review:{review.id} reason:{reason}")
+    db.refresh(entry)
+    return entry
+
+
+def moderate(db: Session, entry: ReviewReport, admin: User, decision: str, note: str | None) -> ReviewReport:
+    """Stage 8.15: an admin's decision on an open report -- keep what was
+    reported, or hide it. Hiding keeps the row (reviewer, parties, rating,
+    text) and the audit says who and why; a hidden review stops being shown or
+    counted (the provider's stored rating is recomputed under its lock), a
+    hidden response stops being shown. Nothing else changes."""
+    from app.services.tender_lifecycle import lock_project
+
+    if decision not in ("keep", "hide"):
+        raise HTTPException(status_code=400, detail="Choose to keep or hide it.")
+    review = db.get(Review, entry.review_id)
+    lock_project(db, review.project_id)  # the same order as every review write: the requirement, then the provider
+    db.refresh(entry)
+    if entry.status != "open":
+        raise HTTPException(status_code=409, detail="This report has already been decided. This page now shows the latest.")
+    db.refresh(review)
+    now = datetime.utcnow().replace(microsecond=0)
+    if decision == "hide":
+        if entry.target == "response":
+            review.response_hidden_at = review.response_hidden_at or now
+        elif review.hidden_at is None:
+            profile = _lock_provider(db, review.service_provider_id) if review.direction == OWNER_TO_PROVIDER else None
+            review.hidden_at = now
+            db.flush()
+            if review.direction == OWNER_TO_PROVIDER:
+                _recount_provider(db, profile, review.service_provider_id)
+    entry.status = "hidden" if decision == "hide" else "kept"
+    entry.resolved_by, entry.resolved_at = admin.id, now
+    entry.resolution_note = (note or "").strip() or None
+    audit.log_action(db, actor_id=admin.id, action=f"review.moderation.{decision}", target_type="project", target_id=review.project_id,
+                     previous_value=f"{entry.id} {entry.target} of review:{review.id}", new_value=entry.status)
+    db.refresh(entry)
+    return entry
 
 
 def _tell(db: Session, project: Project, award: AwardRecord, *, to_provider: bool, kind: NotificationType) -> None:
