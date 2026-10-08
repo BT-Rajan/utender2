@@ -270,7 +270,7 @@ export interface Dictionary {
     documents: string;
     noDocuments: string;
     kindLabel: string;
-    kind: { signed_agreement: string; work_order: string; purchase_order: string; final_quotation: string; agreed_scope: string; other: string };
+    kind: { signed_agreement: string; work_order: string; purchase_order: string; final_quotation: string; agreed_scope: string; certificate: string; other: string };
     by: { owner: string; provider: string };
     file: string;
     attach: string;
@@ -1615,6 +1615,7 @@ export const en: Dictionary = {
       purchase_order: "Purchase order",
       final_quotation: "Final quotation",
       agreed_scope: "Agreed scope",
+      certificate: "Certificate",
       other: "Other",
     },
     by: { owner: "from the owner", provider: "from the service provider" },
@@ -2986,6 +2987,7 @@ export const ar: Dictionary = {
       purchase_order: "أمر شراء",
       final_quotation: "عرض السعر النهائي",
       agreed_scope: "النطاق المتفق عليه",
+      certificate: "شهادة",
       other: "أخرى",
     },
     by: { owner: "من المالك", provider: "من مقدم الخدمة" },

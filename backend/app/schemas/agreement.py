@@ -13,6 +13,7 @@ class AgreementDocumentOut(BaseModel):
     party: str
     file_name: str
     uploaded_at: UTCDateTime
+    uploaded_by_name: str | None = None  # Stage 7.4: the caller's own side's documents only
     url: str
 
 

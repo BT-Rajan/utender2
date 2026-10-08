@@ -18,6 +18,7 @@ from app.db import get_db
 from app.deps import get_current_user
 from app.models.agreement import AGREEMENT_DOCUMENT_KINDS, Agreement, AgreementDocument
 from app.models.award_record import AwardRecord
+from app.models.common import gen_uuid
 from app.models.enums import ProjectStatus, UserRole
 from app.models.offer import Offer
 from app.models.organization import Organization
@@ -105,6 +106,9 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
     else:
         cp = db.get(ServiceProviderProfile, award.service_provider_id)
         provider_name = cp.company_name if cp else None
+    # Stage 7.4: who attached each paper -- the member's name for the caller's
+    # own side; the other party sees which side it came from.
+    names = {}
     docs = db.query(AgreementDocument).filter(AgreementDocument.agreement_id == agreement.id).order_by(AgreementDocument.uploaded_at.asc(), AgreementDocument.id.asc())
     return AgreementOut(
         id=agreement.id,
@@ -132,11 +136,21 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
         documents=[
             AgreementDocumentOut(
                 id=d.id, kind=d.kind, party=d.party, file_name=d.file_name, uploaded_at=d.uploaded_at,
+                uploaded_by_name=_uploader(db, d, side, names),
                 url=_api(f"/projects/{project.id}/agreement/documents/{d.id}/file"),
             )
             for d in docs
         ],
     )
+
+
+def _uploader(db: Session, doc: AgreementDocument, side: str, cache: dict) -> str | None:
+    if not doc.uploaded_by or side not in (doc.party, "admin"):
+        return None
+    if doc.uploaded_by not in cache:
+        u = db.get(User, doc.uploaded_by)
+        cache[doc.uploaded_by] = (u.full_name or u.email) if u else None
+    return cache[doc.uploaded_by]
 
 
 @router.get("", response_model=AgreementOut)
@@ -226,9 +240,13 @@ async def attach_agreement_document(
     if agreement.status == "terminated":
         raise HTTPException(status_code=400, detail="This agreement has been terminated.")
     storage = get_storage()
-    path = f"{project_id}/{agreement.id}/{int(datetime.utcnow().timestamp() * 1000)}-{sanitize_path_segment(file.filename)}"
+    # Stage 7.4: keyed by the document's own id, so two uploads of the same
+    # name at the same moment (owner and provider, or a repeated submit) never
+    # share a stored file -- removing one can't take the other's with it.
+    doc_id = gen_uuid()
+    path = f"{project_id}/{agreement.id}/{doc_id}/{sanitize_path_segment(file.filename)}"
     storage.save(AGREEMENT_BUCKET, path, content, file.content_type or "application/octet-stream")
-    doc = AgreementDocument(agreement_id=agreement.id, kind=kind, party=side, file_path=path, file_name=safe_relative_name(file.filename), uploaded_by=user.id)
+    doc = AgreementDocument(id=doc_id, agreement_id=agreement.id, kind=kind, party=side, file_path=path, file_name=safe_relative_name(file.filename), uploaded_by=user.id)
     db.add(doc)
     try:
         db.flush()

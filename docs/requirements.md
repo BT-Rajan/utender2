@@ -665,4 +665,18 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **Agreement panel:** an agreement panel under the award summary on the owner's requirement page, and on the winner's offer page. It shows the parties, value, award date, effective date, references, status and documents.
     - **Owner controls:** the owner gets the edit, activate and terminate controls. English and Arabic.
 
+- **7.4 Contract documents:**
+  - **Already working (from 7.3):** the post-award papers are the agreement's documents (`agreement_documents`).
+    - **Kept apart:** they have their own table and storage bucket, separate from requirement and offer documents. No pre-award file is ever reused as one.
+    - **Attached to one agreement:** each document belongs to exactly one agreement, so to one award, one requirement, one owner side and one winning side. Ids are checked against the requirement in the path.
+    - **Upload checks:** the existing file-type check, the global upload size limit and safe file names. A failed save removes the stored file.
+    - **Opening:** authorised on every click, then a one-minute signed link. The open link alone, without a session, gets 401.
+    - **Removing:** a side removes only its own papers, and only while the agreement is being prepared. Once in force or terminated they stay on record, and terminated agreements' papers stay readable by the parties only.
+    - **Access:** members who leave an organisation lose access; the organisation keeps it.
+    - **The award is untouched:** a document never changes or reopens the award.
+  - **Fixed:**
+    - **Separate stored files:** each stored file is now keyed by its document's own id. Two uploads of the same name in the same millisecond (owner and provider, or a repeated submit) can no longer share one stored file, where removing one would have removed both.
+    - **Certificate type:** added "Certificate" as a document type.
+    - **Who uploaded it:** each document now shows the uploading member's name to that member's own side (and admins). The other party still sees only which side it came from.
+
 _Stage 7 onwards is added as it is implemented._

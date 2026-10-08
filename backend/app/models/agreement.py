@@ -39,7 +39,7 @@ class Agreement(Base):
     updated_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 
-AGREEMENT_DOCUMENT_KINDS = ("signed_agreement", "work_order", "purchase_order", "final_quotation", "agreed_scope", "other")
+AGREEMENT_DOCUMENT_KINDS = ("signed_agreement", "work_order", "purchase_order", "final_quotation", "agreed_scope", "certificate", "other")
 
 
 class AgreementDocument(Base):

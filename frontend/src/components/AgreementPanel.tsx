@@ -13,6 +13,7 @@ interface AgreementDocument {
   party: "owner" | "provider";
   file_name: string;
   uploaded_at: string;
+  uploaded_by_name: string | null; // Stage 7.4: the viewer's own side's documents only
   url: string;
 }
 
@@ -36,7 +37,7 @@ interface Agreement {
   documents: AgreementDocument[];
 }
 
-const KINDS = ["signed_agreement", "work_order", "purchase_order", "final_quotation", "agreed_scope", "other"] as const;
+const KINDS = ["signed_agreement", "work_order", "purchase_order", "final_quotation", "agreed_scope", "certificate", "other"] as const;
 
 // Stage 7.3: the agreement governing an awarded requirement. The parties agree
 // outside U-Tender and attach the papers here; the owner side records when it
@@ -187,7 +188,7 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
             <li key={d.id} className="flex flex-wrap items-baseline gap-x-3">
               <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-blue underline break-all">{d.file_name}</a>
               <span className="font-mono text-[10px] text-steel">
-                {t(`${c}.kind.${d.kind}`)} · {t(`${c}.by.${d.party}`)} · {fullDate(d.uploaded_at, language)}
+                {t(`${c}.kind.${d.kind}`)} · {t(`${c}.by.${d.party}`)}{d.uploaded_by_name ? ` (${d.uploaded_by_name})` : ""} · {fullDate(d.uploaded_at, language)}
               </span>
               {a.status === "preparing" && d.party === a.side && (
                 <button type="button" onClick={() => remove.mutate(d.id)} disabled={remove.isPending} className="text-xs text-red underline">{t(`${c}.remove`)}</button>
