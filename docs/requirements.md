@@ -1162,4 +1162,24 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **UI:** "Create similar requirement" (the existing `StartAgain` button, with its own confirmation wording) on a completed requirement's page. It leads into the normal draft flow.
   - **Tests:** `tests/test_stage8_11_similar_requirement.py`.
 
+- **8.12 Previous providers (owner side):**
+  - **Already working:**
+    - **Data:** completed transactions (Stage 7) already record the owner organisation (`project.owner_id`) and the provider organisation (`award.service_provider_id`).
+    - **Fairness:** offers are ordered by submission, never by merit. Eligibility (3.9/4.5) and award (6.x) are enforced on every request. 8.11 reuse copies no provider, offer or award.
+    - **Discovery:** owners have no provider search, invitations or favourites; they meet providers only through offers on their own requirements. Nothing was added there.
+  - **Gaps found:**
+    - **No marker:** an owner couldn't tell a provider it had completed work with from one that had only bid.
+  - **Fixed (derived from completed transactions; no new table):**
+    - **`services/reputation`:**
+      - `completed_together`: one grouped query counting the owner organisation's completed transactions with each provider;
+      - `previous_providers`: each provider once, with its completed requirements (title and date).
+    - **API:**
+      - `completed_with_you` on the owner's offers list, but never while a sealed tender is open, and on the offer's reputation block;
+      - `GET /owner/previous-providers` (its own organisation, by current membership).
+    - **Rules:** purely informational: no ordering, scoring, eligibility or award effect.
+    - **UI:**
+      - "Completed work together: N" beside an offer and in its reputation block;
+      - "Providers you've completed work with" on the owner dashboard. Its note says that working with one again means publishing a normal, open requirement.
+  - **Tests:** `tests/test_stage8_12_previous_provider.py`.
+
 _Stage 9 onwards is added as it is implemented._

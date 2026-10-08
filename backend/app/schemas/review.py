@@ -59,6 +59,9 @@ class ProviderReputationOut(BaseModel):
     review_count: int
     avg_rating: float | None
     recent_reviews: list[ReceivedReviewOut]
+    # Stage 8.12: only for an owner weighing the provider's offer -- the
+    # transactions its own organisation completed with this provider.
+    completed_with_you: int | None = None
 
 
 class OwnerReputationOut(BaseModel):
@@ -71,3 +74,18 @@ class OwnerReputationOut(BaseModel):
     review_count: int
     avg_rating: float | None
     recent_reviews: list[ReceivedReviewOut]
+
+
+class PreviousTransactionOut(BaseModel):
+    project_id: str
+    title: str
+    completed_at: UTCDateTime | None
+
+
+class PreviousProviderOut(BaseModel):
+    """Stage 8.12: a provider the owner organisation completed work with --
+    its name and those completed requirements, nothing else of them."""
+    company_name: str | None
+    completed_transactions: int
+    last_completed_at: UTCDateTime | None
+    transactions: list[PreviousTransactionOut]

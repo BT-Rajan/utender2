@@ -57,3 +57,43 @@ def owner_reputation(db: Session, owner_id: str, *, with_reviews: bool) -> Owner
     )
     count, average, recent = _reviews(db, Review.owner_id == owner_id, PROVIDER_TO_OWNER, with_reviews)
     return OwnerReputationOut(completed_transactions=completed, review_count=count, avg_rating=average, recent_reviews=recent)
+
+
+def completed_together(db: Session, owner_id: str, provider_ids) -> dict[str, int]:
+    """Stage 8.12: how many transactions this owner organisation has completed
+    with each of these providers -- from the authoritative Stage 7 completion
+    only (never an offer, a lost or cancelled tender, or unfinished work). One
+    grouped query; informational, never used to order or judge offers."""
+    ids = list(set(provider_ids))
+    if not ids:
+        return {}
+    rows = (
+        db.query(AwardRecord.service_provider_id, func.count(Agreement.id))
+        .join(Agreement, Agreement.award_id == AwardRecord.id)
+        .join(Project, Project.id == AwardRecord.project_id)
+        .filter(Project.owner_id == owner_id, Agreement.status == "completed", AwardRecord.service_provider_id.in_(ids))
+        .group_by(AwardRecord.service_provider_id)
+        .all()
+    )
+    return dict(rows)
+
+
+def previous_providers(db: Session, owner_id: str) -> list[dict]:
+    """Stage 8.12: the providers this owner organisation has completed work
+    with, each once, with its own completed requirements (title and date
+    only), latest first. The owner side's own history, for it alone."""
+    rows = (
+        db.query(AwardRecord.service_provider_id, ServiceProviderProfile.company_name, Project.id, Project.title, Agreement.completed_at)
+        .join(Agreement, Agreement.award_id == AwardRecord.id)
+        .join(Project, Project.id == AwardRecord.project_id)
+        .outerjoin(ServiceProviderProfile, ServiceProviderProfile.user_id == AwardRecord.service_provider_id)
+        .filter(Project.owner_id == owner_id, Agreement.status == "completed")
+        .order_by(Agreement.completed_at.desc(), Project.id)
+        .all()
+    )
+    providers: dict[str, dict] = {}
+    for provider_id, name, project_id, title, completed_at in rows:
+        entry = providers.setdefault(provider_id, {"company_name": name, "transactions": []})
+        entry["transactions"].append({"project_id": project_id, "title": title, "completed_at": completed_at})
+    return [{"company_name": e["company_name"], "completed_transactions": len(e["transactions"]),
+             "last_completed_at": e["transactions"][0]["completed_at"], "transactions": e["transactions"]} for e in providers.values()]

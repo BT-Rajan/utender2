@@ -284,6 +284,12 @@ export interface Dictionary {
     verifiedOwner: string;
     noteOwner: string;
   };
+  previous: {
+    heading: string;
+    together: string;
+    last: string;
+    note: string;
+  };
   history: {
     heading: string;
     awarded: string;
@@ -1778,6 +1784,12 @@ export const en: Dictionary = {
     noReviewsOwner: "No provider reviews yet",
     verifiedOwner: "Provider review · completed U-Tender transaction",
     noteOwner: "From the owner's completed U-Tender transactions and the reviews its providers left. For information only.",
+  },
+  previous: {
+    heading: "Providers you've completed work with",
+    together: "Completed work together: {n}",
+    last: "last",
+    note: "From your completed U-Tender transactions. To work with a provider again, publish a new requirement: it is open to every eligible provider and is judged like any other.",
   },
   history: {
     heading: "History",
@@ -3330,6 +3342,12 @@ export const ar: Dictionary = {
     noReviewsOwner: "لا توجد تقييمات من مقدمي الخدمة بعد",
     verifiedOwner: "تقييم مقدم خدمة · معاملة مكتملة على U-Tender",
     noteOwner: "من معاملات المالك المكتملة على U-Tender والتقييمات التي تركها مقدمو الخدمة. للعلم فقط.",
+  },
+  previous: {
+    heading: "مقدمو خدمة أنجزت معهم أعمالًا",
+    together: "أعمال مكتملة معًا: {n}",
+    last: "آخرها",
+    note: "من معاملاتك المكتملة على U-Tender. للعمل مع مقدم خدمة مجددًا، انشر طلبًا جديدًا: يكون مفتوحًا لكل مقدمي الخدمة المؤهلين ويُقيَّم كأي طلب آخر.",
   },
   history: {
     heading: "السجل",

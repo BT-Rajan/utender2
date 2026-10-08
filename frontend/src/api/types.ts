@@ -305,6 +305,7 @@ export interface Offer {
   shortlisted?: boolean | null; // Stage 6.12: the owner's side only
   service_provider_avg_rating?: string | null;
   service_provider_review_count?: number | null;
+  completed_with_you?: number | null; // Stage 8.12: owner view only -- completed transactions with this provider
   sealed: boolean;
   item_prices: OfferItemPrice[] | null;
   assumptions: string | null;

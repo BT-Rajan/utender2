@@ -882,6 +882,12 @@ export function OwnerProjectDetailPage() {
                     <td className="py-3 px-2.5">
                       <div className="font-display font-semibold text-[13.5px]">
                         {o.service_provider_company_name ?? t("owner.projectDetail.serviceProviderCol")}
+                        {/* Stage 8.12: completed U-Tender work with this provider before -- for information, never an advantage. */}
+                        {!!o.completed_with_you && (
+                          <span className="block font-mono text-[10px] text-green font-normal" data-testid="completed-together">
+                            {t("previous.together").replace("{n}", String(o.completed_with_you))}
+                          </span>
+                        )}
                         {o.status === "submitted" && (o.based_on_material_revision ?? 0) < (project.material_revision ?? 0) && (
                           <span className="block font-mono text-[10px] uppercase text-amber-dark font-normal">{t("postPub.outdatedOwner")}</span>
                         )}

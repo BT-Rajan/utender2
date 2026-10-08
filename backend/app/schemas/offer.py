@@ -165,6 +165,9 @@ class OfferOut(BaseModel):
     service_provider_company_name: str | None = None
     service_provider_avg_rating: Decimal | None = None
     service_provider_review_count: int | None = None
+    # Stage 8.12: owner view only, never while sealed -- transactions the
+    # owner organisation completed with this provider. Informational only.
+    completed_with_you: int | None = None
     # Stage 6.12: on the owner's shortlist -- set for the owner's side only
     # (None everywhere else, providers included).
     shortlisted: bool | None = None

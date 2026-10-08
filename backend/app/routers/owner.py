@@ -27,7 +27,7 @@ from app.schemas.document import DocumentRequirementOut, OwnerDocumentOut
 from app.schemas.offer import ShortlistOut, EvaluationNoteEdit, EvaluationNoteIn, EvaluationNoteOut, OfferComparisonOut, OfferOut, OfferRevisionOut, OwnerOfferOut
 from app.schemas.owner import OwnerProfileOut
 from app.schemas.project import EligibilityQualification, ProjectOut
-from app.schemas.review import OwnerReputationOut, ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut, ReviewResponseCreate
+from app.schemas.review import OwnerReputationOut, PreviousProviderOut, ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut, ReviewResponseCreate
 from app.services.audit import log_action
 from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_response, record_review, review_of
 from app.services.email import notify_provider_requirement_ended, notify_service_provider_offer_decision
@@ -187,10 +187,17 @@ def list_offers(
             for o, _cp in offers
         ]
 
+    # Stage 8.12: which bidders the owner organisation has completed work
+    # with before -- one grouped query, shown beside each offer; it never
+    # changes the order above or anything the offers are judged on.
+    from app.services.reputation import completed_together
+
+    together = completed_together(db, project.owner_id, (o.service_provider_id for o, _cp in offers))
+
     # Stage 6.2: a withdrawn offer is no longer one the owner may consider --
     # they see who withdrew and when, never its content. Otherwise a sealed
     # offer withdrawn before the deadline would be opened at the deadline.
-    return [
+    out = [
         OfferOut(
             id=o.id,
             project_id=o.project_id,
@@ -212,6 +219,9 @@ def list_offers(
         else _owner_offer_out(db, project, o, cp)
         for o, cp in offers
     ]
+    for o in out:
+        o.completed_with_you = together.get(o.service_provider_id, 0)
+    return out
 
 
 def _readable_offer(project_id: str, offer_id: str, user: User, db: Session) -> Offer:
@@ -303,9 +313,24 @@ def offer_provider_reputation(project_id: str, offer_id: str, user: User = Depen
     the owner weighing it -- the same access rules as the offer itself
     (the owner's requirement, unsealed, live, not suspended). The provider is
     the offer's, never one named in the request. Informational only."""
-    from app.services.reputation import provider_reputation
+    from app.services.reputation import completed_together, provider_reputation
 
-    return provider_reputation(db, _readable_offer(project_id, offer_id, user, db).service_provider_id)
+    provider_id = _readable_offer(project_id, offer_id, user, db).service_provider_id
+    out = provider_reputation(db, provider_id)
+    # Stage 8.12: and the work this owner organisation completed with it.
+    out.completed_with_you = completed_together(db, db.get(Project, project_id).owner_id, [provider_id]).get(provider_id, 0)
+    return out
+
+
+@router.get("/previous-providers", response_model=list[PreviousProviderOut])
+def previous_providers_of_mine(user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 8.12: the providers this owner organisation has completed U-Tender
+    work with (Stage 7 completion only), each once, with those requirements.
+    Its own history, by current membership; no id is taken from the request.
+    To work with one again, the owner publishes a new requirement as usual."""
+    from app.services.reputation import previous_providers
+
+    return previous_providers(db, get_owner_profile(user, db).user_id)
 
 
 @router.get("/projects/{project_id}/offers/{offer_id}/clarifications", response_model=list[OfferClarificationOut])

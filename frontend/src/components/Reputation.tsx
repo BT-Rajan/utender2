@@ -8,6 +8,7 @@ interface Reputation {
   completed_transactions: number;
   review_count: number;
   avg_rating: number | null;
+  completed_with_you?: number | null;
   recent_reviews: { rating: number; comment: string | null; created_at: string; response: string | null; response_at: string | null }[];
 }
 
@@ -48,6 +49,9 @@ export function Reputation({ url, of, own = false }: { url: string; of: "provide
             </ul>
           )}
         </>
+      )}
+      {!!data.completed_with_you && (
+        <p className="text-sm text-green mt-2" data-testid="completed-together">{t("previous.together").replace("{n}", String(data.completed_with_you))}</p>
       )}
       <p className="text-[11px] text-steel mt-2">{k("note")}</p>
     </section>
