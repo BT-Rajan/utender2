@@ -378,7 +378,7 @@ AR: dict[str, str] = {
     "Complete your verification to take part in opportunities.": "أكمل التحقق من حسابك للمشاركة في الفرص.",
     "Your account is suspended, so you can't take part in opportunities. Contact support.": "حسابك موقوف، لذا لا يمكنك المشاركة في الفرص. تواصل مع الدعم.",
     "No such version.": "لا توجد نسخة بهذا الرقم.",
-    "Only an ended requirement can be started again.": "لا يمكن البدء من جديد إلا بطلب منتهٍ.",
+    "Only a completed or ended requirement can be used to start a new one.": "لا يمكن بدء طلب جديد إلا من طلب مكتمل أو منتهٍ.",
     "This project can no longer be closed.": "لم يعد من الممكن إغلاق هذا المشروع.",
     # --- billing, misc ---
     "No billing account yet — subscribe first.": "لا يوجد حساب فوترة بعد — اشترك أولًا.",

@@ -908,15 +908,27 @@ class RestartRequest(BaseModel):
 
 @router.post("/projects/{project_id}/restart", response_model=ProjectOut, status_code=201)
 def restart_project(project_id: str, payload: RestartRequest | None = None, user: User = Depends(require_owner), db: Session = Depends(get_db)):
-    """An ended requirement stays ended (canceled, expired, no award). When
-    the work comes back -- postponed, say -- the owner starts a NEW draft from
-    its content: description, items, rules, eligibility and current documents.
+    """An ended requirement stays ended (canceled, expired, no award), and a
+    completed one stays completed (Stage 8.11). When the work comes back --
+    postponed, or the same need a year later -- the owner starts a NEW draft
+    from its content: description, items, rules, eligibility and current
+    documents (fresh copies of the files). Never its state, dates, offers,
+    award, transaction, reviews or history.
     Nothing about the old one changes; its offers and history stay with it,
     and the new draft is published (or not) like any other."""
+    from app.services.transactions import completed_transaction
+
     sync_expired_projects(db)
     source = _get_owned_project(project_id, user, db, lock=True)
-    if source.status not in (ProjectStatus.canceled, ProjectStatus.no_award, ProjectStatus.expired):
-        raise HTTPException(status_code=400, detail="Only an ended requirement can be started again.")
+    # Stage 8.11: also a completed transaction (Stage 7's authoritative
+    # completion) -- the same need again, as a new, independent requirement.
+    # Never one still open, awarded but unfinished, or a draft.
+    ended = source.status in (ProjectStatus.canceled, ProjectStatus.no_award, ProjectStatus.expired)
+    if not ended and not (source.status == ProjectStatus.awarded and completed_transaction(db, source.id) is not None):
+        raise HTTPException(status_code=400, detail="Only a completed or ended requirement can be used to start a new one.")
+    # Stage 8.11: content an admin has suspended isn't copied into a new requirement.
+    if source.is_suspended:
+        raise HTTPException(status_code=400, detail="This requirement is suspended.")
     token = payload.creation_token if payload and payload.creation_token else None
     if token:
         existing = db.query(Project).filter(Project.owner_id == source.owner_id, Project.creation_token == token).first()

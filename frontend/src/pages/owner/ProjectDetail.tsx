@@ -673,6 +673,8 @@ export function OwnerProjectDetailPage() {
       {(project.status === "open" || project.status === "closed" || project.status === "under_evaluation") && <EndRequirement project={project} />}
       {(project.status === "canceled" || project.status === "no_award") && <ClosureOutcome project={project} />}
       {(project.status === "canceled" || project.status === "no_award" || project.status === "expired") && <StartAgain project={project} />}
+      {/* Stage 8.11: the same need again, after a completed transaction -- a new draft, this one untouched. */}
+      {project.status === "awarded" && reviewable && <StartAgain project={project} similar />}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-6 items-start">
         <div>

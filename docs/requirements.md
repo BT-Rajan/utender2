@@ -1146,4 +1146,20 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - an end-to-end chain in both directions with responses, forged ids, replays, invalid ratings, outsiders, substituted ids, a former member and a cancelled requirement;
     - a MySQL concurrency test: four owners reviewing one provider at once, plus two members reviewing and responding at once.
 
+- **8.11 Similar requirement after a completed transaction:**
+  - **Already working (Stage 3.16 restart, `POST /owner/projects/{id}/restart`):**
+    - A **new draft** with a new id, owned by the source's organisation (`owns()`; other owners get 404, providers 403).
+    - **Copied:** description, items (new rows), rules, eligibility, response requirements, and current files as fresh storage copies.
+    - **Never copied:** state, deadline (a new placeholder), publication, offers, award, transaction, reviews, clarifications or history.
+    - **Records:** `restarted_from_id`, a `project.restart` audit entry, and a `creation_token`, so a retry returns the same draft.
+    - **Validation:** the normal draft, quality, preview and publish flow re-validates everything, including dates against the new deadline.
+  - **Gaps found:**
+    - **Completed requirements:** restart refused them; it accepted only cancelled, no-award or expired requirements.
+    - **Suspended requirements:** restart didn't refuse a requirement an admin had suspended, so its content could be copied into a new requirement.
+  - **Fixed:**
+    - **Completed transactions:** restart also accepts an awarded requirement whose transaction is completed (`completed_transaction`, Stage 7). Open, awarded-but-unfinished and draft requirements are still refused.
+    - **Suspension:** a suspended requirement is refused.
+    - **UI:** "Create similar requirement" (the existing `StartAgain` button, with its own confirmation wording) on a completed requirement's page. It leads into the normal draft flow.
+  - **Tests:** `tests/test_stage8_11_similar_requirement.py`.
+
 _Stage 9 onwards is added as it is implemented._

@@ -657,6 +657,9 @@ export interface Dictionary {
     restartConfirmBody: string;
     restartedFrom: string;
     restartedFromLink: string;
+    similar: string;
+    similarConfirm: string;
+    similarConfirmBody: string;
     adminSuspended: string;
     labelSuspended: string;
   };
@@ -2181,6 +2184,9 @@ export const en: Dictionary = {
     restartConfirmBody: "A new draft is created with this requirement’s description, items, rules, eligibility and current documents. Set a new deadline, check it, then publish it as a new requirement. This one stays as it ended, with its offers.",
     restartedFrom: "Started again from an ended requirement:",
     restartedFromLink: "see the original",
+    similar: "Create similar requirement",
+    similarConfirm: "Create a new requirement from this one?",
+    similarConfirmBody: "A new draft is created with this requirement’s description, items, rules, eligibility and current documents. Update anything that has changed, set new dates and a deadline, check it, then publish it as a new requirement. This one stays completed, with its offers, award, transaction and reviews.",
     adminSuspended: "Suspended by U-Tender: hidden from providers and not accepting offers, questions or changes to offers until reactivated. Contact support if you think this is a mistake.",
     labelSuspended: "Suspended by U-Tender",
   },
@@ -3730,6 +3736,9 @@ export const ar: Dictionary = {
     restartConfirmBody: "تُنشأ مسودة جديدة بوصف هذا الطلب وبنوده وقواعده وشروط الأهلية ومستنداته الحالية. حدّد موعداً نهائياً جديداً وراجعها ثم انشرها كطلب جديد. يبقى هذا الطلب كما انتهى، مع عروضه.",
     restartedFrom: "بُدئ من جديد من طلب منتهٍ:",
     restartedFromLink: "اطّلع على الطلب الأصلي",
+    similar: "إنشاء طلب مماثل",
+    similarConfirm: "إنشاء طلب جديد من هذا الطلب؟",
+    similarConfirmBody: "تُنشأ مسودة جديدة بوصف هذا الطلب وبنوده وقواعده وشروط الأهلية ومستنداته الحالية. حدّث ما تغيّر، وحدد تواريخ وموعدًا نهائيًا جديدًا، وراجعها ثم انشرها كطلب جديد. يبقى هذا الطلب مكتملًا بعروضه وترسيته ومعاملته وتقييماته.",
     adminSuspended: "علّقته إدارة U-Tender: مخفي عن مقدّمي الخدمة ولا يقبل عروضاً أو أسئلة أو تعديلات على العروض حتى إعادة تفعيله. تواصل مع الدعم إن رأيت أن ذلك خطأ.",
     labelSuspended: "معلّق من U-Tender",
   },

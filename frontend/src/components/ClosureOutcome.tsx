@@ -163,7 +163,8 @@ export function EndRequirement({ project }: { project: ProjectDetail }) {
 
 // An ended requirement stays ended; when the work comes back, the owner starts
 // a new draft from its content (the server copies it; the old one is untouched).
-export function StartAgain({ project }: { project: ProjectDetail }) {
+// Stage 8.11: likewise from a completed one, when the same need comes back.
+export function StartAgain({ project, similar = false }: { project: ProjectDetail; similar?: boolean }) {
   const { t } = useI18n();
   const confirm = useConfirm();
   const navigate = useNavigate();
@@ -184,10 +185,17 @@ export function StartAgain({ project }: { project: ProjectDetail }) {
       <button
         type="button"
         disabled={act.isPending}
-        onClick={() => void confirm({ title: t("closure.restartConfirm"), body: t("closure.restartConfirmBody"), confirmLabel: t("closure.restart") }).then((ok) => ok && act.mutate())}
+        onClick={() =>
+          void confirm(
+            similar
+              ? { title: t("closure.similarConfirm"), body: t("closure.similarConfirmBody"), confirmLabel: t("closure.similar") }
+              : { title: t("closure.restartConfirm"), body: t("closure.restartConfirmBody"), confirmLabel: t("closure.restart") },
+          ).then((ok) => ok && act.mutate())
+        }
         className="border border-navy text-navy hover:bg-navy hover:text-white disabled:opacity-60 text-xs font-semibold rounded px-4 py-2"
+        data-testid={similar ? "create-similar" : undefined}
       >
-        {t("closure.restart")}
+        {similar ? t("closure.similar") : t("closure.restart")}
       </button>
     </div>
   );
