@@ -86,11 +86,13 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                 subscription = stripe.Subscription.retrieve(data["subscription"])
                 cp = db.get(ServiceProviderProfile, service_provider_id)
                 if cp:
+                    had_access = cp.is_verified_active
                     cp.stripe_customer_id = data["customer"]
                     cp.stripe_subscription_id = subscription.id
                     cp.subscription_status = SubscriptionStatus(map_stripe_status(subscription.status))
                     cp.subscription_current_period_end = datetime.utcfromtimestamp(subscription.current_period_end)
                     db.commit()
+                    _tell_access_change(db, cp, had_access)
 
         # Covers plan changes, renewals, payment failures, and
         # cancellations — Stripe sends this on essentially every status
@@ -108,9 +110,11 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                     .first()
                 )
             if cp:
+                had_access = cp.is_verified_active
                 cp.subscription_status = SubscriptionStatus(map_stripe_status(data["status"]))
                 cp.subscription_current_period_end = datetime.utcfromtimestamp(data["current_period_end"])
                 db.commit()
+                _tell_access_change(db, cp, had_access)
         # Unhandled event types are expected — Stripe sends many more than
         # we act on. No-op is correct here.
     except Exception:
@@ -121,3 +125,24 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Internal error processing webhook")
 
     return {"received": True}
+
+
+def _tell_access_change(db: Session, cp: ServiceProviderProfile, had_access: bool) -> None:
+    """Stage 9.5: after the subscription state is committed (Stripe is the
+    authority), tell everyone acting for the provider when that opened or
+    closed its marketplace access (is_verified_active -- so a provider whose
+    access rests on an admin override isn't told it lost access it still
+    has). Only on an actual change, so Stripe's retries and renewals don't
+    repeat it. Best-effort: never fails the webhook."""
+    from app.models.enums import NotificationType
+    from app.models.user import User
+    from app.services.notify import notify_team
+
+    if cp.is_verified_active == had_access:
+        return
+    try:
+        notify_team(db, db.get(User, cp.user_id), NotificationType.payment_activated if cp.is_verified_active else NotificationType.payment_failed,
+                    link="/service-provider/subscribe", organization_id=cp.organization_id)
+    except Exception:  # noqa: BLE001 -- the subscription state is already recorded
+        db.rollback()
+        logger.exception("could not notify %s of a subscription change", cp.user_id)

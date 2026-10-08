@@ -63,7 +63,8 @@ def side_of(db: Session, organization_id: str | None, creator_id: str | None) ->
 
 def side_users(db: Session, organization_id: str | None, creator_id: str | None) -> list[User]:
     ids = side_of(db, organization_id, creator_id)
-    return db.query(User).filter(User.id.in_(ids)).all() if ids else []
+    # Stage 9.5: current members only, never a deactivated account (9.2).
+    return db.query(User).filter(User.id.in_(ids), User.deactivated_at.is_(None)).all() if ids else []
 
 
 def acting_profile(db: Session, user: User):

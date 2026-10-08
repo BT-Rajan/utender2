@@ -10,6 +10,9 @@ logger = logging.getLogger("email")
 # calling flow (a bid still gets submitted even if the notification email
 # fails) — it's logged instead. Ported from src/lib/email.ts.
 def _send(to: str, subject: str, html: str) -> None:
+    if _deactivated(to):  # Stage 9.5: a deactivated account (9.2) gets no email about the platform
+        logger.info("skipping email to deactivated account: %s", subject)
+        return
     if not settings.resend_api_key:
         logger.warning("RESEND_API_KEY not set — skipping email to %s: %s", to, subject)
         return
@@ -18,8 +21,36 @@ def _send(to: str, subject: str, html: str) -> None:
 
         resend.api_key = settings.resend_api_key
         resend.Emails.send({"from": settings.email_from, "to": to, "subject": subject, "html": html})
-    except Exception:
+    except Exception as exc:
         logger.exception('failed to send "%s" to %s', subject, to)
+        _record_failure(to, subject, exc)
+
+
+def _deactivated(to: str) -> bool:
+    """Looked up in a session of its own: the caller's request is never touched."""
+    from app import db as db_module
+    from app.models.user import User
+
+    try:
+        with db_module.SessionLocal() as s:
+            return s.query(User.id).filter(User.email == to.strip().lower(), User.deactivated_at.isnot(None)).first() is not None
+    except Exception:  # noqa: BLE001 -- a lookup failure never blocks a send
+        logger.exception("could not check the recipient's account state")
+        return False
+
+
+def _record_failure(to: str, subject: str, exc: Exception) -> None:
+    """Stage 9.5: keep a durable trace of a failed send for the operator (9.1
+    overview), in a session of its own; never raises."""
+    from app import db as db_module
+    from app.models.email_failure import EmailFailure
+
+    try:
+        with db_module.SessionLocal() as s:
+            s.add(EmailFailure(recipient=to[:255], subject=subject[:255], error=f"{type(exc).__name__}: {exc}"[:2000]))
+            s.commit()
+    except Exception:  # noqa: BLE001
+        logger.exception("could not record the email failure")
 
 
 def notify_owner_new_offer(

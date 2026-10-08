@@ -167,8 +167,9 @@ def _background(db: Session, now: datetime) -> dict:
     """The deadline-reminder job is called by an external scheduler and keeps
     no run log, so its health is read from what it should have done: a
     reminder still unsent over an hour after its requirement entered the
-    24-hour window means the job isn't running. Email delivery isn't
-    recorded at all, so it is reported as not tracked -- never as fine."""
+    24-hour window means the job isn't running. Each failed email is recorded
+    (Stage 9.5), so delivery reads failing, no failures recorded, or not
+    configured -- never simply "fine"."""
     due = db.query(func.count(Project.id)).filter(
         Project.status == ProjectStatus.open, Project.deadline_reminder_sent.is_(False),
         Project.bid_deadline > now, Project.bid_deadline <= now + REMINDER_WINDOW - REMINDER_GRACE,
@@ -176,10 +177,21 @@ def _background(db: Session, now: datetime) -> dict:
     ).scalar()
     in_window = db.query(func.count(Project.id)).filter(
         Project.status == ProjectStatus.open, Project.bid_deadline > now, Project.bid_deadline <= now + REMINDER_WINDOW).scalar()
+    # Stage 9.5: failed sends are recorded (email_failures), so delivery
+    # problems show; "no failures recorded" is not a promise of delivery.
+    from app.config import get_settings
+    from app.models.email_failure import EmailFailure
+
+    failures = db.query(func.count(EmailFailure.id)).filter(EmailFailure.created_at >= now - timedelta(hours=24)).scalar()
+    if not get_settings().resend_api_key:
+        email = "not_configured"
+    else:
+        email = "failing" if failures else "no_failures_recorded"
     return {
         "deadline_reminders": "overdue" if due else ("ok" if in_window else "not_determinable"),
         "deadline_reminders_overdue": due,
-        "email_delivery": "not_tracked",
+        "email_delivery": email,
+        "email_failures_24h": failures,
     }
 
 

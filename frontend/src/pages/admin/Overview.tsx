@@ -21,7 +21,7 @@ interface Overview {
   offers: Section<{ by_status: Counts; submitted_last_7_days: number; on_open_requirements: number }>;
   transactions: Section<{ by_status: Counts; on_hold: number; completion_awaiting_owner: number; awarded_last_7_days: number }>;
   attention: Section<Attention[]>;
-  background: Section<{ deadline_reminders: "ok" | "overdue" | "not_determinable"; deadline_reminders_overdue: number; email_delivery: string }>;
+  background: Section<{ deadline_reminders: "ok" | "overdue" | "not_determinable"; deadline_reminders_overdue: number; email_delivery: "failing" | "no_failures_recorded" | "not_configured"; email_failures_24h: number }>;
 }
 
 function Block({ title, section, children }: { title: string; section: Section<unknown>; children: React.ReactNode }) {
@@ -109,7 +109,9 @@ export function AdminOverviewPage() {
                     [t("ops.reminders"), data.background.data.deadline_reminders === "overdue"
                       ? t("ops.remindersOverdue").replace("{n}", String(data.background.data.deadline_reminders_overdue))
                       : t(`ops.reminders_${data.background.data.deadline_reminders}`)],
-                    [t("ops.email"), t("ops.notTracked")],
+                    [t("ops.email"), data.background.data.email_delivery === "failing"
+                      ? t("ops.emailFailing").replace("{n}", String(data.background.data.email_failures_24h))
+                      : t(`ops.email_${data.background.data.email_delivery}`)],
                   ]}
                 />
               )}

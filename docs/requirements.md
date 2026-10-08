@@ -1371,4 +1371,23 @@ be added as its prompts (5.1, 5.2, …) are delivered.
       - "Why can't a provider respond?" (by email) on an open requirement's admin page.
   - **Tests:** `tests/test_stage9_4_support_diagnostics.py`.
 
+- **9.5 Notifications:**
+  - **Already working:**
+    - **Commit first:** in-app notifications (`services/notify`) are written after the business change is committed, never before, so a notification is never proof of anything.
+    - **Recipients:** derived server-side from the record's own parties, and for an organisation from its current members (`notify_team` → `side_users`). A member who leaves stops receiving new notices; their old notices stay, but the links open nothing (each page enforces its own access).
+    - **No piling up:** unread notices are deduplicated per person, type and link. A repeat updates the one unread notice to the latest wording.
+    - **Sealed tenders:** the owner is told "A service provider" made an offer, with no name or amount, in-app and by email.
+    - **Coverage:** publication (eligible providers), amendments, pause/resume/close/end, clarifications, offers and revisions, award won/lost, execution, deliverables, changes, completion, reviews and responses, verification, suspension and overrides.
+    - **Emails are best-effort:** a failed send never fails the business action, and failures are logged.
+    - **Retries:** business actions are idempotent or refused with 409 on retry, so they don't send twice.
+  - **Gaps found:**
+    - **Billing (Stripe webhook):** subscription changes that open or close marketplace access notified no one; the `payment_*` types had no templates or caller.
+    - **Deactivated accounts (9.2):** they still received organisation notifications and emails.
+    - **Email failures:** only logged, invisible to the operator (9.1 showed "not tracked").
+  - **Fixed:**
+    - **Billing notices:** the webhook, after committing the state, notifies the provider's whole side when its marketplace access actually changes (`is_verified_active`, so access held through an admin override isn't misreported). It fires only on an actual change, so Stripe's retries and renewals never repeat it. Best-effort, with templates in English and Arabic.
+    - **Deactivated accounts:** `side_users` excludes them, `notify()` skips them, and `email._send` skips their address (checked in its own session).
+    - **Migration 0062: `email_failures`:** each failed send is recorded (recipient, subject, error), in its own session, never raising. The overview's email status reads "failing (N in 24h)", "no failures recorded" or "not configured". It is never presented as guaranteed delivery.
+  - **Tests:** `tests/test_stage9_5_notifications.py`, covering scenarios A–J.
+
 _Later Stage 9 steps are added as they are implemented._

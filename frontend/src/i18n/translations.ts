@@ -328,6 +328,9 @@ export interface Dictionary {
     reminders_not_determinable: string;
     email: string;
     notTracked: string;
+    emailFailing: string;
+    email_no_failures_recorded: string;
+    email_not_configured: string;
     accounts: string;
     owners: string;
     ownersActive: string;
@@ -1952,6 +1955,9 @@ export const en: Dictionary = {
     reminders_not_determinable: "Can't tell yet (nothing due)",
     email: "Email delivery",
     notTracked: "Not tracked",
+    emailFailing: "{n} failed in the last 24 hours",
+    email_no_failures_recorded: "No failures recorded",
+    email_not_configured: "Not configured: no emails are sent",
     accounts: "Accounts",
     owners: "Owners",
     ownersActive: "Owners verified",
@@ -3662,6 +3668,9 @@ export const ar: Dictionary = {
     reminders_not_determinable: "لا يمكن التحديد بعد (لا شيء مستحق)",
     email: "إرسال البريد الإلكتروني",
     notTracked: "غير متتبَّع",
+    emailFailing: "فشل {n} خلال آخر 24 ساعة",
+    email_no_failures_recorded: "لا إخفاقات مسجلة",
+    email_not_configured: "غير مُعَدّ: لا تُرسل رسائل بريد",
     accounts: "الحسابات",
     owners: "الملاك",
     ownersActive: "ملاك موثَّقون",

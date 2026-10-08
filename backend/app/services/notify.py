@@ -110,6 +110,15 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.en: ("You're verified", "Your service provider account has been approved."),
         Language.ar: ("تم التحقق من حسابك", "تمت الموافقة على حساب مزوّد الخدمة الخاص بك."),
     },
+    # Stage 9.5: a subscription change that opens or closes marketplace access (Stripe webhook).
+    NotificationType.payment_activated: {
+        Language.en: ("Subscription active", "Your U-Tender subscription is active: you can respond to requirements you are eligible for."),
+        Language.ar: ("الاشتراك نشط", "اشتراكك في U-Tender نشط: يمكنك الرد على الطلبات المؤهل لها."),
+    },
+    NotificationType.payment_failed: {
+        Language.en: ("Subscription payment problem", "Your U-Tender subscription is no longer active, so you can't submit or revise offers. Open Billing to update your payment."),
+        Language.ar: ("مشكلة في دفع الاشتراك", "اشتراكك في U-Tender لم يعد نشطًا، لذا لا يمكنك تقديم العروض أو تعديلها. افتح الفوترة لتحديث الدفع."),
+    },
     NotificationType.payment_override_granted: {
         Language.en: ("Marketplace access activated", "An administrator activated full marketplace access on your account."),
         Language.ar: ("تم تفعيل الوصول إلى السوق", "قام أحد المسؤولين بتفعيل الوصول الكامل إلى السوق لحسابك."),
@@ -198,7 +207,7 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
 # been read, or there was none to begin with.
 def notify(db: Session, user: User, notification_type: NotificationType, link: str | None = None, **kwargs) -> Notification | None:
     template = _TEMPLATES.get(notification_type)
-    if not template:
+    if not template or user.deactivated_at is not None:  # Stage 9.2/9.5: a deactivated account is told nothing
         return None
     title_fmt, body_fmt = template.get(user.language) or template[Language.en]
     title = title_fmt.format(**kwargs)
