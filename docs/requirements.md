@@ -1433,4 +1433,25 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **UI:** a "Recorded history" list on the admin requirement and owner pages (`AdminAuditTrail`).
   - **Tests:** `tests/test_stage9_7_audit_trail.py`, covering stress cases 1–10.
 
+- **9.8 Exceptions, failures and recovery:**
+  - **Already working:**
+    - **Atomic operations:** each multi-step business operation is a single commit, written together with its audit entry (`log_action` commits). This covers publication, award (award record, offer statuses, agreement, audit), offers, completion, reviews, moderation and billing. A failure part-way rolls back the whole operation.
+    - **Duplicates and concurrency:** the requirement row lock, unique constraints (one review per direction, one report per item, one award per requirement) and explained 409 refusals. These are proven by the Stage 3–8 concurrency tests on MySQL. Since 9.6, Stripe repeats and stale events are no-ops.
+    - **Lazy lifecycle:** expiry and closing are applied on every read (`sync_expired_projects`), so a restart never leaves a requirement stuck open.
+    - **Files:** stored first, then referenced, so a failed store leaves no reference.
+    - **Refused requests change nothing:** failed authorisation returns a 404/403 before anything is changed.
+    - **Emails:** best-effort; failures are recorded since 9.5.
+  - **Gaps found:**
+    - **Notification failures reported as action failures:** a notification that couldn't be written after a committed change (offer submit, withdraw and other non-award paths) failed the request with a 500. The user saw an error for something that had happened.
+    - **Network and server failures on writes:** these showed raw "Failed to fetch" or "Internal Server Error", implying the change hadn't happened when it may have.
+  - **Fixed:**
+    - **`notify()`:** when the session has nothing pending (the business change is committed), a failure to write the notice is logged and skipped. With changes still pending it propagates as before, so nothing can report success after losing data.
+    - **`apiFetch`:** for any write that gets no answer or a 5xx, the message says the outcome couldn't be confirmed and to refresh to see what is on record before trying again (English and Arabic). Business refusals (4xx) keep their own messages.
+  - **Tests:** `tests/test_stage9_8_failure_safety.py`. It injects real failures:
+    - the publication's and the award's final write;
+    - file storage;
+    - notification writes after a committed award and withdrawal;
+    - a failing notice with changes still pending.
+    - It also covers a duplicate submission and another owner's award attempt.
+
 _Later Stage 9 steps are added as they are implemented._

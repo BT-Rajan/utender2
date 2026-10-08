@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
@@ -209,6 +210,23 @@ def notify(db: Session, user: User, notification_type: NotificationType, link: s
     template = _TEMPLATES.get(notification_type)
     if not template or user.deactivated_at is not None:  # Stage 9.2/9.5: a deactivated account is told nothing
         return None
+    # Stage 9.8: when the business change is already committed (nothing is
+    # pending in the session), a notice that can't be written must not turn
+    # the caller's success into an error -- it is logged and skipped. When
+    # changes are still pending, the failure propagates as before, so nothing
+    # can report success after losing them.
+    settled = not (db.new or db.dirty or db.deleted)
+    try:
+        return _write(db, user, notification_type, link, template, kwargs)
+    except Exception:
+        if not settled:
+            raise
+        db.rollback()
+        logging.getLogger(__name__).exception("could not record a %s notification for %s", notification_type.value, user.id)
+        return None
+
+
+def _write(db: Session, user: User, notification_type: NotificationType, link: str | None, template, kwargs) -> Notification:
     title_fmt, body_fmt = template.get(user.language) or template[Language.en]
     title = title_fmt.format(**kwargs)
     body = body_fmt.format(**kwargs)

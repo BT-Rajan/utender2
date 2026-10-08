@@ -26,6 +26,16 @@ async function parseError(res: Response): Promise<never> {
   throw new ApiError(res.status, detail);
 }
 
+function unknownOutcome(): string {
+  return interfaceLanguage() === "ar"
+    ? "تعذر التأكد من حفظ هذا الإجراء. حدّث الصفحة لترى ما هو مسجل قبل المحاولة مرة أخرى."
+    : "We couldn't confirm whether this went through. Refresh the page to see what is on record before trying again.";
+}
+
+function connectionLost(): string {
+  return interfaceLanguage() === "ar" ? "تعذر الاتصال بـ U-Tender. تحقق من اتصالك ثم حاول مرة أخرى." : "Couldn't reach U-Tender. Check your connection and try again.";
+}
+
 let refreshPromise: Promise<boolean> | null = null;
 
 async function tryRefresh(): Promise<boolean> {
@@ -75,8 +85,21 @@ export async function apiFetch<T>(
     init.body = JSON.stringify(body);
   }
 
-  const res = await fetch(`${API_URL}${path}`, init);
+  // Stage 9.8: a change whose request never got an answer (dropped connection,
+  // timeout) or failed on the server may still have been saved. Say so, rather
+  // than implying it didn't happen; the server refuses a repeat that would
+  // double it, and a refresh shows what is on record.
+  const writes = method !== "GET";
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, init);
+  } catch {
+    throw new ApiError(0, writes ? unknownOutcome() : connectionLost());
+  }
   noteServerTime(res.headers.get("X-Server-Time"));
+  if (writes && res.status >= 500) {
+    throw new ApiError(res.status, unknownOutcome());
+  }
 
   if (res.status === 401 && retry) {
     const refreshed = await tryRefresh();
