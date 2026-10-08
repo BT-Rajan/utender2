@@ -1244,4 +1244,21 @@ be added as its prompts (5.1, 5.2, …) are delivered.
       - A "Reported reviews" admin page with Keep and Hide.
   - **Tests:** `tests/test_stage8_15_review_moderation.py`.
 
+- **8.16 Stage 8 audit (8.1–8.15 re-checked end to end):**
+  - **Chain:** completed transaction (7.11, terminal) → review from a party's current members, against the transaction's own parties → reputation read live from shown reviews → informational repeat context.
+    - Terminated, cancelled, lost and unfinished work never yields a review, a count or a relationship.
+  - **Hidden reviews (8.15):** every reader is consistent.
+    - The author's own view (`review_of`, flagged `hidden`) and the one-review rule include hidden reviews.
+    - Everything others see, and every rating, live or stored, excludes them (`shown_review_of`, the reputation filter, `_recount_provider`).
+  - **Gaps found:** two misleading texts in the UI.
+    - **"Public rating":** the owner's review confirmation called the provider rating "public", but it is shown only to signed-in owners weighing an offer (8.6).
+    - **Stale report message:** a repeated report answered "U-Tender is looking at it" even after a decision.
+  - **Fixed:**
+    - **Confirmation text** (English and Arabic): "counts towards the service provider's rating, which owners see when weighing its offers".
+    - **Repeated report:** now answers "This has already been reported to U-Tender."
+  - **Tests:** `tests/test_stage8_16_trust_chain.py`:
+    - the whole chain, including a one-sided review, a kept negative review, both reputations, and a repeat requirement where the previous and the new provider compete on their offers and the new one wins;
+    - the old transaction unchanged and closed;
+    - termination, cancellation and losing yield nothing, in both directions.
+
 _Stage 9 onwards is added as it is implemented._

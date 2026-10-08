@@ -373,7 +373,7 @@ AR: dict[str, str] = {
     "Write a response first.": "اكتب ردًا أولًا.",
     "Choose why you are reporting this.": "اختر سبب الإبلاغ.",
     "There is nothing to report.": "لا يوجد ما يمكن الإبلاغ عنه.",
-    "This has already been reported; U-Tender is looking at it.": "تم الإبلاغ عن هذا بالفعل؛ وU-Tender تراجعه.",
+    "This has already been reported to U-Tender.": "تم الإبلاغ عن هذا إلى U-Tender بالفعل.",
     "Choose to keep or hide it.": "اختر الإبقاء عليه أو إخفاءه.",
     "This report has already been decided.": "تم البت في هذا البلاغ بالفعل.",
     "Report not found.": "البلاغ غير موجود.",

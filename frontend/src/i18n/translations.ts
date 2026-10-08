@@ -1780,7 +1780,7 @@ export const en: Dictionary = {
   },
   review: {
     confirmTitle: "Submit this review?",
-    confirmBody: "Your rating and comment are recorded against this completed transaction and count towards the service provider's public rating. A review can't be changed afterwards.",
+    confirmBody: "Your rating and comment are recorded against this completed transaction and count towards the service provider's rating, which owners see when weighing its offers. A review can't be changed afterwards.",
     receivedHeading: "{party}'s review of you",
     receivedOn: "Received on",
     respond: "Respond",
@@ -3359,7 +3359,7 @@ export const ar: Dictionary = {
   },
   review: {
     confirmTitle: "إرسال هذا التقييم؟",
-    confirmBody: "يُسجَّل تقييمك وتعليقك على هذه المعاملة المكتملة ويُحتسب ضمن التقييم العام لمقدم الخدمة. لا يمكن تغيير التقييم بعد ذلك.",
+    confirmBody: "يُسجَّل تقييمك وتعليقك على هذه المعاملة المكتملة ويُحتسب ضمن تقييم مقدم الخدمة الذي يراه الملاك عند دراسة عروضه. لا يمكن تغيير التقييم بعد ذلك.",
     receivedHeading: "تقييم {party} لك",
     receivedOn: "استُلم في",
     respond: "رد",

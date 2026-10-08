@@ -147,7 +147,7 @@ def report(db: Session, project: Project, direction: str, target: str, reporter:
     if review is None or (target == "response" and review.shown_response is None):
         raise HTTPException(status_code=404, detail="There is nothing to report.")
     if db.query(ReviewReport.id).filter(ReviewReport.review_id == review.id, ReviewReport.target == target).first():
-        raise HTTPException(status_code=409, detail="This has already been reported; U-Tender is looking at it.")
+        raise HTTPException(status_code=409, detail="This has already been reported to U-Tender.")
     entry = ReviewReport(review_id=review.id, target=target, reporter_id=reporter.id, reason=reason, note=(note or "").strip() or None)
     db.add(entry)
     db.flush()
