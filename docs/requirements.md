@@ -901,4 +901,26 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - The timeline is part of the agreement response, so only the parties and admins read it.
   - **UI:** the Execution section's list is now the full History. Each line shows the date, party and event (amounts for the award and changes, the document name), and progress entries keep their evidence.
 
+- **7.14 Post-award access:**
+  - **Audit (no gap found):**
+    - **One gate for every endpoint.** Every agreement, document, execution, deliverable, change, completion and history endpoint goes through one server-side check, decided per request from current state:
+      - the requirement is awarded and has its agreement;
+      - the caller is the owner side (its organisation's current members) or the winning provider's side (its organisation's current members, account not suspended, requirement not suspended);
+      - admins can read only.
+    - **Child ids:** deliverable, change, document, progress-update and offer ids are each checked to belong to that same agreement or requirement.
+    - **Files:** they open only through that check, then a one-minute signed link; storage keys are never public.
+    - **Roles:** organisation members share one role (an invitation must match it), and each action checks the side as well as membership (owner-only, provider-only, the other party only).
+    - **Stage 6 records:** the owner's offer inbox, offer pages, history, clarifications, notes, shortlist, comparison and offer files stay owner-side only after award. The winner never receives a losing offer's id, content or files.
+    - **Losing bidders** see only "awarded to a successful bidder".
+    - **Completion** (7.11) keeps reading and closes writing.
+    - **Membership changes:** a removed member loses access from their next request. Organisations can't dissolve once anything is published, since leaving is only possible before verification.
+    - **Suspension:** a suspended winner loses sight of the transaction. A suspended owner keeps read-only access, the existing owner policy.
+  - **Added:** `tests/test_stage7_14_access.py`, a sweep of every post-award endpoint as:
+    - the losing bidder, another owner organisation, another provider organisation, and a signed-out user;
+    - every member of both sides, and an admin (read-only);
+    - the winner against the Stage 6 owner endpoints and the losing offer's files;
+    - a removed member, a suspended winner, a suspended owner, and after logout;
+    - after completion.
+  - **Known, unchanged (existing design):** an access token stays valid for its short lifetime (30 minutes) after logout if replayed outside the browser. Logout clears the browser's cookies and revokes the refresh token.
+
 _Stage 7 onwards is added as it is implemented._
