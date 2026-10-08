@@ -1024,4 +1024,26 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - **UI:** the winner's offer page shows a review of the owner once the transaction is completed: rating and comment, a confirmation, then its own review.
   - **Tests:** `tests/test_stage8_4_provider_review.py`.
 
+- **8.5 Review integrity:**
+  - **Audit (8.3/8.4 re-checked from scratch):**
+    - **Endpoints:** exactly four review endpoints (owner GET and POST, provider GET and POST). None edits, deletes or reaches a review by its id; reviews are immutable, and admin only counts them (to block deleting a reviewed provider).
+    - **Server-side identity:** reviewer, parties and transaction all come from the server. Request ids such as `owner_id`, `service_provider_id`, `reviewer_id`, `direction` and `id` are ignored.
+    - **One eligibility rule:** a completed transaction (8.1), checked under the same requirement lock completion uses.
+    - **Duplicates:** one review per direction per transaction, guarded in the application (explained 409) and by the database (`uq_review_project_direction`).
+    - **Membership and roles:** checked per request. A provider can't use the owner endpoint, nor an owner the provider endpoint.
+    - **Notifications:** sent only after a review is committed, to the reviewed party's organisation, without content.
+    - **Gaps found:**
+      - **Suspension (owner direction):** the owner direction didn't refuse a requirement an admin has suspended; the provider direction and all other post-award writes did.
+      - **Database guarantees:** nothing at the database level guaranteed a valid direction, or that the two parties differ.
+  - **Fixed:**
+    - **`services/reviews.record_review`:** refuses a suspended requirement, so both directions now behave the same.
+    - **Migration 0058:** `ck_review_direction` (one of the two directions) and `ck_review_two_parties` (`owner_id <> service_provider_id`), alongside the existing rating-range check.
+  - **Tests:** `tests/test_stage8_5_review_integrity.py`:
+    - **Abuse attempts:** losing provider, unrelated owner, cross-transaction attempts in both directions, endpoint and direction swaps, no session. None creates a review or a notification.
+    - **Tampering:** tampered ids are ignored, and both reviews are bound to their transaction's parties and reviewers.
+    - **Duplicates and immutability:** duplicates are refused in both directions, and there is no edit, delete or by-id access.
+    - **Isolation:** each side reads only its own review.
+    - **Standing:** a removed member and a suspended requirement are refused.
+    - **Database:** refuses an invalid direction, the same party on both sides, an out-of-range rating, and a second review in one direction, even when written directly.
+
 _Stage 9 onwards is added as it is implemented._

@@ -13,6 +13,9 @@ class Review(Base):
         # Stage 8.4: one review per completed transaction in each direction.
         UniqueConstraint("project_id", "direction", name="uq_review_project_direction"),
         CheckConstraint("rating >= 1 AND rating <= 5", name="ck_rating_range"),
+        # Stage 8.5: a review is one of the two directions, between two different parties.
+        CheckConstraint("direction IN ('owner_to_provider', 'provider_to_owner')", name="ck_review_direction"),
+        CheckConstraint("owner_id <> service_provider_id", name="ck_review_two_parties"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)

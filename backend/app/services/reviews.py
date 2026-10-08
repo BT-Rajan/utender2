@@ -31,6 +31,9 @@ def review_of(db: Session, project_id: str, direction: str) -> Review | None:
 
 
 def record_review(db: Session, project: Project, direction: str, reviewer: User, rating: int, comment: str | None) -> Review:
+    # Stage 8.5: a requirement an admin has suspended takes no new review, from either side.
+    if project.is_suspended:
+        raise HTTPException(status_code=400, detail="This requirement is suspended.")
     # Stage 8.1: a review rests on completed work -- the transaction closed by
     # the owner side's acceptance (Stage 7.11) -- never on the award alone.
     agreement = completed_transaction(db, project.id)
