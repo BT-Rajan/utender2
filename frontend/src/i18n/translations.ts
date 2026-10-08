@@ -246,6 +246,19 @@ export interface Dictionary {
     earlierVersion: string;
     confirm: string;
   };
+  completion: {
+    heading: string;
+    status: { none: string; submitted: string; returned: string; accepted: string };
+    outstanding: string;
+    openChange: string;
+    submittedOn: string;
+    decidedOn: { accepted: string; returned: string };
+    acceptedHelp: string;
+    noteLabel: { submit: string; accept: string; return: string };
+    confirmHelp: { submit: string; accept: string; return: string };
+    do: { submit: string; accept: string; return: string };
+    history: { delivered: string; accepted: string; returned: string };
+  };
   evidence: {
     heading: string;
     help: string;
@@ -315,7 +328,7 @@ export interface Dictionary {
   };
   execution: {
     heading: string;
-    status: { not_started: string; in_progress: string; on_hold: string; terminated: string };
+    status: { not_started: string; in_progress: string; on_hold: string; accepted: string; terminated: string };
     planned: string;
     source: { offer: string; requirement: string };
     actual: string;
@@ -1667,6 +1680,23 @@ export const en: Dictionary = {
     earlierVersion: "Note: this offer was made against version {n} of the requirement, which is now at version {m}, and its provider didn't confirm it since. You'd be awarding it as it stands.",
     confirm: "Award",
   },
+  completion: {
+    heading: "Work completion",
+    status: { none: "Not yet submitted", submitted: "Submitted as complete — awaiting the owner's review", returned: "Returned for correction", accepted: "Accepted as complete" },
+    outstanding: "{n} deliverable(s) still to be accepted before the work can be submitted as complete.",
+    openChange: "A proposed change is awaiting an answer; settle it before submitting the work as complete.",
+    submittedOn: "Submitted as complete on",
+    decidedOn: { accepted: "Accepted on", returned: "Returned on" },
+    acceptedHelp: "The owner has accepted the work as complete.",
+    noteLabel: { submit: "Note for the owner (optional)", accept: "Note (optional)", return: "What needs correcting?" },
+    confirmHelp: {
+      submit: "The owner will review the work and accept it or return it for correction.",
+      accept: "Accepting confirms the work is complete. It can't be undone.",
+      return: "The service provider will correct it and submit it again.",
+    },
+    do: { submit: "Submit the work as complete", accept: "Accept the work", return: "Return for correction" },
+    history: { delivered: "Work submitted as complete", accepted: "Work accepted", returned: "Work returned for correction" },
+  },
   evidence: {
     heading: "Execution evidence",
     help: "Photographs, site, delivery, completion and inspection reports, and test results that show the work being done. Either party can add them; they stay on record. Deliverables keep their own.",
@@ -1736,7 +1766,7 @@ export const en: Dictionary = {
   },
   execution: {
     heading: "Execution",
-    status: { not_started: "Not started", in_progress: "In progress", on_hold: "On hold", terminated: "Terminated" },
+    status: { not_started: "Not started", in_progress: "In progress", on_hold: "On hold", accepted: "Work accepted", terminated: "Terminated" },
     planned: "Planned start",
     source: { offer: "as committed in the awarded offer", requirement: "as expected in the requirement" },
     actual: "Started",
@@ -3139,6 +3169,23 @@ export const ar: Dictionary = {
     earlierVersion: "ملاحظة: قُدّم هذا العرض على الإصدار {n} من المتطلب، وهو الآن في الإصدار {m}، ولم يؤكده مزوّده منذ ذلك الحين. ستُرسيه كما هو.",
     confirm: "رسِّ",
   },
+  completion: {
+    heading: "إنجاز العمل",
+    status: { none: "لم يُقدَّم بعد", submitted: "قُدّم كمكتمل — بانتظار مراجعة المالك", returned: "أُعيد للتصحيح", accepted: "قُبل كمكتمل" },
+    outstanding: "لا يزال {n} من المخرجات بانتظار القبول قبل تقديم العمل كمكتمل.",
+    openChange: "يوجد تغيير مقترح بانتظار الرد؛ قم بحسمه قبل تقديم العمل كمكتمل.",
+    submittedOn: "قُدّم كمكتمل في",
+    decidedOn: { accepted: "قُبل في", returned: "أُعيد في" },
+    acceptedHelp: "قبل المالك العمل كمكتمل.",
+    noteLabel: { submit: "ملاحظة للمالك (اختياري)", accept: "ملاحظة (اختياري)", return: "ما الذي يحتاج إلى تصحيح؟" },
+    confirmHelp: {
+      submit: "سيراجع المالك العمل ويقبله أو يعيده للتصحيح.",
+      accept: "القبول يؤكد اكتمال العمل ولا يمكن التراجع عنه.",
+      return: "سيصحح مقدم الخدمة العمل ويقدمه مرة أخرى.",
+    },
+    do: { submit: "تقديم العمل كمكتمل", accept: "قبول العمل", return: "إعادة للتصحيح" },
+    history: { delivered: "قُدّم العمل كمكتمل", accepted: "قُبل العمل", returned: "أُعيد العمل للتصحيح" },
+  },
   evidence: {
     heading: "إثباتات التنفيذ",
     help: "صور وتقارير الموقع والتسليم والإنجاز والفحص ونتائج الاختبارات التي تُظهر تنفيذ العمل. يمكن لأي من الطرفين إضافتها، وتبقى في السجل. للمخرجات إثباتاتها الخاصة.",
@@ -3208,7 +3255,7 @@ export const ar: Dictionary = {
   },
   execution: {
     heading: "التنفيذ",
-    status: { not_started: "لم يبدأ", in_progress: "قيد التنفيذ", on_hold: "متوقف مؤقتاً", terminated: "منتهٍ" },
+    status: { not_started: "لم يبدأ", in_progress: "قيد التنفيذ", on_hold: "متوقف مؤقتاً", accepted: "تم قبول العمل", terminated: "منتهٍ" },
     planned: "البدء المخطط",
     source: { offer: "كما التزم به العرض الفائز", requirement: "كما هو متوقع في المتطلب" },
     actual: "تاريخ البدء",

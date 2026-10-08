@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiFetch } from "@/api/client";
+import { Completion } from "@/components/Completion";
 import { Deliverables } from "@/components/Deliverables";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { Evidence, EvidenceList } from "@/components/Evidence";
@@ -93,7 +94,13 @@ export interface Agreement {
   owner_name: string | null;
   provider_name: string | null;
   // Stage 7.5: execution
-  execution_status: "not_started" | "in_progress" | "on_hold" | "terminated";
+  execution_status: "not_started" | "in_progress" | "on_hold" | "accepted" | "terminated";
+  completion_status: "submitted" | "accepted" | "returned" | null;
+  completion_submitted_at: string | null;
+  completion_note: string | null;
+  completion_decided_at: string | null;
+  completion_decision_note: string | null;
+  outstanding_deliverables: number;
   on_hold_since: string | null;
   execution_history: ExecutionUpdate[];
   milestones: Milestone[];
@@ -200,8 +207,9 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
   const busy = save.isPending || activate.isPending || terminate.isPending || startWork.isPending || progress.isPending;
   const e = "execution";
   const day = (d: string) => fullDate(`${d}T12:00:00Z`, language, false);
-  const execTone = a.execution_status === "in_progress" ? "text-green" : a.execution_status === "terminated" ? "text-red" : "text-amber-dark";
+  const execTone = a.execution_status === "in_progress" || a.execution_status === "accepted" ? "text-green" : a.execution_status === "terminated" ? "text-red" : "text-amber-dark";
   const live = party && (a.execution_status === "in_progress" || a.execution_status === "on_hold");
+  const reviewing = a.completion_status === "submitted";
   const general = a.documents.filter((d) => !d.evidence && !d.variation_id);
   const tone = a.status === "active" ? "text-green" : a.status === "terminated" ? "text-red" : "text-amber-dark";
 
@@ -343,7 +351,9 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
                   {fullDate(h.created_at, language)} · {t(`${e}.party.${h.party}`)}{h.recorded_by_name ? ` (${h.recorded_by_name})` : ""}
                 </span>
                 <div>
-                  <span className="font-semibold">{t(`${e}.kind.${h.kind}`)}</span>
+                  <span className="font-semibold">
+                    {!h.milestone_id && ["delivered", "accepted", "returned"].includes(h.kind) ? t(`completion.history.${h.kind}`) : t(`${e}.kind.${h.kind}`)}
+                  </span>
                   {h.milestone_title && <span dir="auto"> · {h.milestone_title}</span>}
                   {h.note && <span dir="auto" className="whitespace-pre-wrap break-words"> — {h.note}</span>}
                 </div>
@@ -368,7 +378,7 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
         ) : (
           <div className="flex flex-wrap gap-3 mt-2">
             <button type="button" disabled={busy} onClick={() => setUpdate({ action: "update", note: "" })} className="text-xs text-blue underline" data-testid="execution-update">{t(`${e}.addUpdate`)}</button>
-            {a.execution_status === "in_progress" ? (
+            {reviewing ? null : a.execution_status === "in_progress" ? (
               <button type="button" disabled={busy} onClick={() => setUpdate({ action: "hold", note: "" })} className="text-xs text-amber-dark underline" data-testid="execution-hold">{t(`${e}.hold`)}</button>
             ) : (
               <button type="button" disabled={busy} onClick={() => setUpdate({ action: "resume", note: "" })} className="text-xs text-green underline" data-testid="execution-resume">{t(`${e}.resume`)}</button>
@@ -397,6 +407,7 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
         ))}
       </div>
 
+      <Completion projectId={projectId} agreement={a} onDone={done} onFailed={failed} />
       <Evidence projectId={projectId} agreement={a} onDone={done} onFailed={failed} />
       <Deliverables projectId={projectId} agreement={a} onDone={done} onFailed={failed} />
       <Variations projectId={projectId} agreement={a} onDone={done} onFailed={failed} />

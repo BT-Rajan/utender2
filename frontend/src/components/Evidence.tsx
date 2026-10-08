@@ -53,7 +53,8 @@ export function Evidence({
   const canAdd = a.side !== "admin" && started && a.status !== "terminated";
   if (!started) return null;
   const x = "evidence";
-  const updates = a.execution_history.filter((h) => ["started", "progress", "on_hold", "resumed"].includes(h.kind));
+  // Progress updates, and the whole work's completion submissions (Stage 7.10).
+  const updates = a.execution_history.filter((h) => ["started", "progress", "on_hold", "resumed"].includes(h.kind) || (h.kind === "delivered" && !h.milestone_id));
 
   return (
     <div className="border-t border-border mt-4 pt-3" data-testid="evidence">
@@ -75,7 +76,7 @@ export function Evidence({
                 <option value="">{t(`${x}.wholeWork`)}</option>
                 {updates.map((h) => (
                   <option key={h.id} value={h.id}>
-                    {fullDate(h.created_at, language)} · {t(`execution.kind.${h.kind}`)}{h.note ? ` — ${h.note.slice(0, 40)}` : ""}
+                    {fullDate(h.created_at, language)} · {h.kind === "delivered" ? t("completion.history.delivered") : t(`execution.kind.${h.kind}`)}{h.note ? ` — ${h.note.slice(0, 40)}` : ""}
                   </option>
                 ))}
               </select>

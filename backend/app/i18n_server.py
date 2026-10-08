@@ -162,6 +162,20 @@ AR: dict[str, str] = {
     "This project has already been awarded, canceled, or has no award.": "تمت ترسية هذا المشروع أو إلغاؤه أو تقرر عدم الترسية بالفعل.",
     "This offer has been suspended by an admin and cannot be awarded.": "علّق المشرف هذا العرض ولا يمكن ترسيته.",
     # Stage 7.3: the agreement
+    # Stage 7.10: completion
+    "The work was already accepted as complete, so the agreement can't be terminated.": "تم قبول العمل كمكتمل بالفعل، لذا لا يمكن إنهاء الاتفاقية.",
+    "The work was already accepted as complete.": "تم قبول العمل كمكتمل بالفعل.",
+    "The work was submitted as complete and is awaiting the owner's review.": "تم تقديم العمل كمكتمل وهو بانتظار مراجعة المالك.",
+    "The work was submitted as complete, so the agreed work can't change now.": "تم تقديم العمل كمكتمل، لذا لا يمكن تغيير العمل المتفق عليه الآن.",
+    "Only the service provider submits the work as complete.": "مقدم الخدمة فقط هو من يقدّم العمل كمكتمل.",
+    "The work was already submitted as complete (by a colleague or from another tab) and is awaiting review.": "تم تقديم العمل كمكتمل بالفعل (من زميل أو من علامة تبويب أخرى) وهو بانتظار المراجعة.",
+    "Every deliverable must be accepted before the work is submitted as complete.": "يجب قبول جميع المخرجات قبل تقديم العمل كمكتمل.",
+    "Resume it first.": "استأنفه أولاً.",
+    "A proposed change is still awaiting an answer.": "لا يزال هناك تغيير مقترح بانتظار الرد.",
+    "Settle it first.": "قم بحسمه أولاً.",
+    "The work was already accepted as complete (by a colleague or from another tab).": "تم قبول العمل كمكتمل بالفعل (من زميل أو من علامة تبويب أخرى).",
+    "The work was already returned for correction (by a colleague or from another tab).": "تمت إعادة العمل للتصحيح بالفعل (من زميل أو من علامة تبويب أخرى).",
+    "The work hasn't been submitted as complete yet.": "لم يتم تقديم العمل كمكتمل بعد.",
     # Stage 7.9: execution evidence
     "A document can relate to one deliverable, change or progress update, not several.": "يمكن أن يتعلق المستند بمُخرَج واحد أو تغيير واحد أو تحديث واحد لسير العمل، وليس بأكثر من ذلك.",
     "Progress update not found.": "لم يتم العثور على تحديث سير العمل.",

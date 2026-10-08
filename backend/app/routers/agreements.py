@@ -147,6 +147,12 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
         owner_name=_owner_name(db, project),
         provider_name=provider_name,
         execution_status=_execution_status(agreement),
+        completion_status=agreement.completion_status,
+        completion_submitted_at=agreement.completion_submitted_at,
+        completion_note=agreement.completion_note,
+        completion_decided_at=agreement.completion_decided_at,
+        completion_decision_note=agreement.completion_decision_note,
+        outstanding_deliverables=sum(1 for m in milestones if m.status != "accepted"),
         on_hold_since=agreement.on_hold_at if agreement.status != "terminated" else None,
         execution_history=[
             ExecutionUpdateOut(
@@ -249,6 +255,8 @@ def _execution_status(agreement: Agreement) -> str:
         return "terminated"
     if agreement.work_started_at is None:
         return "not_started"
+    if agreement.completion_status == "accepted":  # Stage 7.10: the work is done and accepted
+        return "accepted"
     return "on_hold" if agreement.on_hold_at else "in_progress"
 
 
@@ -317,6 +325,8 @@ def terminate_agreement(
     _require_owner(side)
     if agreement.status == "terminated":
         raise HTTPException(status_code=400, detail="This agreement was already terminated. This page now shows the latest.")
+    if agreement.completion_status == "accepted":  # Stage 7.10
+        raise HTTPException(status_code=409, detail="The work was already accepted as complete, so the agreement can't be terminated. This page now shows the latest.")
     _check_version(agreement, if_match)
     reason = payload.reason.strip()
     if not reason:
@@ -383,6 +393,10 @@ def record_progress(
         raise HTTPException(status_code=400, detail="This agreement has been terminated. This page now shows the latest.")
     if agreement.work_started_at is None:
         raise HTTPException(status_code=400, detail="The work hasn't started yet. Record its start first.")
+    if agreement.completion_status == "accepted":  # Stage 7.10
+        raise HTTPException(status_code=409, detail="The work was already accepted as complete. This page now shows the latest.")
+    if agreement.completion_status == "submitted" and payload.action != "update":
+        raise HTTPException(status_code=409, detail="The work was submitted as complete and is awaiting the owner's review. This page now shows the latest.")
     note = (payload.note or "").strip() or None
     if payload.action == "update" and not note:
         raise HTTPException(status_code=400, detail="Write a short progress note.")

@@ -44,6 +44,18 @@ class Agreement(Base):
     # Stage 7.6: set while the work is on hold (server time it was put on
     # hold); cleared when it resumes. The status stays derived from these.
     on_hold_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Stage 7.10: the whole work's completion. The winning provider submits it
+    # as complete (only once every deliverable is accepted); the owner side
+    # accepts it or returns it for correction. Accepted work is what Stage
+    # 7.11's closure builds on. Each step is also an execution-history entry
+    # (delivered / accepted / returned with no deliverable).
+    completion_status: Mapped[str | None] = mapped_column(String(16), nullable=True)  # submitted / accepted / returned
+    completion_submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completion_submitted_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    completion_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    completion_decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completion_decided_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    completion_decision_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Stage 3.11's rule: a change sent from a page showing an older version
     # (another tab, another member) is refused, not silently applied.
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")

@@ -45,6 +45,8 @@ def _variation(db: Session, agreement: Agreement, variation_id: str) -> Variatio
 def _in_force(agreement: Agreement) -> None:
     if agreement.status == "terminated":
         raise HTTPException(status_code=400, detail=f"This agreement has been terminated. {LATEST}")
+    if agreement.completion_status in ("submitted", "accepted"):  # Stage 7.10: the work as submitted is what is reviewed
+        raise HTTPException(status_code=409, detail=f"The work was submitted as complete, so the agreed work can't change now. {LATEST}")
     if agreement.status != "active":
         raise HTTPException(status_code=400, detail="Changes are recorded once the agreement is in force. Until then, edit the agreement and its deliverables directly.")
 

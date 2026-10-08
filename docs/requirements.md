@@ -818,4 +818,31 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **Deliverables:** keep their evidence, now typed as delivery records.
     - **Agreement documents:** now list only the agreement's own papers.
 
+- **7.10 Owner acceptance / completion:**
+  - **Audit:**
+    - **Already working:** per-deliverable delivery and acceptance (7.7): delivered → accepted, or returned → delivered again, with server times, notes, evidence, history, audit and notifications.
+    - **Missing:** a submission and owner acceptance of the work as a whole, which simple jobs need; any statement of what is outstanding; and guards so later actions can't contradict accepted work.
+  - **Added (migration 0054): the whole work's completion on the agreement.**
+    - **Fields:** `completion_status` (submitted / accepted / returned), with submission and decision times (server clock), who did each, and notes.
+    - **History:** each step is an execution-history entry, reusing the delivered / accepted / returned kinds with no deliverable. Evidence (7.9) can be linked to the submission entry.
+    - **Notifications:** `execution_updated` ("Work submitted as complete / accepted as complete / returned for correction").
+    - **Audit:** `completion.submit`, `accept` and `return`.
+  - **Rules:**
+    - **Submitting:** only the winning provider's side submits. The work must have started and not be on hold, every deliverable must be accepted (one accepted and one pending is not complete), and no proposed change may be awaiting an answer.
+    - **Deciding:** only the owner side accepts, or returns with a note; returned work can be submitted again. A provider can never accept its own work.
+    - **Untouched:** the award, the offer, the requirement and the agreement's own status. Accepted is not closed (7.11).
+  - **Guards:**
+    - **While submitted:** the work can't be put on hold or resumed, and no change can be proposed or agreed.
+    - **Once accepted:** no progress, hold, change, termination, resubmission or return.
+    - **Late or repeated actions:** answered with an explained 409 under the requirement lock and the agreement version.
+    - **Status:** the derived execution status shows "Work accepted".
+  - **Access:** losing bidders, other organisations, other owners and never-awarded requirements get 404. Admins can only read.
+  - **UI:** a Work completion section showing:
+    - the status;
+    - deliverables still outstanding;
+    - an open change blocking submission;
+    - the submission and the decision with their notes;
+    - submit, accept and return actions.
+    - The history labels whole-work entries, and the submission can be chosen as "relates to" for evidence.
+
 _Stage 7 onwards is added as it is implemented._
