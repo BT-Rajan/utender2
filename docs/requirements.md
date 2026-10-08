@@ -1415,4 +1415,22 @@ be added as its prompts (5.1, 5.2, …) are delivered.
       - the admin provider page shows interval, renews/ends, last billing event and marketplace status.
   - **Tests:** `tests/test_stage9_6_billing.py` (signed webhook payloads).
 
+- **9.7 Operational audit and traceability:**
+  - **Already working (one audit log, `audit_logs`):**
+    - **What it records:** actor, action, target type/id, before → after, reason and server time. Entries are written by `log_action`, usually in the same commit as the change, with the actor taken from the authenticated session.
+    - **Coverage:** requirement lifecycle (publish, pause, close, cancel, no-award, restart, admin edit or suspend), award, evaluation notes and shortlist, the agreement and execution, deliverables, changes, completion, reviews, responses, reports and moderation, membership, verification, suspension, overrides, deactivation, billing status (9.6), and admin edits and deletions (9.4).
+    - **Separate histories with their own order:** the agreement timeline (numbered, 7.13), offer revisions (5.x), amendments (3.17).
+    - **Integrity:** nothing edits or deletes an entry, and since 9.4 an account with history isn't deleted. Application errors go to the logger, not the trail.
+  - **Gaps found:**
+    - **Offers:** submitting, revising and withdrawing an offer left no audit entry.
+    - **Passwords:** changes and resets (security events) weren't recorded.
+    - **Admin reading:** admins could only read the trail for a service-provider profile. Nothing covered a requirement and what hangs off it, or an account, so "who changed my requirement / where did my offer go / who awarded" needed the database.
+  - **Fixed:**
+    - **Offer entries:** `offer.submit`, `offer.revise` (revision, requirement version, never the price) and `offer.withdraw`, written in the same commit as the change. A refused retry writes nothing.
+    - **Password entries:** `account.password_changed` and `account.password_reset`, recording the fact only (no secret).
+    - **`GET /admin/projects/{id}/audit`:** the requirement, its offers and its agreement, newest first, bounded (≤500), actors resolved in one query. An admin acting shows as the admin; Stripe shows as "system".
+    - **`GET /admin/users/{id}/audit`:** an account's security and account events, its owner/provider profile (verification, suspension, overrides, billing) and its organisation's membership changes. Admin-only and read-only.
+    - **UI:** a "Recorded history" list on the admin requirement and owner pages (`AdminAuditTrail`).
+  - **Tests:** `tests/test_stage9_7_audit_trail.py`, covering stress cases 1–10.
+
 _Later Stage 9 steps are added as they are implemented._

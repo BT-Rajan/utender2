@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import type { AdminOffer, AdminProjectDetail } from "@/api/types";
+import { AdminAuditTrail } from "@/components/AdminAuditTrail";
 import { AdminDecisionTrace } from "@/components/AdminDecisionTrace";
 import { ProviderCheck, PublishCheck } from "@/components/AdminSupport";
 import { ErrorBanner } from "@/components/ErrorBanner";
@@ -327,6 +328,7 @@ export function AdminProjectDetailPage() {
         </div>
 
         <AdminDecisionTrace projectId={id!} detail={detail} />
+        <AdminAuditTrail url={`/admin/projects/${id}/audit`} />
         {/* Stage 9.4: support checks, from the same rules the marketplace enforces. */}
         {detail.project.status === "draft" && <PublishCheck projectId={id!} />}
         {detail.project.status === "open" && <ProviderCheck projectId={id!} />}

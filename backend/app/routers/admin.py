@@ -1814,3 +1814,65 @@ def project_quality(project_id: str, db: Session = Depends(get_db)):
         "owner_suspended": owner_profile.is_suspended if owner_profile else None,
         **requirement_quality.check(db, project).as_dict(),
     }
+
+
+# ---------- Stage 9.7: reading the audit trail ----------
+
+AUDIT_LIMIT = 500
+
+
+def _audit_rows(db: Session, conditions, limit: int) -> list[dict]:
+    """Entries matching any of (target_type, target_ids), newest first and
+    bounded, each with its actor resolved in one query -- who (or "system"
+    for Stripe and other server events), their role, what, to which object,
+    when, before -> after."""
+    from sqlalchemy import or_
+
+    from app.models.audit_log import AuditLog
+
+    clauses = [((AuditLog.target_type == t) & AuditLog.target_id.in_(ids)) for t, ids in conditions if ids]
+    if not clauses:
+        return []
+    rows = db.query(AuditLog).filter(or_(*clauses)).order_by(AuditLog.created_at.desc(), AuditLog.id).limit(limit).all()
+    actors = {u.id: u for u in db.query(User).filter(User.id.in_({r.actor_id for r in rows if r.actor_id}))} if rows else {}
+    out = []
+    for r in rows:
+        a = actors.get(r.actor_id)
+        out.append({
+            "id": r.id, "at": r.created_at, "action": r.action, "target_type": r.target_type, "target_id": r.target_id,
+            "actor": {"id": a.id, "email": a.email, "name": a.full_name, "role": a.role.value} if a else None,
+            "previous_value": r.previous_value, "new_value": r.new_value, "reason": r.reason,
+        })
+    return out
+
+
+@router.get("/projects/{project_id}/audit")
+def project_audit(project_id: str, db: Session = Depends(get_db), limit: int = Query(AUDIT_LIMIT, ge=1, le=AUDIT_LIMIT)):
+    """Stage 9.7: everything recorded about a requirement and what hangs off
+    it -- its own lifecycle and amendments, each offer (submitted, revised,
+    withdrawn, shortlisted, suspended...), the award, the agreement and its
+    execution, reviews and moderation -- newest first, with who did it.
+    Read-only; nothing here edits or removes an entry."""
+    from app.models.agreement import Agreement
+
+    if db.get(Project, project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    offer_ids = [i for (i,) in db.query(Offer.id).filter(Offer.project_id == project_id)]
+    agreement_ids = [i for (i,) in db.query(Agreement.id).filter(Agreement.project_id == project_id)]
+    return _audit_rows(db, [("project", [project_id]), ("offer", offer_ids), ("agreement", agreement_ids)], limit)
+
+
+@router.get("/users/{user_id}/audit")
+def account_audit(user_id: str, db: Session = Depends(get_db), limit: int = Query(AUDIT_LIMIT, ge=1, le=AUDIT_LIMIT)):
+    """Stage 9.7: what was recorded about one account and the stakeholder it
+    stands for -- its own security and account events, its verification,
+    suspension, overrides and billing (as an owner or provider profile), and
+    its organisation's membership changes. Not the business actions it took
+    on requirements: those are read on each requirement's trail."""
+    from app.models.organization import OrganizationMembership
+
+    if db.get(User, user_id) is None:
+        raise HTTPException(status_code=404, detail="Account not found.")
+    orgs = [o for (o,) in db.query(OrganizationMembership.organization_id).filter(OrganizationMembership.user_id == user_id)]
+    return _audit_rows(db, [("user", [user_id]), ("owner_profile", [user_id]), ("service_provider_profile", [user_id]),
+                            ("organization", orgs)], limit)

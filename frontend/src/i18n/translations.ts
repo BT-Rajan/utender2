@@ -414,6 +414,12 @@ export interface Dictionary {
     ownerCannotPublish: string;
     noBlockers: string;
   };
+  audit: {
+    heading: string;
+    empty: string;
+    unavailable: string;
+    system: string;
+  };
   history: {
     heading: string;
     awarded: string;
@@ -2072,6 +2078,12 @@ export const en: Dictionary = {
     publishCheck: "What blocks publishing",
     ownerCannotPublish: "The owner's account can't publish (not verified, or suspended).",
     noBlockers: "Nothing blocks publishing.",
+  },
+  audit: {
+    heading: "Recorded history",
+    empty: "Nothing recorded yet.",
+    unavailable: "The history couldn't be loaded.",
+    system: "System",
   },
   history: {
     heading: "History",
@@ -3788,6 +3800,12 @@ export const ar: Dictionary = {
     publishCheck: "ما يمنع النشر",
     ownerCannotPublish: "لا يمكن لحساب المالك النشر (غير موثَّق أو موقوف).",
     noBlockers: "لا شيء يمنع النشر.",
+  },
+  audit: {
+    heading: "السجل المحفوظ",
+    empty: "لا شيء مسجل بعد.",
+    unavailable: "تعذر تحميل السجل.",
+    system: "النظام",
   },
   history: {
     heading: "السجل",

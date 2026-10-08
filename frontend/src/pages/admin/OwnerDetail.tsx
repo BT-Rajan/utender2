@@ -4,6 +4,7 @@ import { apiFetch, ApiError } from "@/api/client";
 import type { AdminProject, OwnerDocument, OwnerProfile } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { ApplicationDecisionControls, DocumentDecisionControls, type DocumentDecision } from "@/components/AdminReviewControls";
+import { AdminAuditTrail } from "@/components/AdminAuditTrail";
 import { AdminOrganizationMembers, type Member } from "@/components/AdminOrganizationMembers";
 import { StakeholderSummary, type Stakeholder } from "@/components/Stakeholder";
 import { PageLoading } from "@/components/PageLoading";
@@ -107,6 +108,8 @@ export function AdminOwnerDetailPage() {
           <AdminOrganizationMembers members={detail.members ?? []} queryKey={["admin-owner", id]} />
         </div>
       )}
+      {/* Stage 9.7: the account's recorded trail (verification, suspension, membership, security). */}
+      {id && <div className="mb-6"><AdminAuditTrail url={`/admin/users/${id}/audit`} /></div>}
 
       <div className="grid gap-4">
         <div className="bg-white border border-border rounded px-5 py-4.5">
