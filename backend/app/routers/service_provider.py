@@ -17,7 +17,7 @@ from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.saved_opportunity import SavedOpportunity
 from app.models.user import User
 from app.schemas.service_provider import ServiceProviderProfileOut, MyBidOut, SubmitForReview
-from app.schemas.review import ReceivedReviewOut, ReviewCreate, ReviewOut
+from app.schemas.review import ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut
 from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_review, review_of
 from app.schemas.document import ServiceProviderDocumentOut, DocumentRequirementOut
 from app.schemas.common import UTCDateTime
@@ -572,6 +572,15 @@ def _profile_fields(cp: ServiceProviderProfile) -> dict:
         created_at=cp.created_at,
         **profile_state_fields(cp),
     )
+
+
+@router.get("/reputation", response_model=ProviderReputationOut)
+def my_reputation(user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
+    """Stage 8.7: this provider's own U-Tender reputation -- its organisation's,
+    by current membership; no id is taken from the request."""
+    from app.services.reputation import provider_reputation
+
+    return provider_reputation(db, get_service_provider_profile(user, db).user_id)
 
 
 # ---------- Stage 8.4: the winning provider reviews the owner ----------

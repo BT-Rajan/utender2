@@ -262,6 +262,15 @@ export interface Dictionary {
     receivedHeading: string;
     receivedOn: string;
   };
+  reputation: {
+    heading: string;
+    summary: string;
+    completed: string;
+    none: string;
+    noReviews: string;
+    verified: string;
+    note: string;
+  };
   history: {
     heading: string;
     awarded: string;
@@ -1731,6 +1740,15 @@ export const en: Dictionary = {
     confirmBody: "Your rating and comment are recorded against this completed transaction and count towards the service provider's public rating. A review can't be changed afterwards.",
     receivedHeading: "{party}'s review of you",
     receivedOn: "Received on",
+  },
+  reputation: {
+    heading: "U-Tender track record",
+    summary: "{avg} / 5 · {n} reviews",
+    completed: "{n} completed U-Tender transactions",
+    none: "No completed U-Tender transactions yet",
+    noReviews: "No owner reviews yet",
+    verified: "Owner review · completed U-Tender transaction",
+    note: "For information only: it doesn't affect eligibility, verification or award, and offers are never ordered by it.",
   },
   history: {
     heading: "History",
@@ -3259,6 +3277,15 @@ export const ar: Dictionary = {
     receivedHeading: "تقييم {party} لك",
     receivedOn: "استُلم في",
   },
+  reputation: {
+    heading: "السجل على U-Tender",
+    summary: "{avg} / 5 · {n} تقييمات",
+    completed: "{n} معاملات مكتملة على U-Tender",
+    none: "لا توجد معاملات مكتملة على U-Tender بعد",
+    noReviews: "لا توجد تقييمات من الملاك بعد",
+    verified: "تقييم مالك · معاملة مكتملة على U-Tender",
+    note: "للعلم فقط: لا يؤثر في الأهلية أو التحقق أو الترسية، ولا تُرتَّب العروض بحسبه.",
+  },
   history: {
     heading: "السجل",
     awarded: "تمت الترسية",
@@ -3276,7 +3303,7 @@ export const ar: Dictionary = {
     finalValue: "القيمة النهائية المتفق عليها",
     changes: "التغييرات المتفق عليها",
     payments: "المدفوعات",
-    notManaged: "لا يتتبعها يو-تندر — تتم التسوية مباشرة بين المالك ومقدم الخدمة.",
+    notManaged: "لا يتتبعها U-Tender — تتم التسوية مباشرة بين المالك ومقدم الخدمة.",
   },
   completion: {
     heading: "إنجاز العمل",
@@ -3388,7 +3415,7 @@ export const ar: Dictionary = {
     heading: "الاتفاقية",
     status: {
       preparing: "قيد الإعداد",
-      preparingHelp: "يعمل الطرفان على إتمام الاتفاقية خارج يو-تندر. أرفق المستندات الموقعة هنا.",
+      preparingHelp: "يعمل الطرفان على إتمام الاتفاقية خارج U-Tender. أرفق المستندات الموقعة هنا.",
       active: "سارية",
       activeHelp: "الاتفاقية التي تحكم هذه الترسية سارية.",
       completed: "مكتملة",

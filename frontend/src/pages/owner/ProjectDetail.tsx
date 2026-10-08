@@ -921,8 +921,15 @@ export function OwnerProjectDetailPage() {
                       <OfferResponseDetails offer={o} project={project} />
                     </td>
                     <td className="py-3 px-2.5">
-                      <span className="text-amber text-[11px] tracking-tight">{stars(Number(o.service_provider_avg_rating ?? 0))}</span>{" "}
-                      <span className="font-mono text-[11px] text-steel">({o.service_provider_review_count ?? 0})</span>
+                      {/* Stage 8.7: no reviews reads as "none yet", never as 0 stars. */}
+                      {o.service_provider_review_count ? (
+                        <>
+                          <span className="text-amber text-[11px] tracking-tight">{stars(Number(o.service_provider_avg_rating ?? 0))}</span>{" "}
+                          <span className="font-mono text-[11px] text-steel">({o.service_provider_review_count})</span>
+                        </>
+                      ) : (
+                        <span className="font-mono text-[11px] text-steel">{t("reputation.noReviews")}</span>
+                      )}
                     </td>
                     <td className="py-3 px-2.5 font-mono font-semibold text-navy text-sm">
                       {money(o.amount, project.currency)}

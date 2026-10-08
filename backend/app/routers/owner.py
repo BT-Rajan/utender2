@@ -27,7 +27,7 @@ from app.schemas.document import DocumentRequirementOut, OwnerDocumentOut
 from app.schemas.offer import ShortlistOut, EvaluationNoteEdit, EvaluationNoteIn, EvaluationNoteOut, OfferComparisonOut, OfferOut, OfferRevisionOut, OwnerOfferOut
 from app.schemas.owner import OwnerProfileOut
 from app.schemas.project import EligibilityQualification, ProjectOut
-from app.schemas.review import ReceivedReviewOut, ReviewCreate, ReviewOut
+from app.schemas.review import ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut
 from app.services.audit import log_action
 from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_review, review_of
 from app.services.email import notify_provider_requirement_ended, notify_service_provider_offer_decision
@@ -295,6 +295,17 @@ def offer_detail(project_id: str, offer_id: str, user: User = Depends(require_ow
         offer=_owner_offer_out(db, project, offer, cp),
         on_current_version=offer.based_on_material_revision >= project.material_revision,
     )
+
+
+@router.get("/projects/{project_id}/offers/{offer_id}/reputation", response_model=ProviderReputationOut)
+def offer_provider_reputation(project_id: str, offer_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 8.7: the U-Tender reputation of the provider behind an offer, for
+    the owner weighing it -- the same access rules as the offer itself
+    (the owner's requirement, unsealed, live, not suspended). The provider is
+    the offer's, never one named in the request. Informational only."""
+    from app.services.reputation import provider_reputation
+
+    return provider_reputation(db, _readable_offer(project_id, offer_id, user, db).service_provider_id)
 
 
 @router.get("/projects/{project_id}/offers/{offer_id}/clarifications", response_model=list[OfferClarificationOut])

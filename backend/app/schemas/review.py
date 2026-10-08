@@ -39,3 +39,14 @@ class ReceivedReviewOut(BaseModel):
     rating: int
     comment: str | None
     created_at: UTCDateTime
+
+
+class ProviderReputationOut(BaseModel):
+    """Stage 8.7: a provider's reputation from completed U-Tender transactions
+    -- counts, the simple average of owner reviews (None until there is one)
+    and the latest owner reviews, each as rating, comment and date only."""
+    company_name: str | None
+    completed_transactions: int
+    review_count: int
+    avg_rating: float | None
+    recent_reviews: list[ReceivedReviewOut]

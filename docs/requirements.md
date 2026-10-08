@@ -1062,4 +1062,26 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **UI:** a `ReceivedReview` block on the owner's requirement page and on the winner's offer page.
   - **Tests:** `tests/test_stage8_6_review_visibility.py`.
 
+- **8.7 Service provider reputation profile:**
+  - **Already working:**
+    - **Rating:** the provider's `avg_rating` and `review_count` on its organisation profile come from owner reviews only. They are recalculated from the records on every new review; reviews are immutable, so they stay correct.
+    - **Offers list:** owners already saw the rating there; it never orders offers or affects eligibility, verification or award.
+    - **Integrity and identity:** inherited from 8.5. Offers, awards and reviews are recorded under the organisation's profile id, never an employee's.
+  - **Gaps found:**
+    - **No completed-transaction count** anywhere.
+    - **Recent reviews:** owners couldn't see any review text, and the provider had no overview of its own reviews.
+    - **Zero history:** a provider with no reviews showed `☆☆☆☆☆ (0)`, which reads like a poor rating.
+  - **Fixed:**
+    - **`services/reputation.provider_reputation`:** reads everything live in four constant queries, with no N+1 and no stored second copy. It returns:
+      - `completed_transactions`: agreements with status `completed` (the Stage 7 definition), joined through the award to the provider;
+      - `review_count`, and the simple average `avg_rating` (`None` when there are no reviews);
+      - the five latest owner reviews, each with rating, comment and date only: no owner, requirement, amounts or ids.
+    - **Endpoints:**
+      - `GET /service-provider/reputation` (its own organisation, by current membership);
+      - `GET /owner/projects/{id}/offers/{offer_id}/reputation`. This has the same gate as reading the offer (the owner's requirement, unsealed, live, not suspended). The provider is always the offer's, never one named in the request.
+    - **UI:**
+      - `ProviderReputation` on the owner's offer page and the provider's dashboard: "No completed U-Tender transactions yet", otherwise "N completed · avg / 5 · n reviews", plus the recent reviews and an informational-only note.
+      - The offers list shows "No owner reviews yet" instead of 0 stars.
+  - **Tests:** `tests/test_stage8_7_provider_reputation.py`.
+
 _Stage 9 onwards is added as it is implemented._
