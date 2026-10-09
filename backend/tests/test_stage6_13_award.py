@@ -110,8 +110,14 @@ def test_an_offer_on_an_earlier_version_is_awarded_only_knowingly(db):
     db.expire_all()
     assert db.get(Project, pid).status == ProjectStatus.closed and db.query(AwardRecord).count() == 0
     assert db.get(Offer, a_offer).status == OfferStatus.submitted
-    # Said knowingly: awarded as it stands.
-    assert _award(owner, pid, a_offer, acknowledge_earlier_version=True).status_code == 200
+    # Batch B: the owner's word alone is no longer enough; the acknowledgement is refused.
+    r = _award(owner, pid, a_offer, acknowledge_earlier_version=True)
+    assert r.status_code == 409 and "Ask the provider to confirm it still stands" in r.json()["detail"]  # Batch B:
+    db.expire_all()
+    assert db.query(AwardRecord).count() == 0 and db.get(Offer, a_offer).status == OfferStatus.submitted  # Batch B:
+    # Batch B: once its provider confirms it still stands (allowed after the close), it can be awarded.
+    assert a.post(f"/projects/{pid}/offers/confirm").status_code == 200  # Batch B:
+    assert _award(owner, pid, a_offer).status_code == 200  # Batch B:
     # An offer on the current version needs no such confirmation (elsewhere).
     p2 = _tender(owner, "Current")
     _submitted(b, p2)

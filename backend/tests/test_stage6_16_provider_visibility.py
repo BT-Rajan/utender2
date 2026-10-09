@@ -62,7 +62,12 @@ def test_award_outcome_for_the_winner_the_others_and_nobody_else(db):
         leaks = [u for u in (f"/projects/{pid}", f"/projects/{pid}/award", f"/projects/{pid}/offers/mine", "/service-provider/my-bids", "/notifications") if SECRET_NOTE in sp.get(u).text]
         assert leaks == [], leaks
         assert '"shortlisted":true' not in seen
-    for n in db.query(Notification):
+    # Batch C: notifications are no longer merged into one overwritten row, so the owner keeps
+    # "amal submitted an offer" (its own bidder's name, rightly the owner's to see); the check is on what bidders get.
+    owner_id = owner.get("/auth/me").json()["id"]
+    owner_notes = [n for n in db.query(Notification) if n.user_id == owner_id]
+    assert owner_notes and all("1000" not in n.body and "777" not in n.body for n in owner_notes)  # Batch C:
+    for n in db.query(Notification).filter(Notification.user_id != owner_id):  # Batch C:
         assert "1000" not in n.body and "777" not in n.body and "amal" not in n.body.lower() or n.type == NotificationType.award_won
 
 
@@ -78,7 +83,7 @@ def test_ending_without_award_reads_as_the_requirements_outcome(db):
         detail = sp.get(f"/projects/{pid}").json()
         assert (detail["status"], detail["closure_reason"], detail.get("closure_note")) == ("no_award", "no_suitable_offer", None)
         bid = {x["project_id"]: x for x in sp.get("/service-provider/my-bids").json()}[pid]
-        assert (bid["offer_status"], bid["project_status"], bid["closure_reason"]) == ("submitted", "no_award", "no_suitable_offer")
+        assert (bid["offer_status"], bid["project_status"], bid["closure_reason"]) == ("closed", "no_award", "no_suitable_offer")  # Batch B: live offers are closed on no-award
         assert sp.get(f"/projects/{pid}/award").status_code == 404  # nobody won
         assert sp.get(f"/projects/{pid}/offers/mine").json()["amount"] == "1000.000"  # their offer kept as submitted
         assert NotificationType.tender_no_award in _mine_notes(db, sp)

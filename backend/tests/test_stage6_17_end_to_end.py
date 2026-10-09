@@ -87,7 +87,7 @@ def test_scenario_2_no_suitable_provider(db):
     db.expire_all()
     assert db.get(Project, pid).status == ProjectStatus.no_award and db.query(AwardRecord).count() == 0
     assert sorted(str(o.amount) for o in db.query(Offer)) == ["9000.000", "9500.000"]
-    assert all(o.status == OfferStatus.submitted for o in db.query(Offer))
+    assert all(o.status == OfferStatus.closed for o in db.query(Offer))  # Batch B: live offers are closed on no-award
     assert len(owner.get(f"/owner/projects/{pid}/offers").json()) == 2
 
 

@@ -39,8 +39,10 @@ def test_no_suitable_offer_concludes_it_and_keeps_everything(db):
     assert (p.status, p.closure_reason, p.closure_note) == (ProjectStatus.no_award, "no_suitable_offer", "All prices above budget.")
     # Nobody awarded; offers, shortlist, notes exactly as they were; still readable by the owner.
     assert db.query(AwardRecord).count() == 0
-    assert {o.id: (o.status, o.amount, o.message, o.submitted_documents, o.revision, o.updated_at) for o in db.query(Offer)} == before
-    assert all(o.status == OfferStatus.submitted for o in db.query(Offer))
+    # Batch B: the live offers are now set to "closed" (so status and updated_at move); their content stays as it was.
+    assert {o.id: (o.amount, o.message, o.submitted_documents, o.revision) for o in db.query(Offer)} == {k: v[1:5] for k, v in before.items()}  # Batch B:
+    assert all(v[0] == OfferStatus.submitted for v in before.values())  # Batch B:
+    assert all(o.status == OfferStatus.closed for o in db.query(Offer))  # Batch B:
     assert [s.offer_id for s in db.query(OfferShortlist)] == [a_offer] and db.query(EvaluationNote).count() == 1
     assert len(owner.get(f"/owner/projects/{pid}/offers").json()) == 2
     assert owner.get(f"/owner/projects/{pid}/offers/{a_offer}").status_code == 200
