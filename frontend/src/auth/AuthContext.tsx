@@ -55,7 +55,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signup = async (payload: SignupPayload) => {
-    const me = await apiFetch<CurrentUser>("/auth/signup", { method: "POST", body: payload });
+    // Stage 9.14: sign up in the language the visitor is using (I18nProvider keeps <html lang> in step).
+    const language = typeof document !== "undefined" && document.documentElement.lang === "ar" ? "ar" : "en";
+    const me = await apiFetch<CurrentUser>("/auth/signup", { method: "POST", body: { ...payload, language } });
     setUser(me);
     return me;
   };

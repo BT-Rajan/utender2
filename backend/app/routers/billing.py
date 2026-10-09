@@ -40,23 +40,29 @@ def create_checkout_session(
             detail="You already have a subscription. Use Manage billing to update your payment method or plan.",
         )
 
-    session = stripe.checkout.Session.create(
-        mode="subscription",
-        line_items=[{"price": price_id, "quantity": 1}],
-        # Reuse the existing Stripe customer if this service provider has billed
-        # before (e.g. resubscribing after a cancellation) instead of
-        # creating a duplicate customer record.
-        customer=cp.stripe_customer_id or None,
-        customer_email=None if cp.stripe_customer_id else user.email,
-        # Stage 9.6: the stakeholder being billed -- the organisation's profile
-        # (cp), never the member who happens to click. The webhook has no
-        # session of its own; metadata is how it finds that profile.
-        client_reference_id=cp.user_id,
-        metadata={"service_provider_id": cp.user_id},
-        subscription_data={"metadata": {"service_provider_id": cp.user_id}},
-        success_url=f"{settings.app_url}/service-provider/feed?subscribed=1",
-        cancel_url=f"{settings.app_url}/service-provider/subscribe",
-    )
+    try:
+        session = stripe.checkout.Session.create(
+            mode="subscription",
+            line_items=[{"price": price_id, "quantity": 1}],
+            # Reuse the existing Stripe customer if this service provider has billed
+            # before (e.g. resubscribing after a cancellation) instead of
+            # creating a duplicate customer record.
+            customer=cp.stripe_customer_id or None,
+            customer_email=None if cp.stripe_customer_id else user.email,
+            # Stage 9.6: the stakeholder being billed -- the organisation's profile
+            # (cp), never the member who happens to click. The webhook has no
+            # session of its own; metadata is how it finds that profile.
+            client_reference_id=cp.user_id,
+            metadata={"service_provider_id": cp.user_id},
+            subscription_data={"metadata": {"service_provider_id": cp.user_id}},
+            success_url=f"{settings.app_url}/service-provider/feed?subscribed=1",
+            cancel_url=f"{settings.app_url}/service-provider/subscribe",
+        )
+    except stripe.error.StripeError:
+        # Stage 9.14: Stripe unreachable or refusing -- nothing was started,
+        # so say so plainly instead of an unhandled 500.
+        logger.exception("stripe checkout session failed for %s", cp.user_id)
+        raise HTTPException(status_code=502, detail="Could not start checkout. Try again.")
     if not session.url:
         raise HTTPException(status_code=502, detail="Could not start checkout. Try again.")
     return {"url": session.url}
@@ -68,9 +74,13 @@ def create_billing_portal_session(user: User = Depends(require_approved_service_
     if not cp.stripe_customer_id:
         raise HTTPException(status_code=400, detail="No billing account yet — subscribe first.")
 
-    session = stripe.billing_portal.Session.create(
-        customer=cp.stripe_customer_id, return_url=f"{settings.app_url}/service-provider/subscribe"
-    )
+    try:
+        session = stripe.billing_portal.Session.create(
+            customer=cp.stripe_customer_id, return_url=f"{settings.app_url}/service-provider/subscribe"
+        )
+    except stripe.error.StripeError:
+        logger.exception("stripe billing portal session failed for %s", cp.user_id)
+        raise HTTPException(status_code=502, detail="Could not open billing. Try again.")
     return {"url": session.url}
 
 

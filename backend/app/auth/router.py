@@ -92,6 +92,7 @@ def signup(payload: SignupRequest, response: Response, db: Session = Depends(get
         password_hash=hash_password(payload.password),
         role=payload.role,
         full_name=payload.full_name,
+        language=payload.language,
     )
     db.add(user)
     db.flush()  # assigns user.id without committing yet

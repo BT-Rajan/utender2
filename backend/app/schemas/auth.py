@@ -12,6 +12,9 @@ class SignupRequest(BaseModel):
     full_name: str
     role: UserRole  # "owner" or "service_provider" — admin accounts are never self-serve
     company_name: str | None = None  # required in practice when role == service provider
+    # Stage 9.14: the interface language the visitor signed up in, so an
+    # Arabic visitor's account (pages, notifications, emails) is Arabic from the start.
+    language: Language = Language.en
 
 
 class LoginRequest(BaseModel):

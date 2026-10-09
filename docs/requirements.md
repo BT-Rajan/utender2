@@ -1595,4 +1595,33 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - **Operator steps** (HTTPS, categories, documents, contact, billing route, email, reminders, backups): `docs/pilot-launch.md`.
   - **Tests:** `tests/test_stage9_13_pilot_readiness.py`.
 
+- **9.14 End-to-end production stress test:**
+  - **Setup:** run against a production-configured stack:
+    - `ENVIRONMENT=production`; fresh MySQL migrated to head with no model drift;
+    - TLS on the API and on the production frontend build;
+    - Secure, HttpOnly cookies across `utender.example.com` / `api.utender.example.com`;
+    - a failing Resend key, Stripe with an unreachable API and a webhook secret, local file storage.
+  - **Journeys run:**
+    - an organisation owner and three providers (company, individual, unsubscribed) go through the full journey;
+    - a sealed tender with a 5-item BOQ, retention, warranty and a Q&A cut-off; amendment; award; agreement with milestones, a returned deliverable and a variation; completion; reviews; reputation; repeat requirement;
+    - mobile (390×844) UI in English and Arabic for registration, login, verification, requirement creation, viewing, offer submission, review, award, transaction and notifications.
+  - **Failure paths A–J exercised:**
+    - **A:** an abandoned draft stays a draft and stays invisible.
+    - **B:** a late offer, withdrawal or participation is refused.
+    - **C:** an amendment flags offers priced on the old version.
+    - **D:** duplicate draft creation, submit, activate, deliverable or variation accept, completion and webhook each have one effect.
+    - **E:** three concurrent submits produce one offer; a revision racing the deadline has one outcome; an award/award/cancel race has exactly one winner.
+    - **F:** id-swapping by a competitor, an unrelated owner or a loser is denied.
+    - **G:** a forbidden or oversize upload half-creates nothing; a request cut off or a lost response never shows false success.
+    - **H:** email fails, the business stands, and failures are recorded and shown.
+    - **I:** Stripe down or a stale or unsigned webhook can't grant or remove access wrongly.
+    - **J:** logout, a forged token, and a colleague deactivated mid-transaction are all handled; records stay intact.
+  - **Gaps found:**
+    - **Checkout with Stripe unreachable** returned an unhandled 500.
+    - **Arabic sign-ups** were created as English accounts, so pages and notifications switched to English straight after registering.
+  - **Fixed:**
+    - Checkout and billing-portal failures are a clean 502 "Could not start checkout / open billing. Try again." in both languages, with nothing started.
+    - Sign-up records the interface language; the frontend sends it.
+  - **Tests:** `tests/test_stage9_14_stress_fixes.py`.
+
 _Later Stage 9 steps are added as they are implemented._

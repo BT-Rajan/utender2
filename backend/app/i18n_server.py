@@ -392,6 +392,8 @@ AR: dict[str, str] = {
     "This project can no longer be closed.": "لم يعد من الممكن إغلاق هذا المشروع.",
     # --- billing, misc ---
     "No billing account yet — subscribe first.": "لا يوجد حساب فوترة بعد — اشترك أولًا.",
+    "Could not start checkout. Try again.": "تعذّر بدء عملية الدفع. حاول مرة أخرى.",
+    "Could not open billing. Try again.": "تعذّر فتح صفحة الفوترة. حاول مرة أخرى.",
     "You already have a subscription. Use Manage billing to update your payment method or plan.": "لديك اشتراك بالفعل. استخدم «إدارة الفوترة» لتحديث وسيلة الدفع أو الخطة.",
     "Your offer was changed somewhere else (another tab, device or team member) since you opened it.": "تم تغيير عرضك في مكان آخر (علامة تبويب أو جهاز أو عضو فريق آخر) منذ فتحته.",
     "Could not start checkout.": "تعذر بدء الدفع.",
