@@ -213,9 +213,21 @@ def test_files_on_questions_and_answers(db):
     assert noor.post(f"/projects/{pid}/clarifications/{qid}/attachments", files=[("files", ("late.pdf", b"%PDF", "application/pdf"))]).status_code == 400
     # A private question's files stay private.
     private = noor.post(f"/projects/{pid}/clarifications", json={"question": "Our pricing approach?", "shared_with_all": False}).json()["id"]
+    # Batch B: a new question is always stored shared, whatever the request says.
+    assert db.get(Clarification, private).shared_with_all is True
+    # Batch B: only a question stored privately before the change stays private;
+    # simulate that legacy row directly in the DB.
+    db.get(Clarification, private).shared_with_all = False
+    db.commit()
     noor.post(f"/projects/{pid}/clarifications/{private}/attachments", files=[("files", ("our-rates.xlsx", b"PK-rates", "application/vnd.ms-excel"))])
+    owner.post(f"/projects/{pid}/clarifications/{private}/attachments", files=[("files", ("reply.pdf", b"%PDF-reply", "application/pdf"))])
     owner.post(f"/projects/{pid}/clarifications/{private}/answer", json={"answer": "Fine."})
-    assert all(c["id"] != private for c in sami.get(f"/projects/{pid}/clarifications").json())
+    # Batch B: once answered it reaches the field, but its wording and the asker's
+    # files stay private -- only the answer and the answer's files are shown.
+    legacy = [c for c in sami.get(f"/projects/{pid}/clarifications").json() if c["id"] == private]
+    assert len(legacy) == 1 and legacy[0]["question"] == "" and legacy[0]["answer"] == "Fine."
+    assert [a["file_name"] for a in legacy[0]["attachments"]] == ["reply.pdf"]
+    assert legacy[0]["service_provider_company_name"] is None and legacy[0]["service_provider_id"] is None
     # Closed Q&A: no more files.
     owner.post(f"/owner/projects/{pid}/cancel", json={"reason": "not_needed"})
     assert owner.post(f"/projects/{pid}/clarifications/{qid}/attachments", files=[("files", ("x.pdf", b"%PDF", "application/pdf"))]).status_code == 400

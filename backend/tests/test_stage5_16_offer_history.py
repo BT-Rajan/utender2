@@ -65,8 +65,8 @@ def test_one_entry_per_offer_with_status_outcome_and_timing(db):
         "withdrawn": ("withdrawn", "open", None, False),
         "awarded": ("approved", "awarded", None, False),
         "lost": ("rejected", "awarded", None, False),
-        "canceled": ("submitted", "canceled", "not_needed", False),
-        "external": ("submitted", "no_award", "closed_externally", False),
+        "canceled": ("closed", "canceled", "not_needed", False),  # Batch B: live offers end "closed"
+        "external": ("closed", "no_award", "closed_externally", False),  # Batch B: live offers end "closed"
         "expired": ("submitted", "closed", None, False),
         "suspended": ("submitted", "open", None, True),
     }, got
