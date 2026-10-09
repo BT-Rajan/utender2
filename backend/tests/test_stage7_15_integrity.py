@@ -18,6 +18,7 @@ from app.models.project import Project
 from app.models.user import User
 from app.services.tender_lifecycle import lock_project
 from tests.conftest import TEST_DATABASE_URL
+from tests.stage7_helpers import put_in_force
 from tests.test_stage3_bid_integrity import needs_mysql
 from tests.test_stage7_10_completion import _a, _do, _relogin, _started, _v
 
@@ -56,29 +57,35 @@ def test_completion_racing_termination_settles_on_one_outcome(db):
         if n:
             db.expire_all()
         owner, a, b, pid, wid, _ = _started(db) if n == 0 else _fresh(db, n)
-        _do(a, pid, "submit")
-        calls = [lambda: _relogin(owner_email(n)).post(f"/projects/{pid}/agreement/completion/accept", json={}),
+        # Batch A: submitted work can't be terminated (the owner accepts or returns it
+        # first), so the race that can still happen is the submission against the termination.
+        calls = [lambda: _relogin(provider_email(n)).post(f"/projects/{pid}/agreement/completion/submit", json={}),
                  lambda: _relogin(owner_email(n)).post(f"/projects/{pid}/agreement/terminate", json={"reason": "Stop."})]
         with ThreadPoolExecutor(2) as pool:
             codes = [f.result().status_code for f in [pool.submit(c) for c in calls]]
         db.expire_all()
         ag = db.query(Agreement).filter(Agreement.project_id == pid).one()
-        # Exactly one ending, whichever request took the lock first: accepted and
-        # completed (the termination refused), or terminated (the acceptance refused).
-        assert ag.status in ("completed", "terminated") and codes.count(200) == 1, (codes, ag.status)
-        assert (ag.status == "completed") == (ag.completed_at is not None) == (ag.completion_status == "accepted")
-        assert (ag.status == "terminated") == (ag.terminated_at is not None)
+        # Exactly one outcome, whichever request took the lock first: submitted for
+        # review (the termination refused), or terminated (the submission refused).
+        assert codes.count(200) == 1, (codes, ag.status, ag.completion_status)
+        assert (ag.status, ag.completion_status) in (("active", "submitted"), ("terminated", None)), (ag.status, ag.completion_status)
+        assert (ag.status == "terminated") == (ag.terminated_at is not None) == (ag.completion_submitted_at is None)
+        assert ag.completed_at is None
         ends = [u.kind for u in db.query(ExecutionUpdate).filter(ExecutionUpdate.agreement_id == ag.id, ExecutionUpdate.kind.in_(("completed", "terminated")))]
-        assert ends == [ag.status]  # the history records the one outcome that happened
+        assert ends == (["terminated"] if ag.status == "terminated" else [])  # the history records only what happened
 
 
 def owner_email(n):
     return "owner@example.com" if n == 0 else f"owner{n}@example.com"
 
 
+def provider_email(n):
+    return "amal@example.com" if n == 0 else f"amal{n}@example.com"
+
+
 def _fresh(db, n):
     from tests.test_stage4_9_participation import _account
-    from tests.test_stage5_13_revise import _d, _submitted, _tender
+    from tests.test_stage5_13_revise import _submitted, _tender
 
     owner = _account(db, "owner", owner_email(n))
     a = _account(db, "service_provider", f"amal{n}@example.com")
@@ -86,8 +93,7 @@ def _fresh(db, n):
     _submitted(a, pid)
     owner.post(f"/owner/projects/{pid}/close")
     owner.post(f"/owner/projects/{pid}/offers/{a.get(f'/projects/{pid}/offers/mine').json()['id']}/approve")
-    owner.patch(f"/projects/{pid}/agreement", json={"effective_date": _d(1)}, headers=_v(owner, pid))
-    owner.post(f"/projects/{pid}/agreement/activate", headers=_v(owner, pid))
+    put_in_force(owner, a, pid)  # Batch A: effective today (Kuwait), provider confirms, owner activates
     a.post(f"/projects/{pid}/agreement/start-work", json={}, headers=_v(a, pid))
     return owner, a, None, pid, None, []
 

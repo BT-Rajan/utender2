@@ -16,6 +16,7 @@ from app.models.award_record import AwardRecord
 from app.models.enums import OfferStatus, ProjectStatus
 from app.models.offer import Offer, OfferDocument
 from app.models.project import Project
+from app.routers.agreements import kuwait_today
 from tests.test_organization_sharing import _organization
 from tests.test_stage4_9_participation import _account, _admin
 from tests.test_stage6_17_end_to_end import DECL, _local, _offer, _tender
@@ -74,7 +75,9 @@ def test_a_maintenance_contract_from_requirement_to_closed_record(db):
     chiller = owner.post(f"/projects/{pid}/agreement/milestones", json={"title": "Chiller overhaul"}, headers=_v(owner, pid)).json()["milestones"][1]["id"]
     owner.post(f"/projects/{pid}/agreement/documents", data={"kind": "signed_agreement"}, files={"file": PDF})
     manara.post(f"/projects/{pid}/agreement/documents", data={"kind": "certificate"}, files={"file": ("insurance.pdf", b"%PDF ins", "application/pdf")})
-    owner.patch(f"/projects/{pid}/agreement", json={"reference": "PO-2026-311", "effective_date": (date.today() + timedelta(days=1)).isoformat()}, headers=_v(owner, pid))
+    # Batch A: effective today in Kuwait (not tomorrow -- work can't start before it), and the provider confirms the terms first.
+    owner.patch(f"/projects/{pid}/agreement", json={"reference": "PO-2026-311", "effective_date": kuwait_today().isoformat()}, headers=_v(owner, pid))
+    assert technician.post(f"/projects/{pid}/agreement/confirm", headers=_v(technician, pid)).status_code == 200
     assert owner.post(f"/projects/{pid}/agreement/activate", headers=_v(owner, pid)).json()["status"] == "active"
 
     # --- Execution: start, progress with evidence, deliver / correct / accept, a change. ---
@@ -108,7 +111,7 @@ def test_a_maintenance_contract_from_requirement_to_closed_record(db):
             "18000.000", "2400.000", "20400.000", "KWD", "not_managed")
         assert [m["status"] for m in seen["milestones"]] == ["accepted"] * 3
         kinds = [e["kind"] for e in seen["timeline"]]
-        for earlier, later in (("awarded", "in_force"), ("in_force", "started"), ("returned", "change_proposed"), ("change_agreed", "completed")):
+        for earlier, later in (("awarded", "terms_confirmed"), ("terms_confirmed", "in_force"), ("in_force", "started"), ("returned", "change_proposed"), ("change_agreed", "completed")):
             assert kinds.index(earlier) < kinds.index(later), (earlier, later, kinds)
         assert kinds.count("completed") == 1 and kinds[-1] == "completed" and seen["timeline"][0]["amount"] == "18000.000"
         for d in seen["documents"]:

@@ -30,7 +30,7 @@ def test_reputation_follows_completed_work_and_owner_reviews_only(db):
     mine = lambda: amal.get("/service-provider/reputation").json()  # noqa: E731
 
     # 1. Zero history: "none yet", not a 0 rating.
-    assert mine() == {"company_name": "Amal Contracting", "completed_transactions": 0, "review_count": 0, "avg_rating": None, "recent_reviews": [], "completed_with_you": None}
+    assert mine() == {"company_name": "Amal Contracting", "completed_transactions": 0, "terminated_transactions": 0, "review_count": 0, "avg_rating": None, "recent_reviews": [], "completed_with_you": None}
 
     # 2-4. First transaction: awarded is not completed; completed counts; a 4/5 owner review.
     p1 = _tender(owner, title="Tower maintenance")
