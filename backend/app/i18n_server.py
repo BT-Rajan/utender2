@@ -421,6 +421,12 @@ AR: dict[str, str] = {
     "A proposed change is still awaiting an answer.": "لا يزال تعديل مقترح بانتظار الرد.",
     "Settle it first.": "يجب البت فيه أولًا.",
     "The work can be recorded as started from that date.": "يمكن تسجيل بدء العمل اعتبارًا من ذلك التاريخ.",
+    # Batch C: trust and accounts.
+    "Providers can be invited only while the requirement is open for offers.": "لا يمكن دعوة مقدمي الخدمة إلا أثناء فتح الطلب لتلقي العروض.",
+    "This provider doesn't meet this requirement's conditions, so it can't be invited.": "مقدم الخدمة هذا لا يستوفي شروط هذا الطلب، لذا لا يمكن دعوته.",
+    "This provider has already made an offer on this requirement.": "قدّم مقدم الخدمة هذا عرضًا على هذا الطلب بالفعل.",
+    "You are already the organization's representative.": "أنت ممثل المؤسسة بالفعل.",
+    "You can invite a provider you have completed work with.": "يمكنك دعوة مقدم خدمة أنجزت معه عملًا.",
     # Batch B: tender fairness.
     "Confirmation can be asked for only while offers are being evaluated.": "لا يمكن طلب التأكيد إلا أثناء تقييم العروض.",
     "Price every item above zero. If an item's cost is included in another item, give it the smallest price (0.001 KWD) and say so in your assumptions.": "سعّر كل بند بأكثر من صفر. إذا كانت تكلفة بند مشمولة في بند آخر، فأعطه أصغر سعر (0.001 د.ك) واذكر ذلك في افتراضاتك.",

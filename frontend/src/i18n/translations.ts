@@ -78,6 +78,9 @@ export interface Dictionary {
     pOther: string;
   };
   organization: {
+    handOver: string;
+    handOverConfirm: string;
+    handOverBody: string;
     heading: string;
     hint: string;
     representative: string;
@@ -262,6 +265,7 @@ export interface Dictionary {
     error: string;
   };
   review: {
+    sealed: string;
     confirmTitle: string;
     confirmBody: string;
     receivedHeading: string;
@@ -291,6 +295,11 @@ export interface Dictionary {
     noteOwner: string;
   };
   previous: {
+    inviteHeading: string;
+    invite: string;
+    invited: string;
+    inviteNote: string;
+    inviteError: string;
     heading: string;
     together: string;
     last: string;
@@ -1800,6 +1809,9 @@ export const en: Dictionary = {
     pOther: "Other conditions",
   },
   organization: {
+    handOver: "Make representative",
+    handOverConfirm: "Hand over the representative role?",
+    handOverBody: "They will manage members and receive the organization's account notices as its representative. You stay on as a member.",
     heading: "Organization members",
     hint: "Everyone here acts for the organization and shares everything done for it: its verification, requirements, offers and questions.",
     representative: "Authorized representative",
@@ -1996,6 +2008,7 @@ export const en: Dictionary = {
     error: "The review couldn't be submitted.",
   },
   review: {
+    sealed: "Hidden from the other party until they review too, or until {date}. Reviews are revealed together, so neither is written in answer to the other.",
     confirmTitle: "Submit this review?",
     confirmBody: "Your rating and comment are recorded against this completed transaction and count towards the service provider's rating, which owners see when weighing its offers. A review can't be changed afterwards.",
     receivedHeading: "{party}'s review of you",
@@ -2025,6 +2038,11 @@ export const en: Dictionary = {
     noteOwner: "From the owner's completed U-Tender transactions and the reviews its providers left. For information only.",
   },
   previous: {
+    inviteHeading: "Invite a provider you have worked with",
+    invite: "Invite",
+    invited: "Invited",
+    inviteNote: "They are told about this requirement. Its conditions apply as for anyone, and their offer is weighed like every other.",
+    inviteError: "Could not send the invitation.",
     heading: "Providers you've completed work with",
     together: "Completed work together: {n}",
     last: "last",
@@ -3623,6 +3641,9 @@ export const ar: Dictionary = {
     pOther: "شروط أخرى",
   },
   organization: {
+    handOver: "تعيينه ممثلًا",
+    handOverConfirm: "تسليم دور الممثل؟",
+    handOverBody: "سيدير الأعضاء ويتلقى إشعارات حساب المؤسسة بصفته ممثلها. وتبقى أنت عضوًا.",
     heading: "أعضاء الجهة",
     hint: "كل من هنا يعمل باسم الجهة ويشارك كل ما يتم باسمها: توثيقها وطلباتها وعروضها وأسئلتها.",
     representative: "الممثل المفوض",
@@ -3819,6 +3840,7 @@ export const ar: Dictionary = {
     error: "تعذر إرسال التقييم.",
   },
   review: {
+    sealed: "مخفي عن الطرف الآخر حتى يقيّم هو أيضًا، أو حتى {date}. تُكشف التقييمات معًا، فلا يُكتب أحدها ردًا على الآخر.",
     confirmTitle: "إرسال هذا التقييم؟",
     confirmBody: "يُسجَّل تقييمك وتعليقك على هذه المعاملة المكتملة ويُحتسب ضمن تقييم مقدم الخدمة الذي يراه الملاك عند دراسة عروضه. لا يمكن تغيير التقييم بعد ذلك.",
     receivedHeading: "تقييم {party} لك",
@@ -3848,6 +3870,11 @@ export const ar: Dictionary = {
     noteOwner: "من معاملات المالك المكتملة على U-Tender والتقييمات التي تركها مقدمو الخدمة. للعلم فقط.",
   },
   previous: {
+    inviteHeading: "ادعُ مقدم خدمة عملت معه",
+    invite: "دعوة",
+    invited: "تمت الدعوة",
+    inviteNote: "سيتم إبلاغه بهذا الطلب. تسري شروطه كما على أي مقدم خدمة، ويُقيَّم عرضه كأي عرض آخر.",
+    inviteError: "تعذّر إرسال الدعوة.",
     heading: "مقدمو خدمة أنجزت معهم أعمالًا",
     together: "أعمال مكتملة معًا: {n}",
     last: "آخرها",

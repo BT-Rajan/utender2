@@ -64,8 +64,8 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.ar: ("{state_ar}: {project_title}", "{state_ar} العمل المُرسى في {project_title}."),
     },
     NotificationType.milestone_updated: {
-        Language.en: ("Deliverable {state} on {project_title}", "A deliverable of the work awarded on {project_title} was {state}."),
-        Language.ar: ("{state_ar}: {project_title}", "{state_ar} أحد مخرجات العمل المُرسى في {project_title}."),
+        Language.en: ("Deliverable {state} on {project_title}", "The deliverable \"{deliverable}\" of the work awarded on {project_title} was {state}."),
+        Language.ar: ("{state_ar}: {project_title}", "{state_ar} المُخرَج «{deliverable}» من العمل المُرسى في {project_title}."),
     },
     NotificationType.variation_updated: {
         Language.en: ("Change {state} on {project_title}", "A change to the work awarded on {project_title} was {state}."),
@@ -95,6 +95,10 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
     NotificationType.offer_confirmation_requested: {
         Language.en: ("Confirm your offer on {project_title}", "The owner asks you to confirm your offer on {project_title} still stands, price and terms unchanged, so it can be considered for award. Confirm it, or withdraw it."),
         Language.ar: ("أكّد عرضك على {project_title}", "يطلب منك المالك تأكيد أن عرضك على {project_title} ما زال قائمًا بسعره وشروطه دون تغيير، لكي يُنظر فيه للترسية. أكّده أو اسحبه."),
+    },
+    NotificationType.requirement_invitation: {
+        Language.en: ("Invitation: {project_title}", "An owner you completed work for invites you to make an offer on {project_title}, open until {deadline}. The usual rules apply: it is weighed like every other offer."),
+        Language.ar: ("دعوة: {project_title}", "يدعوك مالك سبق أن أنجزت له عملًا لتقديم عرض على {project_title}، والعروض مفتوحة حتى {deadline}. تسري القواعد المعتادة: يُقيَّم كأي عرض آخر."),
     },
     NotificationType.evaluation_started: {
         Language.en: ("{project_title} is being evaluated", "The owner has started evaluating the offers on {project_title}. You'll be told the outcome."),
@@ -221,12 +225,13 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
 
 
 # Dedup policy (spec §2.10 "deduplicated"): if the recipient already has an
-# UNREAD notification of the same type pointing at the same link, a new
-# trigger of the same underlying event (e.g. a service provider revising their
-# bid five times before the owner ever opens their inbox) doesn't pile up
-# a fresh row each time — the existing one already says "you have
-# something to check here." A new one is created only once that one has
-# been read, or there was none to begin with.
+# UNREAD notification of the same type pointing at the same link that says
+# the same thing, a repeat of the same event (e.g. a service provider revising
+# their bid five times before the owner ever opens their inbox) doesn't pile
+# up a fresh row each time -- the existing one is brought to the top.
+# Batch B/C: a notice that says something different is its own row, never
+# written over an unread one -- "deliverable A returned for correction" must
+# not be replaced by "deliverable B accepted" before anyone reads it.
 def notify(db: Session, user: User, notification_type: NotificationType, link: str | None = None, **kwargs) -> Notification | None:
     template = _TEMPLATES.get(notification_type)
     if not template or user.deactivated_at is not None:  # Stage 9.2/9.5: a deactivated account is told nothing
@@ -259,14 +264,12 @@ def _write(db: Session, user: User, notification_type: NotificationType, link: s
             Notification.type == notification_type,
             Notification.link == link,
             Notification.is_read.is_(False),
+            Notification.title == title,
+            Notification.body == body,
         )
         .first()
     )
     if existing:
-        # Still one unread notice for this place -- but it says what the
-        # latest event says (e.g. a scope change after a title fix), never a
-        # stale earlier message.
-        existing.title, existing.body = title, body
         existing.created_at = datetime.utcnow()
         db.commit()
         return existing

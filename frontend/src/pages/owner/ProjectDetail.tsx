@@ -25,6 +25,7 @@ import { ReceivedReview, ReviewResponse } from "@/components/ReceivedReview";
 import { TrackRecord } from "@/components/TrackRecord";
 import { ClosureOutcome, EndRequirement, StartAgain, outcomeLabel } from "@/components/ClosureOutcome";
 import { AmendPublishedForm, AmendmentsList, PauseControl } from "@/components/PostPublication";
+import { InvitePreviousProviders } from "@/components/PreviousProviders";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
 import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
 
@@ -41,6 +42,8 @@ interface Review {
   response?: string | null;  // Stage 8.9: the provider's response, if any
   response_at?: string | null;
   hidden?: boolean;  // Stage 8.15: an admin hid this review
+  revealed?: boolean;  // Batch C: sealed from the other side until both reviewed, or reveals_on
+  reveals_on?: string | null;
 }
 
 // Stage 7.1: the award handover -- read from the permanent award record, the
@@ -599,6 +602,7 @@ export function OwnerProjectDetailPage() {
       {/* Stage 3.15: controlling the published requirement. */}
       {project.status === "open" && <PauseControl project={project} />}
       {project.status === "open" && <AmendPublishedForm project={project} />}
+      {project.status === "open" && !project.paused_at && <InvitePreviousProviders projectId={project.id} />}
       {/* Stage 7.1: the award, as recorded -- who, which offer, what value, when, on which version. */}
       {project.status === "awarded" && <AwardSummary projectId={project.id} currency={project.currency} />}
       {project.status === "awarded" && <AgreementPanel projectId={project.id} />}
@@ -1055,6 +1059,11 @@ export function OwnerProjectDetailPage() {
                 {t("owner.projectDetail.submittedOn")} {new Date(existingReview.created_at).toLocaleDateString()}
               </p>
               {existingReview.hidden && <p className="text-xs text-amber-dark mt-1">{t("report.hiddenNote")}</p>}
+              {existingReview.revealed === false && (
+                <p className="text-xs text-steel mt-1" data-testid="review-sealed">
+                  {t("review.sealed").replace("{date}", existingReview.reveals_on ? fullDate(existingReview.reveals_on, language, false) : "")}
+                </p>
+              )}
               <ReviewResponse response={existingReview.response} at={existingReview.response_at} label={t("review.theirResponse")} reportBase={`/owner/projects/${project.id}`} />
             </div>
           ) : (

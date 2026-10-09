@@ -270,7 +270,8 @@ def _decide_document(db: Session, admin: User, profile, requirement_id: str, dec
         kind = NotificationType.owner_document_approved if is_owner else NotificationType.document_approved
     else:
         kind = NotificationType.owner_document_rejected if is_owner else NotificationType.document_rejected
-    notify(db, profile.user, kind, link=link, requirement_name=req.name, note=note or "")
+    # Batch C: everyone who acts for the stakeholder is told, not only the account that set it up.
+    notify_team(db, profile.user, kind, link=link, organization_id=profile.organization_id, requirement_name=req.name, note=note or "")
     db.refresh(doc)
     return doc, req
 
@@ -306,10 +307,10 @@ def _decide_application(db: Session, admin: User, profile, status: VerificationS
     )
     if status == VerificationStatus.approved:
         kind = NotificationType.owner_verification_activated if is_owner else NotificationType.verification_activated
-        notify(db, profile.user, kind, link="/owner/dashboard" if is_owner else "/service-provider/dashboard")
+        notify_team(db, profile.user, kind, link="/owner/dashboard" if is_owner else "/service-provider/dashboard", organization_id=profile.organization_id)
     else:
         kind = NotificationType.verification_changes_requested if status == VerificationStatus.changes_requested else NotificationType.verification_rejected
-        notify(db, profile.user, kind, link=link, note=note or "")
+        notify_team(db, profile.user, kind, link=link, organization_id=profile.organization_id, note=note or "")
     db.refresh(profile)
 
 
@@ -635,7 +636,7 @@ def grant_payment_override(
 
     user = db.get(User, service_provider_id)
     if user:
-        notify(db, user, NotificationType.payment_override_granted, link="/service-provider/dashboard")
+        notify_team(db, user, NotificationType.payment_override_granted, link="/service-provider/dashboard", organization_id=cp.organization_id)
     return ServiceProviderProfileOut(**_profile_fields(cp), email=user.email if user else None)
 
 
@@ -679,7 +680,7 @@ def revoke_payment_override(
 
     user = db.get(User, service_provider_id)
     if user:
-        notify(db, user, NotificationType.payment_override_revoked, link="/service-provider/dashboard")
+        notify_team(db, user, NotificationType.payment_override_revoked, link="/service-provider/dashboard", organization_id=cp.organization_id)
     return ServiceProviderProfileOut(**_profile_fields(cp), email=user.email if user else None)
 
 

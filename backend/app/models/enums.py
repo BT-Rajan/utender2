@@ -169,3 +169,4 @@ class NotificationType(str, enum.Enum):
     agreement_terminated = "agreement_terminated"
     offer_confirmation_requested = "offer_confirmation_requested"  # Batch B: the owner asks a provider to confirm its offer still stands
     evaluation_started = "evaluation_started"  # Batch B: bidders are told their offers are being evaluated
+    requirement_invitation = "requirement_invitation"  # Batch C: an owner invites a provider it completed work with

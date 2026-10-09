@@ -160,7 +160,7 @@ export function OwnerDashboardPage() {
         </div>
       )}
 
-      {!isError && projects?.length && !filtered.length && (
+      {!isError && !!projects?.length && !filtered.length && (
         <div className="border border-dashed border-border rounded p-10 text-center text-sm text-steel">
           {filtersActive ? t("owner.dashboard.noMatch") : t("owner.dashboard.nothingHere")}
         </div>

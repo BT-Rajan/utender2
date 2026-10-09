@@ -16,16 +16,20 @@ from app.models.review import Review
 from app.models.service_provider import ServiceProviderProfile
 from app.models.project import Project
 from app.schemas.review import OwnerReputationOut, ProviderReputationOut
-from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER
+from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, one_per_reviewer, revealed
 
 RECENT_REVIEWS = 5
 
 
 def _reviews(db: Session, party_filter, direction: str, recent: bool):
-    """(count, simple average or None, latest reviews) of one party's reviews in one direction."""
-    where = (party_filter, Review.direction == direction, Review.hidden_at.is_(None))  # Stage 8.15: hidden reviews don't count
-    count, average = db.query(func.count(Review.id), func.avg(Review.rating)).filter(*where).one()
-    latest = db.query(Review).filter(*where).order_by(Review.created_at.desc(), Review.id).limit(RECENT_REVIEWS).all() if recent and count else []
+    """(count, simple average or None, latest reviews) of one party's reviews in one direction.
+    Stage 8.15: hidden reviews don't count. Batch C: nor sealed ones (not yet
+    revealed), and only the latest from each counterparty counts."""
+    shown = db.query(Review).filter(party_filter, Review.direction == direction, Review.hidden_at.is_(None), revealed()).all()
+    counted = one_per_reviewer(shown, (lambda r: r.owner_id) if direction == OWNER_TO_PROVIDER else (lambda r: r.service_provider_id))
+    count = len(counted)
+    average = sum(r.rating for r in counted) / count if count else None
+    latest = counted[:RECENT_REVIEWS] if recent else []
     return count, round(float(average), 1) if count else None, latest  # no reviews is "none yet", never 0 stars
 
 
@@ -109,8 +113,8 @@ def previous_providers(db: Session, owner_id: str) -> list[dict]:
     for provider_id, name, project_id, title, completed_at in rows:
         entry = providers.setdefault(provider_id, {"company_name": name, "transactions": []})
         entry["transactions"].append({"project_id": project_id, "title": title, "completed_at": completed_at})
-    return [{"company_name": e["company_name"], "completed_transactions": len(e["transactions"]),
-             "last_completed_at": e["transactions"][0]["completed_at"], "transactions": e["transactions"]} for e in providers.values()]
+    return [{"service_provider_id": pid, "company_name": e["company_name"], "completed_transactions": len(e["transactions"]),
+             "last_completed_at": e["transactions"][0]["completed_at"], "transactions": e["transactions"]} for pid, e in providers.items()]
 
 
 def previous_owners(db: Session, service_provider_id: str) -> list[dict]:

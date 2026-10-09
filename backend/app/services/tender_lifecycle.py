@@ -204,7 +204,8 @@ def interested_providers(db: Session, project: Project) -> list:
     bidders: set[str] = set()
     for provider_id, organization_id in db.query(Offer.service_provider_id, Offer.organization_id).filter(Offer.project_id == project.id, tendered()).distinct():
         bidders.update(u.id for u in side_users(db, organization_id, provider_id))
-    told = {n.user_id for n in db.query(Notification.user_id).filter(Notification.type == NotificationType.new_requirement, Notification.link == link)}
+    told = {n.user_id for n in db.query(Notification.user_id).filter(
+        Notification.type.in_((NotificationType.new_requirement, NotificationType.requirement_invitation)), Notification.link == link)}  # Batch C: invited too
     for provider_id, organization_id in db.query(Clarification.service_provider_id, Clarification.organization_id).filter(Clarification.project_id == project.id).distinct():
         told.update(u.id for u in side_users(db, organization_id, provider_id))
     for provider_id, organization_id in db.query(Offer.service_provider_id, Offer.organization_id).filter(Offer.project_id == project.id, Offer.status == OfferStatus.draft).distinct():

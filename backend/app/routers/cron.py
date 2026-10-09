@@ -50,5 +50,8 @@ def deadline_reminders(authorization: str | None = Header(default=None), db: Ses
         p.deadline_reminder_sent = True
         sent += 1
     db.commit()
+    # Batch C: reviews whose sealed period has passed are revealed.
+    from app.services.reviews import reveal_due
 
-    return {"checked": len(projects), "sent": sent}
+    revealed = reveal_due(db)
+    return {"checked": len(projects), "sent": sent, "reviews_revealed": revealed}

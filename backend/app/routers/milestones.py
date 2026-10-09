@@ -78,19 +78,19 @@ def _bump(m: Milestone) -> None:
     m.updated_at = datetime.utcnow().replace(microsecond=0)
 
 
-def _tell(db: Session, project, winner, to: str, state: str, state_ar: str) -> None:
+def _tell(db: Session, project, winner, to: str, state: str, state_ar: str, deliverable: str = "") -> None:
     def send():
         if to == "provider":
             notify_service.notify_team(
                 db, db.get(User, winner.service_provider_id), NotificationType.milestone_updated,
                 link=f"/service-provider/projects/{project.id}/offer", organization_id=winner.organization_id,
-                project_title=project.title, state=state, state_ar=state_ar,
+                project_title=project.title, state=state, state_ar=state_ar, deliverable=deliverable,
             )
         else:
             notify_service.notify_team(
                 db, db.get(User, project.owner_id), NotificationType.milestone_updated,
                 link=f"/owner/projects/{project.id}", organization_id=project.organization_id,
-                project_title=project.title, state=state, state_ar=state_ar,
+                project_title=project.title, state=state, state_ar=state_ar, deliverable=deliverable,
             )
 
     _best_effort(db, send, f"deliverable notifications for {project.id}")
@@ -197,7 +197,7 @@ def deliver_milestone(
     _touch(agreement, user)
     audit.log_action(db, actor_id=user.id, action="milestone.deliver", target_type="agreement", target_id=agreement.id,
                      new_value=f"{m.id}:delivered", reason=m.delivery_note)
-    _tell(db, project, winner, "owner", "delivered", "تم تسليم")
+    _tell(db, project, winner, "owner", "delivered", "تم تسليم", m.title)
     db.refresh(agreement)
     return _out(db, project, agreement, award, winner, side)
 
@@ -225,7 +225,7 @@ def _decide(db: Session, project_id: str, milestone_id: str, user: User, note: s
     _touch(agreement, user)
     audit.log_action(db, actor_id=user.id, action=f"milestone.{'accept' if accept else 'return'}", target_type="agreement",
                      target_id=agreement.id, previous_value=f"{m.id}:delivered", new_value=f"{m.id}:{kind}", reason=note)
-    _tell(db, project, winner, "provider", "accepted" if accept else "returned for correction", "تم قبول" if accept else "تمت إعادة")
+    _tell(db, project, winner, "provider", "accepted" if accept else "returned for correction", "تم قبول" if accept else "تمت إعادة", m.title)
     db.refresh(agreement)
     return _out(db, project, agreement, award, winner, side)
 

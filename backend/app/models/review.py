@@ -1,10 +1,14 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
 from app.models.common import gen_uuid
+
+
+# Batch C: how long a review stays sealed when the other side hasn't reviewed.
+REVEAL_AFTER = timedelta(days=14)
 
 
 class Review(Base):
@@ -35,6 +39,9 @@ class Review(Base):
     rating: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # Batch C: reviews are double-blind -- neither side sees the other's until
+    # both have reviewed, or REVEAL_AFTER has passed since this one was written.
+    revealed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Stage 8.9: the reviewed side's one, final response -- beside the review,
     # never changing it (rating, comment and parties stay as written).
     response: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -45,6 +52,16 @@ class Review(Base):
     # counted, and a hidden response stops being shown. The audit log says who.
     hidden_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     response_hidden_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    @property
+    def is_revealed_now(self) -> bool:
+        """Batch C: visible to the other side (both reviewed, or the sealed period passed)."""
+        return self.revealed_at is not None or (self.created_at is not None and self.created_at <= datetime.utcnow() - REVEAL_AFTER)
+
+    @property
+    def reveals_on(self) -> datetime | None:
+        """Batch C: when a still-sealed review is revealed at the latest."""
+        return None if self.revealed_at is not None or self.created_at is None else self.created_at + REVEAL_AFTER
 
     @property
     def is_hidden(self) -> bool:

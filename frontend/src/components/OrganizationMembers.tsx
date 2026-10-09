@@ -64,6 +64,12 @@ export function OrganizationMembers() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["organization-invitations"] }),
     onError: fail,
   });
+  // Batch C: the representative hands the role to another member.
+  const handOver = useMutation({
+    mutationFn: (id: string) => apiFetch<Member[]>(`/account/organization/representative/${id}`, { method: "POST" }),
+    onSuccess: done,
+    onError: fail,
+  });
   const remove = useMutation({
     mutationFn: (id: string) => apiFetch<Member[]>(`/account/organization/members/${id}`, { method: "DELETE" }),
     onSuccess: done,
@@ -87,6 +93,20 @@ export function OrganizationMembers() {
                 {m.position && ` · ${m.position}`} · {t(m.role === "admin" ? "organization.representative" : "organization.member")}
               </span>
             </span>
+            {isRepresentative && m.role !== "admin" && (
+              <button
+                type="button"
+                onClick={() => {
+                  void confirm({ title: t("organization.handOverConfirm"), body: t("organization.handOverBody"), confirmLabel: t("organization.handOver") }).then(
+                    (ok) => ok && handOver.mutate(m.user_id),
+                  );
+                }}
+                className="text-xs text-blue underline"
+                data-testid="hand-over"
+              >
+                {t("organization.handOver")}
+              </button>
+            )}
             {isRepresentative && m.role !== "admin" && (
               <button
                 type="button"

@@ -1676,4 +1676,22 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - Migration 0066.
   - **Tests:** `tests/test_batch_b_tender_fairness.py`.
 
+- **Batch C — trust, notifications and accounts (post-9.15 business-logic review):**
+  - **Notices:** an unread notice is merged only with an identical one. A notice that says something different is its own notice: "deliverable A returned for correction" is never replaced by "deliverable B accepted". Deliverable notices name the deliverable.
+  - **Double-blind reviews:**
+    - a review is sealed from the other side (`revealed`, `reveals_on`) until both sides have reviewed, or 14 days after it was written;
+    - sealed reviews don't count in ratings;
+    - the hourly cron reveals due reviews and recounts ratings (`reviews.revealed_at`).
+  - **Ratings can't be farmed:** only the latest review from each counterparty counts in a provider's or owner's rating and review count. (Batch A already means a transaction can't be completed without an agreement in force and the provider's confirmation.)
+  - **Organisations:**
+    - document and verification decisions and payment overrides reach every member, not only the account that set the organisation up;
+    - the representative can hand the role to another member (`POST /account/organization/representative/{member}`) and stays on as a member.
+  - **Start similar:** the old expected start and completion dates are no longer copied; only the duration carries over.
+  - **Repeat business:**
+    - on an open requirement the owner can invite a provider it completed work with (`POST /owner/projects/{id}/invitations/{provider}`, notification `requirement_invitation`);
+    - eligibility rules apply as for anyone, and the offer is weighed like the rest.
+  - **Owner dashboard:** no stray "0" when there are no requirements.
+  - Migration 0067.
+  - **Tests:** `tests/test_batch_c_trust_accounts.py`.
+
 _Later Stage 9 steps are added as they are implemented._

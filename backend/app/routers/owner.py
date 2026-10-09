@@ -50,7 +50,7 @@ from app.services.verification import (
 )
 from app.services.storage import get_storage
 from app.services.tender_rules import answers_since, offer_valid_until, validity_lapsed
-from app.services.tender_lifecycle import interested_providers, is_sealed_and_open, lock_project, publish, sync_expired_projects, transaction_status
+from app.services.tender_lifecycle import bidding_is_open, interested_providers, is_sealed_and_open, lock_project, publish, sync_expired_projects, transaction_status
 
 logger = logging.getLogger(__name__)
 
@@ -343,6 +343,37 @@ def previous_providers_of_mine(user: User = Depends(require_owner), db: Session 
     from app.services.reputation import previous_providers
 
     return previous_providers(db, get_owner_profile(user, db).user_id)
+
+
+@router.post("/projects/{project_id}/invitations/{service_provider_id}", status_code=204)
+def invite_previous_provider(project_id: str, service_provider_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Batch C: repeat business -- the owner side invites a provider it has
+    completed U-Tender work with to make an offer on an open requirement.
+    An invitation is a notice only: the requirement's eligibility rules and
+    every other rule apply as for any provider, and the offer is weighed like
+    the rest."""
+    from app.services.eligibility import ineligibility_reasons
+    from app.services.reputation import previous_providers
+
+    project = _get_owned_project(project_id, user, db, lock=True)
+    if not bidding_is_open(project):
+        raise HTTPException(status_code=400, detail="Providers can be invited only while the requirement is open for offers.")
+    if service_provider_id not in {p["service_provider_id"] for p in previous_providers(db, project.owner_id)}:
+        raise HTTPException(status_code=404, detail="You can invite a provider you have completed work with.")
+    profile = db.get(ServiceProviderProfile, service_provider_id)
+    provider_user = db.get(User, service_provider_id)
+    if not profile or not provider_user or not profile.is_verified_active or provider_user.deactivated_at is not None or ineligibility_reasons(db, project, profile):
+        raise HTTPException(status_code=400, detail="This provider doesn't meet this requirement's conditions, so it can't be invited.")
+    if db.query(Offer.id).filter(Offer.project_id == project_id, Offer.service_provider_id == service_provider_id, tendered()).first():
+        raise HTTPException(status_code=409, detail="This provider has already made an offer on this requirement.")
+    log_action(db, actor_id=user.id, action="project.invite_provider", target_type="project", target_id=project_id, new_value=service_provider_id)
+
+    def tell():
+        notify_team(db, provider_user, NotificationType.requirement_invitation, link=f"/service-provider/projects/{project_id}/offer",
+                    organization_id=profile.organization_id, project_title=project.title,
+                    deadline=project.bid_deadline.strftime("%d %b %Y %H:%M UTC"))
+
+    _best_effort(db, tell, f"invitation to {service_provider_id} for {project_id}")
 
 
 @router.get("/projects/{project_id}/offers/{offer_id}/clarifications", response_model=list[OfferClarificationOut])
@@ -1005,8 +1036,10 @@ def cancel_project(project_id: str, payload: ClosureRequest | None = None, user:
 
 # Content that carries over when an ended requirement is started again.
 _RESTART_FIELDS = (
-    "title", "address", "governorate", "area", "description", "trade", "category_id", "expected_start_date",
-    "expected_completion_date", "expected_duration_days", "tender_type", "pricing_basis", "response_requirements",
+    "title", "address", "governorate", "area", "description", "trade", "category_id",
+    # Batch C: never the old expected start/completion dates -- they belong to
+    # the earlier timetable; only how long the work takes carries over.
+    "expected_duration_days", "tender_type", "pricing_basis", "response_requirements",
     "provider_eligibility", "questions_allowed", "commercial_terms", "documents_required", "commercial_conditions",
     "bidder_instructions",
 )
