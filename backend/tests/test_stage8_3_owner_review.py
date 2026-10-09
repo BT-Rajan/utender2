@@ -4,6 +4,7 @@ about the actual winner, with a whole-number 1-5 rating and an optional
 comment. The review, the provider's recomputed public rating and the audit
 entry are one transaction."""
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -50,6 +51,16 @@ def test_a_completed_transaction_is_reviewed_once_about_the_actual_winner(db):
         pid, award.service_provider_id, 4, "Clean, on time, good documentation.")
     assert review["created_at"].endswith("Z")
     assert owner.get(f"/owner/projects/{pid}/review").json()["id"] == review["id"]
+    # Batch C: the review is sealed until both sides have reviewed or 14 days pass --
+    # it doesn't count in the provider's public rating yet.
+    assert review["revealed"] is False and review["reveals_on"] is not None
+    profile = provider.get("/service-provider/profile").json()
+    assert (float(profile["avg_rating"]), profile["review_count"]) == (0.0, 0)
+    # Batch C: once the sealed period has passed, the review counts.
+    stored = db.query(Review).one()
+    stored.created_at = stored.created_at - timedelta(days=15)
+    db.commit()
+    reviews_service.reveal_due(db)
     profile = provider.get("/service-provider/profile").json()
     assert (float(profile["avg_rating"]), profile["review_count"]) == (4.0, 1)
     (entry,) = db.query(AuditLog).filter(AuditLog.action == "review.owner_to_provider").all()

@@ -43,6 +43,9 @@ def test_owner_reputation_follows_completed_work_and_provider_reviews_only(db):
     _award(noura, y, p2)
     complete_transaction(noura, y, p2)
     assert y.post("/service-provider/reviews", json={"project_id": p2, "rating": 5, "comment": "Paid promptly."}).status_code == 200
+    # Batch C: Y's review is sealed until the owner side reviews back (or 14 days pass).
+    assert (mine()["review_count"], mine()["avg_rating"]) == (1, 4.0)
+    assert noura.post("/owner/reviews", json={"project_id": p2, "rating": 5}).status_code == 200  # Batch C: reveals both
     r = mine()
     assert (r["completed_transactions"], r["review_count"], r["avg_rating"]) == (2, 2, 4.5)
     assert sorted(x["rating"] for x in r["recent_reviews"]) == [4, 5]

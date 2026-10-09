@@ -3,6 +3,8 @@ own review; a report changes nothing by itself. An admin keeps or hides what
 was reported: the row and the audit remain, a hidden review stops being shown
 or counted (stored and live ratings alike), a hidden response stops being
 shown. Nobody else can report, read reports or moderate."""
+from datetime import timedelta
+
 from fastapi.testclient import TestClient
 
 from app.auth.security import hash_password
@@ -12,6 +14,7 @@ from app.models.enums import UserRole
 from app.models.review import Review, ReviewReport
 from app.models.service_provider import ServiceProviderProfile
 from app.models.user import User
+from app.services.reviews import reveal_due
 from tests.stage7_helpers import complete_transaction
 from tests.test_stage4_9_participation import _account
 from tests.test_stage5_13_revise import _submitted, _tender
@@ -28,6 +31,14 @@ def _admin(db):
     return c
 
 
+def _past_sealed_period(db, pid):
+    """Batch C: back-date a project's reviews past the 14-day sealed period and reveal them."""
+    for review in db.query(Review).filter(Review.project_id == pid).all():
+        review.created_at = review.created_at - timedelta(days=15)
+    db.commit()
+    reveal_due(db)
+
+
 def test_reports_change_nothing_until_an_admin_decides(db):
     a = _account(db, "owner", "a@example.com")
     x = _account(db, "service_provider", "x@example.com", organization="X Co")
@@ -41,6 +52,10 @@ def test_reports_change_nothing_until_an_admin_decides(db):
 
     # 1-4. A's legitimate 2/5 review; X responds, then reports it. Nothing changes.
     assert a.post("/owner/reviews", json={"project_id": p1, "rating": 2, "comment": "Late and untidy."}).status_code == 200
+    # Batch C: while sealed, X can neither respond to nor report the review.
+    assert x.post(f"/service-provider/projects/{p1}/review/received/response", json={"response": ABUSE}).status_code == 404
+    assert x.post(f"/service-provider/projects/{p1}/review-reports", json={"target": "review", "reason": "other"}).status_code == 404
+    _past_sealed_period(db, p1)  # Batch C: X doesn't review back here, so the 14 days reveal it
     assert x.post(f"/service-provider/projects/{p1}/review/received/response", json={"response": ABUSE}).status_code == 200
     r = x.post(f"/service-provider/projects/{p1}/review-reports", json={"target": "review", "reason": "other", "note": "We disagree."})
     assert r.status_code == 201 and r.json()["status"] == "open"
@@ -84,10 +99,14 @@ def test_reports_change_nothing_until_an_admin_decides(db):
     assert db.query(Review).filter(Review.project_id == p1).one().response == ABUSE  # kept on record
 
     # 9. A review hidden by moderation stops counting -- live and stored -- but stays on record and unrepeatable.
-    p2 = _tender(a, title="Second job")
-    _award(a, x, p2)
-    complete_transaction(a, x, p2)
-    assert a.post("/owner/reviews", json={"project_id": p2, "rating": 5, "comment": "Threatening text"}).status_code == 200
+    # Batch C: only the latest review per owner counts, so this one comes from a second owner, C.
+    c = _account(db, "owner", "c@example.com")
+    p2 = _tender(c, title="Second job")
+    _award(c, x, p2)
+    complete_transaction(c, x, p2)
+    assert c.post("/owner/reviews", json={"project_id": p2, "rating": 5, "comment": "Threatening text"}).status_code == 200
+    assert x.get("/service-provider/reputation").json()["avg_rating"] == 2.0  # Batch C: sealed, not counted yet
+    _past_sealed_period(db, p2)
     assert x.get("/service-provider/reputation").json()["avg_rating"] == 3.5
     assert x.post(f"/service-provider/projects/{p2}/review-reports", json={"target": "review", "reason": "abusive"}).status_code == 201
     rid2 = db.query(ReviewReport).filter(ReviewReport.status == "open").one().id
@@ -98,8 +117,8 @@ def test_reports_change_nothing_until_an_admin_decides(db):
     db.refresh(profile)
     assert (profile.review_count, float(profile.avg_rating)) == (1, 2.0)
     assert x.get(f"/service-provider/projects/{p2}/review/received").json() is None
-    assert a.get(f"/owner/projects/{p2}/review").json()["hidden"] is True
-    assert a.post("/owner/reviews", json={"project_id": p2, "rating": 1}).status_code == 409  # no second review
+    assert c.get(f"/owner/projects/{p2}/review").json()["hidden"] is True  # Batch C: C (not A) owns p2
+    assert c.post("/owner/reviews", json={"project_id": p2, "rating": 1}).status_code == 409  # no second review
     assert x.post(f"/service-provider/projects/{p2}/review/received/response", json={"response": "x"}).status_code == 404
     hidden = db.query(Review).filter(Review.project_id == p2).one()
     assert (hidden.rating, hidden.service_provider_id, hidden.direction) == (5, x_id, "owner_to_provider")

@@ -3,8 +3,11 @@ review each way (or only one), responses, a report decided by an admin,
 reputations, a repeat requirement where the previous provider and a new one
 compete on their offers alone -- and the endings that never produce a review
 (terminated, cancelled, lost). The old transaction stays as it was."""
+from datetime import timedelta
+
 from app.models.agreement import Agreement
 from app.models.review import Review
+from app.services.reviews import reveal_due
 from tests.stage7_helpers import complete_transaction
 from tests.test_stage4_9_participation import _account
 from tests.test_stage5_13_revise import _submitted, _tender
@@ -36,6 +39,13 @@ def test_the_whole_chain(db):
     complete_transaction(a, y, p2)
     assert a.post("/owner/reviews", json={"project_id": p2, "rating": 2}).status_code == 200
     assert y.get(f"/service-provider/projects/{p2}/review").json() is None
+    # Batch C: Y doesn't review back, so the owner's review stays sealed (not reportable) for 14 days.
+    assert y.post(f"/service-provider/projects/{p2}/review-reports", json={"target": "review", "reason": "other"}).status_code == 404
+    assert y.get("/service-provider/reputation").json()["review_count"] == 0
+    sealed = db.query(Review).filter(Review.project_id == p2).one()
+    sealed.created_at = sealed.created_at - timedelta(days=15)
+    db.commit()
+    reveal_due(db)
     # 8. Y reports the 2/5: nothing changes; 9. the admin keeps it (a legitimate negative review stays).
     assert y.post(f"/service-provider/projects/{p2}/review-reports", json={"target": "review", "reason": "other"}).status_code == 201
     assert y.get("/service-provider/reputation").json()["avg_rating"] == 2.0

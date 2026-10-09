@@ -3,6 +3,8 @@ received -- beside the review, which never changes (reviews stay immutable:
 there is no edit or delete path), so ratings and reputations don't move.
 Only the reviewed organisation's current members may respond; the response is
 seen wherever the review is (8.6) and nowhere else; the reviewer is told."""
+from datetime import timedelta
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -10,6 +12,7 @@ from app.models.audit_log import AuditLog
 from app.models.enums import NotificationType
 from app.models.notification import Notification
 from app.models.review import Review
+from app.services.reviews import reveal_due
 from tests.stage7_helpers import complete_transaction
 from tests.test_organization_sharing import _organization
 from tests.test_stage4_9_participation import _account
@@ -41,6 +44,12 @@ def test_the_reviewed_side_responds_once_and_the_review_stands(db):
 
     # Scenario 1: X gives the owner 3/5; the owner organisation responds.
     assert sami.post("/service-provider/reviews", json={"project_id": pid, "rating": 3, "comment": "Scope kept moving."}).status_code == 200
+    # Batch C: the review is sealed until both sides have reviewed or 14 days pass -- no response yet.
+    assert _respond(noura, "owner", pid, SCOPE).status_code == 404
+    sealed = db.query(Review).one()
+    sealed.created_at = sealed.created_at - timedelta(days=15)  # Batch C: the sealed period has passed
+    db.commit()
+    reveal_due(db)
     before = db.query(Review).one()
     original = (before.id, before.rating, before.comment, before.reviewer_id, before.owner_id, before.service_provider_id, before.created_at)
     assert _respond(owner, "owner", pid, "   ").status_code == 400

@@ -16,6 +16,8 @@ def _history(owner, provider, title, rating):
     _award(owner, provider, pid)
     complete_transaction(owner, provider, pid)
     assert owner.post("/owner/reviews", json={"project_id": pid, "rating": rating}).status_code == 200
+    # Batch C: the owner's review is sealed until the provider reviews back (or 14 days pass).
+    assert provider.post("/service-provider/reviews", json={"project_id": pid, "rating": 5}).status_code == 200
 
 
 def _signals(o):
