@@ -23,6 +23,10 @@ class User(Base):
     language: Mapped[Language] = mapped_column(Enum(Language, native_enum=True), nullable=False, default=Language.en)
     email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # Stage 9.2: an admin deactivated this person's account -- no sign-in, no
+    # session, no request. Their memberships and everything recorded under
+    # their organisation stay; reactivating restores exactly what they had.
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     service_provider_profile = relationship(
         "ServiceProviderProfile", back_populates="user", uselist=False, cascade="all, delete-orphan"

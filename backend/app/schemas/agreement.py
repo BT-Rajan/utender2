@@ -33,6 +33,29 @@ class ExecutionUpdateOut(BaseModel):
     milestone_title: str | None = None
 
 
+class TimelineEntry(BaseModel):
+    """Stage 7.13: one business event of the transaction, from its own record
+    (award, agreement, execution history, variations, documents) -- never
+    reconstructed from current values."""
+
+    at: UTCDateTime
+    kind: Literal[
+        "awarded", "in_force", "document", "started", "progress", "on_hold", "resumed",
+        "delivered", "accepted", "returned", "change_proposed", "change_agreed", "change_rejected",
+        "change_withdrawn", "change_lapsed", "terminated", "completed",
+    ]
+    party: Literal["owner", "provider"] | None = None
+    actor_name: str | None = None  # the acting member, for the caller's own side (and admins)
+    note: str | None = None
+    milestone_title: str | None = None  # delivered / accepted / returned of a deliverable
+    variation_number: int | None = None
+    amount: Decimal | None = None  # awarded value; a change's value change
+    resulting_amount: Decimal | None = None  # an agreed change's resulting value
+    document_kind: str | None = None
+    document_name: str | None = None
+    execution_update_id: str | None = None  # its evidence (7.9)
+
+
 class MilestoneOut(BaseModel):
     """Stage 7.7: one deliverable of the agreement."""
 
@@ -135,6 +158,14 @@ class AgreementOut(BaseModel):
     original_completion_date: date | None = None
     original_completion_source: Literal["offer", "requirement"] | None = None
     current_completion_date: date | None = None
+    # Stage 7.12: the financial position U-Tender can state truthfully -- the
+    # net of the agreed changes (current = original + this), and that payments
+    # between the parties are not tracked by U-Tender. Its own billing is the
+    # providers' subscription, never a payment against a transaction.
+    # Stage 7.13: the transaction's history, in order.
+    timeline: list[TimelineEntry] = []
+    agreed_changes_total: Decimal = Decimal(0)
+    payment_tracking: Literal["not_managed"] = "not_managed"
     variations: list[VariationOut] = []
 
 

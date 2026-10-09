@@ -30,6 +30,7 @@ from app.schemas.auth import (
 from app.schemas.user import UserOut
 from app.services.auth_tokens import consume_token, issue_token
 from app.services.documents import ensure_document_rows, ensure_owner_document_rows
+from app.services.audit import log_action
 from app.services.email import notify_password_reset, notify_verify_email
 from app.services.login_throttle import login_throttle
 
@@ -91,6 +92,7 @@ def signup(payload: SignupRequest, response: Response, db: Session = Depends(get
         password_hash=hash_password(payload.password),
         role=payload.role,
         full_name=payload.full_name,
+        language=payload.language,
     )
     db.add(user)
     db.flush()  # assigns user.id without committing yet
@@ -143,6 +145,10 @@ def login(payload: LoginRequest, request: Request, response: Response, db: Sessi
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
 
     login_throttle.record_success(client_ip, email)
+    if user.deactivated_at is not None:  # Stage 9.2: right password, but no session for a deactivated account
+        from app.deps import DEACTIVATED
+
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=DEACTIVATED)
     _set_auth_cookies(response, user)
     return user
 
@@ -157,6 +163,8 @@ def refresh(response: Response, refresh_token: str | None = Cookie(default=None)
     if not payload or not user or not token_matches_password(payload, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
     if db.get(RevokedToken, payload.jti):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
+    if user.deactivated_at is not None:  # Stage 9.2
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
 
     # Rotate: the token just used to refresh is retired immediately, so a
@@ -226,7 +234,8 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     if not user:
         raise HTTPException(status_code=400, detail="This reset link is invalid or has expired.")
     user.password_hash = hash_password(payload.new_password)
-    db.commit()
+    # Stage 9.7: a security event on the trail (never the password), in the same commit.
+    log_action(db, actor_id=user.id, action="account.password_reset", target_type="user", target_id=user.id)
     return {"ok": True}
 
 
@@ -240,7 +249,7 @@ def change_password(
     if not verify_password(payload.current_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Current password is incorrect.")
     user.password_hash = hash_password(payload.new_password)
-    db.commit()
+    log_action(db, actor_id=user.id, action="account.password_changed", target_type="user", target_id=user.id)  # Stage 9.7
     # The new hash ends every other session; re-issue this one so the person
     # who just changed their password isn't logged out of the tab they used.
     _set_auth_cookies(response, user)

@@ -13,3 +13,15 @@ export function money(amount: number | string | null | undefined, currency: stri
     return `${currency} ${value.toLocaleString()}`;
   }
 }
+
+// Stage 9.13: an amount typed on an Arabic keyboard arrives in Arabic-Indic
+// digits (٠-٩, or the Persian ۰-۹) with "٫" as the decimal mark. Read those
+// as the number they are instead of discarding them; grouping marks (",",
+// "٬", "،") and anything else that isn't part of a number are dropped.
+export function normalizeAmountInput(value: string): string {
+  return value
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+    .replace(/٫/g, ".")
+    .replace(/[^0-9.]/g, "");
+}

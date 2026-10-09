@@ -281,7 +281,9 @@ def test_r5_production_refuses_default_secrets():
     with pytest.raises(ValidationError):
         Settings(_env_file=None, environment="production", jwt_secret="j" * 32, storage_signing_secret=_DEFAULT)
 
-    ok = Settings(_env_file=None, environment="production", jwt_secret="j" * 32, storage_signing_secret="s" * 32)
+    ok = Settings(_env_file=None, environment="production", jwt_secret="j" * 32, storage_signing_secret="s" * 32,
+                  # Stage 9.11: production also refuses localhost URLs and non-Secure cookies.
+                  app_url="https://u-tender.example", api_url="https://api.u-tender.example", cors_origins="https://u-tender.example")
     assert ok.environment == "production"
     # Local development keeps working with the placeholder defaults.
     Settings(_env_file=None, environment="development")

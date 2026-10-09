@@ -21,6 +21,8 @@ import { TenderRulesEditor } from "@/components/TenderRules";
 import { QualityCheck, type QualityReport } from "@/components/QualityCheck";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { AgreementPanel } from "@/components/AgreementPanel";
+import { ReceivedReview, ReviewResponse } from "@/components/ReceivedReview";
+import { TrackRecord } from "@/components/TrackRecord";
 import { ClosureOutcome, EndRequirement, StartAgain, outcomeLabel } from "@/components/ClosureOutcome";
 import { AmendPublishedForm, AmendmentsList, PauseControl } from "@/components/PostPublication";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
@@ -36,6 +38,9 @@ interface Review {
   rating: number;
   comment: string | null;
   created_at: string;
+  response?: string | null;  // Stage 8.9: the provider's response, if any
+  response_at?: string | null;
+  hidden?: boolean;  // Stage 8.15: an admin hid this review
 }
 
 // Stage 7.1: the award handover -- read from the permanent award record, the
@@ -418,6 +423,15 @@ export function OwnerProjectDetailPage() {
   });
 
   const approvedOffer = offers?.find((o) => o.status === "approved");
+  // Stage 8.1: a review rests on completed work -- the transaction closed by the
+  // owner side's acceptance -- never on the award alone. Same query as the agreement panel.
+  const { data: transaction } = useQuery({
+    queryKey: ["agreement", id],
+    queryFn: () => apiFetch<{ status: string }>(`/projects/${id}/agreement`),
+    enabled: !!id && project?.status === "awarded",
+    retry: false,
+  });
+  const reviewable = transaction?.status === "completed";
 
   const approveMutation = useMutation({
     mutationFn: ({ offerId, acknowledge }: { offerId: string; acknowledge: boolean }) =>
@@ -469,7 +483,10 @@ export function OwnerProjectDetailPage() {
       setError(null);
       queryClient.invalidateQueries({ queryKey: ["owner-review", id] });
     },
-    onError: (err) => setError(errorMessage(err, t("owner.projectDetail.reviewError"))),
+    onError: (err) => {
+      setError(errorMessage(err, t("owner.projectDetail.reviewError")));
+      queryClient.invalidateQueries({ queryKey: ["owner-review", id] });  // Stage 8.3: show what is on record
+    },
   });
 
   const confirm = useConfirm();
@@ -658,6 +675,8 @@ export function OwnerProjectDetailPage() {
       {(project.status === "open" || project.status === "closed" || project.status === "under_evaluation") && <EndRequirement project={project} />}
       {(project.status === "canceled" || project.status === "no_award") && <ClosureOutcome project={project} />}
       {(project.status === "canceled" || project.status === "no_award" || project.status === "expired") && <StartAgain project={project} />}
+      {/* Stage 8.11: the same need again, after a completed transaction -- a new draft, this one untouched. */}
+      {project.status === "awarded" && reviewable && <StartAgain project={project} similar />}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-6 items-start">
         <div>
@@ -779,7 +798,8 @@ export function OwnerProjectDetailPage() {
               deadlinePassed ? "bg-red-tint text-red border-red" : "bg-blue-tint text-blue border-blue"
             }`}
           >
-            ⏱ {timeRemaining(project.bid_deadline)} — {new Date(project.bid_deadline).toLocaleString()}
+            {/* Stage 9.13: a countdown only while offers are open -- once closed early, the time left means nothing. */}
+            {project.status === "open" ? `⏱ ${timeRemaining(project.bid_deadline)} — ` : ""}{fullDate(project.bid_deadline, language)}
             {formatWorkTiming(t, project) && <div className="mt-1 text-steel">{formatWorkTiming(t, project)}</div>}
           </div>
           {project.description && (
@@ -865,6 +885,8 @@ export function OwnerProjectDetailPage() {
                     <td className="py-3 px-2.5">
                       <div className="font-display font-semibold text-[13.5px]">
                         {o.service_provider_company_name ?? t("owner.projectDetail.serviceProviderCol")}
+                        {/* Stage 8.12/8.14: its U-Tender track record and work with you -- for information, never an advantage. */}
+                        <TrackRecord offer={o} />
                         {o.status === "submitted" && (o.based_on_material_revision ?? 0) < (project.material_revision ?? 0) && (
                           <span className="block font-mono text-[10px] uppercase text-amber-dark font-normal">{t("postPub.outdatedOwner")}</span>
                         )}
@@ -908,8 +930,17 @@ export function OwnerProjectDetailPage() {
                       <OfferResponseDetails offer={o} project={project} />
                     </td>
                     <td className="py-3 px-2.5">
-                      <span className="text-amber text-[11px] tracking-tight">{stars(Number(o.service_provider_avg_rating ?? 0))}</span>{" "}
-                      <span className="font-mono text-[11px] text-steel">({o.service_provider_review_count ?? 0})</span>
+                      {/* Stage 8.7/8.14: no reviews reads as "none yet", never as 0 stars; an average comes with its count. */}
+                      {o.service_provider_review_count ? (
+                        <>
+                          <span className="text-amber text-[11px] tracking-tight">{stars(Number(o.service_provider_avg_rating ?? 0))}</span>{" "}
+                          <span className="font-mono text-[11px] text-steel">
+                            {t("reputation.summary").replace("{avg}", Number(o.service_provider_avg_rating ?? 0).toFixed(1)).replace("{n}", String(o.service_provider_review_count))}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="font-mono text-[11px] text-steel">{t("reputation.noReviews")}</span>
+                      )}
                     </td>
                     <td className="py-3 px-2.5 font-mono font-semibold text-navy text-sm">
                       {money(o.amount, project.currency)}
@@ -970,7 +1001,7 @@ export function OwnerProjectDetailPage() {
       {/* Stage 6.11: the owner side's own private notes on the requirement. */}
       {project.status !== "draft" && <EvaluationNotes projectId={project.id} />}
 
-      {approvedOffer && (
+      {approvedOffer && (existingReview || reviewable) && (
         <div className="mt-8 max-w-xl">
           <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-2">
             {t("owner.projectDetail.rateServiceProvider")} {approvedOffer.service_provider_company_name ?? t("owner.projectDetail.theServiceProvider")}
@@ -982,12 +1013,17 @@ export function OwnerProjectDetailPage() {
               <p className="font-mono text-[10.5px] text-steel-light mt-2">
                 {t("owner.projectDetail.submittedOn")} {new Date(existingReview.created_at).toLocaleDateString()}
               </p>
+              {existingReview.hidden && <p className="text-xs text-amber-dark mt-1">{t("report.hiddenNote")}</p>}
+              <ReviewResponse response={existingReview.response} at={existingReview.response_at} label={t("review.theirResponse")} reportBase={`/owner/projects/${project.id}`} />
             </div>
           ) : (
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                reviewMutation.mutate();
+                // Stage 8.3: a review is final -- confirm before it's recorded.
+                void confirm({ title: t("review.confirmTitle"), body: t("review.confirmBody"), confirmLabel: t("owner.projectDetail.submitReview") }).then(
+                  (ok) => ok && reviewMutation.mutate(),
+                );
               }}
               className="bg-white border border-border rounded px-4.5 py-4 grid gap-3.5"
             >
@@ -996,6 +1032,9 @@ export function OwnerProjectDetailPage() {
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 rows={3}
+                maxLength={2000}
+                dir="auto"
+                aria-label={t("owner.projectDetail.ratingPlaceholder")}
                 placeholder={t("owner.projectDetail.ratingPlaceholder")}
                 className="w-full border border-border rounded px-3 py-2.5 text-sm resize-y"
               />
@@ -1008,6 +1047,11 @@ export function OwnerProjectDetailPage() {
               </button>
             </form>
           )}
+          {/* Stage 8.6: the winning provider's review of this owner side, once written. */}
+          <ReceivedReview
+            url={`/owner/projects/${project.id}/review/received`}
+            from={approvedOffer.service_provider_company_name ?? t("owner.projectDetail.theServiceProvider")}
+          />
         </div>
       )}
     </main>

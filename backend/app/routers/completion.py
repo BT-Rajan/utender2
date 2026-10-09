@@ -114,6 +114,8 @@ def _decide(db: Session, project_id: str, user: User, note: str | None, if_match
         # and nothing could change it since; the transaction closes now.
         agreement.status, agreement.completed_at = "completed", now
     _record(db, agreement, kind, side, user, note, now)
+    if accept:
+        _record(db, agreement, "completed", side, user, None, now)  # Stage 7.13: the closing entry of the history
     _touch(agreement, user)
     audit.log_action(db, actor_id=user.id, action=f"completion.{'accept' if accept else 'return'}", target_type="agreement",
                      target_id=agreement.id, previous_value="submitted", new_value="accepted; transaction completed" if accept else kind, reason=note)

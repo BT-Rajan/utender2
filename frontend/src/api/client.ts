@@ -15,6 +15,20 @@ function interfaceLanguage(): string {
   return typeof document !== "undefined" && document.documentElement.lang === "ar" ? "ar" : "en";
 }
 
+// Stage 9.13: the server answers an access gate with a bare code (the route
+// guards act on the account state). Should one reach a message -- e.g. a
+// subscription that lapsed while an offer was being prepared -- say what it means.
+const ACCESS_CODES: Record<string, { en: string; ar: string }> = {
+  payment_required: {
+    en: "Your marketplace subscription isn't active, so offers can't be saved or sent. Open Subscription to renew or update your payment.",
+    ar: "اشتراكك في السوق غير نشط، لذا لا يمكن حفظ العروض أو إرسالها. افتح صفحة الاشتراك للتجديد أو تحديث وسيلة الدفع.",
+  },
+  not_approved: {
+    en: "Your account's verification isn't approved yet, so this isn't available. See your verification status for what's needed.",
+    ar: "لم تتم الموافقة على توثيق حسابك بعد، لذا هذا غير متاح. راجع حالة التوثيق لمعرفة المطلوب.",
+  },
+};
+
 async function parseError(res: Response): Promise<never> {
   let detail = res.statusText;
   try {
@@ -23,7 +37,18 @@ async function parseError(res: Response): Promise<never> {
   } catch {
     // non-JSON error body — fall back to statusText
   }
+  if (typeof detail === "string" && ACCESS_CODES[detail]) detail = ACCESS_CODES[detail][interfaceLanguage() as "en" | "ar"];
   throw new ApiError(res.status, detail);
+}
+
+function unknownOutcome(): string {
+  return interfaceLanguage() === "ar"
+    ? "تعذر التأكد من حفظ هذا الإجراء. حدّث الصفحة لترى ما هو مسجل قبل المحاولة مرة أخرى."
+    : "We couldn't confirm whether this went through. Refresh the page to see what is on record before trying again.";
+}
+
+function connectionLost(): string {
+  return interfaceLanguage() === "ar" ? "تعذر الاتصال بـ U-Tender. تحقق من اتصالك ثم حاول مرة أخرى." : "Couldn't reach U-Tender. Check your connection and try again.";
 }
 
 let refreshPromise: Promise<boolean> | null = null;
@@ -75,8 +100,21 @@ export async function apiFetch<T>(
     init.body = JSON.stringify(body);
   }
 
-  const res = await fetch(`${API_URL}${path}`, init);
+  // Stage 9.8: a change whose request never got an answer (dropped connection,
+  // timeout) or failed on the server may still have been saved. Say so, rather
+  // than implying it didn't happen; the server refuses a repeat that would
+  // double it, and a refresh shows what is on record.
+  const writes = method !== "GET";
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, init);
+  } catch {
+    throw new ApiError(0, writes ? unknownOutcome() : connectionLost());
+  }
   noteServerTime(res.headers.get("X-Server-Time"));
+  if (writes && res.status >= 500) {
+    throw new ApiError(res.status, unknownOutcome());
+  }
 
   if (res.status === 401 && retry) {
     const refreshed = await tryRefresh();

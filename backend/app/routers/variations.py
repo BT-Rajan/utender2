@@ -24,7 +24,7 @@ from app.deps import get_current_user
 from app.models.agreement import Agreement, Milestone, Variation
 from app.models.enums import NotificationType
 from app.models.user import User
-from app.routers.agreements import _best_effort, _check_version, _load, _out, _touch, current_terms, planned_completion
+from app.routers.agreements import _best_effort, _check_version, _load, _out, _record, _touch, current_terms, planned_completion
 from app.schemas.agreement import AgreementOut, MilestoneNote, VariationIn
 from app.services import audit
 from app.services import notify as notify_service
@@ -130,8 +130,9 @@ def propose_variation(
         add_deliverable=added, proposed_party=side, proposed_by=user.id, proposed_at=datetime.utcnow().replace(microsecond=0),
     )
     db.add(v)
-    _touch(agreement, user)
     db.flush()
+    _record(db, agreement, "change_proposed", side, user, description, v.proposed_at, variation_id=v.id)
+    _touch(agreement, user)
     audit.log_action(db, actor_id=user.id, action="variation.propose", target_type="agreement", target_id=agreement.id,
                      new_value=f"V{v.number}:{v.id} value:{v.value_change} completion:{v.completion_date} milestone:{v.milestone_id}->{v.milestone_due_date} add:{added}",
                      reason=description)
@@ -176,6 +177,7 @@ def agree_variation(
         db.add(Milestone(agreement_id=agreement.id, position=(last[0] if last else 0) + 1, title=v.add_deliverable,
                          description=v.description, created_by=user.id, variation_id=v.id))
     v.version += 1
+    _record(db, agreement, "change_agreed", side, user, v.decision_note, now, variation_id=v.id)
     _touch(agreement, user)
     audit.log_action(db, actor_id=user.id, action="variation.agree", target_type="agreement", target_id=agreement.id,
                      previous_value=f"V{v.number} amount:{v.previous_amount} completion:{v.previous_completion_date} milestone_due:{v.previous_milestone_due_date}",
@@ -200,6 +202,7 @@ def reject_variation(
     v.status, v.decided_party, v.decided_by, v.decided_at = "rejected", side, user.id, datetime.utcnow().replace(microsecond=0)
     v.decision_note = (payload.note or "").strip() or None
     v.version += 1
+    _record(db, agreement, "change_rejected", side, user, v.decision_note, v.decided_at, variation_id=v.id)
     _touch(agreement, user)
     audit.log_action(db, actor_id=user.id, action="variation.reject", target_type="agreement", target_id=agreement.id,
                      new_value=f"V{v.number}:rejected", reason=v.decision_note)
@@ -221,6 +224,7 @@ def withdraw_variation(
     _check(v, if_match)
     v.status, v.decided_party, v.decided_by, v.decided_at = "withdrawn", side, user.id, datetime.utcnow().replace(microsecond=0)
     v.version += 1
+    _record(db, agreement, "change_withdrawn", side, user, None, v.decided_at, variation_id=v.id)
     _touch(agreement, user)
     audit.log_action(db, actor_id=user.id, action="variation.withdraw", target_type="agreement", target_id=agreement.id, new_value=f"V{v.number}:withdrawn")
     _tell(db, project, winner, _other(side), "withdrawn", "سُحب")

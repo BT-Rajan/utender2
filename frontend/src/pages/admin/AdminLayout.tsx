@@ -9,8 +9,11 @@ export function AdminLayout() {
   const { t } = useI18n();
   return (
     <div className="min-h-screen">
-      <AppHeader roleLabel="Site Admin" homeHref="/admin/requirements" />
+      <AppHeader roleLabel="Site Admin" homeHref="/admin/overview" />
       <div className="max-w-5xl mx-auto px-5 pt-4 flex flex-wrap gap-x-4 gap-y-2">
+        <NavLink to="/admin/overview" className={navClass}>
+          {t("admin.nav.overview")}
+        </NavLink>
         <NavLink to="/admin/requirements" className={navClass}>
           {t("admin.nav.requirements")}
         </NavLink>
@@ -31,6 +34,9 @@ export function AdminLayout() {
         </NavLink>
         <NavLink to="/admin/offers" className={navClass}>
           {t("admin.nav.offers")}
+        </NavLink>
+        <NavLink to="/admin/review-reports" className={navClass}>
+          {t("admin.nav.reviewReports")}
         </NavLink>
         <NavLink to="/admin/cms" className={navClass}>
           {t("admin.nav.cms")}

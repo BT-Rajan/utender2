@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
@@ -70,6 +71,14 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.en: ("Change {state} on {project_title}", "A change to the work awarded on {project_title} was {state}."),
         Language.ar: ("{state_ar}: {project_title}", "{state_ar} تغيير على العمل المُرسى في {project_title}."),
     },
+    NotificationType.review_received: {
+        Language.en: ("New review on {project_title}", "The {party} reviewed the completed work on {project_title}."),
+        Language.ar: ("تقييم جديد على {project_title}", "قيّم {party_ar} العمل المكتمل في {project_title}."),
+    },
+    NotificationType.review_response: {
+        Language.en: ("Response to your review on {project_title}", "The {party} responded to your review of the completed work on {project_title}."),
+        Language.ar: ("رد على تقييمك في {project_title}", "ردّ {party_ar} على تقييمك للعمل المكتمل في {project_title}."),
+    },
     NotificationType.new_requirement: {
         Language.en: ("New opportunity: {project_title}", "A new {trade} requirement in {area} is open for offers until {deadline}. You meet its conditions."),
         Language.ar: ("فرصة جديدة: {project_title}", "طلب جديد لأعمال {trade} في {area} مفتوح للعروض حتى {deadline}. أنت تستوفي شروطه."),
@@ -101,6 +110,15 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
     NotificationType.verification_activated: {
         Language.en: ("You're verified", "Your service provider account has been approved."),
         Language.ar: ("تم التحقق من حسابك", "تمت الموافقة على حساب مزوّد الخدمة الخاص بك."),
+    },
+    # Stage 9.5: a subscription change that opens or closes marketplace access (Stripe webhook).
+    NotificationType.payment_activated: {
+        Language.en: ("Subscription active", "Your U-Tender subscription is active: you can respond to requirements you are eligible for."),
+        Language.ar: ("الاشتراك نشط", "اشتراكك في U-Tender نشط: يمكنك الرد على الطلبات المؤهل لها."),
+    },
+    NotificationType.payment_failed: {
+        Language.en: ("Subscription payment problem", "Your U-Tender subscription is no longer active, so you can't submit or revise offers. Open Billing to update your payment."),
+        Language.ar: ("مشكلة في دفع الاشتراك", "اشتراكك في U-Tender لم يعد نشطًا، لذا لا يمكنك تقديم العروض أو تعديلها. افتح الفوترة لتحديث الدفع."),
     },
     NotificationType.payment_override_granted: {
         Language.en: ("Marketplace access activated", "An administrator activated full marketplace access on your account."),
@@ -190,8 +208,25 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
 # been read, or there was none to begin with.
 def notify(db: Session, user: User, notification_type: NotificationType, link: str | None = None, **kwargs) -> Notification | None:
     template = _TEMPLATES.get(notification_type)
-    if not template:
+    if not template or user.deactivated_at is not None:  # Stage 9.2/9.5: a deactivated account is told nothing
         return None
+    # Stage 9.8: when the business change is already committed (nothing is
+    # pending in the session), a notice that can't be written must not turn
+    # the caller's success into an error -- it is logged and skipped. When
+    # changes are still pending, the failure propagates as before, so nothing
+    # can report success after losing them.
+    settled = not (db.new or db.dirty or db.deleted)
+    try:
+        return _write(db, user, notification_type, link, template, kwargs)
+    except Exception:
+        if not settled:
+            raise
+        db.rollback()
+        logging.getLogger(__name__).exception("could not record a %s notification for %s", notification_type.value, user.id)
+        return None
+
+
+def _write(db: Session, user: User, notification_type: NotificationType, link: str | None, template, kwargs) -> Notification:
     title_fmt, body_fmt = template.get(user.language) or template[Language.en]
     title = title_fmt.format(**kwargs)
     body = body_fmt.format(**kwargs)

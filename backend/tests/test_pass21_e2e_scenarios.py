@@ -14,6 +14,8 @@ import app.db as db_module  # noqa: E402
 from fastapi.testclient import TestClient
 from app.main import app
 
+from tests.stage7_helpers import complete_transaction
+
 
 def test_pass21_e2e_scenarios():
     results = []
@@ -167,7 +169,10 @@ def test_pass21_e2e_scenarios():
     check("A: live loser (c1) notified award_lost", "award_lost" in c1_notifs)
     check("A: withdrawn bidder (c3) gets NEITHER award notification", "award_won" not in c3_notifs and "award_lost" not in c3_notifs)
 
-    # --- review + rating recompute ---
+    # --- review + rating recompute (Stage 8.1: once the transaction is completed) ---
+    r = owner_client.post("/owner/reviews", json={"project_id": projA, "service_provider_id": c2_id, "rating": 5})
+    check("A: no review while the work isn't accepted and completed", r.status_code == 400)
+    complete_transaction(owner_client, c2, projA)
     r = owner_client.post("/owner/reviews", json={"project_id": projA, "service_provider_id": c2_id, "rating": 5, "comment": "Great work"})
     check("A: review submitted for the actual winner", r.status_code == 200)
 
@@ -176,7 +181,7 @@ def test_pass21_e2e_scenarios():
     check("A: winning service provider's review_count is 1", r.json()["review_count"] == 1)
 
     r = owner_client.post("/owner/reviews", json={"project_id": projA, "service_provider_id": c2_id, "rating": 1})
-    check("A: duplicate review on the same project rejected", r.status_code == 400)
+    check("A: duplicate review on the same project rejected", r.status_code == 409)
 
     # ======================================================================
     # SCENARIO B: sealed tender, full lifecycle with privacy checks

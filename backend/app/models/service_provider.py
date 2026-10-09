@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, DateTime, Enum, ForeignKey, Text, Integer, Numeric, String, func
+from sqlalchemy import JSON, Boolean, DateTime, Enum, ForeignKey, Text, Integer, Numeric, String, false, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -49,6 +49,13 @@ class ServiceProviderProfile(Base):
         Enum(SubscriptionStatus, native_enum=True), nullable=True
     )
     subscription_current_period_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Stage 9.6: what Stripe last told us, beside the status -- the billing
+    # interval (month/year), a cancellation scheduled for the period end, and
+    # when the Stripe event we applied was created (older events are ignored,
+    # so a delayed delivery can't roll the state back).
+    subscription_interval: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    subscription_cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=false())
+    subscription_event_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Denormalized "is there currently an active admin payment override"
     # flag — kept in sync by the payment_overrides service whenever a
     # PaymentOverride row is created or revoked. Reading this is a hot path

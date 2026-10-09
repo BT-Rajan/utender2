@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     storage_backend: str = "local"  # "local" | "s3"
     storage_root: str = "./storage"
     storage_signing_secret: str = "change-me-in-production"
+    # Stage 9.12: where backup.sh records each run's outcome (last-success /
+    # last-failure); the admin overview reads it. Unset = backups not configured.
+    backup_dir: str | None = None
 
     s3_bucket_drawings: str = "project-drawings"
     s3_bucket_documents: str = "service-provider-documents"
@@ -87,6 +90,24 @@ class Settings(BaseSettings):
                 f"ENVIRONMENT=production but {', '.join(w.upper() for w in weak)} is unset or still a placeholder. "
                 "Generate a long random value (e.g. `openssl rand -hex 32`)."
             )
+        # Stage 9.11: development defaults in production. Localhost URLs can't
+        # be a working deployment (email links and CORS would point at the
+        # server itself), so they are refused. Development database credentials
+        # and non-Secure cookies (plain-http APP_URL, as deploy.sh sets up today)
+        # are real risks but may be how a live server runs, so they are warned
+        # about loudly at every start instead of stopping it.
+        problems = [f"{name.upper()} points at localhost" for name in ("app_url", "api_url", "cors_origins")
+                    if "localhost" in getattr(self, name) or "127.0.0.1" in getattr(self, name)]
+        if problems:
+            raise ValueError("ENVIRONMENT=production but " + "; ".join(problems) + ".")
+        import logging
+
+        log = logging.getLogger("config")
+        if "utender:utender@" in self.database_url:
+            log.warning("SECURITY: ENVIRONMENT=production but DATABASE_URL still uses the development credentials.")
+        if not self.cookies_secure:
+            log.warning("SECURITY: ENVIRONMENT=production but the login cookies aren't Secure (APP_URL isn't https and "
+                        "COOKIE_SECURE isn't true): sessions travel unencrypted. Put the site behind HTTPS.")
         return self
 
 

@@ -1,16 +1,21 @@
 import type { Project } from "@/api/types";
 
-// The response deadline comes from the API as UTC ("...Z"). <input
-// type="datetime-local"> works in the browser's local time, so convert both
-// ways: an owner in Kuwait who picks 17:00 means 17:00 Kuwait time.
+// The response deadline comes from the API as UTC ("...Z") and is shown
+// everywhere in Kuwait time (lib/format.ts). <input type="datetime-local">
+// has no timezone, so read and write it as Kuwait time too (UTC+3, no
+// daylight saving) -- not the device's clock: an owner who picks 17:00 means
+// 17:00 in Kuwait even when their phone is set to another timezone.
+const KUWAIT_OFFSET_MS = 3 * 60 * 60 * 1000;
+
 export function toLocalInputValue(iso: string): string {
-  const d = new Date(iso);
+  const d = new Date(new Date(iso).getTime() + KUWAIT_OFFSET_MS);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 }
 
 export function localInputToUtcIso(value: string): string {
-  return new Date(value).toISOString();
+  const withSeconds = value.length === 16 ? `${value}:00` : value;
+  return new Date(`${withSeconds}+03:00`).toISOString();
 }
 
 // Calendar dates ("YYYY-MM-DD") are shown as-is: they have no time of day.

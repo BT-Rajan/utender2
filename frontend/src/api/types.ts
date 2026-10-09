@@ -305,6 +305,8 @@ export interface Offer {
   shortlisted?: boolean | null; // Stage 6.12: the owner's side only
   service_provider_avg_rating?: string | null;
   service_provider_review_count?: number | null;
+  service_provider_completed_transactions?: number | null; // Stage 8.14: owner view only
+  completed_with_you?: number | null; // Stage 8.12: owner view only -- completed transactions with this provider
   sealed: boolean;
   item_prices: OfferItemPrice[] | null;
   assumptions: string | null;
@@ -339,6 +341,9 @@ export interface ServiceProviderProfile {
   review_count: number;
   subscription_status: SubscriptionStatus | null;
   subscription_current_period_end: string | null;
+  subscription_interval?: string | null; // Stage 9.6: month / year
+  subscription_cancel_at_period_end?: boolean;
+  subscription_event_at?: string | null; // when the last applied Stripe event happened
   payment_override_active: boolean;
   marketplace_status:
     | "documents_incomplete"
@@ -444,6 +449,8 @@ export interface AdminOffer {
   status: OfferStatus;
   is_suspended: boolean;
   revision: number;
+  based_on_material_revision?: number; // Stage 9.3: the requirement version it priced
+  submitted_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -471,6 +478,20 @@ export interface AdminProjectDetail {
   offers: AdminOffer[];
   pricing_basis?: PricingBasis;
   items?: { id: string; position: number; description: string; quantity: string | null; unit: string | null }[];
+  // Stage 9.3: the rest of the chain
+  version?: { material_revision: number; amendments: number };
+  award?: { offer_id: string; service_provider_id: string; service_provider_company_name: string | null; amount: string | null; project_revision: number; offer_revision: number; offer_priced_on: number | null; created_at: string } | null;
+  transaction?: {
+    status: "preparing" | "active" | "completed" | "terminated";
+    created_at: string;
+    activated_at: string | null;
+    work_started_at: string | null;
+    on_hold_at: string | null;
+    completion_status: string | null;
+    completed_at: string | null;
+    terminated_at: string | null;
+    termination_reason: string | null;
+  } | null;
 }
 
 export interface Clarification {

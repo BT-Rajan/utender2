@@ -653,7 +653,10 @@ def _put_forward(db: Session, user: User, project: Project, offer: Offer, profil
     from app.routers.projects import record_decision
 
     record_decision(db, user, project)
-    db.commit()
+    # Stage 9.7: on the audit trail in the same commit -- who put it forward,
+    # which revision, against which version of the requirement (never the price).
+    log_action(db, actor_id=user.id, action="offer.submit" if first else "offer.revise", target_type="offer", target_id=offer.id,
+               new_value=f"revision {offer.revision} on requirement v{offer.based_on_material_revision} ({project.id})")
     db.refresh(offer)
 
     sealed = project.tender_type == TenderType.sealed and project.status == ProjectStatus.open
@@ -767,7 +770,9 @@ def withdraw_offer(project_id: str, user: User = Depends(require_approved_servic
     _snapshot_revision(db, offer)
     offer.status = OfferStatus.withdrawn
     offer.updated_at, offer.updated_by = datetime.utcnow(), user.id
-    db.commit()
+    # Stage 9.7: withdrawn, by whom, in the same commit.
+    log_action(db, actor_id=user.id, action="offer.withdraw", target_type="offer", target_id=offer.id,
+               previous_value="submitted", new_value=f"withdrawn ({project.id})")
     db.refresh(offer)
     # The owner's team is told an offer they may be weighing is gone -- after
     # the commit, and without the provider's name while the tender is sealed.

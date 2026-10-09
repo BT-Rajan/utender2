@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import type { Project, ProjectDetail, TenderType } from "@/api/types";
 import { useI18n } from "@/i18n/I18nContext";
-import { localInputToUtcIso } from "@/lib/dates";
+import { localInputToUtcIso, toLocalInputValue } from "@/lib/dates";
 import { KUWAIT_GOVERNORATES } from "@/lib/location";
 import { CategoryField } from "@/components/CategoryField";
 import { formatDeadline } from "@/lib/format";
@@ -23,9 +23,7 @@ export function OwnerProjectNewPage() {
   const [tenderType, setTenderType] = useState<TenderType>("owner_visible");
 
   const defaultDeadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  const defaultDeadlineValue = new Date(defaultDeadline.getTime() - defaultDeadline.getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 16);
+  const defaultDeadlineValue = toLocalInputValue(defaultDeadline.toISOString());
 
   // Stage 3.11: offer the drafts already in progress before starting another.
   const { data: myProjects } = useQuery({
@@ -45,7 +43,7 @@ export function OwnerProjectNewPage() {
       setError(t("owner.projectNew.validationError"));
       return;
     }
-    // datetime-local is the owner's local time; send the instant explicitly.
+    // datetime-local is Kuwait time (lib/dates.ts); send the instant explicitly.
     form.set("bid_deadline", localInputToUtcIso(form.get("bid_deadline") as string));
     form.set("tender_type", tenderType);
     form.set("status", status);
@@ -190,7 +188,7 @@ export function OwnerProjectNewPage() {
               disabled={pending}
               onClick={() => {
                 const deadline = (formRef.current?.elements.namedItem("bid_deadline") as HTMLInputElement | null)?.value;
-                const text = t("draftDetails.publishNowConfirm").replace("{deadline}", deadline ? formatDeadline(new Date(deadline).toISOString()) : "—");
+                const text = t("draftDetails.publishNowConfirm").replace("{deadline}", deadline ? formatDeadline(localInputToUtcIso(deadline)) : "—");
                 const [title, ...body] = text.split("\n\n");
                 void confirm({ title, body: body.join("\n\n"), confirmLabel: t("owner.projectNew.postProject") }).then(
                   (ok) => {

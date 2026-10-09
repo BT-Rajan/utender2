@@ -30,6 +30,9 @@ class ServiceProviderProfileOut(BaseModel):
     review_count: int
     subscription_status: SubscriptionStatus | None
     subscription_current_period_end: datetime | None
+    subscription_interval: str | None = None  # Stage 9.6: month / year
+    subscription_cancel_at_period_end: bool = False
+    subscription_event_at: UTCDateTime | None = None  # when the last applied Stripe event happened
     payment_override_active: bool
     # Derived, never stored — spec §2.13's human-facing lifecycle status,
     # one of: documents_incomplete, submitted_for_review, changes_requested,

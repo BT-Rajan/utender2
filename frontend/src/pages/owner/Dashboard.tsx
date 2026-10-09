@@ -6,6 +6,8 @@ import type { Project, ProjectStatus } from "@/api/types";
 import { formatDeadline } from "@/lib/format";
 import { QueryError } from "@/components/QueryError";
 import { outcomeLabel } from "@/components/ClosureOutcome";
+import { PreviousProviders } from "@/components/PreviousProviders";
+import { Reputation } from "@/components/Reputation";
 import { useI18n } from "@/i18n/I18nContext";
 
 function badgeClasses(status: string) {
@@ -100,6 +102,10 @@ export function OwnerDashboardPage() {
           {t("owner.dashboard.newProject")}
         </Link>
       </div>
+      {/* Stage 8.8: its own U-Tender track record, from providers' reviews. */}
+      <div className="mb-6 max-w-xl"><Reputation of="owner" own url="/owner/reputation" /></div>
+      {/* Stage 8.12: providers it has completed work with -- history, not a shortlist. */}
+      <PreviousProviders />
 
       {!!projects?.length && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">

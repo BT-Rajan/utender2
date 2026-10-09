@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/api/client";
+import { useI18n } from "@/i18n/I18nContext";
+import { fullDate } from "@/lib/format";
 
 interface NotificationItem {
   id: string;
@@ -14,6 +16,7 @@ interface NotificationItem {
 }
 
 export function NotificationBell() {
+  const { t, language } = useI18n();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -59,7 +62,7 @@ export function NotificationBell() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="relative text-steel hover:text-navy"
-        aria-label="Notifications"
+        aria-label={t("common.notifications")}
       >
         <span className="text-base">🔔</span>
         {count > 0 && (
@@ -74,15 +77,15 @@ export function NotificationBell() {
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div className="absolute end-0 mt-2 w-80 max-w-[calc(100vw-2.5rem)] max-h-96 overflow-y-auto bg-white border border-border rounded shadow-lg z-20">
             <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-border">
-              <span className="font-mono text-[10px] uppercase tracking-wide text-steel">Notifications</span>
+              <span className="font-mono text-[10px] uppercase tracking-wide text-steel">{t("common.notifications")}</span>
               {count > 0 && (
                 <button type="button" onClick={() => markAllReadMutation.mutate()} className="text-[11px] text-navy underline">
-                  Mark all read
+                  {t("common.markAllRead")}
                 </button>
               )}
             </div>
             {!notifications?.length ? (
-              <p className="px-3.5 py-6 text-center text-xs text-steel-light">No notifications yet.</p>
+              <p className="px-3.5 py-6 text-center text-xs text-steel-light">{t("common.noNotifications")}</p>
             ) : (
               <ul>
                 {notifications.map((n) => (
@@ -97,7 +100,7 @@ export function NotificationBell() {
                       <div className="font-display font-semibold text-[12.5px] text-navy">{n.title}</div>
                       <div className="text-[11.5px] text-steel mt-0.5">{n.body}</div>
                       <div className="font-mono text-[9.5px] text-steel-light mt-1">
-                        {new Date(n.created_at).toLocaleString()}
+                        {fullDate(n.created_at, language)}
                       </div>
                     </button>
                   </li>

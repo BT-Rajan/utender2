@@ -15,6 +15,7 @@ import { SaveButton } from "@/components/SaveOpportunity";
 import { useI18n } from "@/i18n/I18nContext";
 import { outcomeText } from "@/components/ClosureOutcome";
 import { AgreementPanel } from "@/components/AgreementPanel";
+import { OwnerReview } from "@/components/OwnerReview";
 import { money } from "@/lib/money";
 import { fullDate, timeLeft } from "@/lib/format";
 import { formatArea } from "@/lib/location";
@@ -201,6 +202,8 @@ export function ServiceProviderOfferPage() {
           {project.status === "awarded" && existingOffer?.status === "approved" && (
             <div className="mt-4 text-ink"><AgreementPanel projectId={project.id} /></div>
           )}
+          {/* Stage 8.4: the winner's review of the owner, once the transaction is completed. */}
+          {project.status === "awarded" && existingOffer?.status === "approved" && <OwnerReview projectId={project.id} />}
           {/* Stage 5.16: the provider's own offer in full, as it stands -- read-only now offers have closed. */}
           {existingOffer && (
             <div className="mt-4 text-start">

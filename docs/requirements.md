@@ -861,4 +861,767 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - **Both parties:** the agreement shows "Completed" with its date, and the execution status shows "Completed".
     - **No edit controls** remain once completed: progress, evidence, papers, changes, termination, deliverables.
 
-_Stage 7 onwards is added as it is implemented._
+- **7.12 Financial status:**
+  - **Audit:**
+    - **Billing is subscription-only.** The existing billing (`routers/billing.py`, `services/stripe_service.py`) is the providers' U-Tender subscription: Stripe checkout, portal and webhook. Nothing records payments, invoices or settlement between owner and provider.
+    - **Not applicable:** amounts paid, outstanding balance and payment status. They can't be derived truthfully, so none are shown.
+    - **Already working:** the immutable awarded amount (award record); the current agreed value as the award plus agreed variations, each keeping its before and after (7.8); one marketplace currency with no conversion; access limited to the parties and admins; losing bidders get no amount.
+    - **Partly there:** no net of agreed changes, and no statement about payments.
+  - **Added:**
+    - **`agreed_changes_total`:** the server-derived net of agreed variations. Original + this = current. Pending proposals don't count.
+    - **`payment_tracking: "not_managed"`.**
+    - **UI:** the agreement summary shows the current value (the "Final agreed value" once completed), the originally awarded value and the agreed changes when they differ. A Payments line says payments are not tracked by U-Tender and are settled directly between the parties.
+  - **Unchanged by design:**
+    - **Completion and payment are independent.** A completed transaction stays completed with no payment state invented.
+    - **Subscription billing** never appears in a transaction response.
+    - **No request can set a value.** Values are always derived, and extra fields are ignored.
+
+- **7.13 Transaction history:**
+  - **Audit:**
+    - **Already working:**
+      - requirement versions and amendments (Stage 3) and offer revisions (Stage 5), each readable by its own side;
+      - the award record (winning offer, its revision, the requirement version answered, value, time, who awarded);
+      - the agreement's write-once times;
+      - the add-only execution history (start, progress, hold, resume, deliverable and whole-work delivered / accepted / returned);
+      - variations with their before and after values;
+      - document metadata;
+      - the admin audit log.
+    - **Partly there:** the parties' history covered execution only. The award, the agreement coming into force, its papers, changes, termination and completion lived in separate records with no shared order, and second-resolution timestamps from separate tables can't order same-second events.
+  - **Fixed (migration 0056):**
+    - **One ordered log.** The other business events (`in_force`, `document` for the agreement's own papers, `change_proposed` / `agreed` / `rejected` / `withdrawn` / `lapsed`, `terminated`, `completed`) are now written to the same execution-history log, in the same request as the event itself.
+    - **Numbering:** the log is already numbered under the requirement's lock, so its order is the order the server applied events.
+    - **Links:** `execution_updates.variation_id` and `document_id`.
+    - **Backfill:** existing agreements get these events from the times already recorded, and each agreement's log is renumbered in time order.
+    - **`timeline`** on the agreement response: the award first, with its original value, then the log. Each entry gives its server time, the party, the member's name (own side and admins only), the note, the deliverable, the change number with its value change and resulting value, or the document.
+    - **What stays unchanged:** `execution_history` still lists execution entries only. Evidence stays on its entry or deliverable and doesn't become a timeline event.
+  - **Integrity:**
+    - Every entry is written once and never edited.
+    - A retried or concurrent request that is refused (completed, already decided, stale) writes nothing, so the history has no duplicates.
+    - Current values never rewrite it: the award entry keeps the original value.
+    - The timeline is part of the agreement response, so only the parties and admins read it.
+  - **UI:** the Execution section's list is now the full History. Each line shows the date, party and event (amounts for the award and changes, the document name), and progress entries keep their evidence.
+
+- **7.14 Post-award access:**
+  - **Audit (no gap found):**
+    - **One gate for every endpoint.** Every agreement, document, execution, deliverable, change, completion and history endpoint goes through one server-side check, decided per request from current state:
+      - the requirement is awarded and has its agreement;
+      - the caller is the owner side (its organisation's current members) or the winning provider's side (its organisation's current members, account not suspended, requirement not suspended);
+      - admins can read only.
+    - **Child ids:** deliverable, change, document, progress-update and offer ids are each checked to belong to that same agreement or requirement.
+    - **Files:** they open only through that check, then a one-minute signed link; storage keys are never public.
+    - **Roles:** organisation members share one role (an invitation must match it), and each action checks the side as well as membership (owner-only, provider-only, the other party only).
+    - **Stage 6 records:** the owner's offer inbox, offer pages, history, clarifications, notes, shortlist, comparison and offer files stay owner-side only after award. The winner never receives a losing offer's id, content or files.
+    - **Losing bidders** see only "awarded to a successful bidder".
+    - **Completion** (7.11) keeps reading and closes writing.
+    - **Membership changes:** a removed member loses access from their next request. Organisations can't dissolve once anything is published, since leaving is only possible before verification.
+    - **Suspension:** a suspended winner loses sight of the transaction. A suspended owner keeps read-only access, the existing owner policy.
+  - **Added:** `tests/test_stage7_14_access.py`, a sweep of every post-award endpoint as:
+    - the losing bidder, another owner organisation, another provider organisation, and a signed-out user;
+    - every member of both sides, and an admin (read-only);
+    - the winner against the Stage 6 owner endpoints and the losing offer's files;
+    - a removed member, a suspended winner, a suspended owner, and after logout;
+    - after completion.
+  - **Known, unchanged (existing design):** an access token stays valid for its short lifetime (30 minutes) after logout if replayed outside the browser. Logout clears the browser's cookies and revokes the refresh token.
+
+- **7.15 Post-award integrity under concurrent actions:**
+  - **Audit:**
+    - **Serialized decisions (working):** every post-award change (agreement, documents, start, progress, deliverables, changes, completion, termination) and every Stage 6 decision runs under one row lock on the requirement (`lock_project`, `SELECT … FOR UPDATE`), with the state checked under it. Stale pages get the agreement, deliverable or change version check (409), with the explanation and refresh from 7.6.
+    - **Once-only records (working):** backed by unique constraints: one award per requirement, one agreement per award and per requirement, history numbers unique per agreement, change numbers unique per agreement.
+    - **History in the same transaction (working):** each history entry and audit row commits together with its state change, so a refused or failed change writes none.
+    - **Notifications (working):** best-effort after the commit, never undoing it, and unread ones merge.
+    - **Background jobs (working):** the expiry sweep moves only open or draft requirements and skips locked rows; the cron job only sends reminders for open requirements. Neither touches awarded or post-award records.
+    - **No payment records exist**, so there are none to duplicate (7.12).
+    - **Gap — invalid in production:** the app's MySQL connections ran at the default REPEATABLE READ. InnoDB fixes a transaction's snapshot at its first plain read. A request that had read anything (its user, during authentication) before waiting for the requirement lock therefore went on reading the agreement, deliverables and changes from that earlier snapshot once it had the lock. It could judge "already accepted?" or "already completed?" on state another request had just committed, which allows a double acceptance, a decision on a settled change, or a duplicate history entry.
+    - **Why tests missed it:** the MySQL test setup replaces the app's engine with a READ COMMITTED one, so tests never ran the production setting.
+  - **Fixed:**
+    - `app/db.py` now opens MySQL connections at READ COMMITTED (`engine_options`). Every statement sees the latest committed data, so a check made under the lock sees what the previous holder committed. Production now matches what the race tests verify. SQLite is unchanged.
+  - **Tests (`tests/test_stage7_15_integrity.py`):**
+    - **Regression:** a request built with the production settings reads first, waits for the lock while another owner accepts, then must see accepted and completed. It fails at REPEATABLE READ and passes with the fix.
+    - **Races:** completion racing termination (three rounds), and a change proposal racing the completion submission. Exactly one stands, and the history records the one outcome.
+    - **Background:** the expiry sweep leaves a completed transaction alone.
+    - **Existing races still pass:** award and decision races (6.15), double start, hold/resume, accept/return/re-deliver, simultaneous proposals and answers, double completion.
+
+- **7.16 Final Stage 7 audit (end to end):**
+  - **The journey, as one test:** `tests/test_stage7_16_end_to_end.py` runs one real transaction through the actual API: annual MEP maintenance of a Sharq tower. A two-member owner organisation awards a two-member facilities company over a cheaper individual bidder.
+    - **Owner and provider steps:** create → publish → provider discovers it in the feed and passes eligibility → two offers → close → review, including the loser's documents → private note → award.
+    - **Handover:** both organisations' four members see the same award, offer, parties and value; the loser sees only the outcome.
+    - **Agreement:** deliverables set out by both owner members, a signed paper and an insurance certificate, PO reference and effective date, in force.
+    - **Execution:** a provider member (not the representative) starts the work and records progress with a photo. A deliverable carries a site report; it is delivered, returned for correction, delivered again and accepted. A change is proposed by the provider (+KWD 2,400, adding a deliverable) and agreed by the owner; the provider can't agree its own. The remaining deliverables are delivered and accepted.
+    - **Closing:** the work is submitted, accepted and completed; the retry is refused.
+  - **Checked at each boundary:**
+    - **Identity:** the same requirement, award, offer, agreement and organisations throughout.
+    - **Documents:** each kept in its own context: offer documents, agreement papers, progress evidence, deliverable evidence.
+    - **Money:** original KWD 18,000, agreed changes +2,400, final 20,400, payments not tracked.
+    - **History:** in order (awarded → in force → started … returned … change agreed … completed once), with the award entry at the original value.
+    - **After completion:** every document still opens; every old action (progress, deliver, evidence, accept, change, submit) is refused.
+    - **Access:** the losing bidder, another organisation and a signed-out user are refused, documents included. The winner can't reach the owner's notes or the losing offer's files, and its responses carry nothing of the losing price or notes. The admin can read.
+    - **Database:** one agreement, one change, three deliverables, every document on this agreement, one unbroken history with no duplicates, and the award and winning offer unchanged.
+  - **Result:** passes on SQLite and MySQL, together with every Stage 7 test (7.1–7.15) and the Stage 6 award and decision race tests.
+  - **No code changes were needed:** the only cross-stage defect found in Stage 7 was the REPEATABLE READ isolation level, fixed in 7.15.
+
+## Stage 8 — Trust and reputation
+
+- **8.1 Completion boundary:**
+  - **Audit:**
+    - **Already working:** Stage 7 records one authoritative completion: the agreement is closed as `completed` by the owner side's acceptance of the whole work (7.10/7.11), with `completed_at` at server time, written once, never reopened. It appears in the history (7.13), notifies the provider, and is audit-logged.
+    - **Invalid:** the existing owner review of the provider (`POST /owner/reviews`, the rating form on the owner's requirement page) opened as soon as the requirement was awarded, before any work had been done or accepted. The review also feeds the provider's public average rating.
+  - **Fixed:**
+    - **`app/services/transactions.py` → `completed_transaction(db, project_id)`:** the one definition of a completed transaction for Stage 8, namely the completed agreement. It is not a new state or record.
+    - **Review endpoint:** now requires a completed transaction. Awarded, in force, executing, on hold, returned, delivered or submitted awaiting acceptance, terminated, cancelled, no award, expired and closed externally all stay ineligible.
+    - **Owner page:** shows the rating form only once the transaction is completed (an existing review still shows).
+    - **Older tests:** two tests that reviewed straight after the award now complete the transaction first (`tests/stage7_helpers.py`).
+  - **Unchanged:** the review's provider still comes from the award, never the request; one review per requirement.
+- **8.2 Transaction outcome:**
+  - **No new record needed.** The completed Stage 7 transaction already holds the outcome, from authoritative, write-once data:
+    - **requirement:** the agreement's requirement, and the version awarded on (`award_records.project_revision`, the offer's `based_on_material_revision`);
+    - **parties:** the owner organisation (the requirement's) and the provider organisation (the winning offer's);
+    - **winning offer and award;**
+    - **value:** the original awarded value; each agreed variation with its before and after values; the final agreed value, derived and frozen once completed;
+    - **ending and time:** the outcome (agreement `completed`, or `terminated` with its reason) and `completed_at`.
+  - **Other endings:** cancelled, no award, closed externally (no award with its own closure reason) and expired have no agreement, so they can never be taken for completed business.
+  - **Duplicates and staleness:** retries, stale pages and late changes are refused (7.11), so the outcome has no duplicate and can't be rewritten.
+  - **Access:** the parties and admins (read-only) read it; the losing bidder and other organisations can't.
+  - **Payments:** not tracked, and not part of the outcome.
+  - **Tests:** `tests/test_stage8_1_completion_boundary.py` and `tests/test_stage8_2_outcome.py` prove these points.
+
+- **8.3 Owner reviews the service provider:**
+  - **Audit:**
+    - **Already working:** the review (`reviews`: one per requirement, unique; whole-number rating 1–5 enforced by a database check; optional comment). The reviewed provider is always the award's, never the request's (the PASS 17 fix). It requires a completed transaction (8.1), and the provider's public average is recomputed from all its reviews. The owner page shows the review once recorded.
+    - **Gaps found:**
+      - **Authorization:** the endpoint needed only an owner role, so a suspended or unverified owner could record a review, unlike every other owner action.
+      - **Duplicates:** two simultaneous submissions both passed the "already reviewed?" check and the second failed on the unique constraint with a 500.
+      - **Atomicity:** the review and the provider's recomputed rating were two commits, with no audit entry.
+      - **Input:** the comment had no length limit and wasn't trimmed. Callers had to send a `service_provider_id` the server ignores.
+  - **Fixed (`app/routers/owner.py`, `app/schemas/review.py`):**
+    - **Authorization:** the review now goes through `_get_owned_project(lock=True)`, which takes the requirement's lock and requires an active, verified account. Any member of the owner organisation can review; providers, other owners and the signed-out can't.
+    - **Duplicates:** a second review (a retry, a colleague, another tab) is an explained 409.
+    - **One transaction:** the review, the provider's recomputed rating and a `review.create` audit entry commit together; a failure records none of them.
+    - **Input:** the rating is a strict whole number 1–5 (no coercion from text or decimals). The comment is trimmed, at most 2,000 characters, and a blank one becomes none. `service_provider_id` is optional, and still ignored. `created_at` is returned in UTC.
+  - **UI:** the owner confirms before submitting ("A review can't be changed afterwards"). The comment box has the limit and a label. A refused submission reloads what's on record.
+  - **Tests:** `tests/test_stage8_3_owner_review.py`.
+
+- **8.4 Provider reviews the owner (and the 8.3 notification fix):**
+  - **Audit:**
+    - **Already working:** the owner → provider review (8.3) and its rules: a completed transaction (8.1), the subject taken from the transaction, the requirement lock, an active account, a single atomic save with its audit entry.
+    - **Missing:**
+      - **A review in the other direction:** the review record was one-directional (one per requirement, with `owner_id` holding the reviewing owner user).
+      - **A notification:** neither party was told when reviewed.
+    - **Reused:** the owner party's stable identity, `projects.owner_id` (the owner stakeholder that created the requirement), like `award_records.service_provider_id` for the provider.
+  - **Changed (migration 0057), one review table extended, not a second one:**
+    - **`reviews.direction`** (`owner_to_provider` / `provider_to_owner`) and `reviews.reviewer_id` (the member who wrote it).
+    - **Parties:** `owner_id` and `service_provider_id` always name the transaction's two parties, from the requirement and the award, never from the request. Existing rows keep their writer in `reviewer_id`.
+    - **Uniqueness:** one review per transaction per direction (`uq_review_project_direction` replaces `uq_review_project`).
+    - **`services/reviews.record_review`:** both directions run the same checks:
+      - **eligibility:** a completed transaction;
+      - **duplicates:** an explained 409;
+      - **one transaction:** review, provider rating (owner reviews only), and an audit entry `review.owner_to_provider` / `review.provider_to_owner`;
+      - **notification:** a best-effort `review_received` to the reviewed party's organisation, without the content.
+    - **Endpoints:**
+      - **`POST /service-provider/reviews` and `GET /service-provider/projects/{id}/review`:** any member of the winning provider's side, approved and unsuspended, under the requirement's lock. Losers, other organisations and other transactions get 404; owners get 403.
+      - **Owner endpoint:** reads and writes only the owner's own direction.
+    - **The 8.3 fix:** the provider's organisation is now notified when the owner reviews it.
+    - **Provider rating:** the public average counts owner reviews only.
+  - **UI:** the winner's offer page shows a review of the owner once the transaction is completed: rating and comment, a confirmation, then its own review.
+  - **Tests:** `tests/test_stage8_4_provider_review.py`.
+
+- **8.5 Review integrity:**
+  - **Audit (8.3/8.4 re-checked from scratch):**
+    - **Endpoints:** exactly four review endpoints (owner GET and POST, provider GET and POST). None edits, deletes or reaches a review by its id; reviews are immutable, and admin only counts them (to block deleting a reviewed provider).
+    - **Server-side identity:** reviewer, parties and transaction all come from the server. Request ids such as `owner_id`, `service_provider_id`, `reviewer_id`, `direction` and `id` are ignored.
+    - **One eligibility rule:** a completed transaction (8.1), checked under the same requirement lock completion uses.
+    - **Duplicates:** one review per direction per transaction, guarded in the application (explained 409) and by the database (`uq_review_project_direction`).
+    - **Membership and roles:** checked per request. A provider can't use the owner endpoint, nor an owner the provider endpoint.
+    - **Notifications:** sent only after a review is committed, to the reviewed party's organisation, without content.
+    - **Gaps found:**
+      - **Suspension (owner direction):** the owner direction didn't refuse a requirement an admin has suspended; the provider direction and all other post-award writes did.
+      - **Database guarantees:** nothing at the database level guaranteed a valid direction, or that the two parties differ.
+  - **Fixed:**
+    - **`services/reviews.record_review`:** refuses a suspended requirement, so both directions now behave the same.
+    - **Migration 0058:** `ck_review_direction` (one of the two directions) and `ck_review_two_parties` (`owner_id <> service_provider_id`), alongside the existing rating-range check.
+  - **Tests:** `tests/test_stage8_5_review_integrity.py`:
+    - **Abuse attempts:** losing provider, unrelated owner, cross-transaction attempts in both directions, endpoint and direction swaps, no session. None creates a review or a notification.
+    - **Tampering:** tampered ids are ignored, and both reviews are bound to their transaction's parties and reviewers.
+    - **Duplicates and immutability:** duplicates are refused in both directions, and there is no edit, delete or by-id access.
+    - **Isolation:** each side reads only its own review.
+    - **Standing:** a removed member and a suspended requirement are refused.
+    - **Database:** refuses an invalid direction, the same party on both sides, an out-of-range rating, and a second review in one direction, even when written directly.
+
+- **8.6 Review visibility:**
+  - **Visibility model (authenticated only; nothing public):**
+    - **Reviewer's side:** sees the review it wrote (`GET …/review`).
+    - **Reviewed side:** sees the review it received (`GET …/review/received`). The whole organisation sees it, by current membership.
+    - **Owners evaluating a provider:** see only the aggregate already on offers (`service_provider_avg_rating` and `service_provider_review_count`). They never see review text or the earlier transaction. The provider's detailed profile is 8.7.
+    - **Owner reputation for future providers:** none yet; that is 8.8.
+    - **Admin:** keeps aggregates and audit entries; there is no review-content endpoint.
+    - **Everyone else:** losing providers, unrelated users, former members and visitors with no session get 404, 403 or 401.
+    - **Timing:** a review is visible as soon as it is committed, never before. A refused or duplicate submission shows nothing new.
+  - **Gap found:** the reviewed party couldn't read the review it received in either direction, although 8.3/8.4 notified it of the review.
+  - **Fixed:**
+    - **Endpoints:** `GET /owner/projects/{id}/review/received` and `GET /service-provider/projects/{id}/review/received`, behind each side's existing transaction gate (`owns()` / `_winning_side`).
+    - **Response:** returns `ReceivedReviewOut` with only `rating`, `comment` and `created_at`. It has no ids and no reviewer account; the counterparty organisation is already named on the page.
+    - **UI:** a `ReceivedReview` block on the owner's requirement page and on the winner's offer page.
+  - **Tests:** `tests/test_stage8_6_review_visibility.py`.
+
+- **8.7 Service provider reputation profile:**
+  - **Already working:**
+    - **Rating:** the provider's `avg_rating` and `review_count` on its organisation profile come from owner reviews only. They are recalculated from the records on every new review; reviews are immutable, so they stay correct.
+    - **Offers list:** owners already saw the rating there; it never orders offers or affects eligibility, verification or award.
+    - **Integrity and identity:** inherited from 8.5. Offers, awards and reviews are recorded under the organisation's profile id, never an employee's.
+  - **Gaps found:**
+    - **No completed-transaction count** anywhere.
+    - **Recent reviews:** owners couldn't see any review text, and the provider had no overview of its own reviews.
+    - **Zero history:** a provider with no reviews showed `☆☆☆☆☆ (0)`, which reads like a poor rating.
+  - **Fixed:**
+    - **`services/reputation.provider_reputation`:** reads everything live in four constant queries, with no N+1 and no stored second copy. It returns:
+      - `completed_transactions`: agreements with status `completed` (the Stage 7 definition), joined through the award to the provider;
+      - `review_count`, and the simple average `avg_rating` (`None` when there are no reviews);
+      - the five latest owner reviews, each with rating, comment and date only: no owner, requirement, amounts or ids.
+    - **Endpoints:**
+      - `GET /service-provider/reputation` (its own organisation, by current membership);
+      - `GET /owner/projects/{id}/offers/{offer_id}/reputation`. This has the same gate as reading the offer (the owner's requirement, unsealed, live, not suspended). The provider is always the offer's, never one named in the request.
+    - **UI:**
+      - `ProviderReputation` on the owner's offer page and the provider's dashboard: "No completed U-Tender transactions yet", otherwise "N completed · avg / 5 · n reviews", plus the recent reviews and an informational-only note.
+      - The offers list shows "No owner reviews yet" instead of 0 stars.
+  - **Tests:** `tests/test_stage8_7_provider_reputation.py`.
+
+- **8.8 Owner reputation profile:**
+  - **Already working:**
+    - **Provider reviews of owners** (8.4/8.5) are recorded against `project.owner_id`. That is the owner organisation's acting profile id, never the employee who raised the requirement.
+    - **Completion state** is authoritative (Stage 7).
+  - **Gaps found:**
+    - **No owner reputation anywhere:** no counts, average or reviews for the owner itself, and nothing for providers weighing its requirements.
+  - **Fixed:**
+    - **`services/reputation.owner_reputation`:** shares the 8.7 query helper and reads everything live in constant queries. It returns:
+      - completed agreements on the owner's requirements;
+      - the count and simple average (`None` when there are none) of `provider_to_owner` reviews only;
+      - the five latest reviews (rating, comment, date).
+    - **Endpoints:**
+      - `GET /owner/reputation` (the organisation's, by current membership);
+      - `GET /projects/{id}/owner-reputation`, for whoever may open the requirement (`_can_view_project`). The owner is the requirement's, never one named in the request.
+    - **Owner anonymity:** a provider gets counts and average only, with no review text, because the owner is anonymous to it before award (Stage 7.2) and review text could name it. The owner side and admin also get the recent reviews.
+    - **UI:** the shared `Reputation` component (renamed from 8.7's `ProviderReputation`):
+      - on the owner dashboard: its own record;
+      - on the provider's requirement view: the owner's track record.
+  - **Tests:** `tests/test_stage8_8_owner_reputation.py`.
+
+- **8.9 Review responses (reviews stay immutable):**
+  - **Already working:**
+    - **Reviews are immutable by design (8.5):** there is no edit, delete or by-id path, a resubmission gets 409, and the UI states it before submission. Correction is therefore intentionally not supported, and none was added.
+    - **Reputation (8.7/8.8)** reads the authoritative review rows.
+  - **Gaps found:**
+    - **No response:** the reviewed party had no way to answer a review.
+  - **Fixed:**
+    - **Storage (migration 0059):** the reviewed side's one, final response is kept on the review row: `response`, `response_at` (server time), `responded_by` (the member).
+      - `ck_review_response_complete` requires the text and the time together.
+      - The `review_response` notification type is added.
+    - **`services/reviews.record_response`:** sets only the response fields, never rating, comment, reviewer or parties, so no reputation changes. It refuses:
+      - a suspended requirement (400);
+      - no review (404);
+      - an existing response (409, explained);
+      - blank text (400).
+      - It also writes an audit entry (`review.response.<direction>`) in the same transaction, and tells the reviewer's organisation after the commit (no loop).
+    - **Endpoints:**
+      - `POST /owner/projects/{id}/review/received/response`, under the owner-side lock gate;
+      - `POST /service-provider/projects/{id}/review/received/response`, under `_winning_side(lock=True)`, approved accounts only.
+      - The responding party is the review's subject, from the transaction; the reviewer, other organisations, losers and former members are refused (403/404).
+    - **Visibility (8.6):** the response travels only with its review (`ReviewOut`, `ReceivedReviewOut`, reputation `recent_reviews`). Providers weighing an owner still see counts only.
+    - **UI:**
+      - `ReceivedReview` takes a response, with a confirmation first.
+      - `ReviewResponse` shows it under the review on both sides and in the reputation lists.
+  - **Tests:** `tests/test_stage8_9_review_response.py`.
+
+- **8.10 Review and reputation integrity audit (8.1–8.9 re-checked in code):**
+  - **Already working:**
+    - **Chain:** every review rests on an Agreement with status `completed`, checked under the requirement lock that completion also takes.
+    - **Parties come from the server:** the requirement's `owner_id` and the award's provider, both organisation profile ids; the reviewer is the member. Request ids are ignored, and self-review is blocked in the database (`ck_review_two_parties`).
+    - **Duplicates:** at most one review per direction per transaction (lock, `uq_review_project_direction`, explained 409), and one response per review (lock, explained 409).
+    - **Ratings:** whole numbers 1–5 in strict validation and a database check.
+    - **Reputation:** read live from authoritative rows with transparent simple averages; directions are never mixed. Responses never touch ratings, and reviews stay immutable.
+    - **Access:** decided by current membership, so former members lose it. Outsiders, losers, the wrong role, no session and substituted ids all get 401/403/404.
+    - **Data exposure:** review and reputation responses carry only rating, comment, dates and the response. The model has no ORM relationships, so nothing nested can leak, and notifications carry no content.
+    - **Owner anonymity:** providers weighing an owner see counts and average only, preserving Stage 7.2.
+  - **Gap found (MySQL, concurrency):** owners of different requirements reviewing the same provider at the same moment could deadlock on its profile row (one review failed with a server error) or store a stale `review_count`/`avg_rating`, the figures shown on offers. The cause: the recount ran under each requirement's lock only.
+  - **Fixed:** `record_review` locks the provider's profile row (after the requirement lock, always in that order) before inserting an owner review. Concurrent reviews of one provider now queue, and each recount sees the earlier ones.
+  - **Tests:** `tests/test_stage8_10_reputation_integrity.py`:
+    - an end-to-end chain in both directions with responses, forged ids, replays, invalid ratings, outsiders, substituted ids, a former member and a cancelled requirement;
+    - a MySQL concurrency test: four owners reviewing one provider at once, plus two members reviewing and responding at once.
+
+- **8.11 Similar requirement after a completed transaction:**
+  - **Already working (Stage 3.16 restart, `POST /owner/projects/{id}/restart`):**
+    - A **new draft** with a new id, owned by the source's organisation (`owns()`; other owners get 404, providers 403).
+    - **Copied:** description, items (new rows), rules, eligibility, response requirements, and current files as fresh storage copies.
+    - **Never copied:** state, deadline (a new placeholder), publication, offers, award, transaction, reviews, clarifications or history.
+    - **Records:** `restarted_from_id`, a `project.restart` audit entry, and a `creation_token`, so a retry returns the same draft.
+    - **Validation:** the normal draft, quality, preview and publish flow re-validates everything, including dates against the new deadline.
+  - **Gaps found:**
+    - **Completed requirements:** restart refused them; it accepted only cancelled, no-award or expired requirements.
+    - **Suspended requirements:** restart didn't refuse a requirement an admin had suspended, so its content could be copied into a new requirement.
+  - **Fixed:**
+    - **Completed transactions:** restart also accepts an awarded requirement whose transaction is completed (`completed_transaction`, Stage 7). Open, awarded-but-unfinished and draft requirements are still refused.
+    - **Suspension:** a suspended requirement is refused.
+    - **UI:** "Create similar requirement" (the existing `StartAgain` button, with its own confirmation wording) on a completed requirement's page. It leads into the normal draft flow.
+  - **Tests:** `tests/test_stage8_11_similar_requirement.py`.
+
+- **8.12 Previous providers (owner side):**
+  - **Already working:**
+    - **Data:** completed transactions (Stage 7) already record the owner organisation (`project.owner_id`) and the provider organisation (`award.service_provider_id`).
+    - **Fairness:** offers are ordered by submission, never by merit. Eligibility (3.9/4.5) and award (6.x) are enforced on every request. 8.11 reuse copies no provider, offer or award.
+    - **Discovery:** owners have no provider search, invitations or favourites; they meet providers only through offers on their own requirements. Nothing was added there.
+  - **Gaps found:**
+    - **No marker:** an owner couldn't tell a provider it had completed work with from one that had only bid.
+  - **Fixed (derived from completed transactions; no new table):**
+    - **`services/reputation`:**
+      - `completed_together`: one grouped query counting the owner organisation's completed transactions with each provider;
+      - `previous_providers`: each provider once, with its completed requirements (title and date).
+    - **API:**
+      - `completed_with_you` on the owner's offers list, but never while a sealed tender is open, and on the offer's reputation block;
+      - `GET /owner/previous-providers` (its own organisation, by current membership).
+    - **Rules:** purely informational: no ordering, scoring, eligibility or award effect.
+    - **UI:**
+      - "Completed work together: N" beside an offer and in its reputation block;
+      - "Providers you've completed work with" on the owner dashboard. Its note says that working with one again means publishing a normal, open requirement.
+  - **Tests:** `tests/test_stage8_12_previous_provider.py`.
+
+- **8.13 Previous owners (provider side):**
+  - **Already working:**
+    - **Data:** completed transactions record both organisations.
+    - **Feed:** the provider feed (Stage 4) already surfaces an owner's new requirements to every eligible provider, the previous one included, in the same order and with the same eligibility (3.9/4.5) and suspension rules.
+    - **Notifications:** the `new_requirement` notification already tells eligible providers. No repeat-business notification was added.
+    - **History:** my-bids lists the provider's own transactions.
+    - **Contact:** providers have no channel to contact owners outside a requirement, and none was added.
+  - **Gaps found:**
+    - **No list of past customers:** a provider couldn't see, as an organisation, which owners it had completed work for.
+  - **Fixed (derived from completed transactions; no new table):**
+    - **`services/reputation.previous_owners`:** each owner once (by `project.owner_id`, the organisation), with its completed requirements (title and date).
+    - **Owner name only:** the organisation's legal name or the individual's name, which the provider already saw on award. Never an email, phone or other contact detail.
+    - **Endpoint:** `GET /service-provider/previous-owners` (its own organisation, by current membership).
+    - **UI:** "Owners you've completed work for" on the provider dashboard.
+  - **Deliberately not done:**
+    - **No "previous customer" label on feed items:** owners stay anonymous to providers until award (Stage 7.2), and such a label would reveal whose open requirement it is.
+  - **Tests:** `tests/test_stage8_13_previous_owner.py`.
+
+- **8.14 Trust signals during a competition:**
+  - **Already working:**
+    - **Offers list (8.7/8.12):** the provider's stored average and review count (which equal the live figures since 8.10), and "Completed work together".
+    - **Offer page (8.7):** the full track record.
+    - **Providers weighing an owner (8.8):** counts and average only.
+    - **No effect on the competition:** offers are ordered by submission (comparison: the owner's chosen order). Eligibility, validity, pricing and award ignore reputation, and there is no score or recommendation anywhere.
+    - **While sealed:** every trust field is withheld.
+  - **Gaps found:**
+    - **Comparison (Stage 6.6):** the main decision view showed no trust information at all.
+    - **No completed count beside offers:** neither the list nor the comparison showed a provider's completed transactions.
+    - **Average without its count:** the list showed stars with a bare `(n)`.
+  - **Fixed:**
+    - **`_with_track_record`:** shared by the inbox and the comparison. It fills `service_provider_completed_transactions` and `completed_with_you` with two grouped queries per page (`completed_counts`, `completed_together`): no N+1, never while sealed, and nothing taken from the request.
+    - **`TrackRecord` component:** beside each offer in both views, it shows "N completed U-Tender transactions · avg / 5 · n reviews". A provider with no history shows "No completed U-Tender transactions yet". "Completed work together" appears where it applies.
+    - **List rating:** now reads "avg / 5 · n reviews".
+  - **Tests:** `tests/test_stage8_14_trust_signals.py`.
+
+- **8.15 Abuse resistance and moderation:**
+  - **Already working:**
+    - **Integrity (8.5/8.10):** reviews come only from the parties to a completed transaction; ids from the client are ignored; self-review, duplicates and concurrent submissions are blocked; ratings are strict 1–5.
+    - **Immutability (8.9):** reviews can't be edited or deleted, and one final response goes to the reviewed side.
+    - **Safe rendering:** all review text is rendered by React as text (no raw HTML anywhere), and notifications carry no content.
+    - **Admin access:** the admin router is gated server-side (`require_admin`).
+  - **Gaps found:**
+    - **No reporting:** nothing let a party report an abusive review or response.
+    - **No moderation:** an admin could not take abusive content out of view or out of ratings.
+  - **Fixed:**
+    - **Migration 0060:**
+      - `review_reports`: review, target (review or response), reporter, reason, optional note, status (open / kept / hidden), the deciding admin, time and note. Unique per review and target.
+      - `reviews.hidden_at` and `reviews.response_hidden_at`.
+    - **Reporting** (`POST /owner|service-provider/projects/{id}/review-reports`): under each side's existing gate.
+      - The reviewed side may report the review about it, and the reviewer side the response to its review.
+      - Each item can be reported once (explained 409).
+      - A report changes nothing and is audited.
+      - The reported party never sees who reported it.
+    - **Moderation** (`GET /admin/review-reports`, `POST /admin/review-reports/{id}/decision`): keep or hide, decided once, under the requirement lock and then the provider lock, and audited.
+      - **A hidden review:** stops being shown (`shown_review_of`) and counted, both in the live reputation and in the stored provider rating (recomputed). It stays on record with its parties and rating, can't be re-submitted and takes no response. Its author sees "hidden" (`ReviewOut.hidden`).
+      - **A hidden response:** stops being shown (`shown_response`) and stays on record.
+      - **Admin view:** only the report, the content and the parties' names.
+    - **UI:**
+      - A "Report this review / response" control (reason and note, explaining that disagreement belongs in a response).
+      - A "Reported reviews" admin page with Keep and Hide.
+  - **Tests:** `tests/test_stage8_15_review_moderation.py`.
+
+- **8.16 Stage 8 audit (8.1–8.15 re-checked end to end):**
+  - **Chain:** completed transaction (7.11, terminal) → review from a party's current members, against the transaction's own parties → reputation read live from shown reviews → informational repeat context.
+    - Terminated, cancelled, lost and unfinished work never yields a review, a count or a relationship.
+  - **Hidden reviews (8.15):** every reader is consistent.
+    - The author's own view (`review_of`, flagged `hidden`) and the one-review rule include hidden reviews.
+    - Everything others see, and every rating, live or stored, excludes them (`shown_review_of`, the reputation filter, `_recount_provider`).
+  - **Gaps found:** two misleading texts in the UI.
+    - **"Public rating":** the owner's review confirmation called the provider rating "public", but it is shown only to signed-in owners weighing an offer (8.6).
+    - **Stale report message:** a repeated report answered "U-Tender is looking at it" even after a decision.
+  - **Fixed:**
+    - **Confirmation text** (English and Arabic): "counts towards the service provider's rating, which owners see when weighing its offers".
+    - **Repeated report:** now answers "This has already been reported to U-Tender."
+  - **Tests:** `tests/test_stage8_16_trust_chain.py`:
+    - the whole chain, including a one-sided review, a kept negative review, both reputations, and a repeat requirement where the previous and the new provider compete on their offers and the new one wins;
+    - the old transaction unchanged and closed;
+    - termination, cancellation and losing yield nothing, in both directions.
+
+## Stage 9: operations
+
+- **9.1 Business operations and platform health:**
+  - **Already working:**
+    - **Admin lists:** requirements (with offer counts), offers, providers, owners and their details, with suspend controls.
+    - **Review work:** the verification review queue (providers; owners by detail page) and the reported-reviews page (8.15).
+    - **Access:** `/health` (liveness), and `/admin/*` gated server-side by `require_admin`.
+    - **Expiry:** past-deadline requirements are closed or expired on read (`sync_expired_projects`).
+  - **Gaps found:**
+    - **No overview:** the admin landed on the document-requirements settings. Nothing showed the marketplace's state or what needed attention without opening every list.
+    - **No job health:** nothing said whether the hourly deadline-reminder job, called by an external scheduler with no run log, was actually running.
+  - **Fixed:**
+    - **`services/operations.overview`, at `GET /admin/overview`:** runs `sync_expired_projects` first, so nothing expired counts as open. Every section is grouped `COUNT`s plus bounded lists (10, oldest first), never whole tables.
+    - **Stakeholder counting:** organisations and individuals each count once, never member rows.
+    - **Sections:**
+      - **Accounts:** owners and providers, verified, awaiting review, suspended; providers able to bid (the `is_verified_active` gate as SQL), verified without payment, payment failed.
+      - **Requirements:** by status, with "open with / without offers".
+      - **Offers:** counts only, no amounts, bidders or messages.
+      - **Transactions:** by status, on hold, completion awaiting the owner.
+      - **Attention**, each a count with the oldest few and their age:
+        - open requirements with no offers, especially those closing within 24 hours;
+        - closed requirements awaiting the owner's decision;
+        - completion awaiting the owner; transactions on hold; agreements not in force;
+        - providers and owners awaiting verification;
+        - verified providers whose payment failed;
+        - open review reports.
+      - **Background:**
+        - deadline reminders "overdue" when a reminder is still unsent an hour after its requirement entered the job's 24-hour window, "not determinable" when nothing is due;
+        - email delivery "not tracked". Neither is ever claimed healthy without evidence.
+    - **Failure handling:** each section is computed on its own; one that fails is logged and returns `available: false`, never zeros.
+    - **No invented thresholds:** only the reminder job's own window is used; everything else shows its age.
+    - **UI:** an admin "Overview" page, now the admin landing:
+      - "Needs attention" first, linking each item to its admin page, then the state counts;
+      - an "as of" time, a refresh button, and "Unavailable" for a failed section.
+  - **Tests:** `tests/test_stage9_1_operations.py`.
+
+- **9.2 Users and organisations through their lifecycle:**
+  - **Already working:**
+    - **Identity model:** person (`users`) → organisation (`organizations`) → membership (`organization_memberships`, representative or member). Authority is derived per request from current membership (`acting_profile`, `can_access`). Records are kept under the organisation's profile id, so they never follow a person.
+    - **Membership:**
+      - the representative invites, and only the invited email can accept;
+      - the representative removes members; a removed member loses the organisation at once while it, its other members and its records stay;
+      - the representative can't remove itself; all of this is audited.
+    - **Stakeholder state:** admin suspends or reactivates an organisation or individual (audited). New actions are refused and history stays readable.
+    - **Verification and eligibility (Stage 4):** enforced on every request, never cached in the client.
+    - **Sessions:**
+      - access tokens are short-lived and checked per request;
+      - refresh tokens rotate and are revocable at logout;
+      - a password change or reset kills older tokens;
+      - forgotten passwords can be reset.
+  - **Gaps found:**
+    - **No way to stop one person:** a compromised login, or someone who left while the representative is unavailable, could only be stopped by suspending the whole organisation.
+    - **Admins couldn't see an organisation's members:** only the representative and a count.
+    - **Member rows shown as stakeholders:** admin lists showed members' own (unused) profile rows, and suspending or verifying one did nothing.
+    - **Suspension notices:** they reached the representative only, so the other members were blocked without being told.
+  - **Fixed:**
+    - **Migration 0061:** `users.deactivated_at`.
+    - **Enforcement:** `get_current_user` refuses a deactivated account on every request (so every live session stops at once), and login and refresh refuse it with a clear message.
+    - **Admin endpoints:** `POST /admin/users/{id}/deactivate|reactivate`. They are admin-only, row-locked and idempotent (audited once), and never touch admin accounts. Memberships stay, so reactivation restores exactly the same organisation and rights.
+    - **Admin detail pages:** owner and provider pages list the organisation's members (representative first), with Deactivate/Reactivate (`AdminOrganizationMembers`).
+    - **Admin lists:** owner and provider lists show stakeholders only (`team.stakeholder_rows`, shared with 9.1). Admin actions on a member's own row are refused (409) with a pointer to the organisation.
+    - **Suspension:** suspend and reactivate notify everyone acting for the stakeholder (`notify_team`).
+  - **Tests:** `tests/test_stage9_2_account_lifecycle.py`.
+
+- **9.3 Operator view of a requirement's life:**
+  - **Already working:**
+    - **Admin detail:** the requirement with its offers. Sealed offers are visible to admins as platform oversight; owners stay sealed.
+    - **Admin edits** follow the owner's amendment rules (draft/open only, recorded amendments).
+    - **Suspend and delete:** admins can suspend requirements and offers. Deleting is refused once offers or an award exist (suspend instead); all of this is audited.
+    - **Read-only history:** admins can already read `/projects/{id}/amendments` and the agreement (timeline, deliverables, changes) and can change none of it.
+  - **Gaps found:**
+    - **Stale status:** the admin requirement list and detail didn't apply deadline expiry first, so a requirement past its deadline could show "open".
+    - **The trace stopped at the offers:** no version, no award, no resulting transaction or its history. Offers didn't show which requirement version they priced.
+  - **Fixed:**
+    - **Expiry first:** `sync_expired_projects` runs before the admin lists and detail.
+    - **`_decision_trace` in the admin detail:**
+      - `version` (material revision, amendment count);
+      - `award` (offer, provider, amount, date, and `offer_priced_on`, the material version the winning offer priced; `project_revision` is the requirement's edit counter, not its version);
+      - `transaction` (status, key dates, hold, completion awaiting, termination reason).
+    - **Admin offers:** each carries `based_on_material_revision` and `submitted_at`.
+    - **UI:** an `AdminDecisionTrace` section on the admin requirement page: version, award, transaction status and the transaction's own history from the existing agreement endpoint (read-only). Offers show "priced on vN", flagged when it's an earlier version.
+  - **Tests:** `tests/test_stage9_3_requirement_trace.py`, covering scenarios A–H.
+
+- **9.4 Supporting a customer:**
+  - **Already working:**
+    - **Each layer has its record:** the person (9.2: account state, membership), the organisation (`describe`: verification, eligibility, marketplace status), billing (provider detail: subscription status, override history), the requirement → award → transaction trace (9.3), and the overview's exceptions (9.1).
+    - **Customer-facing refusals:** every refusal tells the customer the business reason (eligibility reasons, explained 4xx), never "try again".
+    - **Safe admin actions:** verification decisions, document review, suspend, deactivate, moderation and the amendment-ruled edit. None can force a state, an offer or an award.
+  - **Gaps found:**
+    - **No diagnosis of other people's blockers:**
+      - an admin couldn't find a person by email (organisation members weren't listed after 9.2);
+      - nor see why a provider can't respond to a requirement, or where its offer stands;
+      - nor see what blocks a draft's publication. Those answers existed only for the customer themselves.
+    - **Unaudited changes to business state:** admin account deletion, admin edits to a provider's record, and changes to a document's expiry.
+    - **Deletion bug (MySQL only):** deleting any account that had ever acted failed with a server error (the audit log's foreign key).
+  - **Fixed (diagnostics are read-only, from the rules the marketplace enforces):**
+    - **`GET /admin/users?email=`:** the person, the stakeholder they act for, their role in it, and the state of both. No password, token or session data.
+    - **`GET /admin/projects/{id}/provider-check/{provider}`:** `participation()` and `ineligibility_reasons()` (exactly what the offer endpoints enforce), plus the provider's own offer: state, version priced, won.
+    - **`GET /admin/projects/{id}/quality`:** `requirement_quality.check` (what the Publish button runs), plus whether the owner may publish at all.
+    - **Audit entries:**
+      - admin provider-record edits (`service_provider.admin_edit`, with before/after);
+      - document expiry (`document.expiry_set`);
+      - account deletion (`owner.delete` / `service_provider.delete`, with who it was).
+    - **Deletion:** an account with recorded history isn't deleted (that would fail, or erase who did what); the admin is pointed to deactivation (9.2), which keeps the history. The more specific existing guards still answer first.
+    - **UI:**
+      - "Find a person" on the admin overview;
+      - "What blocks publishing" on a draft's admin page;
+      - "Why can't a provider respond?" (by email) on an open requirement's admin page.
+  - **Tests:** `tests/test_stage9_4_support_diagnostics.py`.
+
+- **9.5 Notifications:**
+  - **Already working:**
+    - **Commit first:** in-app notifications (`services/notify`) are written after the business change is committed, never before, so a notification is never proof of anything.
+    - **Recipients:** derived server-side from the record's own parties, and for an organisation from its current members (`notify_team` → `side_users`). A member who leaves stops receiving new notices; their old notices stay, but the links open nothing (each page enforces its own access).
+    - **No piling up:** unread notices are deduplicated per person, type and link. A repeat updates the one unread notice to the latest wording.
+    - **Sealed tenders:** the owner is told "A service provider" made an offer, with no name or amount, in-app and by email.
+    - **Coverage:** publication (eligible providers), amendments, pause/resume/close/end, clarifications, offers and revisions, award won/lost, execution, deliverables, changes, completion, reviews and responses, verification, suspension and overrides.
+    - **Emails are best-effort:** a failed send never fails the business action, and failures are logged.
+    - **Retries:** business actions are idempotent or refused with 409 on retry, so they don't send twice.
+  - **Gaps found:**
+    - **Billing (Stripe webhook):** subscription changes that open or close marketplace access notified no one; the `payment_*` types had no templates or caller.
+    - **Deactivated accounts (9.2):** they still received organisation notifications and emails.
+    - **Email failures:** only logged, invisible to the operator (9.1 showed "not tracked").
+  - **Fixed:**
+    - **Billing notices:** the webhook, after committing the state, notifies the provider's whole side when its marketplace access actually changes (`is_verified_active`, so access held through an admin override isn't misreported). It fires only on an actual change, so Stripe's retries and renewals never repeat it. Best-effort, with templates in English and Arabic.
+    - **Deactivated accounts:** `side_users` excludes them, `notify()` skips them, and `email._send` skips their address (checked in its own session).
+    - **Migration 0062: `email_failures`:** each failed send is recorded (recipient, subject, error), in its own session, never raising. The overview's email status reads "failing (N in 24h)", "no failures recorded" or "not configured". It is never presented as guaranteed delivery.
+  - **Tests:** `tests/test_stage9_5_notifications.py`, covering scenarios A–J.
+
+- **9.6 Billing and subscription operations:**
+  - **Already working:**
+    - **One authoritative state:** `subscription_status` on the provider's profile, set only by Stripe webhooks, which must be signed (missing or bad signature → 400; no client can set it). Stripe statuses fold into active / trialing / past_due / canceled.
+    - **Access:** decided on every request by `is_verified_active`: verified, unsuspended, and (active/trialing or an audited admin override). Owners are never billed.
+    - **Checkout and portal:** both reuse the Stripe customer and are open to approved providers only.
+    - **Failed processing:** returns 500 so Stripe retries, and nothing is half-written.
+    - **No payment details stored:** only Stripe ids. Subscription and marketplace money are separate (Stage 7.12).
+  - **Gaps found:**
+    - **Wrong stakeholder billed (real bug):** checkout recorded the clicking member's own user id. A non-representative member's subscription activated that member's unused personal row; the organisation stayed unpaid, and later webhooks followed the wrong mapping.
+    - **Stale events:** a late, older `customer.subscription.updated` event overwrote a newer state.
+    - **Missing facts for operator and provider:** the plan interval, a scheduled cancellation and the last billing event weren't recorded. The page said "renews" for a subscription about to end.
+    - **No audit:** Stripe-driven status changes left no record.
+  - **Fixed:**
+    - **Billing the right stakeholder:**
+      - checkout passes the billed profile's id (the organisation's);
+      - the webhook resolves the target by the subscription it holds, else by the recorded id mapped to the stakeholder that person acts for;
+      - a subscription an older checkout put on a member's row is moved to the organisation on its next event.
+    - **Migration 0063:** `subscription_interval`, `subscription_cancel_at_period_end` and `subscription_event_at`, on the same profile row (still one state).
+    - **Stale events:** an event older than the last applied one is ignored. Repeats are no-ops, and the 9.5 access notices fire only on a real change.
+    - **Audit:** each status change is recorded (`billing.subscription_status`, previous → new, Stripe event id).
+    - **UI:**
+      - the provider page shows the plan, and "cancelled: access ends <date>" instead of "renews";
+      - the admin provider page shows interval, renews/ends, last billing event and marketplace status.
+  - **Tests:** `tests/test_stage9_6_billing.py` (signed webhook payloads).
+
+- **9.7 Operational audit and traceability:**
+  - **Already working (one audit log, `audit_logs`):**
+    - **What it records:** actor, action, target type/id, before → after, reason and server time. Entries are written by `log_action`, usually in the same commit as the change, with the actor taken from the authenticated session.
+    - **Coverage:** requirement lifecycle (publish, pause, close, cancel, no-award, restart, admin edit or suspend), award, evaluation notes and shortlist, the agreement and execution, deliverables, changes, completion, reviews, responses, reports and moderation, membership, verification, suspension, overrides, deactivation, billing status (9.6), and admin edits and deletions (9.4).
+    - **Separate histories with their own order:** the agreement timeline (numbered, 7.13), offer revisions (5.x), amendments (3.17).
+    - **Integrity:** nothing edits or deletes an entry, and since 9.4 an account with history isn't deleted. Application errors go to the logger, not the trail.
+  - **Gaps found:**
+    - **Offers:** submitting, revising and withdrawing an offer left no audit entry.
+    - **Passwords:** changes and resets (security events) weren't recorded.
+    - **Admin reading:** admins could only read the trail for a service-provider profile. Nothing covered a requirement and what hangs off it, or an account, so "who changed my requirement / where did my offer go / who awarded" needed the database.
+  - **Fixed:**
+    - **Offer entries:** `offer.submit`, `offer.revise` (revision, requirement version, never the price) and `offer.withdraw`, written in the same commit as the change. A refused retry writes nothing.
+    - **Password entries:** `account.password_changed` and `account.password_reset`, recording the fact only (no secret).
+    - **`GET /admin/projects/{id}/audit`:** the requirement, its offers and its agreement, newest first, bounded (≤500), actors resolved in one query. An admin acting shows as the admin; Stripe shows as "system".
+    - **`GET /admin/users/{id}/audit`:** an account's security and account events, its owner/provider profile (verification, suspension, overrides, billing) and its organisation's membership changes. Admin-only and read-only.
+    - **UI:** a "Recorded history" list on the admin requirement and owner pages (`AdminAuditTrail`).
+  - **Tests:** `tests/test_stage9_7_audit_trail.py`, covering stress cases 1–10.
+
+- **9.8 Exceptions, failures and recovery:**
+  - **Already working:**
+    - **Atomic operations:** each multi-step business operation is a single commit, written together with its audit entry (`log_action` commits). This covers publication, award (award record, offer statuses, agreement, audit), offers, completion, reviews, moderation and billing. A failure part-way rolls back the whole operation.
+    - **Duplicates and concurrency:** the requirement row lock, unique constraints (one review per direction, one report per item, one award per requirement) and explained 409 refusals. These are proven by the Stage 3–8 concurrency tests on MySQL. Since 9.6, Stripe repeats and stale events are no-ops.
+    - **Lazy lifecycle:** expiry and closing are applied on every read (`sync_expired_projects`), so a restart never leaves a requirement stuck open.
+    - **Files:** stored first, then referenced, so a failed store leaves no reference.
+    - **Refused requests change nothing:** failed authorisation returns a 404/403 before anything is changed.
+    - **Emails:** best-effort; failures are recorded since 9.5.
+  - **Gaps found:**
+    - **Notification failures reported as action failures:** a notification that couldn't be written after a committed change (offer submit, withdraw and other non-award paths) failed the request with a 500. The user saw an error for something that had happened.
+    - **Network and server failures on writes:** these showed raw "Failed to fetch" or "Internal Server Error", implying the change hadn't happened when it may have.
+  - **Fixed:**
+    - **`notify()`:** when the session has nothing pending (the business change is committed), a failure to write the notice is logged and skipped. With changes still pending it propagates as before, so nothing can report success after losing data.
+    - **`apiFetch`:** for any write that gets no answer or a 5xx, the message says the outcome couldn't be confirmed and to refresh to see what is on record before trying again (English and Arabic). Business refusals (4xx) keep their own messages.
+  - **Tests:** `tests/test_stage9_8_failure_safety.py`. It injects real failures:
+    - the publication's and the award's final write;
+    - file storage;
+    - notification writes after a committed award and withdrawal;
+    - a failing notice with changes still pending.
+    - It also covers a duplicate submission and another owner's award attempt.
+
+- **9.9 Business metrics:**
+  - **Already working (9.1 overview):** the current state, from authoritative records, with grouped counts only.
+    - **Stakeholders** (organisations or individuals, never member rows): verified, awaiting review, suspended, able to bid, payment failed.
+    - **Requirements** by real lifecycle status, open with and without offers.
+    - **Offers** (counts only, no prices).
+    - **Transactions** by status.
+    - **The attention list.**
+    - **Accuracy:** amendments are a separate table, so a requirement counts once; each offer is one row (revisions are kept apart); expiry is applied before counting; each section fails visibly ("Unavailable"), never as zero.
+  - **Gaps found:**
+    - **No time dimension:** nothing showed activity over a period, the requirement funnel (published → offers → award → completion), the provider funnel (registered → verified → able to bid → participated), whether people come back, or a subscription breakdown.
+    - **No index for period queries on the audit trail.**
+  - **Fixed:**
+    - **`GET /admin/metrics?period=today|7d|30d|month|all`** (`services/operations.metrics`), with UTC boundaries from the server clock. Other period values are refused (422).
+    - **Activity in the period:**
+      - new accounts;
+      - requirements first published;
+      - offers first submitted (`submitted_at` is the first submission, so revisions don't count);
+      - awards;
+      - transactions completed (owner acceptance, never just awarded);
+      - shown reviews;
+      - active people (distinct non-admin actors on the audit trail) and returning people (active, and registered before the period).
+    - **Funnels:** the requirement funnel for the period's published cohort, and the provider funnel for the period's registered stakeholders.
+    - **Subscriptions now** (Stripe's state, 9.6): paying, override only, past due, cancelled or expired, never subscribed.
+    - **Definitions:** every figure carries a written definition in the response, shown on hover. No prices, names or documents; admin-only.
+    - **Migration 0064:** an index on `audit_logs.created_at`.
+    - **UI:** "Marketplace activity" on the admin overview, with a period selector and simple percentages within each funnel.
+  - **Tests:** `tests/test_stage9_9_metrics.py`, covering scenarios A–H.
+
+- **9.10 Admin operational dashboard:**
+  - **Already working (the overview, built in 9.1/9.4/9.9):**
+    - **Place:** the admin landing page, gated server-side by `require_admin`.
+    - **"Needs attention" first,** each item linked to its existing admin page: open with no offers (and closing within 24 hours), awaiting the owner's decision, completion awaiting the owner, transactions on hold, agreements not in force, verification waiting, payment failed, reports to decide.
+    - **Then information:** state counts and period metrics with definitions.
+    - **Background jobs:** reminders overdue / running / can't tell; email failing / none recorded / not configured.
+    - **Find a person.**
+    - **Freshness:** "as of" time, a refresh button, a 5-minute refetch. Nothing claims to be live.
+    - **Failures:** a failing section shows "Unavailable", never zeros.
+    - **Two API calls,** each made of grouped counts and short, bounded lists.
+  - **Gaps found:**
+    - **Transactions waiting on a party:** deliverables awaiting the owner's review and changes awaiting an answer weren't surfaced.
+    - **Failed emails:** counted but not listed.
+    - **Billing webhooks:** nothing said whether they were configured or when Stripe last reported.
+    - **Unnamed items:** verification items linked correctly but showed no name.
+  - **Fixed** (`services/operations`, no new page):
+    - **New attention items:**
+      - `deliverables_awaiting_owner` and `changes_awaiting_answer`, linked to the requirement's admin page;
+      - `email_failures` (last 24 hours: subject and time, never the recipient; no link, since there is nothing to retry from there).
+    - **Background:** `billing_webhook` (configured / not configured) and `last_billing_event_at`. It shows the last event, never "healthy".
+    - **Names:** verification items carry the provider's company name or the owner organisation's legal name.
+  - **Tests:** `tests/test_stage9_10_dashboard.py`, covering scenarios A–I.
+
+- **9.11 Production security and reliability:**
+  - **Already working:**
+    - **Authentication:**
+      - bcrypt passwords (8–72 characters); JWT with a pinned algorithm in httpOnly, `SameSite=Lax` cookies (cross-site writes don't carry them), `Secure` on https;
+      - short access tokens checked against the password fingerprint and the account's state on every request; rotating, revocable refresh tokens;
+      - single-use reset tokens; a non-enumerating forgotten-password flow; login throttling; deactivation (9.2).
+    - **Authorization:** server-side on every object (role dependencies, `owns`/`can_access`, `_winning_side`, `_can_view_project`, `require_admin` on the whole admin router), proven by the Stage 5.12, 7.14 and PASS 17 suites.
+    - **Files:**
+      - extension allow-lists (no HTML or SVG); stored under sanitised names;
+      - served only through expiring HMAC-signed links (the file name is signed too) with `nosniff` and `no-store`; inline only for PDFs and images.
+    - **Request limits:** a 50 MB request cap (413).
+    - **Webhooks:** Stripe signed and idempotent (9.6); cron behind a shared secret.
+    - **No secrets committed:** only `.env.example`; the frontend's only variable is `VITE_API_URL`.
+    - **Startup:** no automatic schema changes (Alembic only); 500s carry no internals; production refused placeholder secrets.
+  - **Gaps found:**
+    - **Email could hang a request:** the email SDK calls `requests` with no timeout, inside the request, so a hung provider could hold an offer submission or award open indefinitely.
+    - **No browser security headers on API responses:** no `nosniff`, no frame protection, and no referrer policy (signed file links carry their signature in the URL).
+    - **API docs public in production:** `/docs` and `/openapi.json` were served.
+    - **Production accepted development defaults:** localhost URLs, development database credentials and non-Secure cookies, silently.
+  - **Fixed:**
+    - **Email timeout:** a send is bounded at 10 s (a small worker pool); a timeout is recorded as an email failure (9.5).
+    - **Headers on every API response:** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`.
+    - **Production:** the docs and OpenAPI are off.
+    - **Production startup:**
+      - refuses localhost APP/API/CORS URLs;
+      - warns loudly about development database credentials and plain-http (non-Secure cookie) deployment. `deploy.sh` deploys over http today, so this is a warning, not a refusal.
+  - **Tests:** `tests/test_stage9_11_production.py`. The Stage 2 production-settings test was updated for the localhost rule.
+
+- **9.12 Backup, restore and disaster recovery:**
+  - **Already in place:**
+    - all state in MySQL (Alembic-managed, head `0064`), the uploaded files under `STORAGE_ROOT`, and configuration in `backend/.env` (mode 600, generated secrets);
+    - Stripe is authoritative for billing, and its webhooks are idempotent and ignore stale events (9.6).
+  - **Gaps found:**
+    - **No backup at all:** there was no database dump, no copy of the uploaded files or the configuration, and nothing scheduled.
+    - **No restore procedure** and no way to tell that backups had stopped.
+  - **Fixed:**
+    - **`backup.sh`** takes a consistent `mysqldump --single-transaction`, the file store and `.env`, plus the code and schema versions.
+      - It is root-only (0700/0600) and keeps credentials off the command line.
+      - Optional AES-256 encryption (`BACKUP_ENCRYPTION_KEY_FILE`) and an optional off-server rsync (`BACKUP_RSYNC_TARGET`).
+      - Retention is `BACKUP_KEEP_DAYS` (default 14).
+      - Each run records `last-success` or `last-failure` (with the failed step). A partial run is removed, but a run that only failed to copy off-server is kept.
+    - **`restore.sh`** restores the database, then the files, then optionally the configuration, then runs `alembic upgrade head`, restarts and health-checks.
+      - It needs `RESTORE_CONFIRM=yes` and moves the current files aside.
+      - `ENV_FILE` rehearses into a scratch database without touching the live service.
+    - **`deploy.sh`** sets `BACKUP_DIR` and installs a daily `utender-backup.timer` (02:30, persistent).
+    - **Admin Overview → Background → Backups** shows: not configured, never run, failing (with the step), overdue (no success for 26 h), or last success. It is never "healthy".
+    - **`docs/disaster-recovery.md`**: the recovery order, secrets handling, external services (Stripe, Resend, DNS), RPO up to 24 h, RTO about 1–2 h by hand, and the limitations.
+  - **Rehearsed** on a non-production MySQL copy with encryption on:
+    - 39/39 tables with identical row counts, and identical SHA-256 for every stored file;
+    - schema at head; sign-in works;
+    - the private agreement document opens via its signed link, a tampered link gets 403, and an unrelated organisation gets 404;
+    - a wrong-credential run and a failed off-server copy were both detected.
+  - **Tests:** `tests/test_stage9_12_backup_status.py`. The Stage 9.1 overview test was updated for the new background fields.
+
+- **9.13 Kuwait launch readiness:**
+  - **Audited** as real Kuwait customers would use it:
+    - on a phone-sized browser (390×844), English and Arabic, against a fresh MySQL install;
+    - the owner signs up, establishes identity, verifies, publishes in Arabic, answers a question, closes, awards, completes and reviews;
+    - two providers sign up as a company and as an individual, verify, get access, find the requirement, ask, offer (one typing the price in Arabic digits) and get the decision;
+    - the operator approves, grants access, checks the provider and diagnoses.
+  - **Confirmed by direct API probes:** competitors and other owners get 403/404 on offers, prices, notes, compare and admin; no competitor-readable response contains another price or name.
+  - **Gaps found:**
+    - **Provider verification lost data:** the trading name and licence number were wiped when a document was uploaded after typing them, and submitted empty.
+    - **Double billing:** a provider whose payment failed was offered "Start subscription", which would start a second Stripe subscription.
+    - **Money in Arabic:** an offer price typed in Arabic-Indic digits (٠-٩, ٫) was silently stripped. The admin amount field was labelled USD.
+    - **Deadlines:** the deadline input read the device's clock while every deadline is shown in Kuwait time.
+    - **Language:** raw codes (`payment_required`, `not_approved`) and English chrome (load error, notifications, status badges) reached Arabic users; the provider role description was garbled; the form examples were US-style.
+    - **Dead ends:** "contact support" with no contact anywhere; no Stripe meant a dead-end subscribe page.
+    - **Deployment:** `deploy.sh` could only serve plain http, overwriting any https address.
+  - **Fixed:**
+    - **Verification:** fields are seeded once.
+    - **Billing:**
+      - checkout refuses (409) while a subscription is active, trialing or past due;
+      - a past-due provider is shown "payment failed — update payment method" (the billing portal);
+      - without Stripe the page says the team can activate access.
+    - **Money and time:**
+      - Arabic digits are normalised in offer amounts;
+      - KWD on the admin amount field;
+      - deadline inputs are Kuwait time (UTC+3), with a hint.
+    - **Language:**
+      - access codes are turned into messages in both languages;
+      - translated load error, loading text, notifications and status badges;
+      - the countdown is hidden once offers close;
+      - Kuwait-style examples; role wording fixed.
+    - **Support contact:** admin-editable `support_contact` content, shown where customers are told to contact the team.
+    - **Deployment:** `deploy.sh` takes `PUBLIC_APP_URL` / `PUBLIC_API_URL` for a TLS proxy, keeps https, binds to localhost behind it, and warns on plain http.
+    - **Test fix:** the 9.6 billing test no longer depends on same-second notification order (it failed CI once on MySQL).
+  - **Operator steps** (HTTPS, categories, documents, contact, billing route, email, reminders, backups): `docs/pilot-launch.md`.
+  - **Tests:** `tests/test_stage9_13_pilot_readiness.py`.
+
+- **9.14 End-to-end production stress test:**
+  - **Setup:** run against a production-configured stack:
+    - `ENVIRONMENT=production`; fresh MySQL migrated to head with no model drift;
+    - TLS on the API and on the production frontend build;
+    - Secure, HttpOnly cookies across `utender.example.com` / `api.utender.example.com`;
+    - a failing Resend key, Stripe with an unreachable API and a webhook secret, local file storage.
+  - **Journeys run:**
+    - an organisation owner and three providers (company, individual, unsubscribed) go through the full journey;
+    - a sealed tender with a 5-item BOQ, retention, warranty and a Q&A cut-off; amendment; award; agreement with milestones, a returned deliverable and a variation; completion; reviews; reputation; repeat requirement;
+    - mobile (390×844) UI in English and Arabic for registration, login, verification, requirement creation, viewing, offer submission, review, award, transaction and notifications.
+  - **Failure paths A–J exercised:**
+    - **A:** an abandoned draft stays a draft and stays invisible.
+    - **B:** a late offer, withdrawal or participation is refused.
+    - **C:** an amendment flags offers priced on the old version.
+    - **D:** duplicate draft creation, submit, activate, deliverable or variation accept, completion and webhook each have one effect.
+    - **E:** three concurrent submits produce one offer; a revision racing the deadline has one outcome; an award/award/cancel race has exactly one winner.
+    - **F:** id-swapping by a competitor, an unrelated owner or a loser is denied.
+    - **G:** a forbidden or oversize upload half-creates nothing; a request cut off or a lost response never shows false success.
+    - **H:** email fails, the business stands, and failures are recorded and shown.
+    - **I:** Stripe down or a stale or unsigned webhook can't grant or remove access wrongly.
+    - **J:** logout, a forged token, and a colleague deactivated mid-transaction are all handled; records stay intact.
+  - **Gaps found:**
+    - **Checkout with Stripe unreachable** returned an unhandled 500.
+    - **Arabic sign-ups** were created as English accounts, so pages and notifications switched to English straight after registering.
+  - **Fixed:**
+    - Checkout and billing-portal failures are a clean 502 "Could not start checkout / open billing. Try again." in both languages, with nothing started.
+    - Sign-up records the interface language; the frontend sends it.
+  - **Tests:** `tests/test_stage9_14_stress_fixes.py`.
+
+_Later Stage 9 steps are added as they are implemented._

@@ -64,7 +64,7 @@ DEFAULT_CMS: dict[str, dict[str, str]] = {
     "home_owner_cta": {"en": "Sign up as an Owner", "ar": "سجّل كمالك"},
     "home_provider_title": {"en": "Service provider", "ar": "مزوّد خدمة"},
     "home_provider_who": {
-        "en": "You are a service provider, company or other service provider looking for projects to price and win.",
+        "en": "You are a contractor, company or other service provider looking for projects to price and win.",
         "ar": "أنت مقاول أو شركة أو أي مزوّد خدمة يبحث عن مشاريع لتسعيرها والفوز بها.",
     },
     "home_provider_step_1": {"en": "Discover open requirements", "ar": "اكتشف المتطلبات المفتوحة"},
@@ -88,6 +88,11 @@ DEFAULT_CMS: dict[str, dict[str, str]] = {
         "en": "You want to find requirements and submit offers. Next you'll tell us whether you work as an individual or for a company, and verify it; submitting offers needs a paid subscription.",
         "ar": "تريد إيجاد المتطلبات وتقديم العروض. ستخبرنا بعد ذلك هل تعمل بصفتك الفردية أم لصالح شركة، ثم تتحقق من ذلك؛ تقديم العروض يتطلب اشتراكًا مدفوعًا.",
     },
+    # Stage 9.13: how a customer reaches the U-Tender team (an email, phone or
+    # WhatsApp number), shown wherever the app says "contact support" --
+    # verification rejected, account suspended, billing unavailable or failing.
+    # Empty until an admin sets it (Admin -> Content); never a made-up address.
+    "support_contact": {"en": "", "ar": ""},
 }
 
 

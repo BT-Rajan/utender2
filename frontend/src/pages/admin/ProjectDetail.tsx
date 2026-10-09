@@ -3,17 +3,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import type { AdminOffer, AdminProjectDetail } from "@/api/types";
+import { AdminAuditTrail } from "@/components/AdminAuditTrail";
+import { AdminDecisionTrace } from "@/components/AdminDecisionTrace";
+import { ProviderCheck, PublishCheck } from "@/components/AdminSupport";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
 import { money } from "@/lib/money";
-
-// datetime-local inputs want "YYYY-MM-DDTHH:mm" with no timezone suffix.
-function toLocalInputValue(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+import { localInputToUtcIso, toLocalInputValue } from "@/lib/dates";
 
 const OFFER_STATUS_BADGE: Record<string, string> = {
   submitted: "bg-blue-tint text-blue",
@@ -24,7 +21,7 @@ const OFFER_STATUS_BADGE: Record<string, string> = {
 
 type AdminItems = NonNullable<AdminProjectDetail["items"]>;
 
-function OfferRow({ offer, projectId, items, t }: { offer: AdminOffer; projectId: string; items: AdminItems | null; t: (k: string) => string }) {
+function OfferRow({ offer, projectId, items, t, currentRevision }: { offer: AdminOffer; projectId: string; items: AdminItems | null; t: (k: string) => string; currentRevision: number }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [amount, setAmount] = useState(offer.amount ?? "");
@@ -143,6 +140,12 @@ function OfferRow({ offer, projectId, items, t }: { offer: AdminOffer; projectId
     <tr className="border-b border-border">
       <td className="py-3 px-2.5">
         <div className="text-[13px]">{offer.service_provider_company_name ?? "—"}</div>
+        {/* Stage 9.3: which version of the requirement it priced, and when it was submitted. */}
+        <div className="font-mono text-[10px] text-steel">
+          {t("trace.pricedOn").replace("{n}", String(offer.based_on_material_revision ?? 0))}
+          {(offer.based_on_material_revision ?? 0) < currentRevision && <span className="text-amber-dark"> · {t("trace.earlierVersion")}</span>}
+          {offer.submitted_at && ` · ${new Date(offer.submitted_at).toLocaleString()}`}
+        </div>
         {offer.is_suspended && (
           <span className="font-mono text-[10px] uppercase px-2 py-0.5 rounded-full bg-red-tint text-red">
             {t("admin.projectDetail.offerSuspendedBadge")}
@@ -232,7 +235,7 @@ export function AdminProjectDetailPage() {
           address,
           description: description || null,
           trade: trade || null,
-          bid_deadline: new Date(bidDeadline).toISOString(),
+          bid_deadline: localInputToUtcIso(bidDeadline),
         },
       }),
     onSuccess: invalidate,
@@ -318,6 +321,12 @@ export function AdminProjectDetailPage() {
           </p>
         </div>
 
+        <AdminDecisionTrace projectId={id!} detail={detail} />
+        <AdminAuditTrail url={`/admin/projects/${id}/audit`} />
+        {/* Stage 9.4: support checks, from the same rules the marketplace enforces. */}
+        {detail.project.status === "draft" && <PublishCheck projectId={id!} />}
+        {detail.project.status === "open" && <ProviderCheck projectId={id!} />}
+
         <div className="bg-white border border-border rounded px-5 py-4.5">
           <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-3">
             {t("admin.projectDetail.offersHeading")} ({offers.length})
@@ -338,7 +347,7 @@ export function AdminProjectDetailPage() {
                 </thead>
                 <tbody>
                   {offers.map((o) => (
-                    <OfferRow key={o.id} offer={o} projectId={id!} items={detail.pricing_basis === "per_item" ? detail.items ?? [] : null} t={t} />
+                    <OfferRow key={o.id} offer={o} projectId={id!} items={detail.pricing_basis === "per_item" ? detail.items ?? [] : null} t={t} currentRevision={detail.version?.material_revision ?? 0} />
                   ))}
                 </tbody>
               </table>

@@ -16,7 +16,8 @@ from app.models.owner import OwnerProfile
 from app.models.payment_override import PaymentOverride
 from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.project_amendment import ProjectAmendment
-from app.models.review import Review
+from app.models.review import Review, ReviewReport
+from app.models.email_failure import EmailFailure
 from app.models.revoked_token import RevokedToken
 from app.models.user import User
 
@@ -49,6 +50,8 @@ __all__ = [
     "AwardRecord",
     "ServiceCategory",
     "Review",
+    "ReviewReport",
+    "EmailFailure",
     "RevokedToken",
     "PaymentOverride",
     "Notification",

@@ -2,9 +2,9 @@ import json
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import func
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -22,6 +22,7 @@ from app.models.project import Project, ProjectDrawing
 from app.models.review import Review
 from app.models.user import User
 from app.schemas.cms import CmsContentOut, CmsContentUpsert
+from app.schemas.review import ModerationDecision, ReviewReportAdminOut
 from app.schemas.service_provider import ServiceProviderProfileOut, ServiceProviderProfileUpdate
 from app.schemas.document import (
     ServiceProviderDocumentOut,
@@ -38,6 +39,7 @@ from app.services.audit import log_action
 from app.services.stakeholder import describe as describe_stakeholder
 from app.services.verification import assert_ready_to_approve, checklist, document_out_fields, is_added_qualification, profile_state_fields
 from app.services.notify import notify, notify_team
+from app.services.team import stakeholder_rows
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import is_sealed_and_open, lock_project, sync_expired_projects
 from app.models.category import ServiceCategory
@@ -360,11 +362,15 @@ def review_document(payload: ReviewDocumentDecision, admin: User = Depends(requi
 
 
 @router.patch("/documents/{document_id}/expiry", response_model=ServiceProviderDocumentOut)
-def set_document_expiry(document_id: str, payload: DocumentExpiryUpdate, db: Session = Depends(get_db)):
+def set_document_expiry(document_id: str, payload: DocumentExpiryUpdate, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     doc = db.get(ServiceProviderDocument, document_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
+    previous = doc.expires_on
     doc.expires_on = payload.expires_on
+    if previous != doc.expires_on:  # Stage 9.4: a qualification's validity decides eligibility -- audited
+        log_action(db, actor_id=admin.id, action="document.expiry_set", target_type="service_provider_document", target_id=doc.id,
+                   previous_value=str(previous) if previous else None, new_value=str(doc.expires_on) if doc.expires_on else None)
     db.commit()
     db.refresh(doc)
     requirement = db.get(DocumentRequirement, doc.requirement_id)
@@ -423,7 +429,49 @@ def _get_active_service_provider_profile(db: Session, service_provider_id: str) 
     user = db.get(User, service_provider_id)
     if not cp or not user or user.role != UserRole.service_provider:
         raise HTTPException(status_code=404, detail="Service provider not found.")
+    _not_a_member_row(db, cp)
     return cp
+
+
+def _no_recorded_history(db: Session, user_id: str) -> None:
+    """Stage 9.4: an account that has acted on the platform is part of its
+    audit trail, which names it; deleting it would either fail on that record
+    or erase who did what. Deactivating (Stage 9.2) stops the person and keeps
+    the history; deletion is for accounts that never did anything."""
+    from app.models.audit_log import AuditLog
+
+    if db.query(AuditLog.id).filter(AuditLog.actor_id == user_id).first():
+        raise HTTPException(status_code=400, detail="This account has a history on record. Deactivate it instead, which keeps that history.")
+
+
+def _not_a_member_row(db: Session, profile) -> None:
+    """Stage 9.2: a member's own profile row is not a stakeholder -- the
+    member acts as its organisation -- so suspending or verifying it would do
+    nothing. The organisation's page is where its people are managed."""
+    from app.models.organization import OrganizationMembership
+
+    if profile.organization_id is None and db.query(OrganizationMembership.id).filter(OrganizationMembership.user_id == profile.user_id).first():
+        raise HTTPException(status_code=409, detail="This account acts for an organization. Manage it from the organization's page.")
+
+
+def _members(db: Session, profile) -> list[dict]:
+    """Stage 9.2: the organisation's current members, for an admin -- who
+    they are, their role and whether their account is deactivated."""
+    from app.models.enums import MembershipRole
+    from app.models.organization import OrganizationMembership
+
+    if profile.organization_id is None:
+        return []
+    rows = (
+        db.query(OrganizationMembership, User)
+        .join(User, User.id == OrganizationMembership.user_id)
+        .filter(OrganizationMembership.organization_id == profile.organization_id)
+        # the representative first, then members as they joined
+        .order_by(case((OrganizationMembership.role == MembershipRole.admin, 0), else_=1), OrganizationMembership.created_at.asc(), User.id)
+        .all()
+    )
+    return [{"user_id": u.id, "full_name": u.full_name, "email": u.email, "role": m.role.value, "position": m.position,
+             "joined_at": m.created_at, "deactivated_at": u.deactivated_at} for m, u in rows]
 
 
 @router.get("/service-providers", response_model=list[ServiceProviderProfileOut])
@@ -431,7 +479,7 @@ def list_service_providers(db: Session = Depends(get_db)):
     rows = (
         db.query(ServiceProviderProfile, User)
         .join(User, ServiceProviderProfile.user_id == User.id)
-        .filter(User.role == UserRole.service_provider)
+        .filter(User.role == UserRole.service_provider, stakeholder_rows(ServiceProviderProfile))  # Stage 9.2: not members' own rows
         .all()
     )
     return [ServiceProviderProfileOut(**_profile_fields(cp), email=u.email) for cp, u in rows]
@@ -447,6 +495,7 @@ def service_provider_detail(service_provider_id: str, db: Session = Depends(get_
     return {
         "service_provider": ServiceProviderProfileOut(**_profile_fields(cp), email=user.email if user else None),
         "stakeholder": describe_stakeholder(cp, user, db) if user else None,
+        "members": _members(db, cp),  # Stage 9.2
         "documents": [
             {
                 **ServiceProviderDocumentOut(**document_out_fields(d, r)).model_dump(),
@@ -458,15 +507,22 @@ def service_provider_detail(service_provider_id: str, db: Session = Depends(get_
 
 
 @router.patch("/service-providers/{service_provider_id}", response_model=ServiceProviderProfileOut)
-def update_service_provider(service_provider_id: str, payload: ServiceProviderProfileUpdate, db: Session = Depends(get_db)):
+def update_service_provider(service_provider_id: str, payload: ServiceProviderProfileUpdate, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     cp = _get_active_service_provider_profile(db, service_provider_id)
     if not payload.company_name.strip():
         raise HTTPException(status_code=400, detail="Company name is required.")
 
+    fields = ("company_name", "license_number", "primary_trade", "service_area")
+    before = {f: getattr(cp, f) for f in fields}
     cp.company_name = payload.company_name.strip()
     cp.license_number = payload.license_number or None
     cp.primary_trade = payload.primary_trade or None
     cp.service_area = payload.service_area or None
+    after = {f: getattr(cp, f) for f in fields}
+    if after != before:  # Stage 9.4: an admin's correction of a provider's record is on the audit trail
+        log_action(db, actor_id=admin.id, action="service_provider.admin_edit", target_type="service_provider_profile", target_id=service_provider_id,
+                   previous_value=json.dumps({f: v for f, v in before.items() if before[f] != after[f]}),
+                   new_value=json.dumps({f: v for f, v in after.items() if before[f] != after[f]}))
     db.commit()
     db.refresh(cp)
     user = db.get(User, service_provider_id)
@@ -528,11 +584,13 @@ def set_suspended(
     )
     service_provider_user = db.get(User, service_provider_id)
     if service_provider_user:
-        notify(
+        # Stage 9.2: everyone who acts for it is told, not only its representative.
+        notify_team(
             db,
             service_provider_user,
             NotificationType.service_provider_suspended if payload.suspended else NotificationType.service_provider_reactivated,
             link="/service-provider/dashboard",
+            organization_id=cp.organization_id,
         )
     return cp
 
@@ -748,7 +806,7 @@ def reset_cms(key: str, language: Language, admin: User = Depends(require_admin)
 # has no cascade by design, so a hard delete would otherwise violate that
 # foreign key. Suspend instead to preserve history while cutting access.
 @router.delete("/service-providers/{service_provider_id}", status_code=204)
-def delete_service_provider(service_provider_id: str, db: Session = Depends(get_db)):
+def delete_service_provider(service_provider_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     _get_active_service_provider_profile(db, service_provider_id)  # 404s outright for a since-promoted admin account
 
     review_count = db.query(Review).filter(Review.service_provider_id == service_provider_id).count()
@@ -778,11 +836,14 @@ def delete_service_provider(service_provider_id: str, db: Session = Depends(get_
     user = db.get(User, service_provider_id)
     if not user:
         raise HTTPException(status_code=404, detail="Service provider not found.")
+    _no_recorded_history(db, service_provider_id)  # after the more specific guards above
     from app.models.saved_opportunity import SavedOpportunity
 
     db.query(SavedOpportunity).filter(SavedOpportunity.service_provider_id == service_provider_id).delete(synchronize_session=False)  # Stage 4.8
+    snapshot = json.dumps({"email": user.email, "company_name": user.service_provider_profile.company_name if getattr(user, "service_provider_profile", None) else None})
     db.delete(user)  # cascades to service_provider_profiles -> service_provider_documents/offers
-    db.commit()
+    # Stage 9.4: removing an account is on the audit trail, with who it was (log_action commits the deletion with it).
+    log_action(db, actor_id=admin.id, action="service_provider.delete", target_type="user", target_id=service_provider_id, previous_value=snapshot)
     return None
 
 
@@ -815,6 +876,7 @@ def _get_active_owner_profile(db: Session, owner_id: str) -> OwnerProfile:
     user = db.get(User, owner_id)
     if not op or not user or user.role != UserRole.owner:
         raise HTTPException(status_code=404, detail="Owner not found.")
+    _not_a_member_row(db, op)
     return op
 
 
@@ -843,7 +905,7 @@ def list_owners(db: Session = Depends(get_db)):
     rows = (
         db.query(OwnerProfile, User)
         .join(User, OwnerProfile.user_id == User.id)
-        .filter(User.role == UserRole.owner)
+        .filter(User.role == UserRole.owner, stakeholder_rows(OwnerProfile))  # Stage 9.2: not members' own rows
         .all()
     )
     project_counts = dict(db.query(Project.owner_id, func.count(Project.id)).group_by(Project.owner_id).all())
@@ -854,14 +916,13 @@ def list_owners(db: Session = Depends(get_db)):
 
 @router.get("/owners/{owner_id}")
 def owner_detail(owner_id: str, db: Session = Depends(get_db)):
-    op = db.get(OwnerProfile, owner_id)
+    op = _get_active_owner_profile(db, owner_id)
     user = db.get(User, owner_id)
-    if not op or not user or user.role != UserRole.owner:
-        raise HTTPException(status_code=404, detail="Owner not found.")
     project_count = db.query(Project).filter(Project.owner_id == owner_id).count()
     return {
         "owner": OwnerProfileOut(**_owner_fields(op, user), project_count=project_count),
         "stakeholder": describe_stakeholder(op, user, db),
+        "members": _members(db, op),  # Stage 9.2
         "documents": _owner_documents(db, owner_id),
     }
 
@@ -944,11 +1005,13 @@ def set_owner_suspended(
     )
     owner_user = db.get(User, owner_id)
     if owner_user:
-        notify(
+        # Stage 9.2: everyone who acts for it is told, not only its representative.
+        notify_team(
             db,
             owner_user,
             NotificationType.owner_suspended if payload.suspended else NotificationType.owner_reactivated,
             link="/owner/dashboard",
+            organization_id=op.organization_id,
         )
     return OwnerProfileOut(**_owner_fields(op, owner_user))
 
@@ -963,7 +1026,7 @@ def set_owner_suspended(
 # routine "remove this account" action, so deletion is blocked outright
 # once the owner has posted anything; suspend instead.
 @router.delete("/owners/{owner_id}", status_code=204)
-def delete_owner(owner_id: str, db: Session = Depends(get_db)):
+def delete_owner(owner_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     _get_active_owner_profile(db, owner_id)  # 404s outright for a since-promoted admin account
 
     project_count = db.query(Project).filter(Project.owner_id == owner_id).count()
@@ -972,6 +1035,7 @@ def delete_owner(owner_id: str, db: Session = Depends(get_db)):
             status_code=400,
             detail="This owner has posted projects. Suspend the account instead of deleting it, to keep that project and offer history intact for the service providers involved.",
         )
+    _no_recorded_history(db, owner_id)  # after the more specific guards above
 
     docs_with_files = (
         db.query(OwnerDocument.file_path)
@@ -985,8 +1049,10 @@ def delete_owner(owner_id: str, db: Session = Depends(get_db)):
     user = db.get(User, owner_id)
     if not user:
         raise HTTPException(status_code=404, detail="Owner not found.")
+    snapshot = json.dumps({"email": user.email, "full_name": user.full_name})
     db.delete(user)  # cascades to owner_profiles -> owner_documents
-    db.commit()
+    # Stage 9.4: removing an account is on the audit trail (log_action commits the deletion with it).
+    log_action(db, actor_id=admin.id, action="owner.delete", target_type="user", target_id=owner_id, previous_value=snapshot)
     return None
 
 
@@ -1071,6 +1137,8 @@ def _offer_admin_fields(o: Offer, p: Project | None, cp: ServiceProviderProfile 
         "status": o.status,
         "is_suspended": o.is_suspended,
         "revision": o.revision,
+        "based_on_material_revision": o.based_on_material_revision,  # Stage 9.3: the requirement version it priced
+        "submitted_at": o.submitted_at,
         "created_at": o.created_at,
         "updated_at": o.updated_at,
     }
@@ -1078,6 +1146,7 @@ def _offer_admin_fields(o: Offer, p: Project | None, cp: ServiceProviderProfile 
 
 @router.get("/projects")
 def list_all_projects(db: Session = Depends(get_db)):
+    sync_expired_projects(db)  # Stage 9.3: no requirement listed "open" past its deadline
     rows = db.query(Project, User).join(User, Project.owner_id == User.id).order_by(Project.created_at.desc()).all()
     offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(tendered()).group_by(Offer.project_id).all())
     return [{**_project_admin_fields(p, u), "offer_count": offer_counts.get(p.id, 0)} for p, u in rows]
@@ -1088,6 +1157,7 @@ def list_owner_projects(owner_id: str, db: Session = Depends(get_db)):
     """Every project a given owner has posted — the drill-down from the
     owner detail page into what they've actually put on the marketplace,
     each one with a link into its own offers below."""
+    sync_expired_projects(db)  # Stage 9.3
     _get_active_owner_profile(db, owner_id)  # 404s outright for a since-promoted admin account
     owner_user = db.get(User, owner_id)
     rows = db.query(Project).filter(Project.owner_id == owner_id).order_by(Project.created_at.desc()).all()
@@ -1097,6 +1167,9 @@ def list_owner_projects(owner_id: str, db: Session = Depends(get_db)):
 
 @router.get("/projects/{project_id}")
 def admin_project_detail(project_id: str, db: Session = Depends(get_db)):
+    # Stage 9.3: a deadline that has passed is applied first, so a requirement
+    # is never shown "open" after it closed (as every other read does).
+    sync_expired_projects(db)
     project = db.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found.")
@@ -1115,6 +1188,48 @@ def admin_project_detail(project_id: str, db: Session = Depends(get_db)):
         # correction can follow it.
         "pricing_basis": project.pricing_basis,
         "items": [{"id": i.id, "position": i.position, "description": i.description, "quantity": str(i.quantity) if i.quantity is not None else None, "unit": i.unit} for i in project.items],
+        **_decision_trace(db, project),
+    }
+
+
+def _decision_trace(db: Session, project: Project) -> dict:
+    """Stage 9.3: the rest of the chain, from the authoritative records --
+    the requirement's version (Stage 3.17), the award if any, and the
+    transaction it started (Stage 7), with nothing recalculated."""
+    from app.models.agreement import Agreement
+    from app.models.project_amendment import ProjectAmendment
+
+    award = db.query(AwardRecord).filter(AwardRecord.project_id == project.id).first()
+    winner = db.get(ServiceProviderProfile, award.service_provider_id) if award else None
+    winning_offer = db.get(Offer, award.offer_id) if award else None
+    agreement = db.query(Agreement).filter(Agreement.project_id == project.id).first()
+    return {
+        "version": {
+            "material_revision": project.material_revision,
+            "amendments": db.query(func.count(ProjectAmendment.id)).filter(ProjectAmendment.project_id == project.id).scalar(),
+        },
+        "award": {
+            "offer_id": award.offer_id,
+            "service_provider_id": award.service_provider_id,
+            "service_provider_company_name": winner.company_name if winner else None,
+            "amount": str(award.amount) if award.amount is not None else None,
+            "project_revision": award.project_revision,  # the requirement's edit counter at award (not its material version)
+            "offer_revision": award.offer_revision,
+            # the material version (Stage 3.17) the winning offer priced
+            "offer_priced_on": winning_offer.based_on_material_revision if winning_offer else None,
+            "created_at": award.created_at,
+        } if award else None,
+        "transaction": {
+            "status": agreement.status,
+            "created_at": agreement.created_at,
+            "activated_at": agreement.activated_at,
+            "work_started_at": agreement.work_started_at,
+            "on_hold_at": agreement.on_hold_at,
+            "completion_status": agreement.completion_status,
+            "completed_at": agreement.completed_at,
+            "terminated_at": agreement.terminated_at,
+            "termination_reason": agreement.termination_reason,
+        } if agreement else None,
     }
 
 
@@ -1492,8 +1607,287 @@ def _profile_fields(cp: ServiceProviderProfile) -> dict:
         review_count=cp.review_count,
         subscription_status=cp.subscription_status,
         subscription_current_period_end=cp.subscription_current_period_end,
+        subscription_interval=cp.subscription_interval,
+        subscription_cancel_at_period_end=cp.subscription_cancel_at_period_end,
+        subscription_event_at=cp.subscription_event_at,
         payment_override_active=cp.payment_override_active,
         marketplace_status=cp.marketplace_status,
         created_at=cp.created_at,
         **profile_state_fields(cp),
     )
+
+
+# ---------- Stage 8.15: reported reviews and responses ----------
+
+
+def _report_out(db: Session, entry, review, project) -> ReviewReportAdminOut:
+    from app.models.organization import Organization
+    from app.services.reviews import OWNER_TO_PROVIDER
+
+    org = db.get(Organization, project.organization_id) if project.organization_id else None
+    owner = db.get(User, project.owner_id)
+    cp = db.get(ServiceProviderProfile, review.service_provider_id)
+    # The review is reported by its subject; a response by the review's author.
+    owner_side = (review.direction == OWNER_TO_PROVIDER) == (entry.target == "response")
+    return ReviewReportAdminOut(
+        id=entry.id, target=entry.target, reason=entry.reason, note=entry.note, status=entry.status,
+        created_at=entry.created_at, resolved_at=entry.resolved_at, resolution_note=entry.resolution_note,
+        reported_by="owner" if owner_side else "service_provider",
+        direction=review.direction, rating=review.rating, comment=review.comment, response=review.response,
+        review_hidden=review.hidden_at is not None, response_hidden=review.response_hidden_at is not None,
+        project_title=project.title,
+        owner_name=org.legal_name if org else (owner.full_name if owner else None),
+        provider_name=cp.company_name if cp else None,
+    )
+
+
+@router.get("/review-reports", response_model=list[ReviewReportAdminOut])
+def review_reports(db: Session = Depends(get_db), limit: int = Query(200, ge=1, le=500)):
+    """Stage 8.15: reports on reviews and responses, open ones first -- what
+    was reported, why, and the two parties; nothing else of the transaction."""
+    from app.models.review import ReviewReport
+
+    rows = (
+        db.query(ReviewReport, Review, Project)
+        .join(Review, Review.id == ReviewReport.review_id)
+        .join(Project, Project.id == Review.project_id)
+        .order_by(case((ReviewReport.status == "open", 0), else_=1), ReviewReport.created_at.desc(), ReviewReport.id)
+        .limit(limit)
+        .all()
+    )
+    return [_report_out(db, *row) for row in rows]
+
+
+@router.post("/review-reports/{report_id}/decision", response_model=ReviewReportAdminOut)
+def decide_review_report(report_id: str, payload: ModerationDecision, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Stage 8.15: keep what was reported, or hide it -- the row and the audit
+    remain; a hidden review stops counting towards any rating."""
+    from app.models.review import ReviewReport
+    from app.services.reviews import moderate
+
+    entry = db.get(ReviewReport, report_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    entry = moderate(db, entry, admin, payload.decision, payload.note)
+    review = db.get(Review, entry.review_id)
+    return _report_out(db, entry, review, db.get(Project, review.project_id))
+
+
+# ---------- Stage 9.1: operations overview ----------
+
+
+@router.get("/overview")
+def operations_overview(db: Session = Depends(get_db)):
+    """Stage 9.1: the marketplace's current state and what needs attention --
+    grouped counts and the oldest few of each exception, from the
+    authoritative records; a section that can't be computed says so."""
+    from app.services.operations import overview
+
+    return overview(db)
+
+
+# ---------- Stage 9.2: one person's account ----------
+
+
+class AccountStatePatch(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)
+
+
+def _account_target(db: Session, user_id: str, admin: User) -> User:
+    target = db.query(User).filter(User.id == user_id).with_for_update().first()
+    if target is None or target.role == UserRole.admin:
+        raise HTTPException(status_code=404, detail="Account not found.")
+    return target
+
+
+@router.post("/users/{user_id}/deactivate")
+def deactivate_account(user_id: str, payload: AccountStatePatch | None = None, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Stage 9.2: stop one person -- every session at once (checked on each
+    request), and no sign-in -- without touching the organisation they act
+    for, its other members, or anything recorded. Admin accounts aren't
+    managed here. Repeating it changes nothing."""
+    target = _account_target(db, user_id, admin)
+    if target.deactivated_at is None:
+        target.deactivated_at = datetime.utcnow().replace(microsecond=0)
+        log_action(db, actor_id=admin.id, action="account.deactivate", target_type="user", target_id=target.id,
+                   new_value=(payload.reason if payload and payload.reason else None))
+    db.commit()
+    return {"user_id": target.id, "deactivated_at": target.deactivated_at}
+
+
+@router.post("/users/{user_id}/reactivate")
+def reactivate_account(user_id: str, payload: AccountStatePatch | None = None, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Stage 9.2: let the person back in, exactly as they were -- the same
+    memberships and rights, nothing more. Repeating it changes nothing."""
+    target = _account_target(db, user_id, admin)
+    if target.deactivated_at is not None:
+        log_action(db, actor_id=admin.id, action="account.reactivate", target_type="user", target_id=target.id,
+                   previous_value=str(target.deactivated_at), new_value=(payload.reason if payload and payload.reason else None))
+        target.deactivated_at = None
+    db.commit()
+    return {"user_id": target.id, "deactivated_at": None}
+
+
+# ---------- Stage 9.4: support diagnostics (read-only) ----------
+# What an operator needs to answer "why can't they...?" from the same rules
+# the marketplace enforces -- never a way around them. Nothing here writes.
+
+
+@router.get("/users")
+def find_account(email: str = Query(..., min_length=3, max_length=255), db: Session = Depends(get_db)):
+    """Find one person by their exact email: who they are, which stakeholder
+    they act for (their organisation's, or their own), their place in it, and
+    the state of both. No password, token or session data."""
+    from app.services.stakeholder import describe
+    from app.services.team import acting_profile, org_of
+
+    user = db.query(User).filter(User.email == email.strip().lower()).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Account not found.")
+    profile = acting_profile(db, user)
+    membership = None
+    if org_of(db, user.id):
+        from app.models.organization import OrganizationMembership
+
+        m = db.query(OrganizationMembership).filter(OrganizationMembership.user_id == user.id).first()
+        membership = {"role": m.role.value, "position": m.position, "joined_at": m.created_at}
+    standing = None
+    if isinstance(profile, ServiceProviderProfile):
+        standing = {"verification_status": profile.verification_status.value, "suspended": profile.is_suspended,
+                    "subscription_status": profile.subscription_status.value if profile.subscription_status else None,
+                    "payment_override_active": profile.payment_override_active, "can_bid": profile.is_verified_active}
+    elif isinstance(profile, OwnerProfile):
+        standing = {"verification_status": profile.verification_status.value, "suspended": profile.is_suspended,
+                    "can_publish": profile.is_verified_active}
+    return {
+        "user": {"id": user.id, "email": user.email, "full_name": user.full_name, "role": user.role.value,
+                 "email_verified": user.email_verified, "created_at": user.created_at, "deactivated_at": user.deactivated_at},
+        "acts_for": {"stakeholder_id": profile.user_id, **describe(profile, user, db, viewer_id=user.id), "standing": standing} if profile else None,
+        "membership": membership,
+    }
+
+
+@router.get("/projects/{project_id}/provider-check/{service_provider_id}")
+def provider_check(project_id: str, service_provider_id: str, db: Session = Depends(get_db)):
+    """Why a provider can or can't take part in a requirement -- the same
+    participation and eligibility checks the offer endpoints enforce -- and
+    where its own offer stands (draft, submitted, withdrawn...), against which
+    version of the requirement. The provider is its stakeholder id (an
+    organisation's, or an individual's)."""
+    from app.services.eligibility import ineligibility_reasons, participation
+
+    sync_expired_projects(db)
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    profile = _get_active_service_provider_profile(db, service_provider_id)
+    reasons = ineligibility_reasons(db, project, profile)
+    offer = db.query(Offer).filter(Offer.project_id == project_id, Offer.service_provider_id == service_provider_id).first()
+    award = db.query(AwardRecord).filter(AwardRecord.project_id == project_id).first()
+    return {
+        "project": {"status": project.status.value, "suspended": project.is_suspended, "bid_deadline": utc_iso(project.bid_deadline),
+                    "paused": project.paused_at is not None, "material_revision": project.material_revision},
+        "participation": participation(db, project, profile, reasons).model_dump(),
+        "ineligibility_reasons": [r.model_dump() for r in reasons],
+        "offer": {"id": offer.id, "status": offer.status.value, "suspended": offer.is_suspended, "revision": offer.revision,
+                  "based_on_material_revision": offer.based_on_material_revision, "submitted_at": offer.submitted_at,
+                  "updated_at": offer.updated_at, "won": bool(award and award.offer_id == offer.id)} if offer else None,
+    }
+
+
+@router.get("/projects/{project_id}/quality")
+def project_quality(project_id: str, db: Session = Depends(get_db)):
+    """What blocks a requirement's publication (errors) or weakens it
+    (warnings) -- the same check the owner's Publish button runs -- and
+    whether its owner may publish at all."""
+    from app.services import requirement_quality
+
+    sync_expired_projects(db)
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    owner_profile = db.get(OwnerProfile, project.owner_id)
+    return {
+        "status": project.status.value,
+        "owner_can_publish": bool(owner_profile and owner_profile.is_verified_active),
+        "owner_verification_status": owner_profile.verification_status.value if owner_profile else None,
+        "owner_suspended": owner_profile.is_suspended if owner_profile else None,
+        **requirement_quality.check(db, project).as_dict(),
+    }
+
+
+# ---------- Stage 9.7: reading the audit trail ----------
+
+AUDIT_LIMIT = 500
+
+
+def _audit_rows(db: Session, conditions, limit: int) -> list[dict]:
+    """Entries matching any of (target_type, target_ids), newest first and
+    bounded, each with its actor resolved in one query -- who (or "system"
+    for Stripe and other server events), their role, what, to which object,
+    when, before -> after."""
+    from sqlalchemy import or_
+
+    from app.models.audit_log import AuditLog
+
+    clauses = [((AuditLog.target_type == t) & AuditLog.target_id.in_(ids)) for t, ids in conditions if ids]
+    if not clauses:
+        return []
+    rows = db.query(AuditLog).filter(or_(*clauses)).order_by(AuditLog.created_at.desc(), AuditLog.id).limit(limit).all()
+    actors = {u.id: u for u in db.query(User).filter(User.id.in_({r.actor_id for r in rows if r.actor_id}))} if rows else {}
+    out = []
+    for r in rows:
+        a = actors.get(r.actor_id)
+        out.append({
+            "id": r.id, "at": r.created_at, "action": r.action, "target_type": r.target_type, "target_id": r.target_id,
+            "actor": {"id": a.id, "email": a.email, "name": a.full_name, "role": a.role.value} if a else None,
+            "previous_value": r.previous_value, "new_value": r.new_value, "reason": r.reason,
+        })
+    return out
+
+
+@router.get("/projects/{project_id}/audit")
+def project_audit(project_id: str, db: Session = Depends(get_db), limit: int = Query(AUDIT_LIMIT, ge=1, le=AUDIT_LIMIT)):
+    """Stage 9.7: everything recorded about a requirement and what hangs off
+    it -- its own lifecycle and amendments, each offer (submitted, revised,
+    withdrawn, shortlisted, suspended...), the award, the agreement and its
+    execution, reviews and moderation -- newest first, with who did it.
+    Read-only; nothing here edits or removes an entry."""
+    from app.models.agreement import Agreement
+
+    if db.get(Project, project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    offer_ids = [i for (i,) in db.query(Offer.id).filter(Offer.project_id == project_id)]
+    agreement_ids = [i for (i,) in db.query(Agreement.id).filter(Agreement.project_id == project_id)]
+    return _audit_rows(db, [("project", [project_id]), ("offer", offer_ids), ("agreement", agreement_ids)], limit)
+
+
+@router.get("/users/{user_id}/audit")
+def account_audit(user_id: str, db: Session = Depends(get_db), limit: int = Query(AUDIT_LIMIT, ge=1, le=AUDIT_LIMIT)):
+    """Stage 9.7: what was recorded about one account and the stakeholder it
+    stands for -- its own security and account events, its verification,
+    suspension, overrides and billing (as an owner or provider profile), and
+    its organisation's membership changes. Not the business actions it took
+    on requirements: those are read on each requirement's trail."""
+    from app.models.organization import OrganizationMembership
+
+    if db.get(User, user_id) is None:
+        raise HTTPException(status_code=404, detail="Account not found.")
+    orgs = [o for (o,) in db.query(OrganizationMembership.organization_id).filter(OrganizationMembership.user_id == user_id)]
+    return _audit_rows(db, [("user", [user_id]), ("owner_profile", [user_id]), ("service_provider_profile", [user_id]),
+                            ("organization", orgs)], limit)
+
+
+# ---------- Stage 9.9: marketplace metrics ----------
+
+
+@router.get("/metrics")
+def marketplace_metrics(period: str = Query("30d", pattern="^(today|7d|30d|month|all)$"), db: Session = Depends(get_db)):
+    """Stage 9.9: what happened on the marketplace in a period (UTC, server
+    clock), the requirement and provider funnels for that period's cohort, and
+    the current subscription picture -- grouped counts from the authoritative
+    records, each with its definition. Platform-wide, admin-only; no prices,
+    names or documents."""
+    from app.services.operations import metrics
+
+    return metrics(db, period)

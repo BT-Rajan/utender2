@@ -17,6 +17,8 @@ from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.saved_opportunity import SavedOpportunity
 from app.models.user import User
 from app.schemas.service_provider import ServiceProviderProfileOut, MyBidOut, SubmitForReview
+from app.schemas.review import PreviousOwnerOut, ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut, ReviewReportCreate, ReviewReportOut, ReviewResponseCreate
+from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_response, record_review, report, review_of, shown_review_of
 from app.schemas.document import ServiceProviderDocumentOut, DocumentRequirementOut
 from app.schemas.common import UTCDateTime
 from app.schemas.project import FeedPage, ProjectOut
@@ -565,8 +567,97 @@ def _profile_fields(cp: ServiceProviderProfile) -> dict:
         review_count=cp.review_count,
         subscription_status=cp.subscription_status,
         subscription_current_period_end=cp.subscription_current_period_end,
+        subscription_interval=cp.subscription_interval,
+        subscription_cancel_at_period_end=cp.subscription_cancel_at_period_end,
+        subscription_event_at=cp.subscription_event_at,
         payment_override_active=cp.payment_override_active,
         marketplace_status=cp.marketplace_status,
         created_at=cp.created_at,
         **profile_state_fields(cp),
     )
+
+
+@router.get("/reputation", response_model=ProviderReputationOut)
+def my_reputation(user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
+    """Stage 8.7: this provider's own U-Tender reputation -- its organisation's,
+    by current membership; no id is taken from the request."""
+    from app.services.reputation import provider_reputation
+
+    return provider_reputation(db, get_service_provider_profile(user, db).user_id)
+
+
+@router.get("/previous-owners", response_model=list[PreviousOwnerOut])
+def previous_owners_of_mine(user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
+    """Stage 8.13: the owners this provider organisation has completed U-Tender
+    work for, each once, with those requirements -- its own history, by
+    current membership; no id is taken from the request. Their new
+    requirements reach it only through the normal feed and eligibility,
+    without saying whose they are (the owner is named on award, Stage 7.2)."""
+    from app.services.reputation import previous_owners
+
+    return previous_owners(db, get_service_provider_profile(user, db).user_id)
+
+
+# ---------- Stage 8.4: the winning provider reviews the owner ----------
+
+
+def _winning_side(db: Session, user: User, project_id: str, *, lock: bool = False) -> Project:
+    """The requirement, if the caller is on its winning provider's side (its
+    organisation's current members, or the individual winner) and the
+    requirement isn't suspended; everyone else gets a 404, whatever id they
+    send. With lock=True the requirement's row is locked first (Stage 7.15)."""
+    from app.models.award_record import AwardRecord
+    from app.services.team import can_access
+    from app.services.tender_lifecycle import lock_project
+
+    project = lock_project(db, project_id) if lock else db.get(Project, project_id)
+    award = db.query(AwardRecord).filter(AwardRecord.project_id == project_id).first() if project else None
+    winner = db.get(Offer, award.offer_id) if award else None
+    if not winner or project.is_suspended or not can_access(db, user, winner.organization_id, winner.service_provider_id):
+        raise HTTPException(status_code=404, detail="Project not found.")
+    return project
+
+
+@router.get("/projects/{project_id}/review", response_model=ReviewOut | None)
+def my_review_of_the_owner(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """The provider side's own review of the owner, if it has written one."""
+    _winning_side(db, user, project_id)
+    return review_of(db, project_id, PROVIDER_TO_OWNER)
+
+
+@router.get("/projects/{project_id}/review/received", response_model=ReceivedReviewOut | None)
+def review_received_from_the_owner(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """Stage 8.6: the owner side's review of this winning provider side, once
+    recorded -- to the winner's side only, as rating, comment and date. Other
+    providers see only the aggregate rating owners already see on offers."""
+    _winning_side(db, user, project_id)
+    return shown_review_of(db, project_id, OWNER_TO_PROVIDER)  # Stage 8.15: not once an admin has hidden it
+
+
+@router.post("/projects/{project_id}/review-reports", response_model=ReviewReportOut, status_code=201)
+def report_review_content(project_id: str, payload: ReviewReportCreate, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """Stage 8.15: the winning provider side reports the owner's review of it,
+    or the owner's response to its own review -- for an admin to look at.
+    Nothing changes until an admin decides."""
+    project = _winning_side(db, user, project_id, lock=True)
+    direction = OWNER_TO_PROVIDER if payload.target == "review" else PROVIDER_TO_OWNER
+    return report(db, project, direction, payload.target, user, payload.reason, payload.note)
+
+
+@router.post("/projects/{project_id}/review/received/response", response_model=ReceivedReviewOut)
+def respond_to_the_owners_review(project_id: str, payload: ReviewResponseCreate, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """Stage 8.9: the winning provider side's one, final response to the
+    owner's review of it -- from an approved, unsuspended account, under the
+    requirement's lock."""
+    project = _winning_side(db, user, project_id, lock=True)
+    return record_response(db, project, OWNER_TO_PROVIDER, user, payload.response)
+
+
+@router.post("/reviews", response_model=ReviewOut)
+def review_the_owner(payload: ReviewCreate, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """Stage 8.4: the winning provider's side reviews the owner, once the
+    transaction is completed -- once per transaction, about the requirement's
+    owner (from the transaction, never the request), under the requirement's
+    lock, from an approved and unsuspended account (the dependency)."""
+    project = _winning_side(db, user, payload.project_id, lock=True)
+    return record_review(db, project, PROVIDER_TO_OWNER, user, payload.rating, payload.comment)

@@ -21,15 +21,15 @@ from app.models.enums import DocumentStatus, NotificationType, OfferStatus, Proj
 from app.models.offer import Offer, OfferRevision, tendered
 from app.models.owner import OwnerProfile
 from app.models.project import Project, ProjectDrawing, ProjectItem
-from app.models.review import Review
 from app.models.user import User
 from app.schemas.clarification import OfferClarificationAsk, OfferClarificationOut
 from app.schemas.document import DocumentRequirementOut, OwnerDocumentOut
 from app.schemas.offer import ShortlistOut, EvaluationNoteEdit, EvaluationNoteIn, EvaluationNoteOut, OfferComparisonOut, OfferOut, OfferRevisionOut, OwnerOfferOut
 from app.schemas.owner import OwnerProfileOut
 from app.schemas.project import EligibilityQualification, ProjectOut
-from app.schemas.review import ReviewCreate, ReviewOut
+from app.schemas.review import OwnerReputationOut, PreviousProviderOut, ProviderReputationOut, ReceivedReviewOut, ReviewCreate, ReviewOut, ReviewReportCreate, ReviewReportOut, ReviewResponseCreate
 from app.services.audit import log_action
+from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_response, record_review, report, review_of, shown_review_of
 from app.services.email import notify_provider_requirement_ended, notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify, notify_team
@@ -190,7 +190,7 @@ def list_offers(
     # Stage 6.2: a withdrawn offer is no longer one the owner may consider --
     # they see who withdrew and when, never its content. Otherwise a sealed
     # offer withdrawn before the deadline would be opened at the deadline.
-    return [
+    out = [
         OfferOut(
             id=o.id,
             project_id=o.project_id,
@@ -212,6 +212,23 @@ def list_offers(
         else _owner_offer_out(db, project, o, cp)
         for o, cp in offers
     ]
+    return _with_track_record(db, project, out)
+
+
+def _with_track_record(db: Session, project: Project, out: list[OfferOut]) -> list[OfferOut]:
+    """Stage 8.12/8.14: beside each unsealed offer, its provider's completed
+    U-Tender transactions and those completed with this owner organisation
+    -- two grouped queries for the whole page, from the authoritative
+    records. Information for the owner only: it never changes which offers
+    are shown, their order, or anything they are judged on."""
+    from app.services.reputation import completed_counts, completed_together
+
+    ids = [o.service_provider_id for o in out if o.service_provider_id]
+    completed, together = completed_counts(db, ids), completed_together(db, project.owner_id, ids)
+    for o in out:
+        o.service_provider_completed_transactions = completed.get(o.service_provider_id, 0)
+        o.completed_with_you = together.get(o.service_provider_id, 0)
+    return out
 
 
 def _readable_offer(project_id: str, offer_id: str, user: User, db: Session) -> Offer:
@@ -267,7 +284,7 @@ def compare_offers(
     }
     return OfferComparisonOut(
         requirement=preview_requirement(db, project),
-        offers=[_owner_offer_out(db, project, *rows[i]) for i in wanted if i in rows],
+        offers=_with_track_record(db, project, [_owner_offer_out(db, project, *rows[i]) for i in wanted if i in rows]),
         unavailable=[i for i in wanted if i not in rows],
     )
 
@@ -295,6 +312,32 @@ def offer_detail(project_id: str, offer_id: str, user: User = Depends(require_ow
         offer=_owner_offer_out(db, project, offer, cp),
         on_current_version=offer.based_on_material_revision >= project.material_revision,
     )
+
+
+@router.get("/projects/{project_id}/offers/{offer_id}/reputation", response_model=ProviderReputationOut)
+def offer_provider_reputation(project_id: str, offer_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 8.7: the U-Tender reputation of the provider behind an offer, for
+    the owner weighing it -- the same access rules as the offer itself
+    (the owner's requirement, unsealed, live, not suspended). The provider is
+    the offer's, never one named in the request. Informational only."""
+    from app.services.reputation import completed_together, provider_reputation
+
+    provider_id = _readable_offer(project_id, offer_id, user, db).service_provider_id
+    out = provider_reputation(db, provider_id)
+    # Stage 8.12: and the work this owner organisation completed with it.
+    out.completed_with_you = completed_together(db, db.get(Project, project_id).owner_id, [provider_id]).get(provider_id, 0)
+    return out
+
+
+@router.get("/previous-providers", response_model=list[PreviousProviderOut])
+def previous_providers_of_mine(user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 8.12: the providers this owner organisation has completed U-Tender
+    work with (Stage 7 completion only), each once, with those requirements.
+    Its own history, by current membership; no id is taken from the request.
+    To work with one again, the owner publishes a new requirement as usual."""
+    from app.services.reputation import previous_providers
+
+    return previous_providers(db, get_owner_profile(user, db).user_id)
 
 
 @router.get("/projects/{project_id}/offers/{offer_id}/clarifications", response_model=list[OfferClarificationOut])
@@ -897,15 +940,27 @@ class RestartRequest(BaseModel):
 
 @router.post("/projects/{project_id}/restart", response_model=ProjectOut, status_code=201)
 def restart_project(project_id: str, payload: RestartRequest | None = None, user: User = Depends(require_owner), db: Session = Depends(get_db)):
-    """An ended requirement stays ended (canceled, expired, no award). When
-    the work comes back -- postponed, say -- the owner starts a NEW draft from
-    its content: description, items, rules, eligibility and current documents.
+    """An ended requirement stays ended (canceled, expired, no award), and a
+    completed one stays completed (Stage 8.11). When the work comes back --
+    postponed, or the same need a year later -- the owner starts a NEW draft
+    from its content: description, items, rules, eligibility and current
+    documents (fresh copies of the files). Never its state, dates, offers,
+    award, transaction, reviews or history.
     Nothing about the old one changes; its offers and history stay with it,
     and the new draft is published (or not) like any other."""
+    from app.services.transactions import completed_transaction
+
     sync_expired_projects(db)
     source = _get_owned_project(project_id, user, db, lock=True)
-    if source.status not in (ProjectStatus.canceled, ProjectStatus.no_award, ProjectStatus.expired):
-        raise HTTPException(status_code=400, detail="Only an ended requirement can be started again.")
+    # Stage 8.11: also a completed transaction (Stage 7's authoritative
+    # completion) -- the same need again, as a new, independent requirement.
+    # Never one still open, awarded but unfinished, or a draft.
+    ended = source.status in (ProjectStatus.canceled, ProjectStatus.no_award, ProjectStatus.expired)
+    if not ended and not (source.status == ProjectStatus.awarded and completed_transaction(db, source.id) is not None):
+        raise HTTPException(status_code=400, detail="Only a completed or ended requirement can be used to start a new one.")
+    # Stage 8.11: content an admin has suspended isn't copied into a new requirement.
+    if source.is_suspended:
+        raise HTTPException(status_code=400, detail="This requirement is suspended.")
     token = payload.creation_token if payload and payload.creation_token else None
     if token:
         existing = db.query(Project).filter(Project.owner_id == source.owner_id, Project.creation_token == token).first()
@@ -960,60 +1015,61 @@ def discard_draft(project_id: str, user: User = Depends(require_owner), db: Sess
 
 @router.get("/projects/{project_id}/review", response_model=ReviewOut | None)
 def get_review(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """The owner side's own review of the provider."""
     project = db.get(Project, project_id)
     if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
-    return db.query(Review).filter(Review.project_id == project_id).first()
+    return review_of(db, project_id, OWNER_TO_PROVIDER)
+
+
+@router.get("/projects/{project_id}/review/received", response_model=ReceivedReviewOut | None)
+def get_received_review(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 8.6: the winning provider's review of this owner side, once
+    recorded -- to the requirement's owner side only, as rating, comment and
+    date (never ids or the reviewer's account)."""
+    project = db.get(Project, project_id)
+    if not project or not owns(db, user, project):
+        raise HTTPException(status_code=404, detail="Project not found.")
+    return shown_review_of(db, project_id, PROVIDER_TO_OWNER)  # Stage 8.15: not once an admin has hidden it
+
+
+@router.post("/projects/{project_id}/review-reports", response_model=ReviewReportOut, status_code=201)
+def report_review_content(project_id: str, payload: ReviewReportCreate, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 8.15: the owner side reports the provider's review of it, or the
+    provider's response to its own review -- for an admin to look at. Nothing
+    changes until an admin decides."""
+    project = _get_owned_project(project_id, user, db, lock=True)
+    direction = PROVIDER_TO_OWNER if payload.target == "review" else OWNER_TO_PROVIDER
+    return report(db, project, direction, payload.target, user, payload.reason, payload.note)
+
+
+@router.post("/projects/{project_id}/review/received/response", response_model=ReceivedReviewOut)
+def respond_to_received_review(project_id: str, payload: ReviewResponseCreate, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 8.9: the owner side's one, final response to the winning
+    provider's review of it -- from an active, verified owner account, under
+    the requirement's lock, like every other owner action."""
+    project = _get_owned_project(project_id, user, db, lock=True)
+    return record_response(db, project, PROVIDER_TO_OWNER, user, payload.response)
+
+
+@router.get("/reputation", response_model=OwnerReputationOut)
+def my_reputation(user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Stage 8.8: this owner side's own U-Tender reputation -- its
+    organisation's, by current membership; no id is taken from the request."""
+    from app.services.reputation import owner_reputation
+
+    return owner_reputation(db, get_owner_profile(user, db).user_id, with_reviews=True)
 
 
 @router.post("/reviews", response_model=ReviewOut)
 def submit_review(payload: ReviewCreate, user: User = Depends(require_owner), db: Session = Depends(get_db)):
-    project = db.get(Project, payload.project_id)
-    if not project or not owns(db, user, project):
-        raise HTTPException(status_code=404, detail="Project not found.")
-    if project.status != ProjectStatus.awarded:
-        raise HTTPException(status_code=400, detail="You can only review a project after it's awarded.")
-
-    existing = db.query(Review).filter(Review.project_id == payload.project_id).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="A review already exists for this project.")
-
-    # The service provider being reviewed is derived from the project's own
-    # AwardRecord, never trusted from the request body — payload.service_provider_id
-    # is otherwise a free-text client-supplied ID with only a "some real
-    # service provider exists" FK constraint behind it, letting an owner rate ANY
-    # service provider's public profile under cover of an unrelated awarded
-    # project (a real IDOR, found and fixed in PASS 17's security audit).
-    award = db.query(AwardRecord).filter(AwardRecord.project_id == payload.project_id).first()
-    if not award:
-        raise HTTPException(status_code=400, detail="This project has no award record to review against.")
-
-    review = Review(
-        project_id=payload.project_id,
-        owner_id=user.id,
-        service_provider_id=award.service_provider_id,
-        rating=payload.rating,
-        comment=payload.comment or None,
-    )
-    db.add(review)
-    db.commit()
-
-    # Recompute the service provider's public average rather than trusting an
-    # incrementally-maintained counter, so it can never drift out of sync.
-    # Uses the same server-derived award.service_provider_id as above — never
-    # payload.service_provider_id.
-    all_reviews = db.query(Review.rating).filter(Review.service_provider_id == award.service_provider_id).all()
-    review_count = len(all_reviews)
-    avg_rating = round(sum(r[0] for r in all_reviews) / review_count, 1) if review_count else 0
-
-    profile = db.get(ServiceProviderProfile, award.service_provider_id)
-    if profile:
-        profile.avg_rating = avg_rating
-        profile.review_count = review_count
-        db.commit()
-
-    db.refresh(review)
-    return review
+    """Stage 8.3: the owner side reviews the provider it awarded, once the
+    transaction is completed (8.1) -- once per transaction. Under the
+    requirement's lock and from an active, verified owner account like every
+    other owner action; the review, the provider's recomputed public rating
+    and the audit entry are one transaction (services.reviews)."""
+    project = _get_owned_project(payload.project_id, user, db, lock=True)
+    return record_review(db, project, OWNER_TO_PROVIDER, user, payload.rating, payload.comment)
 
 
 # ---------- owner verification (mirrors the service provider document-review

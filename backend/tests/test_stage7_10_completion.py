@@ -188,7 +188,7 @@ def test_failures_leave_one_story(db, monkeypatch):
     monkeypatch.undo()
     db.expire_all()
     assert db.query(Agreement).one().completion_status == "submitted"
-    assert [u.kind for u in db.query(ExecutionUpdate).order_by(ExecutionUpdate.sequence)] == ["started", "delivered"]
+    assert [u.kind for u in db.query(ExecutionUpdate).order_by(ExecutionUpdate.sequence) if u.kind in ("started", "delivered", "accepted")] == ["started", "delivered"]
 
 
 @needs_mysql

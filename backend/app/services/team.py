@@ -63,7 +63,8 @@ def side_of(db: Session, organization_id: str | None, creator_id: str | None) ->
 
 def side_users(db: Session, organization_id: str | None, creator_id: str | None) -> list[User]:
     ids = side_of(db, organization_id, creator_id)
-    return db.query(User).filter(User.id.in_(ids)).all() if ids else []
+    # Stage 9.5: current members only, never a deactivated account (9.2).
+    return db.query(User).filter(User.id.in_(ids), User.deactivated_at.is_(None)).all() if ids else []
 
 
 def acting_profile(db: Session, user: User):
@@ -89,3 +90,13 @@ def acting_profile(db: Session, user: User):
 def acting_id(db: Session, user: User) -> str:
     profile = acting_profile(db, user)
     return profile.user_id if profile else user.id
+
+
+def stakeholder_rows(model):
+    """SQL condition: profile rows that stand for a stakeholder -- an
+    organisation's, or an individual's. A member's own row is not one: members
+    act as their organisation (acting_profile). Used wherever stakeholders are
+    listed or counted, so a ten-person organisation is one stakeholder."""
+    from sqlalchemy import select
+
+    return or_(model.organization_id.isnot(None), model.user_id.notin_(select(OrganizationMembership.user_id)))

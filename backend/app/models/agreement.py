@@ -108,6 +108,12 @@ class AgreementDocument(Base):
 # resuming -- in order, never edited. The parties' own history of the
 # execution; the admin audit log records the same events for moderation.
 EXECUTION_UPDATE_KINDS = ("started", "progress", "on_hold", "resumed", "delivered", "accepted", "returned")
+# Stage 7.13: the transaction's other business events, recorded in the same
+# numbered log so the history's order is the order the server applied them.
+TRANSACTION_EVENT_KINDS = (
+    "in_force", "document", "change_proposed", "change_agreed", "change_rejected", "change_withdrawn", "change_lapsed",
+    "terminated", "completed",
+)
 
 
 class ExecutionUpdate(Base):
@@ -125,6 +131,10 @@ class ExecutionUpdate(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Stage 7.7: delivered / accepted / returned entries name their deliverable.
     milestone_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("milestones.id", ondelete="SET NULL"), nullable=True)
+    # Stage 7.13: change_* entries name their variation.
+    variation_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("variations.id", ondelete="SET NULL"), nullable=True)
+    # Stage 7.13: a "document" entry -- one of the agreement's own papers (its name is kept in note).
+    document_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("agreement_documents.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 

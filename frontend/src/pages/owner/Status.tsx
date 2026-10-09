@@ -5,6 +5,7 @@ import type { OwnerDocument, OwnerProfile } from "@/api/types";
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
 import { VerificationStateBanner } from "@/components/VerificationChecklist";
+import { SupportContact } from "@/components/SupportContact";
 
 function statusBadge(status: string) {
   switch (status) {
@@ -44,6 +45,7 @@ export function OwnerStatusPage() {
         <div className="bg-white border border-red border-l-4 rounded px-5 py-4">
           <div className="font-display font-semibold text-navy">{t("owner.status.suspendedTitle")}</div>
           <p className="text-sm text-steel mt-1.5">{t("owner.status.suspendedBody")}</p>
+          <SupportContact />
         </div>
       </main>
     );

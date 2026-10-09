@@ -162,6 +162,9 @@ AR: dict[str, str] = {
     "This project has already been awarded, canceled, or has no award.": "تمت ترسية هذا المشروع أو إلغاؤه أو تقرر عدم الترسية بالفعل.",
     "This offer has been suspended by an admin and cannot be awarded.": "علّق المشرف هذا العرض ولا يمكن ترسيته.",
     # Stage 7.3: the agreement
+    "You can review the owner once the work has been accepted and the transaction is completed.": "يمكنك تقييم المالك بعد قبول العمل واكتمال المعاملة.",
+    "This transaction has already been reviewed (by a colleague or from another tab).": "تم تقييم هذه المعاملة بالفعل (من زميل أو من علامة تبويب أخرى).",
+    "You can review the service provider once the work has been accepted and the transaction is completed.": "يمكنك تقييم مقدم الخدمة بعد قبول العمل واكتمال المعاملة.",
     "This transaction is completed and closed; nothing more can be changed.": "اكتملت هذه المعاملة وأُغلقت؛ لا يمكن تغيير أي شيء بعد الآن.",
     # Stage 7.10: completion
     "The work was already accepted as complete, so the agreement can't be terminated.": "تم قبول العمل كمكتمل بالفعل، لذا لا يمكن إنهاء الاتفاقية.",
@@ -365,6 +368,19 @@ AR: dict[str, str] = {
     "Change it by updating your offer.": "لتغييره، حدّث عرضك.",
     "The requirement changed after you started this offer.": "تغيّر الطلب بعد أن بدأت هذا العرض.",
     "Review the current requirement first.": "راجع الطلب الحالي أولًا.",
+    "There is no review to respond to.": "لا يوجد تقييم للرد عليه.",
+    "This review already has a response (from a colleague or another tab).": "لهذا التقييم رد بالفعل (من زميل أو من علامة تبويب أخرى).",
+    "Write a response first.": "اكتب ردًا أولًا.",
+    "Choose why you are reporting this.": "اختر سبب الإبلاغ.",
+    "There is nothing to report.": "لا يوجد ما يمكن الإبلاغ عنه.",
+    "This has already been reported to U-Tender.": "تم الإبلاغ عن هذا إلى U-Tender بالفعل.",
+    "Choose to keep or hide it.": "اختر الإبقاء عليه أو إخفاءه.",
+    "This report has already been decided.": "تم البت في هذا البلاغ بالفعل.",
+    "Report not found.": "البلاغ غير موجود.",
+    "This account has been deactivated. Contact U-Tender if you think this is a mistake.": "تم تعطيل هذا الحساب. تواصل مع U-Tender إذا كنت تعتقد أن هذا خطأ.",
+    "This account acts for an organization. Manage it from the organization's page.": "هذا الحساب يعمل باسم منظمة. أدِره من صفحة المنظمة.",
+    "Account not found.": "الحساب غير موجود.",
+    "This account has a history on record. Deactivate it instead, which keeps that history.": "لهذا الحساب سجل محفوظ. عطّله بدلًا من ذلك، فيبقى السجل محفوظًا.",
     "Your offer draft was changed somewhere else (another tab, device or team member) since you opened it.": "تغيّرت مسودة عرضك في مكان آخر (علامة تبويب أو جهاز آخر أو عضو في الفريق) منذ فتحتها.",
     "Reload to see the latest, then make your change again.": "أعد التحميل لرؤية أحدث نسخة، ثم أعد إجراء التعديل.",
     "This requirement is temporarily unavailable.": "هذا الطلب غير متاح مؤقتًا.",
@@ -372,10 +388,14 @@ AR: dict[str, str] = {
     "Complete your verification to take part in opportunities.": "أكمل التحقق من حسابك للمشاركة في الفرص.",
     "Your account is suspended, so you can't take part in opportunities. Contact support.": "حسابك موقوف، لذا لا يمكنك المشاركة في الفرص. تواصل مع الدعم.",
     "No such version.": "لا توجد نسخة بهذا الرقم.",
-    "Only an ended requirement can be started again.": "لا يمكن البدء من جديد إلا بطلب منتهٍ.",
+    "Only a completed or ended requirement can be used to start a new one.": "لا يمكن بدء طلب جديد إلا من طلب مكتمل أو منتهٍ.",
     "This project can no longer be closed.": "لم يعد من الممكن إغلاق هذا المشروع.",
     # --- billing, misc ---
     "No billing account yet — subscribe first.": "لا يوجد حساب فوترة بعد — اشترك أولًا.",
+    "Could not start checkout. Try again.": "تعذّر بدء عملية الدفع. حاول مرة أخرى.",
+    "Could not open billing. Try again.": "تعذّر فتح صفحة الفوترة. حاول مرة أخرى.",
+    "You already have a subscription. Use Manage billing to update your payment method or plan.": "لديك اشتراك بالفعل. استخدم «إدارة الفوترة» لتحديث وسيلة الدفع أو الخطة.",
+    "Your offer was changed somewhere else (another tab, device or team member) since you opened it.": "تم تغيير عرضك في مكان آخر (علامة تبويب أو جهاز أو عضو فريق آخر) منذ فتحته.",
     "Could not start checkout.": "تعذر بدء الدفع.",
     "Billing isn't configured yet — a Stripe price ID is missing.": "لم يتم إعداد الفوترة بعد — معرّف السعر في Stripe مفقود.",
     "Internal server error.": "خطأ داخلي في الخادم.",
@@ -404,6 +424,7 @@ def _gov(name: str) -> str:
 
 
 PATTERNS: list[tuple[re.Pattern, object]] = [
+    (re.compile(r"^Compare up to (\d+) offers at a time\.$"), lambda m: f"يمكنك مقارنة {m[1]} عروض كحد أقصى في كل مرة."),
     (re.compile(r"^Your offer is missing (.+)\.$"), _missing),
     (re.compile(r'^Item (\d+) \("(.*)"\) has a quantity but no unit\.$'), lambda m: f'البند {m[1]} ("{m[2]}") له كمية بدون وحدة.'),
     (re.compile(r'^Item (\d+) \("(.*)"\) has no quantity, so providers will price it as a lump sum\.$'), lambda m: f'البند {m[1]} ("{m[2]}") بدون كمية، لذا سيسعّره مقدمو الخدمة كمبلغ مقطوع.'),

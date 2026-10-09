@@ -1,5 +1,5 @@
 export interface Dictionary {
-  common: { loading: string; save: string; cancel: string; back: string };
+  common: { loading: string; save: string; cancel: string; back: string; loadFailed: string; retry: string; notifications: string; markAllRead: string; noNotifications: string; supportContact: string };
   brand: { tagline: string };
   home: {
     login: string;
@@ -245,6 +245,239 @@ export interface Dictionary {
     confirmBody: string;
     earlierVersion: string;
     confirm: string;
+  };
+  ownerReview: {
+    heading: string;
+    theOwner: string;
+    rating: string;
+    comment: string;
+    submit: string;
+    submitted: string;
+    confirmBody: string;
+    error: string;
+  };
+  review: {
+    confirmTitle: string;
+    confirmBody: string;
+    receivedHeading: string;
+    receivedOn: string;
+    respond: string;
+    responsePlaceholder: string;
+    respondConfirmTitle: string;
+    respondConfirmBody: string;
+    responseError: string;
+    yourResponse: string;
+    theirResponse: string;
+    ownerResponse: string;
+    providerResponse: string;
+  };
+  reputation: {
+    heading: string;
+    summary: string;
+    completed: string;
+    none: string;
+    noReviews: string;
+    verified: string;
+    note: string;
+    headingOwner: string;
+    noReviewsOwner: string;
+    verifiedOwner: string;
+    noteOwner: string;
+  };
+  previous: {
+    heading: string;
+    together: string;
+    last: string;
+    note: string;
+    ownersHeading: string;
+    ownersNote: string;
+  };
+  report: {
+    reportReview: string;
+    reportResponse: string;
+    explain: string;
+    reason: string;
+    reasons: { abusive: string; private_information: string; not_about_this_transaction: string; other: string };
+    note: string;
+    submit: string;
+    cancel: string;
+    sent: string;
+    error: string;
+    hiddenNote: string;
+    adminNone: string;
+    targetReview: string;
+    targetResponse: string;
+    keep: string;
+    hide: string;
+  };
+  ops: {
+    unavailable: string;
+    asOf: string;
+    refresh: string;
+    loading: string;
+    failed: string;
+    attention: string;
+    nothing: string;
+    open: string;
+    since: string;
+    more: string;
+    background: string;
+    reminders: string;
+    remindersOverdue: string;
+    reminders_ok: string;
+    reminders_not_determinable: string;
+    email: string;
+    notTracked: string;
+    emailFailing: string;
+    billing: string;
+    billingNotConfigured: string;
+    lastBillingEvent: string;
+    noBillingEvents: string;
+    backup: string;
+    backup_not_configured: string;
+    backup_never_run: string;
+    backupFailing: string;
+    backupOverdue: string;
+    backupRecent: string;
+    email_no_failures_recorded: string;
+    email_not_configured: string;
+    accounts: string;
+    owners: string;
+    ownersActive: string;
+    awaitingReview: string;
+    providers: string;
+    canBid: string;
+    withoutPayment: string;
+    paymentFailed: string;
+    awaitingReviewProviders: string;
+    suspended: string;
+    requirements: string;
+    openWithOffers: string;
+    openWithoutOffers: string;
+    drafts: string;
+    awaitingDecision: string;
+    awarded: string;
+    endedWithoutAward: string;
+    offers: string;
+    onOpen: string;
+    last7: string;
+    withdrawn: string;
+    transactions: string;
+    preparing: string;
+    active: string;
+    onHold: string;
+    completionAwaiting: string;
+    completed: string;
+    terminated: string;
+    awardedLast7: string;
+    kinds: { open_without_offers_closing_24h: string; open_without_offers: string; awaiting_owner_decision: string; completion_awaiting_owner: string; transactions_on_hold: string; agreements_not_in_force: string; providers_awaiting_review: string; owners_awaiting_review: string; provider_payment_failed: string; open_review_reports: string; deliverables_awaiting_owner: string; changes_awaiting_answer: string; email_failures: string };
+  };
+  members: {
+    heading: string;
+    representative: string;
+    member: string;
+    deactivatedOn: string;
+    deactivate: string;
+    reactivate: string;
+    deactivateTitle: string;
+    deactivateBody: string;
+    reactivateTitle: string;
+    reactivateBody: string;
+    error: string;
+  };
+  trace: {
+    heading: string;
+    version: string;
+    amendments: string;
+    awardedTo: string;
+    pricedOn: string;
+    earlierVersion: string;
+    noAward: string;
+    transaction: string;
+    onHold: string;
+    completionSubmitted: string;
+    owner: string;
+    provider: string;
+    status: { preparing: string; active: string; completed: string; terminated: string };
+    kinds: { awarded: string; in_force: string; document: string; started: string; progress: string; on_hold: string; resumed: string; delivered: string; accepted: string; returned: string; change_proposed: string; change_agreed: string; change_rejected: string; change_withdrawn: string; change_lapsed: string; terminated: string; completed: string };
+  };
+  support: {
+    find: string;
+    email: string;
+    search: string;
+    notFound: string;
+    person: string;
+    deactivated: string;
+    emailUnverified: string;
+    actsFor: string;
+    notEstablished: string;
+    standing: string;
+    checkProvider: string;
+    providerEmail: string;
+    check: string;
+    notAProvider: string;
+    failed: string;
+    participation: string;
+    offer: string;
+    noOffer: string;
+    publishCheck: string;
+    ownerCannotPublish: string;
+    noBlockers: string;
+  };
+  audit: {
+    heading: string;
+    empty: string;
+    unavailable: string;
+    system: string;
+  };
+  metrics: {
+    heading: string;
+    period: string;
+    since: string;
+    activity: string;
+    newAccounts: string;
+    published: string;
+    offers: string;
+    awards: string;
+    completed: string;
+    reviews: string;
+    activePeople: string;
+    returning: string;
+    requirementFunnel: string;
+    receivedOffers: string;
+    awarded: string;
+    endedWithoutAward: string;
+    providerFunnel: string;
+    registered: string;
+    verified: string;
+    ableToBid: string;
+    participated: string;
+    subscriptions: string;
+    paying: string;
+    overrideOnly: string;
+    pastDue: string;
+    cancelled: string;
+    neverSubscribed: string;
+    periods: { today: string; "7d": string; "30d": string; month: string; all: string };
+  };
+  history: {
+    heading: string;
+    awarded: string;
+    in_force: string;
+    document: string;
+    change_proposed: string;
+    change_agreed: string;
+    change_rejected: string;
+    change_withdrawn: string;
+    change_lapsed: string;
+    terminated: string;
+    completed: string;
+  };
+  finance: {
+    finalValue: string;
+    changes: string;
+    payments: string;
+    notManaged: string;
   };
   completion: {
     heading: string;
@@ -586,6 +819,11 @@ export interface Dictionary {
     error: string;
     labelCanceled: string;
     labelExpired: string;
+    labelDraft: string;
+    labelOpen: string;
+    labelClosed: string;
+    labelUnderEvaluation: string;
+    labelAwarded: string;
     labelExternal: string;
     labelNoSuitable: string;
     textCanceled: string;
@@ -600,6 +838,9 @@ export interface Dictionary {
     restartConfirmBody: string;
     restartedFrom: string;
     restartedFromLink: string;
+    similar: string;
+    similarConfirm: string;
+    similarConfirmBody: string;
     adminSuspended: string;
     labelSuspended: string;
   };
@@ -1082,7 +1323,14 @@ export interface Dictionary {
       subheadingInactive: string;
       overrideBadge: string;
       overrideMessage: string;
+      pastDueTitle: string;
+      pastDueBody: string;
+      updatePayment: string;
+      billingUnavailable: string;
       renews: string;
+      ends: string;
+      monthly: string;
+      yearly: string;
       manageBilling: string;
       checkoutNote: string;
       checkoutError: string;
@@ -1285,6 +1533,8 @@ export interface Dictionary {
       offers: string;
       projects: string;
       cms: string;
+      reviewReports: string;
+      overview: string;
     };
     owners: {
       eyebrow: string;
@@ -1432,6 +1682,12 @@ export const en: Dictionary = {
     save: "Save",
     cancel: "Cancel",
     back: "Back",
+    loadFailed: "Couldn't load this — check your connection and try again.",
+    retry: "Retry",
+    notifications: "Notifications",
+    markAllRead: "Mark all read",
+    noNotifications: "No notifications yet.",
+    supportContact: "Contact the U-Tender team:",
   },
   brand: {
     tagline: "Drawings in. Offers out.",
@@ -1680,6 +1936,271 @@ export const en: Dictionary = {
     confirmBody: "This is your final decision on this requirement: {provider}'s offer of {amount} is accepted as submitted, every other live offer is marked not selected, and every provider is told. It can't be undone. It isn't a contract or a payment.",
     earlierVersion: "Note: this offer was made against version {n} of the requirement, which is now at version {m}, and its provider didn't confirm it since. You'd be awarding it as it stands.",
     confirm: "Award",
+  },
+  ownerReview: {
+    heading: "Review {owner}",
+    theOwner: "the owner",
+    rating: "{n} out of 5",
+    comment: "How was working with this owner? (optional)",
+    submit: "Submit review",
+    submitted: "Submitted on",
+    confirmBody: "Your rating and comment are recorded against this completed transaction. A review can't be changed afterwards.",
+    error: "The review couldn't be submitted.",
+  },
+  review: {
+    confirmTitle: "Submit this review?",
+    confirmBody: "Your rating and comment are recorded against this completed transaction and count towards the service provider's rating, which owners see when weighing its offers. A review can't be changed afterwards.",
+    receivedHeading: "{party}'s review of you",
+    receivedOn: "Received on",
+    respond: "Respond",
+    responsePlaceholder: "Respond to this review (optional)",
+    respondConfirmTitle: "Post this response?",
+    respondConfirmBody: "Your response is shown with this review wherever the review is shown. It doesn't change the review or its rating, and it can't be changed afterwards.",
+    responseError: "The response couldn't be posted.",
+    yourResponse: "Your response",
+    theirResponse: "Their response",
+    ownerResponse: "The owner's response",
+    providerResponse: "The provider's response",
+  },
+  reputation: {
+    heading: "U-Tender track record",
+    summary: "{avg} / 5 · {n} reviews",
+    completed: "{n} completed U-Tender transactions",
+    none: "No completed U-Tender transactions yet",
+    noReviews: "No owner reviews yet",
+    verified: "Owner review · completed U-Tender transaction",
+    note: "For information only: it doesn't affect eligibility, verification or award, and offers are never ordered by it.",
+    headingOwner: "The owner's U-Tender track record",
+    noReviewsOwner: "No provider reviews yet",
+    verifiedOwner: "Provider review · completed U-Tender transaction",
+    noteOwner: "From the owner's completed U-Tender transactions and the reviews its providers left. For information only.",
+  },
+  previous: {
+    heading: "Providers you've completed work with",
+    together: "Completed work together: {n}",
+    last: "last",
+    note: "From your completed U-Tender transactions. To work with a provider again, publish a new requirement: it is open to every eligible provider and is judged like any other.",
+    ownersHeading: "Owners you've completed work for",
+    ownersNote: "From your completed U-Tender transactions. Their new requirements appear in your feed like any others when you're eligible, open to every eligible provider; who posted them is shown on award.",
+  },
+  report: {
+    reportReview: "Report this review",
+    reportResponse: "Report this response",
+    explain: "For abuse, private details or content that isn't about this work. If you simply disagree, respond instead. Nothing changes until U-Tender decides.",
+    reason: "Reason",
+    reasons: { abusive: "Abusive or threatening", private_information: "Shares private information", not_about_this_transaction: "Not about this work", other: "Other" },
+    note: "Short explanation (optional)",
+    submit: "Send report",
+    cancel: "Cancel",
+    sent: "Reported. U-Tender will look at it; the review stays as it is until then.",
+    error: "The report couldn't be sent.",
+    hiddenNote: "U-Tender has hidden this review: it is no longer shown or counted.",
+    adminNone: "No reports.",
+    targetReview: "review",
+    targetResponse: "response",
+    keep: "Keep",
+    hide: "Hide",
+  },
+  ops: {
+    unavailable: "Unavailable: this couldn't be loaded, so no figure is shown.",
+    asOf: "As of",
+    refresh: "Refresh",
+    loading: "Loading…",
+    failed: "The overview couldn't be loaded.",
+    attention: "Needs attention",
+    nothing: "Nothing needs attention right now.",
+    open: "Open",
+    since: "since",
+    more: "and {n} more",
+    background: "Background jobs",
+    reminders: "Deadline reminders",
+    remindersOverdue: "Overdue for {n}: the scheduler may not be running",
+    reminders_ok: "Running",
+    reminders_not_determinable: "Can't tell yet (nothing due)",
+    email: "Email delivery",
+    notTracked: "Not tracked",
+    emailFailing: "{n} failed in the last 24 hours",
+    billing: "Billing webhooks (Stripe)",
+    billingNotConfigured: "Not configured: subscription changes won't arrive",
+    lastBillingEvent: "Last event received",
+    noBillingEvents: "Configured; no event received yet",
+    backup: "Backups",
+    backup_not_configured: "Not configured (BACKUP_DIR unset)",
+    backup_never_run: "No backup recorded yet",
+    backupFailing: "Last run failed at: {step}",
+    backupOverdue: "Overdue -- last success",
+    backupRecent: "Last success",
+    email_no_failures_recorded: "No failures recorded",
+    email_not_configured: "Not configured: no emails are sent",
+    accounts: "Accounts",
+    owners: "Owners",
+    ownersActive: "Owners verified",
+    awaitingReview: "Owners awaiting review",
+    providers: "Service providers",
+    canBid: "Providers able to bid",
+    withoutPayment: "Verified, payment not active",
+    paymentFailed: "Payment failed",
+    awaitingReviewProviders: "Providers awaiting review",
+    suspended: "Suspended",
+    requirements: "Requirements",
+    openWithOffers: "Open with offers",
+    openWithoutOffers: "Open with no offers",
+    drafts: "Drafts",
+    awaitingDecision: "Closed, awaiting owner decision",
+    awarded: "Awarded",
+    endedWithoutAward: "Ended without award",
+    offers: "Offers",
+    onOpen: "On open requirements",
+    last7: "Submitted in the last 7 days",
+    withdrawn: "Withdrawn",
+    transactions: "Transactions",
+    preparing: "Agreement being prepared",
+    active: "In progress",
+    onHold: "On hold",
+    completionAwaiting: "Completion awaiting owner",
+    completed: "Completed",
+    terminated: "Terminated",
+    awardedLast7: "Awarded in the last 7 days",
+    kinds: {
+      open_without_offers_closing_24h: "Open, no offers, closing within 24 hours",
+      open_without_offers: "Open with no offers yet",
+      awaiting_owner_decision: "Closed, awaiting the owner's decision",
+      completion_awaiting_owner: "Completion submitted, awaiting the owner",
+      transactions_on_hold: "Transactions on hold",
+      agreements_not_in_force: "Agreements not yet in force",
+      providers_awaiting_review: "Service providers awaiting verification",
+      owners_awaiting_review: "Owners awaiting verification",
+      provider_payment_failed: "Verified providers whose payment failed",
+      open_review_reports: "Reported reviews to decide",
+      deliverables_awaiting_owner: "Deliverables awaiting the owner's review",
+      changes_awaiting_answer: "Changes awaiting the other party's answer",
+      email_failures: "Emails that couldn't be sent (last 24 hours)",
+    },
+  },
+  members: {
+    heading: "People acting for it",
+    representative: "representative",
+    member: "member",
+    deactivatedOn: "deactivated",
+    deactivate: "Deactivate account",
+    reactivate: "Reactivate account",
+    deactivateTitle: "Deactivate this person's account?",
+    deactivateBody: "They are signed out everywhere at once and can't sign in. The organization, its other members and everything recorded stay as they are. You can reactivate the account later.",
+    reactivateTitle: "Reactivate this person's account?",
+    reactivateBody: "They can sign in again, with exactly the organization and rights they had before.",
+    error: "The account couldn't be changed.",
+  },
+  trace: {
+    heading: "Decision and transaction",
+    version: "Current version: v{n}",
+    amendments: "{n} amendments",
+    awardedTo: "Awarded to",
+    pricedOn: "priced on v{n}",
+    earlierVersion: "an earlier version",
+    noAward: "No award.",
+    transaction: "Transaction",
+    onHold: "on hold since",
+    completionSubmitted: "completion submitted, awaiting the owner",
+    owner: "owner",
+    provider: "provider",
+    status: { preparing: "agreement being prepared", active: "in progress", completed: "completed", terminated: "terminated" },
+    kinds: {
+      awarded: "Awarded",
+      in_force: "Agreement in force",
+      document: "Document added",
+      started: "Work started",
+      progress: "Progress update",
+      on_hold: "Put on hold",
+      resumed: "Resumed",
+      delivered: "Deliverable submitted",
+      accepted: "Deliverable accepted",
+      returned: "Deliverable returned",
+      change_proposed: "Change proposed",
+      change_agreed: "Change agreed",
+      change_rejected: "Change rejected",
+      change_withdrawn: "Change withdrawn",
+      change_lapsed: "Change lapsed",
+      terminated: "Terminated",
+      completed: "Completed",
+    },
+  },
+  support: {
+    find: "Find a person",
+    email: "Email address",
+    search: "Find",
+    notFound: "No account with that email.",
+    person: "Person",
+    deactivated: "deactivated",
+    emailUnverified: "email not verified",
+    actsFor: "Acts for",
+    notEstablished: "not set up as an owner or provider yet",
+    standing: "Standing",
+    checkProvider: "Why can't a provider respond?",
+    providerEmail: "The provider's email",
+    check: "Check",
+    notAProvider: "That email isn't a service provider's account.",
+    failed: "The check couldn't be run.",
+    participation: "Can take part",
+    offer: "Its offer here",
+    noOffer: "none",
+    publishCheck: "What blocks publishing",
+    ownerCannotPublish: "The owner's account can't publish (not verified, or suspended).",
+    noBlockers: "Nothing blocks publishing.",
+  },
+  audit: {
+    heading: "Recorded history",
+    empty: "Nothing recorded yet.",
+    unavailable: "The history couldn't be loaded.",
+    system: "System",
+  },
+  metrics: {
+    heading: "Marketplace activity",
+    period: "Period",
+    since: "From",
+    activity: "In this period",
+    newAccounts: "New accounts",
+    published: "Requirements published",
+    offers: "Offers submitted",
+    awards: "Awards",
+    completed: "Transactions completed",
+    reviews: "Reviews",
+    activePeople: "Active people",
+    returning: "Returning people",
+    requirementFunnel: "Requirements published in this period",
+    receivedOffers: "Received offers",
+    awarded: "Awarded",
+    endedWithoutAward: "Ended without award",
+    providerFunnel: "Providers registered in this period",
+    registered: "Registered",
+    verified: "Verified",
+    ableToBid: "Able to bid now",
+    participated: "Submitted an offer",
+    subscriptions: "Subscriptions now",
+    paying: "Paying",
+    overrideOnly: "Admin override only",
+    pastDue: "Past due",
+    cancelled: "Cancelled or expired",
+    neverSubscribed: "Never subscribed",
+    periods: { "today": "Today", "7d": "7 days", "30d": "30 days", "month": "This month", "all": "All time" },
+  },
+  history: {
+    heading: "History",
+    awarded: "Awarded",
+    in_force: "Agreement in force",
+    document: "Document added",
+    change_proposed: "Change {n} proposed",
+    change_agreed: "Change {n} agreed",
+    change_rejected: "Change {n} rejected",
+    change_withdrawn: "Change {n} withdrawn",
+    change_lapsed: "Change {n} closed (agreement ended)",
+    terminated: "Agreement terminated",
+    completed: "Transaction completed",
+  },
+  finance: {
+    finalValue: "Final agreed value",
+    changes: "Agreed changes",
+    payments: "Payments",
+    notManaged: "Not tracked by U-Tender — settled directly between the owner and the service provider.",
   },
   completion: {
     heading: "Work completion",
@@ -2053,6 +2574,11 @@ export const en: Dictionary = {
     error: "Couldn't end the requirement.",
     labelCanceled: "Canceled",
     labelExpired: "Expired",
+    labelDraft: "Draft",
+    labelOpen: "Open for offers",
+    labelClosed: "Closed to offers",
+    labelUnderEvaluation: "Under evaluation",
+    labelAwarded: "Awarded",
     labelExternal: "Closed outside U-Tender",
     labelNoSuitable: "No award",
     textCanceled: "The owner canceled this requirement; it won't go ahead in this form.",
@@ -2067,6 +2593,9 @@ export const en: Dictionary = {
     restartConfirmBody: "A new draft is created with this requirement’s description, items, rules, eligibility and current documents. Set a new deadline, check it, then publish it as a new requirement. This one stays as it ended, with its offers.",
     restartedFrom: "Started again from an ended requirement:",
     restartedFromLink: "see the original",
+    similar: "Create similar requirement",
+    similarConfirm: "Create a new requirement from this one?",
+    similarConfirmBody: "A new draft is created with this requirement’s description, items, rules, eligibility and current documents. Update anything that has changed, set new dates and a deadline, check it, then publish it as a new requirement. This one stays completed, with its offers, award, transaction and reviews.",
     adminSuspended: "Suspended by U-Tender: hidden from providers and not accepting offers, questions or changes to offers until reactivated. Contact support if you think this is a mistake.",
     labelSuspended: "Suspended by U-Tender",
   },
@@ -2568,7 +3097,14 @@ export const en: Dictionary = {
       subheadingInactive: "One plan, full access. Cancel any time.",
       overrideBadge: "admin override",
       overrideMessage: "An administrator has granted your account full marketplace access without a paid subscription.",
+      pastDueTitle: "Your last payment failed",
+      pastDueBody: "Viewing full requirements and sending offers is paused until the payment goes through. Update your card below — your existing subscription continues; there's no need to subscribe again.",
+      updatePayment: "Update payment method",
+      billingUnavailable: "Online subscription isn't available yet. The U-Tender team can activate your marketplace access directly.",
       renews: "Renews",
+      ends: "Cancelled: access ends",
+      monthly: "monthly",
+      yearly: "yearly",
       manageBilling: "Manage billing",
       checkoutNote: "You'll be redirected to Stripe's secure checkout to complete your subscription.",
       checkoutError: "Could not start checkout. Try again.",
@@ -2651,18 +3187,18 @@ export const en: Dictionary = {
       ownerVisibleHint: "You can see bids as they come in. Locked in once the first bid arrives.",
       sealedHint: "Bids stay hidden from you until bidding closes. Locked in once the first bid arrives.",
       title: "Project title",
-      titlePlaceholder: "e.g. Maple St. Duplex — Roof Replacement",
+      titlePlaceholder: "e.g. Villa in Salwa — roof waterproofing",
       address: "Site address",
-      addressPlaceholder: "Street, city, state",
+      addressPlaceholder: "Block, street, building / plot number",
       trade: "Trade",
-      tradePlaceholder: "e.g. Roofing, Framing, Fencing",
+      tradePlaceholder: "e.g. Waterproofing, electrical, painting",
       scope: "Scope of work",
       scopePlaceholder: "Describe the work you need done. Service providers will use this alongside your drawings to price their offer.",
       drawings: "Drawings & documents",
       drawingsHint: "PDF, DWG, JPG, PNG, or a .zip folder of drawings — up to 50MB total",
       drawingsAccessNote: "Only approved, subscribed service providers can view these files.",
       deadline: "Bid deadline",
-      deadlineNote: "No offers are accepted after this time.",
+      deadlineNote: "Kuwait time. No offers are accepted after this time.",
       postProject: "Post project",
       posting: "Posting…",
       saveAsDraft: "Save as draft",
@@ -2774,6 +3310,8 @@ export const en: Dictionary = {
       offers: "All offers",
       projects: "All projects",
       cms: "Website content",
+      reviewReports: "Reported reviews",
+      overview: "Overview",
     },
     owners: {
       eyebrow: "Admin · Owners",
@@ -2879,7 +3417,7 @@ export const en: Dictionary = {
       actionsCol: "",
       edit: "Edit",
       editOfferHeading: "Edit offer",
-      amountFieldLabel: "Amount (USD)",
+      amountFieldLabel: "Amount (KWD)",
       timelineFieldLabel: "Timeline",
       messageFieldLabel: "Message",
       saveOffer: "Save",
@@ -2924,6 +3462,12 @@ export const ar: Dictionary = {
     save: "حفظ",
     cancel: "إلغاء",
     back: "رجوع",
+    loadFailed: "تعذّر التحميل — تحقّق من الاتصال وحاول مرة أخرى.",
+    retry: "إعادة المحاولة",
+    notifications: "الإشعارات",
+    markAllRead: "تعليم الكل كمقروء",
+    noNotifications: "لا توجد إشعارات بعد.",
+    supportContact: "تواصل مع فريق U-Tender:",
   },
   brand: {
     tagline: "المخططات تدخل، والعروض تخرج.",
@@ -3173,6 +3717,271 @@ export const ar: Dictionary = {
     earlierVersion: "ملاحظة: قُدّم هذا العرض على الإصدار {n} من المتطلب، وهو الآن في الإصدار {m}، ولم يؤكده مزوّده منذ ذلك الحين. ستُرسيه كما هو.",
     confirm: "رسِّ",
   },
+  ownerReview: {
+    heading: "تقييم {owner}",
+    theOwner: "المالك",
+    rating: "{n} من 5",
+    comment: "كيف كان العمل مع هذا المالك؟ (اختياري)",
+    submit: "إرسال التقييم",
+    submitted: "أُرسل في",
+    confirmBody: "يُسجَّل تقييمك وتعليقك على هذه المعاملة المكتملة. لا يمكن تغيير التقييم بعد ذلك.",
+    error: "تعذر إرسال التقييم.",
+  },
+  review: {
+    confirmTitle: "إرسال هذا التقييم؟",
+    confirmBody: "يُسجَّل تقييمك وتعليقك على هذه المعاملة المكتملة ويُحتسب ضمن تقييم مقدم الخدمة الذي يراه الملاك عند دراسة عروضه. لا يمكن تغيير التقييم بعد ذلك.",
+    receivedHeading: "تقييم {party} لك",
+    receivedOn: "استُلم في",
+    respond: "رد",
+    responsePlaceholder: "رد على هذا التقييم (اختياري)",
+    respondConfirmTitle: "نشر هذا الرد؟",
+    respondConfirmBody: "يظهر ردك مع هذا التقييم أينما ظهر التقييم. لا يغيّر التقييم أو درجته، ولا يمكن تغييره بعد ذلك.",
+    responseError: "تعذر نشر الرد.",
+    yourResponse: "ردك",
+    theirResponse: "ردهم",
+    ownerResponse: "رد المالك",
+    providerResponse: "رد مقدم الخدمة",
+  },
+  reputation: {
+    heading: "السجل على U-Tender",
+    summary: "{avg} / 5 · {n} تقييمات",
+    completed: "{n} معاملات مكتملة على U-Tender",
+    none: "لا توجد معاملات مكتملة على U-Tender بعد",
+    noReviews: "لا توجد تقييمات من الملاك بعد",
+    verified: "تقييم مالك · معاملة مكتملة على U-Tender",
+    note: "للعلم فقط: لا يؤثر في الأهلية أو التحقق أو الترسية، ولا تُرتَّب العروض بحسبه.",
+    headingOwner: "سجل المالك على U-Tender",
+    noReviewsOwner: "لا توجد تقييمات من مقدمي الخدمة بعد",
+    verifiedOwner: "تقييم مقدم خدمة · معاملة مكتملة على U-Tender",
+    noteOwner: "من معاملات المالك المكتملة على U-Tender والتقييمات التي تركها مقدمو الخدمة. للعلم فقط.",
+  },
+  previous: {
+    heading: "مقدمو خدمة أنجزت معهم أعمالًا",
+    together: "أعمال مكتملة معًا: {n}",
+    last: "آخرها",
+    note: "من معاملاتك المكتملة على U-Tender. للعمل مع مقدم خدمة مجددًا، انشر طلبًا جديدًا: يكون مفتوحًا لكل مقدمي الخدمة المؤهلين ويُقيَّم كأي طلب آخر.",
+    ownersHeading: "ملاك أنجزت لهم أعمالًا",
+    ownersNote: "من معاملاتك المكتملة على U-Tender. تظهر طلباتهم الجديدة في قائمة الفرص مثل غيرها عندما تكون مؤهلًا، ومفتوحة لكل مقدمي الخدمة المؤهلين؛ ويُعرف صاحب الطلب عند الترسية.",
+  },
+  report: {
+    reportReview: "الإبلاغ عن هذا التقييم",
+    reportResponse: "الإبلاغ عن هذا الرد",
+    explain: "للإساءة أو المعلومات الخاصة أو المحتوى الذي لا يتعلق بهذا العمل. إذا كنت لا تتفق معه فحسب، فردّ عليه بدلًا من ذلك. لا يتغير شيء حتى تقرر U-Tender.",
+    reason: "السبب",
+    reasons: { abusive: "مسيء أو تهديدي", private_information: "يكشف معلومات خاصة", not_about_this_transaction: "لا يتعلق بهذا العمل", other: "أخرى" },
+    note: "توضيح قصير (اختياري)",
+    submit: "إرسال البلاغ",
+    cancel: "إلغاء",
+    sent: "تم الإبلاغ. ستراجعه U-Tender؛ ويبقى التقييم كما هو حتى ذلك الحين.",
+    error: "تعذر إرسال البلاغ.",
+    hiddenNote: "أخفت U-Tender هذا التقييم: لم يعد يظهر أو يُحتسب.",
+    adminNone: "لا توجد بلاغات.",
+    targetReview: "تقييم",
+    targetResponse: "رد",
+    keep: "إبقاء",
+    hide: "إخفاء",
+  },
+  ops: {
+    unavailable: "غير متاح: تعذر تحميل هذا القسم، لذا لا يُعرض رقم.",
+    asOf: "حتى",
+    refresh: "تحديث",
+    loading: "جارٍ التحميل…",
+    failed: "تعذر تحميل النظرة العامة.",
+    attention: "يحتاج إلى متابعة",
+    nothing: "لا شيء يحتاج إلى متابعة الآن.",
+    open: "مفتوح",
+    since: "منذ",
+    more: "و{n} أخرى",
+    background: "المهام الخلفية",
+    reminders: "تذكيرات المواعيد النهائية",
+    remindersOverdue: "متأخرة لـ {n}: قد لا يعمل المجدول",
+    reminders_ok: "تعمل",
+    reminders_not_determinable: "لا يمكن التحديد بعد (لا شيء مستحق)",
+    email: "إرسال البريد الإلكتروني",
+    notTracked: "غير متتبَّع",
+    emailFailing: "فشل {n} خلال آخر 24 ساعة",
+    billing: "إشعارات الفوترة (Stripe)",
+    billingNotConfigured: "غير مُعَدّة: لن تصل تغييرات الاشتراك",
+    lastBillingEvent: "آخر حدث مستلم",
+    noBillingEvents: "مُعَدّة؛ لم يصل أي حدث بعد",
+    backup: "النسخ الاحتياطي",
+    backup_not_configured: "غير مُعَدّ (BACKUP_DIR غير محدد)",
+    backup_never_run: "لم تُسجَّل أي نسخة احتياطية بعد",
+    backupFailing: "فشل التشغيل الأخير عند: {step}",
+    backupOverdue: "متأخر -- آخر نجاح",
+    backupRecent: "آخر نجاح",
+    email_no_failures_recorded: "لا إخفاقات مسجلة",
+    email_not_configured: "غير مُعَدّ: لا تُرسل رسائل بريد",
+    accounts: "الحسابات",
+    owners: "الملاك",
+    ownersActive: "ملاك موثَّقون",
+    awaitingReview: "ملاك بانتظار المراجعة",
+    providers: "مقدمو الخدمة",
+    canBid: "مقدمو خدمة يمكنهم التقديم",
+    withoutPayment: "موثَّقون دون دفع نشط",
+    paymentFailed: "فشل الدفع",
+    awaitingReviewProviders: "مقدمو خدمة بانتظار المراجعة",
+    suspended: "موقوفون",
+    requirements: "الطلبات",
+    openWithOffers: "مفتوحة ولها عروض",
+    openWithoutOffers: "مفتوحة دون عروض",
+    drafts: "مسودات",
+    awaitingDecision: "مغلقة بانتظار قرار المالك",
+    awarded: "مُرساة",
+    endedWithoutAward: "انتهت دون ترسية",
+    offers: "العروض",
+    onOpen: "على طلبات مفتوحة",
+    last7: "قُدمت خلال آخر 7 أيام",
+    withdrawn: "مسحوبة",
+    transactions: "المعاملات",
+    preparing: "الاتفاقية قيد الإعداد",
+    active: "قيد التنفيذ",
+    onHold: "متوقفة مؤقتًا",
+    completionAwaiting: "إنجاز بانتظار المالك",
+    completed: "مكتملة",
+    terminated: "منتهية",
+    awardedLast7: "أُرسيت خلال آخر 7 أيام",
+    kinds: {
+      open_without_offers_closing_24h: "مفتوحة دون عروض وتُغلق خلال 24 ساعة",
+      open_without_offers: "مفتوحة دون عروض حتى الآن",
+      awaiting_owner_decision: "مغلقة بانتظار قرار المالك",
+      completion_awaiting_owner: "إنجاز مُقدَّم بانتظار المالك",
+      transactions_on_hold: "معاملات متوقفة مؤقتًا",
+      agreements_not_in_force: "اتفاقيات لم تدخل حيز التنفيذ بعد",
+      providers_awaiting_review: "مقدمو خدمة بانتظار التوثيق",
+      owners_awaiting_review: "ملاك بانتظار التوثيق",
+      provider_payment_failed: "مقدمو خدمة موثَّقون فشل دفعهم",
+      open_review_reports: "تقييمات مبلغ عنها بانتظار القرار",
+      deliverables_awaiting_owner: "مخرجات بانتظار مراجعة المالك",
+      changes_awaiting_answer: "تغييرات بانتظار رد الطرف الآخر",
+      email_failures: "رسائل بريد تعذر إرسالها (آخر 24 ساعة)",
+    },
+  },
+  members: {
+    heading: "الأشخاص الذين يعملون باسمها",
+    representative: "الممثل",
+    member: "عضو",
+    deactivatedOn: "مُعطَّل منذ",
+    deactivate: "تعطيل الحساب",
+    reactivate: "إعادة تفعيل الحساب",
+    deactivateTitle: "تعطيل حساب هذا الشخص؟",
+    deactivateBody: "يُسجَّل خروجه من كل مكان فورًا ولا يمكنه تسجيل الدخول. تبقى المنظمة وأعضاؤها الآخرون وكل ما سُجّل كما هو. يمكنك إعادة تفعيل الحساب لاحقًا.",
+    reactivateTitle: "إعادة تفعيل حساب هذا الشخص؟",
+    reactivateBody: "يمكنه تسجيل الدخول مجددًا، بالمنظمة والصلاحيات نفسها التي كانت لديه تمامًا.",
+    error: "تعذر تغيير الحساب.",
+  },
+  trace: {
+    heading: "القرار والمعاملة",
+    version: "الإصدار الحالي: v{n}",
+    amendments: "{n} تعديلات",
+    awardedTo: "أُرسي على",
+    pricedOn: "مُسعَّر على v{n}",
+    earlierVersion: "إصدار سابق",
+    noAward: "لا ترسية.",
+    transaction: "المعاملة",
+    onHold: "متوقفة منذ",
+    completionSubmitted: "قُدِّم الإنجاز وبانتظار المالك",
+    owner: "المالك",
+    provider: "مقدم الخدمة",
+    status: { preparing: "الاتفاقية قيد الإعداد", active: "قيد التنفيذ", completed: "مكتملة", terminated: "منتهية" },
+    kinds: {
+      awarded: "الترسية",
+      in_force: "سريان الاتفاقية",
+      document: "إضافة مستند",
+      started: "بدء العمل",
+      progress: "تحديث التقدم",
+      on_hold: "إيقاف مؤقت",
+      resumed: "استئناف",
+      delivered: "تسليم مخرج",
+      accepted: "قبول مخرج",
+      returned: "إعادة مخرج",
+      change_proposed: "اقتراح تغيير",
+      change_agreed: "الموافقة على تغيير",
+      change_rejected: "رفض تغيير",
+      change_withdrawn: "سحب تغيير",
+      change_lapsed: "سقوط تغيير",
+      terminated: "إنهاء",
+      completed: "اكتمال",
+    },
+  },
+  support: {
+    find: "البحث عن شخص",
+    email: "البريد الإلكتروني",
+    search: "بحث",
+    notFound: "لا يوجد حساب بهذا البريد.",
+    person: "الشخص",
+    deactivated: "مُعطَّل",
+    emailUnverified: "البريد غير موثَّق",
+    actsFor: "يعمل باسم",
+    notEstablished: "لم يُعدّ كمالك أو مقدم خدمة بعد",
+    standing: "الوضع",
+    checkProvider: "لماذا لا يستطيع مقدم الخدمة التقديم؟",
+    providerEmail: "بريد مقدم الخدمة",
+    check: "تحقق",
+    notAProvider: "هذا البريد ليس لحساب مقدم خدمة.",
+    failed: "تعذر إجراء التحقق.",
+    participation: "إمكانية المشاركة",
+    offer: "عرضه هنا",
+    noOffer: "لا يوجد",
+    publishCheck: "ما يمنع النشر",
+    ownerCannotPublish: "لا يمكن لحساب المالك النشر (غير موثَّق أو موقوف).",
+    noBlockers: "لا شيء يمنع النشر.",
+  },
+  audit: {
+    heading: "السجل المحفوظ",
+    empty: "لا شيء مسجل بعد.",
+    unavailable: "تعذر تحميل السجل.",
+    system: "النظام",
+  },
+  metrics: {
+    heading: "نشاط السوق",
+    period: "الفترة",
+    since: "من",
+    activity: "في هذه الفترة",
+    newAccounts: "حسابات جديدة",
+    published: "طلبات منشورة",
+    offers: "عروض مقدمة",
+    awards: "ترسيات",
+    completed: "معاملات مكتملة",
+    reviews: "تقييمات",
+    activePeople: "أشخاص نشطون",
+    returning: "أشخاص عائدون",
+    requirementFunnel: "الطلبات المنشورة في هذه الفترة",
+    receivedOffers: "تلقت عروضًا",
+    awarded: "أُرسيت",
+    endedWithoutAward: "انتهت دون ترسية",
+    providerFunnel: "مقدمو الخدمة المسجلون في هذه الفترة",
+    registered: "مسجلون",
+    verified: "موثَّقون",
+    ableToBid: "يمكنهم التقديم الآن",
+    participated: "قدموا عرضًا",
+    subscriptions: "الاشتراكات الآن",
+    paying: "يدفعون",
+    overrideOnly: "تجاوز إداري فقط",
+    pastDue: "متأخر الدفع",
+    cancelled: "ملغى أو منتهٍ",
+    neverSubscribed: "لم يشتركوا قط",
+    periods: { "today": "اليوم", "7d": "7 أيام", "30d": "30 يومًا", "month": "هذا الشهر", "all": "كل الوقت" },
+  },
+  history: {
+    heading: "السجل",
+    awarded: "تمت الترسية",
+    in_force: "سريان الاتفاقية",
+    document: "أُضيف مستند",
+    change_proposed: "اقتُرح التغيير {n}",
+    change_agreed: "تمت الموافقة على التغيير {n}",
+    change_rejected: "رُفض التغيير {n}",
+    change_withdrawn: "سُحب التغيير {n}",
+    change_lapsed: "أُغلق التغيير {n} (انتهت الاتفاقية)",
+    terminated: "تم إنهاء الاتفاقية",
+    completed: "اكتملت المعاملة",
+  },
+  finance: {
+    finalValue: "القيمة النهائية المتفق عليها",
+    changes: "التغييرات المتفق عليها",
+    payments: "المدفوعات",
+    notManaged: "لا يتتبعها U-Tender — تتم التسوية مباشرة بين المالك ومقدم الخدمة.",
+  },
   completion: {
     heading: "إنجاز العمل",
     status: { none: "لم يُقدَّم بعد", submitted: "قُدّم كمكتمل — بانتظار مراجعة المالك", returned: "أُعيد للتصحيح", accepted: "قُبل كمكتمل" },
@@ -3283,7 +4092,7 @@ export const ar: Dictionary = {
     heading: "الاتفاقية",
     status: {
       preparing: "قيد الإعداد",
-      preparingHelp: "يعمل الطرفان على إتمام الاتفاقية خارج يو-تندر. أرفق المستندات الموقعة هنا.",
+      preparingHelp: "يعمل الطرفان على إتمام الاتفاقية خارج U-Tender. أرفق المستندات الموقعة هنا.",
       active: "سارية",
       activeHelp: "الاتفاقية التي تحكم هذه الترسية سارية.",
       completed: "مكتملة",
@@ -3545,6 +4354,11 @@ export const ar: Dictionary = {
     error: "تعذّر إنهاء الطلب.",
     labelCanceled: "ملغى",
     labelExpired: "منتهي الصلاحية",
+    labelDraft: "مسودة",
+    labelOpen: "مفتوح للعروض",
+    labelClosed: "مغلق أمام العروض",
+    labelUnderEvaluation: "قيد التقييم",
+    labelAwarded: "تمت الترسية",
     labelExternal: "أُغلق خارج U-Tender",
     labelNoSuitable: "بلا ترسية",
     textCanceled: "ألغى المالك هذا الطلب؛ لن يُنفَّذ بهذه الصيغة.",
@@ -3559,6 +4373,9 @@ export const ar: Dictionary = {
     restartConfirmBody: "تُنشأ مسودة جديدة بوصف هذا الطلب وبنوده وقواعده وشروط الأهلية ومستنداته الحالية. حدّد موعداً نهائياً جديداً وراجعها ثم انشرها كطلب جديد. يبقى هذا الطلب كما انتهى، مع عروضه.",
     restartedFrom: "بُدئ من جديد من طلب منتهٍ:",
     restartedFromLink: "اطّلع على الطلب الأصلي",
+    similar: "إنشاء طلب مماثل",
+    similarConfirm: "إنشاء طلب جديد من هذا الطلب؟",
+    similarConfirmBody: "تُنشأ مسودة جديدة بوصف هذا الطلب وبنوده وقواعده وشروط الأهلية ومستنداته الحالية. حدّث ما تغيّر، وحدد تواريخ وموعدًا نهائيًا جديدًا، وراجعها ثم انشرها كطلب جديد. يبقى هذا الطلب مكتملًا بعروضه وترسيته ومعاملته وتقييماته.",
     adminSuspended: "علّقته إدارة U-Tender: مخفي عن مقدّمي الخدمة ولا يقبل عروضاً أو أسئلة أو تعديلات على العروض حتى إعادة تفعيله. تواصل مع الدعم إن رأيت أن ذلك خطأ.",
     labelSuspended: "معلّق من U-Tender",
   },
@@ -4060,7 +4877,14 @@ export const ar: Dictionary = {
       subheadingInactive: "باقة واحدة، وصول كامل. يمكن الإلغاء في أي وقت.",
       overrideBadge: "استثناء إداري",
       overrideMessage: "منحك أحد المسؤولين وصولاً كاملاً للسوق دون اشتراك مدفوع.",
+      pastDueTitle: "فشلت عملية الدفع الأخيرة",
+      pastDueBody: "عرض الطلبات كاملة وإرسال العروض متوقفان حتى تنجح عملية الدفع. حدّث بطاقتك من الزر أدناه — اشتراكك الحالي مستمر ولا حاجة للاشتراك مجددًا.",
+      updatePayment: "تحديث وسيلة الدفع",
+      billingUnavailable: "الاشتراك عبر الإنترنت غير متاح بعد. يمكن لفريق U-Tender تفعيل وصولك إلى السوق مباشرةً.",
       renews: "يتجدد في",
+      ends: "أُلغي: ينتهي الوصول في",
+      monthly: "شهري",
+      yearly: "سنوي",
       manageBilling: "إدارة الفوترة",
       checkoutNote: "سيتم تحويلك إلى صفحة الدفع الآمنة الخاصة بـ Stripe لإتمام اشتراكك.",
       checkoutError: "تعذر بدء عملية الدفع. حاول مرة أخرى.",
@@ -4143,18 +4967,18 @@ export const ar: Dictionary = {
       ownerVisibleHint: "يمكنك رؤية العروض فور ورودها. يُثبَّت النوع بمجرد وصول أول عرض.",
       sealedHint: "تبقى العروض مخفية عنك حتى يُغلق تقديم العروض. يُثبَّت النوع بمجرد وصول أول عرض.",
       title: "عنوان المشروع",
-      titlePlaceholder: "مثال: دوبلكس شارع مابل — استبدال السقف",
+      titlePlaceholder: "مثال: فيلا في سلوى — عزل السطح",
       address: "عنوان الموقع",
-      addressPlaceholder: "الشارع، المدينة، المنطقة",
+      addressPlaceholder: "القطعة، الشارع، رقم المبنى / القسيمة",
       trade: "التخصص",
-      tradePlaceholder: "مثال: أسقف، هياكل، أسوار",
+      tradePlaceholder: "مثال: عزل، كهرباء، أصباغ",
       scope: "نطاق العمل",
       scopePlaceholder: "صف العمل المطلوب. سيستخدم مزوّدو الخدمات هذا الوصف مع مخططاتك لتسعير عروضهم.",
       drawings: "المخططات والمستندات",
       drawingsHint: "PDF أو DWG أو JPG أو PNG أو ملف .zip للمخططات — حتى 50 ميغابايت إجمالاً",
       drawingsAccessNote: "فقط مزوّدو الخدمات المعتمدون والمشتركون يمكنهم عرض هذه الملفات.",
       deadline: "الموعد النهائي لتقديم العروض",
-      deadlineNote: "لا تُقبل العروض بعد هذا الوقت.",
+      deadlineNote: "بتوقيت الكويت. لا تُقبل العروض بعد هذا الوقت.",
       postProject: "نشر المشروع",
       posting: "جارٍ النشر…",
       saveAsDraft: "حفظ كمسودة",
@@ -4266,6 +5090,8 @@ export const ar: Dictionary = {
       offers: "جميع العروض",
       projects: "جميع المشاريع",
       cms: "محتوى الموقع",
+      reviewReports: "التقييمات المبلغ عنها",
+      overview: "نظرة عامة",
     },
     owners: {
       eyebrow: "المسؤول · الملاك",
@@ -4371,7 +5197,7 @@ export const ar: Dictionary = {
       actionsCol: "",
       edit: "تعديل",
       editOfferHeading: "تعديل العرض",
-      amountFieldLabel: "القيمة (بالدولار)",
+      amountFieldLabel: "القيمة (بالدينار الكويتي)",
       timelineFieldLabel: "الجدول الزمني",
       messageFieldLabel: "الرسالة",
       saveOffer: "حفظ",
