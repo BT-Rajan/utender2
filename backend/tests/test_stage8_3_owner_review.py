@@ -4,7 +4,8 @@ about the actual winner, with a whole-number 1-5 rating and an optional
 comment. The review, the provider's recomputed public rating and the audit
 entry are one transaction."""
 from concurrent.futures import ThreadPoolExecutor
-from datetime import timedelta
+
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -149,4 +150,11 @@ def test_two_members_reviewing_at_once_record_one_review(db):
     assert codes == [200, 409], codes
     db.expire_all()
     assert db.query(Review).count() == 1
-    assert db.get(ServiceProviderProfile, db.query(AwardRecord).one().service_provider_id).review_count == 1
+    # Batch C: sealed until revealed; once its sealed period has passed, it counts once.
+    provider_id = db.query(AwardRecord).one().service_provider_id
+    assert db.get(ServiceProviderProfile, provider_id).review_count == 0
+    db.query(Review).one().created_at = datetime.utcnow() - timedelta(days=15)
+    db.commit()
+    assert reviews_service.reveal_due(db) == 1
+    db.expire_all()
+    assert db.get(ServiceProviderProfile, provider_id).review_count == 1

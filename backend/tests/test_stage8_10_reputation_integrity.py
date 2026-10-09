@@ -4,12 +4,14 @@ held by the server against substitution, outsiders, former members, replays
 and concurrency, with the provider's stored rating (shown on offers) always
 equal to the live count."""
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.models.review import Review
 from app.models.service_provider import ServiceProviderProfile
+from app.services.reviews import reveal_due
 from tests.stage7_helpers import complete_transaction
 from tests.test_organization_sharing import _organization
 from tests.test_stage3_bid_integrity import needs_mysql
@@ -104,6 +106,15 @@ def test_concurrent_reviews_keep_one_review_and_a_true_stored_rating(db):
             pool.submit(lambda e=e, p=p, r=r: _login(e).post("/owner/reviews", json={"project_id": p, "rating": r}))
             for e, p, r in zip(owners, pids, (5, 4, 3, 2))]]
     assert codes == [200] * 4, codes
+    db.expire_all()
+    # Batch C: sealed until revealed -- nothing counts yet; then the sealed
+    # period passes and the hourly job reveals all four at once.
+    profile = db.get(ServiceProviderProfile, x_id)
+    assert profile.review_count == 0
+    for review in db.query(Review).filter(Review.project_id.in_(pids)):
+        review.created_at = datetime.utcnow() - timedelta(days=15)
+    db.commit()
+    assert reveal_due(db) == 4
     db.expire_all()
     profile = db.get(ServiceProviderProfile, x_id)
     assert (profile.review_count, float(profile.avg_rating)) == (4, 3.5)  # the stored rating owners see on offers

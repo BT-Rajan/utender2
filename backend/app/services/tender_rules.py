@@ -69,7 +69,7 @@ def answers_since(db, project: Project, offer) -> int:
         db.query(Clarification)
         .filter(
             Clarification.project_id == project.id, Clarification.offer_id.is_(None), Clarification.shared_with_all.is_(True),
-            Clarification.answered_at.isnot(None), Clarification.answered_at > offer.updated_at,
+            Clarification.answered_at.isnot(None), Clarification.answered_at >= offer.updated_at,  # same second counts (MySQL keeps whole seconds)
         )
         .count()
     )
