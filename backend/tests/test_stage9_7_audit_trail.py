@@ -42,6 +42,10 @@ def test_an_admin_reconstructs_what_happened(db):
     complete_transaction(owner, amal, pid)
     # 5. Reviewed, reported, moderated.
     assert owner.post("/owner/reviews", json={"project_id": pid, "rating": 2}).status_code == 200
+    # Batch C: a sealed review can't be reported (404); X's own review of the
+    # owner reveals both, after which the report goes through.
+    assert amal.post(f"/service-provider/projects/{pid}/review-reports", json={"target": "review", "reason": "other"}).status_code == 404
+    assert amal.post("/service-provider/reviews", json={"project_id": pid, "rating": 4}).status_code == 200
     assert amal.post(f"/service-provider/projects/{pid}/review-reports", json={"target": "review", "reason": "other"}).status_code == 201
     rid = admin.get("/admin/review-reports").json()[0]["id"]
     assert admin.post(f"/admin/review-reports/{rid}/decision", json={"decision": "keep"}).status_code == 200

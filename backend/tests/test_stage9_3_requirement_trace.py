@@ -52,10 +52,17 @@ def test_an_admin_follows_a_requirement_through_its_life(db):
     db.commit()
     assert _detail(admin, pid)["project"]["status"] in ("closed", "under_evaluation")
     win = a.get(f"/projects/{pid}/offers/mine").json()["id"]
+    # Batch B: an offer on an earlier version can't be awarded on the owner's
+    # word alone (409); the provider confirms it still stands, then it's awarded.
+    r = owner.post(f"/owner/projects/{pid}/offers/{win}/approve", json={"acknowledge_earlier_version": True})
+    assert r.status_code == 409 and "Ask the provider to confirm it still stands" in r.json()["detail"]
+    assert a.post(f"/projects/{pid}/offers/confirm").status_code == 200
     assert owner.post(f"/owner/projects/{pid}/offers/{win}/approve", json={"acknowledge_earlier_version": True}).status_code == 200
     d = _detail(admin, pid)
     assert d["project"]["status"] == "awarded"
-    assert (d["award"]["offer_id"], d["award"]["service_provider_id"], d["award"]["offer_priced_on"]) == (win, a.get("/auth/me").json()["id"], 0)
+    # Batch B: the provider's confirmation re-bases the offer on the current
+    # version, so the award records it as priced on revision 1.
+    assert (d["award"]["offer_id"], d["award"]["service_provider_id"], d["award"]["offer_priced_on"]) == (win, a.get("/auth/me").json()["id"], 1)
     assert d["transaction"]["status"] == "preparing"
     assert {o["id"]: o["status"] for o in d["offers"]}[win] == "approved"
 

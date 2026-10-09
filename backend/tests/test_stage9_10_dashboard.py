@@ -89,6 +89,10 @@ def test_the_dashboard_points_at_what_needs_attention(db):
     _award(owner, x, p2)
     complete_transaction(owner, x, p2)
     assert owner.post("/owner/reviews", json={"project_id": p2, "rating": 1}).status_code == 200
+    # Batch C: a sealed review can't be reported (404); the provider's own
+    # review reveals both, after which the report goes through.
+    assert x.post(f"/service-provider/projects/{p2}/review-reports", json={"target": "review", "reason": "abusive"}).status_code == 404
+    assert x.post("/service-provider/reviews", json={"project_id": p2, "rating": 3}).status_code == 200
     assert x.post(f"/service-provider/projects/{p2}/review-reports", json={"target": "review", "reason": "abusive"}).status_code == 201
     assert _attention(admin)["open_review_reports"]["link"] == "/admin/review-reports"
 

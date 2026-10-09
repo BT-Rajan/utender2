@@ -176,6 +176,13 @@ def test_pass21_e2e_scenarios():
     r = owner_client.post("/owner/reviews", json={"project_id": projA, "service_provider_id": c2_id, "rating": 5, "comment": "Great work"})
     check("A: review submitted for the actual winner", r.status_code == 200)
 
+    # Batch C: the owner's review is sealed (not counted) until the provider
+    # reviews back; the provider's review reveals both.
+    r = c2.get("/service-provider/profile")
+    check("A: sealed review not yet counted in review_count", r.json()["review_count"] == 0)
+    r = c2.post("/service-provider/reviews", json={"project_id": projA, "rating": 5})
+    check("A: winner reviews the owner back, revealing both reviews", r.status_code == 200)
+
     r = c2.get("/service-provider/profile")
     check("A: winning service provider's avg_rating recomputed to 5.0", float(r.json()["avg_rating"]) == 5.0)
     check("A: winning service provider's review_count is 1", r.json()["review_count"] == 1)
