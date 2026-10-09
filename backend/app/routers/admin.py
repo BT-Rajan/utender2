@@ -15,7 +15,7 @@ from app.models.cms_content import CmsContent
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import ServiceProviderDocument, DocumentRequirement, OwnerDocument
 from app.models.enums import DocumentStatus, Language, NotificationType, OfferStatus, PricingBasis, ProjectStatus, StakeholderType, UserRole, VerificationStatus
-from app.models.offer import Offer, OfferRevision, tendered
+from app.models.offer import Offer, OfferRevision, tendered, counted
 from app.models.owner import OwnerProfile
 from app.models.payment_override import PaymentOverride
 from app.models.project import Project, ProjectDrawing
@@ -1148,7 +1148,7 @@ def _offer_admin_fields(o: Offer, p: Project | None, cp: ServiceProviderProfile 
 def list_all_projects(db: Session = Depends(get_db)):
     sync_expired_projects(db)  # Stage 9.3: no requirement listed "open" past its deadline
     rows = db.query(Project, User).join(User, Project.owner_id == User.id).order_by(Project.created_at.desc()).all()
-    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(tendered()).group_by(Offer.project_id).all())
+    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(counted()).group_by(Offer.project_id).all())
     return [{**_project_admin_fields(p, u), "offer_count": offer_counts.get(p.id, 0)} for p, u in rows]
 
 
@@ -1161,7 +1161,7 @@ def list_owner_projects(owner_id: str, db: Session = Depends(get_db)):
     _get_active_owner_profile(db, owner_id)  # 404s outright for a since-promoted admin account
     owner_user = db.get(User, owner_id)
     rows = db.query(Project).filter(Project.owner_id == owner_id).order_by(Project.created_at.desc()).all()
-    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(tendered()).group_by(Offer.project_id).all())
+    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(counted()).group_by(Offer.project_id).all())
     return [{**_project_admin_fields(p, owner_user), "offer_count": offer_counts.get(p.id, 0)} for p in rows]
 
 

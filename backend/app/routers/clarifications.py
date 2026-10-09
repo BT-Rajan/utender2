@@ -150,7 +150,10 @@ def ask_clarification(
         service_provider_id=asker,
         organization_id=org_of(db, user.id),
         question=question,
-        shared_with_all=payload.shared_with_all,
+        # Batch B: every answer is published to all providers (the asker stays
+        # anonymous) -- a private answer would let one bidder price against
+        # information the others never see.
+        shared_with_all=True,
     )
     db.add(clarification)
     db.commit()
@@ -197,11 +200,10 @@ def answer_clarification(
     clarification.answer = answer
     clarification.answered_at = datetime.utcnow()
     clarification.answered_by = user.id
-    # The owner may publish a privately asked question for everyone (its
-    # asker stays anonymous) -- never make a shared one private.
+    # Batch B: every answer is published for every provider (the asker stays
+    # anonymous), including one to a question asked privately before this rule.
     asked_privately = not clarification.shared_with_all
-    if payload.shared_with_all:
-        clarification.shared_with_all = True
+    clarification.shared_with_all = True
     # log_action commits: the answer and its audit entry land together.
     log_action(
         db, actor_id=user.id, action="clarification.answer", target_type="clarification", target_id=clarification.id,

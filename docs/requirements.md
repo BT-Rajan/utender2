@@ -1650,4 +1650,30 @@ be added as its prompts (5.1, 5.2, …) are delivered.
   - **Schedule:** a change's completion date can't be in the past or before the effective date or the work start; a deliverable can't be rescheduled past the completion date.
   - **Tests:** `tests/test_batch_a_contract_logic.py`. Earlier stage tests that asserted the old order were updated to the corrected rules.
 
+- **Batch B — tender, offers and award (post-9.15 business-logic review):** the tender now treats every provider alike, and its outcome is plain.
+  - **Q&A:**
+    - every answer is published to all providers (the asker stays anonymous), including one asked "privately";
+    - an offer made before a published answer is flagged to its provider and the owner (`answers_since`);
+    - a material change reopens questions for at least two days when the question cut-off has passed.
+  - **Offer validity:**
+    - an offer holds its price for the requirement's validity period, from the close (`valid_until`, `validity_lapsed`);
+    - past it, the owner can't award it until the provider confirms it still stands (`POST /offers/confirm`, now also after the close);
+    - the provider may instead withdraw a lapsed offer;
+    - the owner can ask for confirmation (`POST /owner/projects/{id}/offers/{offer}/request-confirmation`, notification `offer_confirmation_requested`).
+  - **Earlier versions:** an offer made against an earlier version of the requirement is awarded only once its provider confirms it; the owner's own acknowledgement no longer suffices.
+  - **Outcomes:**
+    - a requirement cancelled or ended without award closes its live offers (offer status `closed`);
+    - closing early with no live offer expires it;
+    - starting evaluation tells the bidders (`evaluation_started`);
+    - offer counts leave withdrawn offers out.
+  - **Fair timing:**
+    - the deadline can't move earlier once published;
+    - offers can't be closed early while a provider is still preparing one, and providers who were told about the requirement hear it closed.
+  - **Offers:**
+    - two withdrawals are final (`withdrawal_count`, `withdrawals_left`);
+    - every item is priced above zero;
+    - the owner's offer table shows the committed duration or completion date.
+  - Migration 0066.
+  - **Tests:** `tests/test_batch_b_tender_fairness.py`.
+
 _Later Stage 9 steps are added as they are implemented._

@@ -421,6 +421,16 @@ AR: dict[str, str] = {
     "A proposed change is still awaiting an answer.": "لا يزال تعديل مقترح بانتظار الرد.",
     "Settle it first.": "يجب البت فيه أولًا.",
     "The work can be recorded as started from that date.": "يمكن تسجيل بدء العمل اعتبارًا من ذلك التاريخ.",
+    # Batch B: tender fairness.
+    "Confirmation can be asked for only while offers are being evaluated.": "لا يمكن طلب التأكيد إلا أثناء تقييم العروض.",
+    "Price every item above zero. If an item's cost is included in another item, give it the smallest price (0.001 KWD) and say so in your assumptions.": "سعّر كل بند بأكثر من صفر. إذا كانت تكلفة بند مشمولة في بند آخر، فأعطه أصغر سعر (0.001 د.ك) واذكر ذلك في افتراضاتك.",
+    "Providers are still preparing offers against the published deadline, so offers can't be closed early. They close at the deadline.": "لا يزال مقدمو خدمة يُعدّون عروضهم وفق الموعد النهائي المنشور، لذا لا يمكن إغلاق العروض مبكرًا. تُغلق عند الموعد النهائي.",
+    "The offer deadline can't be moved earlier once the requirement is published. Providers plan their offers on it.": "لا يمكن تقديم الموعد النهائي للعروض بعد نشر الطلب. يخطط مقدمو الخدمة عروضهم على أساسه.",
+    "This offer has already been decided, so it can no longer be withdrawn.": "تم البت في هذا العرض بالفعل، لذا لم يعد بالإمكان سحبه.",
+    "This offer has been withdrawn twice, so it can't be put forward again on this requirement.": "سُحب هذا العرض مرتين، لذا لا يمكن تقديمه مجددًا على هذا الطلب.",
+    "This offer is on the current version and within its validity period; it can be awarded as it is.": "هذا العرض على الإصدار الحالي وضمن مدة سريانه؛ يمكن ترسيته كما هو.",
+    "This offer was made against an earlier version of the requirement and its provider hasn't confirmed it since. Ask the provider to confirm it still stands before awarding it.": "قُدّم هذا العرض على إصدار سابق من الطلب ولم يؤكده مقدمه منذ ذلك الحين. اطلب من مقدم الخدمة تأكيد أنه ما زال قائمًا قبل ترسيته.",
+    "This offer's validity period has ended. Ask the provider to confirm it still stands before awarding it.": "انتهت مدة سريان هذا العرض. اطلب من مقدم الخدمة تأكيد أنه ما زال قائمًا قبل ترسيته.",
 }
 
 _GENERIC_INVALID = {"en": 'Check the value of "{field}".', "ar": "تحقق من قيمة «{field}»."}

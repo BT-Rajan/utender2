@@ -91,6 +91,15 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.en: ("Response to your review on {project_title}", "The {party} responded to your review of the completed work on {project_title}."),
         Language.ar: ("رد على تقييمك في {project_title}", "ردّ {party_ar} على تقييمك للعمل المكتمل في {project_title}."),
     },
+    # Batch B
+    NotificationType.offer_confirmation_requested: {
+        Language.en: ("Confirm your offer on {project_title}", "The owner asks you to confirm your offer on {project_title} still stands, price and terms unchanged, so it can be considered for award. Confirm it, or withdraw it."),
+        Language.ar: ("أكّد عرضك على {project_title}", "يطلب منك المالك تأكيد أن عرضك على {project_title} ما زال قائمًا بسعره وشروطه دون تغيير، لكي يُنظر فيه للترسية. أكّده أو اسحبه."),
+    },
+    NotificationType.evaluation_started: {
+        Language.en: ("{project_title} is being evaluated", "The owner has started evaluating the offers on {project_title}. You'll be told the outcome."),
+        Language.ar: ("بدأ تقييم {project_title}", "بدأ المالك تقييم العروض المقدمة على {project_title}. سيتم إبلاغك بالنتيجة."),
+    },
     NotificationType.new_requirement: {
         Language.en: ("New opportunity: {project_title}", "A new {trade} requirement in {area} is open for offers until {deadline}. You meet its conditions."),
         Language.ar: ("فرصة جديدة: {project_title}", "طلب جديد لأعمال {trade} في {area} مفتوح للعروض حتى {deadline}. أنت تستوفي شروطه."),

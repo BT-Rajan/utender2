@@ -9,7 +9,7 @@ export type ProjectStatus =
   | "canceled"
   | "expired";
 export type TenderType = "sealed" | "owner_visible";
-export type OfferStatus = "draft" | "submitted" | "approved" | "rejected" | "withdrawn";
+export type OfferStatus = "draft" | "submitted" | "approved" | "rejected" | "withdrawn" | "closed";
 export type VerificationStatus = "incomplete" | "pending_review" | "changes_requested" | "approved" | "rejected";
 export type DocumentStatus = "not_submitted" | "pending" | "approved" | "rejected";
 export type SubscriptionStatus = "trialing" | "active" | "past_due" | "canceled";
@@ -315,6 +315,11 @@ export interface Offer {
   assumptions: string | null;
   declarations_accepted: string[] | null;
   documents: OfferDocument[];
+  // Batch B: validity after the close, answers published since it was put forward, withdrawals left.
+  valid_until?: string | null;
+  validity_lapsed?: boolean;
+  answers_since?: number;
+  withdrawals_left?: number | null;
 }
 
 export interface OfferRevision {

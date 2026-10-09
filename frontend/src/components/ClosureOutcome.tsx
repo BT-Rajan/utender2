@@ -32,6 +32,8 @@ export function outcomeLabel(t: T, status: ProjectStatus, reason?: ClosureReason
 // without an award (no suitable offer, outside U-Tender, cancelled, expired)
 // is shown with that outcome -- never as an offer still in play.
 export function offerStatusLabel(t: T, offerStatus: string, projectStatus: ProjectStatus, reason?: ClosureReason | null): string {
+  // Batch B: an offer on a requirement that ended without an award is closed -- the outcome says why.
+  if (offerStatus === "closed") return outcomeLabel(t, projectStatus, reason);
   if (offerStatus === "submitted") {
     if (projectStatus === "no_award" || projectStatus === "canceled" || projectStatus === "expired") return outcomeLabel(t, projectStatus, reason);
     return t("service_provider.feed.bidPlaced");

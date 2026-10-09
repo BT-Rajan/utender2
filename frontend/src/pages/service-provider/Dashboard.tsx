@@ -105,6 +105,8 @@ function offerStatusBadge(status: OfferStatus, projectStatus?: string) {
       return "bg-border text-steel";
     case "withdrawn":
       return "bg-border text-steel-light";
+    case "closed":
+      return "bg-border text-steel";
     default:
       return "bg-blue-tint text-blue";
   }

@@ -12,7 +12,7 @@ from app.deps import get_service_provider_profile, get_current_user, require_app
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import DocumentRequirement
 from app.models.enums import DocumentStatus, OfferStatus, ProjectStatus, UserRole
-from app.models.offer import Offer, tendered
+from app.models.offer import Offer, tendered, counted
 from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.saved_opportunity import SavedOpportunity
 from app.models.user import User
@@ -221,7 +221,7 @@ def _cards(db: Session, page: list[Project], profile, my_offers: dict, full_acce
     """The opportunity summary (Stage 4.3) for a list of requirements -- the
     feed's and the saved list's one representation."""
     ids = [p.id for p in page]
-    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(Offer.project_id.in_(ids), tendered(), Offer.is_suspended.is_(False)).group_by(Offer.project_id).all()) if ids else {}
+    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(Offer.project_id.in_(ids), counted(), Offer.is_suspended.is_(False)).group_by(Offer.project_id).all()) if ids else {}
     item_counts = dict(db.query(ProjectItem.project_id, func.count(ProjectItem.id)).filter(ProjectItem.project_id.in_(ids)).group_by(ProjectItem.project_id).all()) if ids else {}
     document_counts = dict(
         db.query(ProjectDrawing.project_id, func.count(ProjectDrawing.id))

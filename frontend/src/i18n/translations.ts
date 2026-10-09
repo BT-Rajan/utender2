@@ -240,6 +240,11 @@ export interface Dictionary {
     count: string;
     row: string;
   };
+  offerTiming: { days: string; by: string };
+  offerValidity: {
+    until: string; lapsed: string; answersSince: string; answersSinceProvider: string; asked: string; ask: string; askHint: string;
+    standsHeading: string; lapsedBody: string; outdatedBody: string; confirm: string; withdraw: string; lastWithdrawal: string; noMoreResubmission: string;
+  };
   award: {
     confirmTitle: string;
     confirmBody: string;
@@ -1241,6 +1246,8 @@ export interface Dictionary {
     cameWithChange: string;
     publishForAll: string;
     materialHint: string;
+    sharedNote: string;
+    answerSharedNote: string;
     becauseOf: string;
     notBecauseOf: string;
     attachFiles: string;
@@ -1954,6 +1961,23 @@ export const en: Dictionary = {
     note: "A private marker for your evaluation. It isn't an award, nothing is sent to the provider, and the offer stays exactly as submitted.",
     count: "{n} shortlisted",
     row: "On your shortlist",
+  },
+  offerTiming: { days: "{n} days", by: "by {date}" },
+  offerValidity: {
+    until: "Valid until {date}",
+    lapsed: "Validity ended",
+    answersSince: "{n} answer(s) published after this offer",
+    answersSinceProvider: "{n} answer(s) were published to every provider after you submitted. Check the Q&A: revise your offer if they change it.",
+    asked: "Asked the provider to confirm",
+    ask: "Ask to confirm",
+    askHint: "Made on an earlier version or past its validity: the provider confirms it stands before it can be awarded.",
+    standsHeading: "Confirm your offer still stands",
+    lapsedBody: "Your offer's validity period has ended. The owner can award it only if you confirm its price and terms still stand (valid again from today). You may withdraw it instead.",
+    outdatedBody: "The requirement changed after you made this offer. The owner can award it only if you confirm it still stands, unchanged, against the current version.",
+    confirm: "Confirm it still stands",
+    withdraw: "Withdraw my offer",
+    lastWithdrawal: "If you withdraw this offer again, it can't be put forward again on this requirement.",
+    noMoreResubmission: "This offer was withdrawn twice, so it can't be put forward again on this requirement.",
   },
   award: {
     confirmTitle: "Award this requirement to {provider}?",
@@ -3037,6 +3061,8 @@ export const en: Dictionary = {
     cameWithChange: "This answer came with a change to the requirement (change #{n}) — see the changes above.",
     publishForAll: "Publish this question and answer to every provider (the asker stays anonymous)",
     materialHint: "If the answer changes the scope, quantities, documents, timing or who can respond, change the requirement itself too (Change the published requirement) and choose this question there.",
+    sharedNote: "Every answer is published to all providers. Your name is never shown.",
+    answerSharedNote: "Your answer is published to every provider, so all of them price on the same information. The asker stays anonymous.",
     becauseOf: "Because of a question (optional)",
     notBecauseOf: "Not because of a question",
     attachFiles: "Attach files (optional, up to 5: PDF, images, drawings, Excel, Word)",
@@ -3758,6 +3784,23 @@ export const ar: Dictionary = {
     note: "علامة خاصة لتقييمك. ليست ترسية، ولا يُرسل شيء إلى المزوّد، ويبقى العرض كما قُدّم تمامًا.",
     count: "{n} في القائمة المختصرة",
     row: "في قائمتك المختصرة",
+  },
+  offerTiming: { days: "{n} يومًا", by: "بحلول {date}" },
+  offerValidity: {
+    until: "ساري حتى {date}",
+    lapsed: "انتهت مدة السريان",
+    answersSince: "{n} إجابة نُشرت بعد هذا العرض",
+    answersSinceProvider: "نُشرت {n} إجابة لجميع مقدمي الخدمة بعد تقديم عرضك. راجع الأسئلة والأجوبة وعدّل عرضك إن غيّرته.",
+    asked: "طُلب من مقدم الخدمة التأكيد",
+    ask: "اطلب التأكيد",
+    askHint: "قُدّم على إصدار سابق أو انتهت مدة سريانه: يؤكد مقدم الخدمة أنه ما زال قائمًا قبل ترسيته.",
+    standsHeading: "أكّد أن عرضك ما زال قائمًا",
+    lapsedBody: "انتهت مدة سريان عرضك. لا يمكن للمالك ترسيته إلا إذا أكدت أن سعره وشروطه ما زالت قائمة (ساري مجددًا من اليوم). ويمكنك سحبه بدلًا من ذلك.",
+    outdatedBody: "تغيّر الطلب بعد تقديم عرضك. لا يمكن للمالك ترسيته إلا إذا أكدت أنه ما زال قائمًا دون تغيير على الإصدار الحالي.",
+    confirm: "أكّد أنه ما زال قائمًا",
+    withdraw: "اسحب عرضي",
+    lastWithdrawal: "إذا سحبت هذا العرض مرة أخرى فلن يمكن تقديمه مجددًا على هذا الطلب.",
+    noMoreResubmission: "سُحب هذا العرض مرتين، لذا لا يمكن تقديمه مجددًا على هذا الطلب.",
   },
   award: {
     confirmTitle: "ترسية هذا المتطلب على {provider}؟",
@@ -4841,6 +4884,8 @@ export const ar: Dictionary = {
     cameWithChange: "جاءت هذه الإجابة مع تعديل على الطلب (التعديل رقم {n}) — اطّلع على التعديلات أعلاه.",
     publishForAll: "انشر هذا السؤال وإجابته لجميع مقدّمي الخدمة (يبقى السائل مجهولًا)",
     materialHint: "إن غيّرت الإجابة نطاق العمل أو الكميات أو المستندات أو التوقيت أو من يمكنه الرد، فعدّل الطلب نفسه أيضًا (تعديل الطلب المنشور) واختر هذا السؤال هناك.",
+    sharedNote: "تُنشر كل إجابة لجميع مقدمي الخدمة. لا يظهر اسمك أبدًا.",
+    answerSharedNote: "تُنشر إجابتك لجميع مقدمي الخدمة ليسعّروا على المعلومات نفسها. يبقى السائل مجهولًا.",
     becauseOf: "بسبب سؤال (اختياري)",
     notBecauseOf: "ليس بسبب سؤال",
     attachFiles: "إرفاق ملفات (اختياري، حتى 5: PDF أو صور أو مخططات أو Excel أو Word)",

@@ -12,6 +12,7 @@ import { OfferHistory, OfferPreview } from "@/components/OfferPreview";
 import { OfferClarifications } from "@/components/OfferClarifications";
 import { offerStatusLabel } from "@/components/ClosureOutcome";
 import { SaveButton } from "@/components/SaveOpportunity";
+import { OfferStandsNotice } from "@/components/PostPublication";
 import { useI18n } from "@/i18n/I18nContext";
 import { outcomeText } from "@/components/ClosureOutcome";
 import { AgreementPanel } from "@/components/AgreementPanel";
@@ -197,6 +198,7 @@ export function ServiceProviderOfferPage() {
               {offerStatusLabel(t, existingOffer.status, project.status, project.closure_reason)}
             </div>
           )}
+          {existingOffer && <OfferStandsNotice project={project} offer={existingOffer} />}
           {project.status === "awarded" && <AwardOutcome projectId={project.id} />}
           {/* Stage 7.3: the winner's side only -- the server refuses everyone else. */}
           {project.status === "awarded" && existingOffer?.status === "approved" && (
@@ -230,6 +232,15 @@ export function ServiceProviderOfferPage() {
               <p className="text-xs text-steel mt-1">
                 {project.tender_type === "sealed" ? t("submitOffer.sealedNote") : t("submitOffer.visibleNote")} {t("submitOffer.canStill")}
               </p>
+              {/* Batch B: answers published after the offer was put forward may change how it should read. */}
+              {!!existingOffer.answers_since && (
+                <p className="text-xs text-amber-dark mt-1" data-testid="offer-answers-since">
+                  {t("offerValidity.answersSinceProvider").replace("{n}", String(existingOffer.answers_since))}
+                </p>
+              )}
+              {existingOffer.withdrawals_left === 1 && (
+                <p className="text-xs text-steel mt-1" data-testid="offer-last-withdrawal">{t("offerValidity.lastWithdrawal")}</p>
+              )}
             </div>
           )}
           {/* Stage 5.14: a withdrawn offer says so; the existing rule lets it be resubmitted while offers are open. */}
@@ -237,7 +248,9 @@ export function ServiceProviderOfferPage() {
             <div className="border border-border bg-white rounded px-4 py-3 mb-4 text-sm" data-testid="offer-withdrawn">
               <strong className="font-display text-navy block">{t("feed.offer_withdrawn")}</strong>
               <span className="text-steel">{t("submitOffer.withdrawnAt")} {fullDate(existingOffer.updated_at, language)}</span>
-              <p className="text-xs text-steel mt-1">{t("submitOffer.withdrawnNote")}</p>
+              <p className="text-xs text-steel mt-1">
+                {existingOffer.withdrawals_left === 0 ? t("offerValidity.noMoreResubmission") : t("submitOffer.withdrawnNote")}
+              </p>
             </div>
           )}
           {/* Stage 5.1: which requirement this offer is for. */}

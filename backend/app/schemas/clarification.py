@@ -7,14 +7,14 @@ from app.schemas.common import UTCDateTime
 
 class ClarificationCreate(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
+    # Batch B: ignored -- every answer is published to all providers.
     shared_with_all: bool = True
 
 
 class ClarificationAnswer(BaseModel):
     answer: str = Field(min_length=1, max_length=4000)
-    # Stage 4.7: the owner may publish the answer to a privately asked
-    # question for every provider, when it matters to how all of them read
-    # the requirement (the asker stays anonymous). None = as the asker chose.
+    # Batch B: ignored -- every answer is published to all providers (the
+    # asker stays anonymous).
     shared_with_all: bool | None = None
 
 

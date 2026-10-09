@@ -433,9 +433,19 @@ export function OwnerProjectDetailPage() {
   });
   const reviewable = transaction?.status === "completed";
 
+  // Batch B: an offer on an earlier version, or past its validity, is confirmed by its provider before it can be awarded.
+  const [askedToConfirm, setAskedToConfirm] = useState<string[]>([]);
+  const requestConfirmationMutation = useMutation({
+    mutationFn: (offerId: string) => apiFetch(`/owner/projects/${id}/offers/${offerId}/request-confirmation`, { method: "POST" }),
+    onSuccess: (_, offerId) => {
+      setError(null);
+      setAskedToConfirm((prev) => [...prev, offerId]);
+    },
+    onError: (err) => setError(errorMessage(err, t("owner.projectDetail.approveError"))),
+  });
+
   const approveMutation = useMutation({
-    mutationFn: ({ offerId, acknowledge }: { offerId: string; acknowledge: boolean }) =>
-      apiFetch(`/owner/projects/${id}/offers/${offerId}/approve`, { method: "POST", body: { acknowledge_earlier_version: acknowledge } }),
+    mutationFn: ({ offerId }: { offerId: string }) => apiFetch(`/owner/projects/${id}/offers/${offerId}/approve`, { method: "POST", body: {} }),
     onSuccess: () => {
       setError(null);
       queryClient.invalidateQueries({ queryKey: ["project", id] });
@@ -945,7 +955,14 @@ export function OwnerProjectDetailPage() {
                     <td className="py-3 px-2.5 font-mono font-semibold text-navy text-sm">
                       {money(o.amount, project.currency)}
                     </td>
-                    <td className="py-3 px-2.5 font-mono text-xs">{o.timeline_estimate || "—"}</td>
+                    {/* Batch B: the committed duration or completion date first; the free-text period otherwise. */}
+                    <td className="py-3 px-2.5 font-mono text-xs" data-testid="owner-offer-timing">
+                      {o.proposed_duration_days
+                        ? t("offerTiming.days").replace("{n}", String(o.proposed_duration_days))
+                        : o.proposed_completion_date
+                          ? t("offerTiming.by").replace("{date}", fullDate(o.proposed_completion_date, language))
+                          : o.timeline_estimate || "—"}
+                    </td>
                     <td className="py-3 px-2.5">
                       {/* Stage 6.1: the offer's own status, as the server holds it. */}
                       <span
@@ -956,24 +973,48 @@ export function OwnerProjectDetailPage() {
                       >
                         {o.status === "submitted" ? t("owner.projectDetail.offerReceived") : t(`feed.offer_${o.status}`)}
                       </span>
+                      {o.status === "submitted" && o.valid_until && (
+                        <span className={`block mt-1 font-mono text-[10px] whitespace-nowrap ${o.validity_lapsed ? "text-red" : "text-steel"}`} data-testid="owner-offer-validity">
+                          {o.validity_lapsed ? t("offerValidity.lapsed") : t("offerValidity.until").replace("{date}", fullDate(o.valid_until, language))}
+                        </span>
+                      )}
+                      {!!o.answers_since && (
+                        <span className="block mt-1 font-mono text-[10px] text-amber-dark" data-testid="owner-offer-answers-since">
+                          {t("offerValidity.answersSince").replace("{n}", String(o.answers_since))}
+                        </span>
+                      )}
                       {o.shortlisted && (
                         <span className="block mt-1 font-mono text-[10px] text-amber-dark whitespace-nowrap" data-testid="owner-offer-shortlisted">★ {t("shortlist.badge")}</span>
                       )}
                     </td>
                     <td className="py-3 px-2.5">
-                      {o.status !== "submitted" ? null : project.status === "closed" || project.status === "under_evaluation" ? (
+                      {o.status !== "submitted" ? null : (project.status === "closed" || project.status === "under_evaluation") &&
+                        ((o.based_on_material_revision ?? 0) < (project.material_revision ?? 0) || o.validity_lapsed) ? (
+                        askedToConfirm.includes(o.id) ? (
+                          <span className="font-mono text-[10px] text-steel" data-testid="owner-offer-confirmation-asked">{t("offerValidity.asked")}</span>
+                        ) : (
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => requestConfirmationMutation.mutate(o.id)}
+                              disabled={requestConfirmationMutation.isPending}
+                              className="border border-navy text-navy hover:bg-blue-tint disabled:opacity-60 text-xs font-semibold rounded px-3 py-1.5"
+                              data-testid="owner-offer-request-confirmation"
+                            >
+                              {t("offerValidity.ask")}
+                            </button>
+                            <p className="font-mono text-[10px] text-steel-light mt-1 max-w-[12rem]">{t("offerValidity.askHint")}</p>
+                          </div>
+                        )
+                      ) : project.status === "closed" || project.status === "under_evaluation" ? (
                         <button
                           type="button"
                           onClick={() => {
                             // Stage 6.13: a final decision -- said plainly, and confirmed first.
                             const name = o.service_provider_company_name ?? t("owner.projectDetail.theServiceProvider");
-                            const earlier = (o.based_on_material_revision ?? 0) < (project.material_revision ?? 0);
-                            const body = [
-                              t("award.confirmBody").replace("{provider}", name).replace("{amount}", money(o.amount, project.currency)),
-                              ...(earlier ? [t("award.earlierVersion").replace("{n}", String(o.based_on_material_revision ?? 0)).replace("{m}", String(project.material_revision ?? 0))] : []),
-                            ];
-                            void confirm({ title: t("award.confirmTitle").replace("{provider}", name), body: body.join("\n\n"), confirmLabel: t("award.confirm") }).then(
-                              (ok) => ok && approveMutation.mutate({ offerId: o.id, acknowledge: earlier }),
+                            const body = t("award.confirmBody").replace("{provider}", name).replace("{amount}", money(o.amount, project.currency));
+                            void confirm({ title: t("award.confirmTitle").replace("{provider}", name), body, confirmLabel: t("award.confirm") }).then(
+                              (ok) => ok && approveMutation.mutate({ offerId: o.id }),
                             );
                           }}
                           disabled={approveMutation.isPending}

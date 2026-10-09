@@ -28,6 +28,7 @@ from app.services.offer_response import (
 )
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import bidding_is_open, lock_project, sync_expired_projects
+from app.services.tender_rules import answers_since, offer_valid_until, validity_lapsed
 
 router = APIRouter(prefix="/projects/{project_id}/offers", tags=["offers"])
 
@@ -46,6 +47,22 @@ def _with_documents(db: Session, offer: Offer) -> OfferOut:
     out.documents = documents_out(db, offer.project_id, offer.organization_id, offer.service_provider_id)
     project = db.get(Project, offer.project_id)
     out.timing_conflicts = timing_conflicts(project, offer) if project else []  # Stage 5.5
+    if project:
+        _validity(db, project, offer, out)
+    out.withdrawals_left = max(0, MAX_WITHDRAWALS - (offer.withdrawal_count or 0))
+    return out
+
+
+# Batch B: withdrawing and putting an offer forward again is allowed, but not
+# without end -- the second withdrawal is final.
+MAX_WITHDRAWALS = 2
+
+
+def _validity(db: Session, project: Project, offer: Offer, out: OfferOut) -> OfferOut:
+    if offer.status == OfferStatus.submitted:
+        out.valid_until = offer_valid_until(project, offer)
+        out.validity_lapsed = validity_lapsed(project, offer)
+        out.answers_since = answers_since(db, project, offer)
     return out
 
 
@@ -566,6 +583,8 @@ def submit_offer(
     revised_timing = {f: getattr(payload, f) for f in timing_fields if f in payload.model_fields_set}
     commitment = {f: revised_timing.get(f, getattr(offer, f) if offer else None) for f in timing_fields}
     check_commitment(project, commitment["proposed_start_date"], commitment["proposed_completion_date"], commitment["proposed_duration_days"])
+    if offer and offer.status == OfferStatus.withdrawn and (offer.withdrawal_count or 0) >= MAX_WITHDRAWALS:
+        raise HTTPException(status_code=400, detail="This offer has been withdrawn twice, so it can't be put forward again on this requirement.")
     first = offer is None or offer.status == OfferStatus.draft  # Stage 5.11: put forward for the first time
     # Stage 5.13: revising a submitted (or withdrawn) offer from a page showing
     # an earlier revision -- another tab, a colleague, a retried request -- is
@@ -726,6 +745,8 @@ def confirm_offer(project_id: str, user: User = Depends(require_marketplace_acti
     offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
     if not project or not offer or offer.status != OfferStatus.submitted:
         raise HTTPException(status_code=404, detail="No offer to confirm.")
+    if project.status in (ProjectStatus.closed, ProjectStatus.under_evaluation) and not project.is_suspended:
+        return _confirm_after_close(db, user, project, offer)
     if not bidding_is_open(project):
         raise HTTPException(status_code=400, detail="Bidding on this project is closed.")
     assert_eligible(db, project, acting_profile(db, user))
@@ -750,6 +771,29 @@ def confirm_offer(project_id: str, user: User = Depends(require_marketplace_acti
     return _with_documents(db, offer)
 
 
+def _confirm_after_close(db: Session, user: User, project: Project, offer: Offer) -> OfferOut:
+    """Batch B: once offers have closed, the owner can award only an offer its
+    provider stands by -- made against the requirement as it now is, and
+    within its validity period. Confirming re-states it, unchanged, against
+    the current version and restarts its validity from now. Only the
+    provider confirms; the owner can ask (request-confirmation)."""
+    if offer.based_on_material_revision >= project.material_revision and not validity_lapsed(project, offer) and offer_valid_until(project, offer) is None:
+        raise HTTPException(status_code=400, detail="Your offer is already up to date with the requirement.")
+    previous = offer.based_on_material_revision
+    if previous < project.material_revision:
+        _snapshot_revision(db, offer)
+        offer.based_on_material_revision = project.material_revision
+    now = datetime.utcnow().replace(microsecond=0)
+    offer.validity_confirmed_at = now
+    offer.updated_at, offer.updated_by = now, user.id
+    log_action(
+        db, actor_id=user.id, action="offer.confirmed", target_type="offer", target_id=offer.id,
+        previous_value=f"material revision {previous}", new_value=f"material revision {project.material_revision}; stands from {now.isoformat()}Z",
+    )
+    db.refresh(offer)
+    return _with_documents(db, offer)
+
+
 @router.post("/withdraw", response_model=OfferOut)
 def withdraw_offer(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
     # Same lock-then-check as submit_offer. Withdrawal is a change to a bid, and
@@ -763,11 +807,18 @@ def withdraw_offer(project_id: str, user: User = Depends(require_approved_servic
         raise HTTPException(status_code=404, detail="No offer to withdraw.")
     if offer.status == OfferStatus.withdrawn:
         raise HTTPException(status_code=400, detail="This offer has already been withdrawn.")
-    if not bidding_is_open(project):
+    if offer.status != OfferStatus.submitted:
+        raise HTTPException(status_code=400, detail="This offer has already been decided, so it can no longer be withdrawn.")
+    # Batch B: after the close an offer is held only for its validity period;
+    # once that has run out (and the provider hasn't confirmed it since), the
+    # provider is free to withdraw it.
+    lapsed_after_close = project.status in (ProjectStatus.closed, ProjectStatus.under_evaluation) and validity_lapsed(project, offer)
+    if not bidding_is_open(project) and not lapsed_after_close:
         raise HTTPException(
             status_code=400, detail="Bidding on this project has closed, so this offer can no longer be withdrawn."
         )
     _snapshot_revision(db, offer)
+    offer.withdrawal_count = (offer.withdrawal_count or 0) + 1
     offer.status = OfferStatus.withdrawn
     offer.updated_at, offer.updated_by = datetime.utcnow(), user.id
     # Stage 9.7: withdrawn, by whom, in the same commit.

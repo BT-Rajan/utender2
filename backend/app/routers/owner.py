@@ -18,7 +18,7 @@ from app.models.notification import Notification
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import DocumentRequirement
 from app.models.enums import DocumentStatus, NotificationType, OfferStatus, ProjectStatus, UserRole, VerificationStatus
-from app.models.offer import Offer, OfferRevision, tendered
+from app.models.offer import Offer, OfferRevision, tendered, counted
 from app.models.owner import OwnerProfile
 from app.models.project import Project, ProjectDrawing, ProjectItem
 from app.models.user import User
@@ -49,6 +49,7 @@ from app.services.verification import (
     profile_state_fields,
 )
 from app.services.storage import get_storage
+from app.services.tender_rules import answers_since, offer_valid_until, validity_lapsed
 from app.services.tender_lifecycle import interested_providers, is_sealed_and_open, lock_project, publish, sync_expired_projects, transaction_status
 
 logger = logging.getLogger(__name__)
@@ -97,7 +98,7 @@ def dashboard(user: User = Depends(require_owner), db: Session = Depends(get_db)
     out = []
     for p in projects:
         # Stage 6.3: the offers the owner's inbox lists (an admin-suspended one is withheld from it).
-        offer_count = db.query(Offer).filter(Offer.project_id == p.id, tendered(), Offer.is_suspended.is_(False)).count()
+        offer_count = db.query(Offer).filter(Offer.project_id == p.id, counted(), Offer.is_suspended.is_(False)).count()
         out.append(ProjectOut(**_project_fields(p), offer_count=offer_count))
     return out
 
@@ -130,6 +131,10 @@ def _owner_offer_out(db: Session, project: Project, o: Offer, cp: ServiceProvide
         service_provider_avg_rating=cp.avg_rating if cp else None,
         service_provider_review_count=cp.review_count if cp else None,
         shortlisted=db.query(OfferShortlist.id).filter(OfferShortlist.offer_id == o.id).first() is not None,  # Stage 6.12
+        # Batch B: whether it still holds its price, and answers published since it was put forward.
+        valid_until=offer_valid_until(project, o) if o.status == OfferStatus.submitted else None,
+        validity_lapsed=o.status == OfferStatus.submitted and validity_lapsed(project, o),
+        answers_since=answers_since(db, project, o) if o.status == OfferStatus.submitted else 0,
     )
 
 
@@ -577,8 +582,9 @@ def open_offer_document(
 
 
 class AwardRequest(BaseModel):
-    # Stage 6.13: awarding an offer made against an earlier version of the
-    # requirement (not confirmed by its provider since) needs the owner to say so.
+    # Stage 6.13 (kept for older pages): Batch B no longer lets the owner
+    # award an offer made against an earlier version on the owner's word --
+    # its provider confirms it stands (request-confirmation asks them).
     acknowledge_earlier_version: bool = False
 
 
@@ -624,12 +630,19 @@ def approve_offer(
             status_code=409,
             detail="This provider's account isn't in good standing (suspended, closed or its verification is under review), so it can't be awarded the work now.",
         )
-    # Stage 6.13: never silently award an offer priced against an earlier
-    # version of the requirement as if it answered the current one.
-    if winning_offer.based_on_material_revision < project.material_revision and not (payload and payload.acknowledge_earlier_version):
+    # Stage 6.13 / Batch B: never award an offer priced against an earlier
+    # version of the requirement, nor one past its validity period, on the
+    # owner's word alone -- the provider confirms it still stands (price and
+    # terms) first. The owner can ask them to (request-confirmation).
+    if winning_offer.based_on_material_revision < project.material_revision:
         raise HTTPException(
             status_code=409,
-            detail="This offer was made against an earlier version of the requirement and its provider hasn't confirmed it since. Confirm that you want to award it as it stands.",
+            detail="This offer was made against an earlier version of the requirement and its provider hasn't confirmed it since. Ask the provider to confirm it still stands before awarding it.",
+        )
+    if validity_lapsed(project, winning_offer):
+        raise HTTPException(
+            status_code=409,
+            detail="This offer's validity period has ended. Ask the provider to confirm it still stands before awarding it.",
         )
 
     # Only other LIVE bids get marked rejected — a bid the service provider
@@ -699,8 +712,36 @@ def approve_offer(
     _best_effort(db, tell, f"award notifications for {project_id}")
 
     db.refresh(project)
-    offer_count = db.query(Offer).filter(Offer.project_id == project_id, tendered()).count()
+    offer_count = db.query(Offer).filter(Offer.project_id == project_id, counted()).count()
     return ProjectOut(**_project_fields(project), offer_count=offer_count)
+
+
+@router.post("/projects/{project_id}/offers/{offer_id}/request-confirmation", response_model=OfferOut)
+def request_offer_confirmation(project_id: str, offer_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
+    """Batch B: the owner asks a provider to confirm its offer still stands --
+    made against an earlier version of the requirement, or past its validity
+    period -- so it can be awarded. The provider confirms (or withdraws)."""
+    project = _get_owned_project(project_id, user, db, lock=True)
+    if project.status not in (ProjectStatus.closed, ProjectStatus.under_evaluation) or project.is_suspended:
+        raise HTTPException(status_code=400, detail="Confirmation can be asked for only while offers are being evaluated.")
+    offer = db.get(Offer, offer_id)
+    if not offer or offer.project_id != project_id or offer.is_suspended:
+        raise HTTPException(status_code=404, detail="Offer not found.")
+    if offer.status != OfferStatus.submitted:
+        raise HTTPException(status_code=400, detail="Only a live bid can be awarded.")
+    if offer.based_on_material_revision >= project.material_revision and not validity_lapsed(project, offer):
+        raise HTTPException(status_code=400, detail="This offer is on the current version and within its validity period; it can be awarded as it is.")
+    log_action(db, actor_id=user.id, action="offer.confirmation_requested", target_type="offer", target_id=offer.id)
+
+    def tell():
+        provider = db.get(User, offer.service_provider_id)
+        if provider:
+            notify_team(db, provider, NotificationType.offer_confirmation_requested, link=f"/service-provider/projects/{project_id}/offer",
+                        organization_id=offer.organization_id, project_title=project.title)
+
+    _best_effort(db, tell, f"confirmation request for {offer_id}")
+    cp = db.get(ServiceProviderProfile, offer.service_provider_id)
+    return _owner_offer_out(db, project, offer, cp)
 
 
 # ---------- lifecycle actions (spec §2.12 full tender lifecycle) ----------
@@ -708,7 +749,7 @@ def approve_offer(
 # one is open -> closed/expired, handled lazily by sync_expired_projects.
 
 def _project_response(project: Project, db: Session) -> ProjectOut:
-    offer_count = db.query(Offer).filter(Offer.project_id == project.id, tendered()).count()
+    offer_count = db.query(Offer).filter(Offer.project_id == project.id, counted()).count()
     return ProjectOut(**_project_fields(project), offer_count=offer_count)
 
 
@@ -736,14 +777,31 @@ def close_project(project_id: str, user: User = Depends(require_owner), db: Sess
             detail="A sealed tender can't be closed early \u2014 its bids stay sealed until the deadline. "
             "Cancel the tender instead if you no longer want bids.",
         )
+    # Batch B: closing early cuts off providers still preparing an offer --
+    # they planned on the published deadline. While anyone is, offers stay
+    # open until it passes.
+    preparing = db.query(Offer.id).filter(Offer.project_id == project_id, Offer.status == OfferStatus.draft).first()
+    if preparing is not None and project.bid_deadline > datetime.utcnow():
+        raise HTTPException(
+            status_code=409,
+            detail="Providers are still preparing offers against the published deadline, so offers can't be closed early. They close at the deadline.",
+        )
     # Stage 3.15: the authoritative closure time, an audit entry, and the
-    # bidders told. Every offer stays exactly as submitted.
+    # bidders told. Every offer stays exactly as submitted. Batch B: with no
+    # live offer there is nothing to evaluate -- it expires, as it would at
+    # the deadline.
     now = datetime.utcnow().replace(microsecond=0)
-    project.status = ProjectStatus.closed
+    live = db.query(Offer.id).filter(Offer.project_id == project_id, Offer.status == OfferStatus.submitted).first() is not None
+    project.status = ProjectStatus.closed if live else ProjectStatus.expired
     project.closed_at = now
     project.paused_at = None
-    log_action(db, actor_id=user.id, action="project.close", target_type="project", target_id=project_id, previous_value="open", new_value="closed")
-    _notify_bidders(db, project, NotificationType.tender_closed)
+    log_action(db, actor_id=user.id, action="project.close", target_type="project", target_id=project_id, previous_value="open", new_value=project.status.value)
+
+    def tell():
+        _notify_bidders(db, project, NotificationType.tender_closed)
+        _notify_watchers(db, project)  # Batch B: providers who were told about it hear offers closed early
+
+    _best_effort(db, tell, f"close notifications for {project_id}")
     db.refresh(project)
     return _project_response(project, db)
 
@@ -801,6 +859,8 @@ def start_evaluation(project_id: str, user: User = Depends(require_owner), db: S
     project.status = ProjectStatus.under_evaluation
     # Stage 3.18: recorded like every other lifecycle change (log_action commits both together).
     log_action(db, actor_id=user.id, action="project.start_evaluation", target_type="project", target_id=project_id, previous_value="closed", new_value="under_evaluation")
+    # Batch B: the bidders are told their offers are now being evaluated.
+    _best_effort(db, lambda: _notify_bidders(db, project, NotificationType.evaluation_started), f"evaluation notifications for {project_id}")
     db.refresh(project)
     return _project_response(project, db)
 
@@ -878,6 +938,11 @@ def _end(db: Session, user: User, project: Project, status: ProjectStatus, reaso
     project.closure_reason = reason
     project.closure_note = (note or "").strip() or None
     project.paused_at = None
+    # Batch B: the live offers are no longer under consideration -- closed,
+    # in the same commit, never left "submitted" on an ended requirement.
+    now_ts = datetime.utcnow()
+    for offer in db.query(Offer).filter(Offer.project_id == project.id, Offer.status == OfferStatus.submitted):
+        offer.status, offer.updated_at = OfferStatus.closed, now_ts
     log_action(
         db, actor_id=user.id, action=action, target_type="project", target_id=project.id,
         previous_value=previous, new_value=f"{status.value}:{reason}", reason=project.closure_note,

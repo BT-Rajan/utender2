@@ -175,6 +175,15 @@ class OfferOut(BaseModel):
     # (None everywhere else, providers included).
     shortlisted: bool | None = None
     sealed: bool = False
+    # Batch B: until when the offer holds its price (the requirement's offer
+    # validity, from the close or the provider's latest confirmation); past
+    # it, the provider confirms again before it can be awarded.
+    valid_until: UTCDateTime | None = None
+    validity_lapsed: bool = False
+    # Batch B: answers published to everyone after the offer was last put forward.
+    answers_since: int = 0
+    # Batch B: times it can still be withdrawn (two withdrawals are final).
+    withdrawals_left: int | None = None
 
 
 class OfferRevisionOut(BaseModel):
