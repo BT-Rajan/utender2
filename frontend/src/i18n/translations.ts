@@ -276,6 +276,7 @@ export interface Dictionary {
     summary: string;
     completed: string;
     none: string;
+    terminated: string;
     noReviews: string;
     verified: string;
     note: string;
@@ -463,6 +464,7 @@ export interface Dictionary {
   history: {
     heading: string;
     awarded: string;
+    terms_confirmed: string;
     in_force: string;
     document: string;
     change_proposed: string;
@@ -603,6 +605,24 @@ export interface Dictionary {
     activateConfirmBody: string;
     terminate: string;
     terminatePrompt: string;
+    confirmTerms: string;
+    confirmTermsHelp: string;
+    confirmTermsBody: string;
+    termsConfirmed: string;
+    awaitingConfirmation: string;
+    needsConfirmation: string;
+    terminatedBy: string;
+    notInForce: string;
+    startsOn: string;
+    submittedBlocksTermination: string;
+    commercialHeading: string;
+    paymentStage: string;
+    retention: string;
+    retentionRelease: string;
+    warranty: string;
+    warrantyUntil: string;
+    offerValidity: string;
+    paymentsNote: string;
     documents: string;
     noDocuments: string;
     kindLabel: string;
@@ -824,6 +844,10 @@ export interface Dictionary {
     labelClosed: string;
     labelUnderEvaluation: string;
     labelAwarded: string;
+    labelTxPreparing: string;
+    labelTxActive: string;
+    labelTxCompleted: string;
+    labelTxTerminated: string;
     labelExternal: string;
     labelNoSuitable: string;
     textCanceled: string;
@@ -1967,6 +1991,7 @@ export const en: Dictionary = {
     summary: "{avg} / 5 · {n} reviews",
     completed: "{n} completed U-Tender transactions",
     none: "No completed U-Tender transactions yet",
+    terminated: "{n} agreement(s) terminated before completion",
     noReviews: "No owner reviews yet",
     verified: "Owner review · completed U-Tender transaction",
     note: "For information only: it doesn't affect eligibility, verification or award, and offers are never ordered by it.",
@@ -2186,6 +2211,7 @@ export const en: Dictionary = {
   history: {
     heading: "History",
     awarded: "Awarded",
+    terms_confirmed: "Terms confirmed by the service provider",
     in_force: "Agreement in force",
     document: "Document added",
     change_proposed: "Change {n} proposed",
@@ -2339,6 +2365,24 @@ export const en: Dictionary = {
     activateConfirmBody: "Do this once both parties have agreed. Its reference and effective date can't be changed afterwards.",
     terminate: "Terminate the agreement",
     terminatePrompt: "Why was the agreement terminated?",
+    confirmTerms: "Confirm these terms",
+    confirmTermsHelp: "Check the effective date, reference and deliverables above. Once you confirm, the owner can put the agreement in force; if the owner changes anything, you'll be asked to confirm again.",
+    confirmTermsBody: "You confirm the agreement's effective date, reference and deliverables as shown. The owner can then put it in force.",
+    termsConfirmed: "Terms confirmed by the service provider",
+    awaitingConfirmation: "Waiting for the service provider to confirm these terms. You can put the agreement in force once they do.",
+    needsConfirmation: "The service provider confirms the terms first.",
+    terminatedBy: "Terminated by",
+    notInForce: "The work can be recorded as started once the agreement is in force.",
+    startsOn: "The agreement takes effect on {date}; the start of the work can be recorded from that day.",
+    submittedBlocksTermination: "The work was submitted as complete. The owner accepts it or returns it for correction before either party can terminate.",
+    commercialHeading: "Commercial terms (from the requirement)",
+    paymentStage: "Payment stage",
+    retention: "Retention",
+    retentionRelease: "Retention due for release",
+    warranty: "Warranty (defects liability)",
+    warrantyUntil: "Warranty ends",
+    offerValidity: "Offer validity",
+    paymentsNote: "Amounts are worked out on the current agreed value. Payments are made between the parties outside U-Tender.",
     documents: "Agreement documents",
     noDocuments: "No documents attached yet.",
     kindLabel: "Document",
@@ -2579,6 +2623,10 @@ export const en: Dictionary = {
     labelClosed: "Closed to offers",
     labelUnderEvaluation: "Under evaluation",
     labelAwarded: "Awarded",
+    labelTxPreparing: "Awarded · agreement being prepared",
+    labelTxActive: "Awarded · agreement in force",
+    labelTxCompleted: "Completed",
+    labelTxTerminated: "Awarded · agreement terminated",
     labelExternal: "Closed outside U-Tender",
     labelNoSuitable: "No award",
     textCanceled: "The owner canceled this requirement; it won't go ahead in this form.",
@@ -3747,6 +3795,7 @@ export const ar: Dictionary = {
     summary: "{avg} / 5 · {n} تقييمات",
     completed: "{n} معاملات مكتملة على U-Tender",
     none: "لا توجد معاملات مكتملة على U-Tender بعد",
+    terminated: "{n} اتفاقية أُنهيت قبل الإكمال",
     noReviews: "لا توجد تقييمات من الملاك بعد",
     verified: "تقييم مالك · معاملة مكتملة على U-Tender",
     note: "للعلم فقط: لا يؤثر في الأهلية أو التحقق أو الترسية، ولا تُرتَّب العروض بحسبه.",
@@ -3966,6 +4015,7 @@ export const ar: Dictionary = {
   history: {
     heading: "السجل",
     awarded: "تمت الترسية",
+    terms_confirmed: "أكّد مقدم الخدمة الشروط",
     in_force: "سريان الاتفاقية",
     document: "أُضيف مستند",
     change_proposed: "اقتُرح التغيير {n}",
@@ -4119,6 +4169,24 @@ export const ar: Dictionary = {
     activateConfirmBody: "قم بذلك بعد اتفاق الطرفين. لا يمكن تغيير المرجع وتاريخ السريان بعد ذلك.",
     terminate: "إنهاء الاتفاقية",
     terminatePrompt: "لماذا تم إنهاء الاتفاقية؟",
+    confirmTerms: "تأكيد هذه الشروط",
+    confirmTermsHelp: "راجع تاريخ السريان والمرجع والمخرجات أعلاه. بعد تأكيدك يمكن للمالك جعل الاتفاقية سارية؛ وإذا غيّر المالك أي شيء فسيُطلب منك التأكيد مجددًا.",
+    confirmTermsBody: "تؤكد تاريخ سريان الاتفاقية ومرجعها ومخرجاتها كما هي معروضة. يمكن للمالك بعدها جعلها سارية.",
+    termsConfirmed: "أكّد مقدم الخدمة الشروط",
+    awaitingConfirmation: "بانتظار تأكيد مقدم الخدمة لهذه الشروط. يمكنك جعل الاتفاقية سارية بعد تأكيده.",
+    needsConfirmation: "يؤكد مقدم الخدمة الشروط أولًا.",
+    terminatedBy: "أنهاها",
+    notInForce: "يمكن تسجيل بدء العمل بعد سريان الاتفاقية.",
+    startsOn: "تسري الاتفاقية في {date}؛ ويمكن تسجيل بدء العمل اعتبارًا من ذلك اليوم.",
+    submittedBlocksTermination: "قُدّم العمل على أنه مكتمل. يقبله المالك أو يعيده للتصحيح قبل أن يتمكن أي طرف من الإنهاء.",
+    commercialHeading: "الشروط التجارية (من الطلب)",
+    paymentStage: "دفعة",
+    retention: "المحتجزات",
+    retentionRelease: "موعد الإفراج عن المحتجزات",
+    warranty: "الضمان (مسؤولية العيوب)",
+    warrantyUntil: "ينتهي الضمان في",
+    offerValidity: "صلاحية العرض",
+    paymentsNote: "المبالغ محسوبة على القيمة المتفق عليها الحالية. تتم المدفوعات بين الطرفين خارج U-Tender.",
     documents: "مستندات الاتفاقية",
     noDocuments: "لم يتم إرفاق أي مستندات بعد.",
     kindLabel: "المستند",
@@ -4359,6 +4427,10 @@ export const ar: Dictionary = {
     labelClosed: "مغلق أمام العروض",
     labelUnderEvaluation: "قيد التقييم",
     labelAwarded: "تمت الترسية",
+    labelTxPreparing: "تمت الترسية · الاتفاقية قيد الإعداد",
+    labelTxActive: "تمت الترسية · الاتفاقية سارية",
+    labelTxCompleted: "مكتمل",
+    labelTxTerminated: "تمت الترسية · أُنهيت الاتفاقية",
     labelExternal: "أُغلق خارج U-Tender",
     labelNoSuitable: "بلا ترسية",
     textCanceled: "ألغى المالك هذا الطلب؛ لن يُنفَّذ بهذه الصيغة.",

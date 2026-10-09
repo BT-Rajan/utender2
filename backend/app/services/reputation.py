@@ -1,6 +1,7 @@
 """Stage 8.7/8.8: a party's U-Tender reputation, read live from the
 authoritative records -- transactions completed under Stage 7 (the one
-definition of "completed") and the owner reviews recorded on them (8.3-8.5).
+definition of "completed"), transactions terminated before completion (Batch
+A: shown, never hidden), and the reviews recorded on them (8.3-8.5).
 Informational only: nothing here feeds eligibility, verification, ordering
 or award. Reviews are shown without the reviewer, the requirement or any
 other detail of the transaction they came from (8.6). Both parties are
@@ -37,10 +38,17 @@ def provider_reputation(db: Session, service_provider_id: str) -> ProviderReputa
         .filter(AwardRecord.service_provider_id == service_provider_id, Agreement.status == "completed")
         .scalar()
     )
+    terminated = (
+        db.query(func.count(Agreement.id))
+        .join(AwardRecord, AwardRecord.id == Agreement.award_id)
+        .filter(AwardRecord.service_provider_id == service_provider_id, Agreement.status == "terminated")
+        .scalar()
+    )
     count, average, recent = _reviews(db, Review.service_provider_id == service_provider_id, OWNER_TO_PROVIDER, True)
     return ProviderReputationOut(
         company_name=profile.company_name if profile else None,
         completed_transactions=completed,
+        terminated_transactions=terminated,
         review_count=count,
         avg_rating=average,
         recent_reviews=recent,
@@ -55,8 +63,14 @@ def owner_reputation(db: Session, owner_id: str, *, with_reviews: bool) -> Owner
         .filter(Project.owner_id == owner_id, Agreement.status == "completed")
         .scalar()
     )
+    terminated = (
+        db.query(func.count(Agreement.id))
+        .join(Project, Project.id == Agreement.project_id)
+        .filter(Project.owner_id == owner_id, Agreement.status == "terminated")
+        .scalar()
+    )
     count, average, recent = _reviews(db, Review.owner_id == owner_id, PROVIDER_TO_OWNER, with_reviews)
-    return OwnerReputationOut(completed_transactions=completed, review_count=count, avg_rating=average, recent_reviews=recent)
+    return OwnerReputationOut(completed_transactions=completed, terminated_transactions=terminated, review_count=count, avg_rating=average, recent_reviews=recent)
 
 
 def completed_together(db: Session, owner_id: str, provider_ids) -> dict[str, int]:

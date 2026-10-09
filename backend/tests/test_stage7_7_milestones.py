@@ -22,6 +22,7 @@ from app.routers import milestones as milestones_router
 from tests.test_stage3_bid_integrity import needs_mysql
 from tests.test_stage4_9_participation import _account, _admin
 from tests.test_stage5_13_revise import _d, _submitted, _tender
+from tests.stage7_helpers import put_in_force
 
 PDF = ("delivery-note.pdf", b"%PDF delivery", "application/pdf")
 
@@ -89,8 +90,7 @@ def test_set_out_delivered_returned_redelivered_accepted(db):
         (1, "Transformers delivered to site", "pending", "1. Supply 4 transformers"), (2, "Commissioning report", "pending", None),
     ]
     # In force: what was agreed stays as agreed.
-    owner.patch(f"/projects/{pid}/agreement", json={"effective_date": "2026-11-01"}, headers=_v(owner, pid))
-    owner.post(f"/projects/{pid}/agreement/activate", headers=_v(owner, pid))
+    put_in_force(owner, a, pid)  # Batch A: effective today (Kuwait), with the provider's confirmation
     assert owner.post(f"/projects/{pid}/agreement/milestones", json={"title": "Extra"}, headers=_v(owner, pid)).status_code == 400
     assert owner.patch(f"/projects/{pid}/agreement/milestones/{m2}", json={"title": "Changed"}, headers=_mv(owner, pid, m2)).status_code == 400
     assert owner.delete(f"/projects/{pid}/agreement/milestones/{m2}", headers=_mv(owner, pid, m2)).status_code == 400
@@ -135,6 +135,7 @@ def test_set_out_delivered_returned_redelivered_accepted(db):
 
 def test_a_simple_job_needs_no_deliverables(db):
     owner, a, b, pid, wid = _awarded(db)
+    put_in_force(owner, a, pid)  # Batch A: work starts only under an agreement in force
     _start(a, pid)
     seen = _agreement(owner, pid)
     assert seen["milestones"] == [] and seen["execution_status"] == "in_progress"
@@ -144,6 +145,7 @@ def test_a_simple_job_needs_no_deliverables(db):
 def test_who_may_do_what_and_ids_from_elsewhere(db):
     owner, a, b, pid, wid = _awarded(db)
     m = _add(owner, pid, "Report")
+    put_in_force(owner, a, pid)  # Batch A: work starts only under an agreement in force
     _start(a, pid)
     assert a.post(f"/projects/{pid}/agreement/milestones", json={"title": "Mine"}, headers=_v(a, pid)).status_code == 403  # the owner side sets them out
     assert _decide(a, pid, m, "accept", headers={}).status_code == 403  # a provider can't accept its own delivery
@@ -185,6 +187,8 @@ def test_dates_and_set_out_rules(db):
 def test_stale_pages_repeats_holds_and_endings(db, monkeypatch):
     owner, a, b, pid, wid = _awarded(db)
     m = _add(owner, pid, "Batch 1")
+    m2 = _add(owner, pid, "Batch 2")  # Batch A: set out while being prepared -- work needs the agreement in force
+    put_in_force(owner, a, pid)
     _start(a, pid)
     stale = _mv(a, pid, m)
     assert _deliver(a, pid, m, headers=stale).status_code == 200
@@ -194,7 +198,8 @@ def test_stale_pages_repeats_holds_and_endings(db, monkeypatch):
     assert _decide(owner, pid, m, "accept", headers=fresh).status_code == 200
     assert _decide(owner, pid, m, "return", "No.", headers=fresh).status_code == 409  # the colleague's late return
 
-    m2 = _add(owner, pid, "Batch 2")  # still being prepared: more can be set out
+    # Batch A: in force, no more can be set out (previously added after the start while still preparing).
+    assert owner.post(f"/projects/{pid}/agreement/milestones", json={"title": "Batch 3"}, headers=_v(owner, pid)).status_code == 400
     a.post(f"/projects/{pid}/agreement/progress", json={"action": "hold"}, headers=_v(a, pid))
     assert _deliver(a, pid, m2).status_code == 400  # on hold
     a.post(f"/projects/{pid}/agreement/progress", json={"action": "resume"}, headers=_v(a, pid))
@@ -213,6 +218,7 @@ def test_stale_pages_repeats_holds_and_endings(db, monkeypatch):
 def test_a_failed_save_records_nothing(db, monkeypatch):
     owner, a, b, pid, wid = _awarded(db)
     m = _add(owner, pid, "Report")
+    put_in_force(owner, a, pid)  # Batch A: work starts only under an agreement in force
     _start(a, pid)
 
     def failing_log(*args, **kwargs):
@@ -224,7 +230,8 @@ def test_a_failed_save_records_nothing(db, monkeypatch):
     monkeypatch.undo()
     db.expire_all()
     assert db.get(Milestone, m).status == "pending"
-    assert [u.kind for u in db.query(ExecutionUpdate)] == ["started"]
+    # Batch A: putting the agreement in force now records the provider's confirmation and the activation first.
+    assert [u.kind for u in db.query(ExecutionUpdate).order_by(ExecutionUpdate.sequence)] == ["terms_confirmed", "in_force", "started"]
 
 
 def test_no_award_no_deliverables(db):
@@ -243,6 +250,7 @@ def test_no_award_no_deliverables(db):
 def test_accept_and_return_at_once_is_one_decision(db):
     owner, a, b, pid, wid = _awarded(db)
     m = _add(owner, pid, "Report")
+    put_in_force(owner, a, pid)  # Batch A: work starts only under an agreement in force
     _start(a, pid)
     _deliver(a, pid, m)
     calls = [lambda: _relogin("owner@example.com").post(f"/projects/{pid}/agreement/milestones/{m}/accept", json={}),

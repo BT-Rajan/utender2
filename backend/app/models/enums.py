@@ -160,3 +160,7 @@ class NotificationType(str, enum.Enum):
     variation_updated = "variation_updated"  # Stage 7.8: proposed / agreed / rejected / withdrawn, to the other party
     review_received = "review_received"  # Stage 8.3/8.4: the other party reviewed the completed work
     review_response = "review_response"  # Stage 8.9: the reviewed party responded to the review
+    # Batch A: the agreement's own steps, told to the other party.
+    agreement_terms_confirmed = "agreement_terms_confirmed"
+    agreement_in_force = "agreement_in_force"
+    agreement_terminated = "agreement_terminated"

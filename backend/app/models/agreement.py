@@ -35,6 +35,13 @@ class Agreement(Base):
     activated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     terminated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     termination_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Batch A: which side ended it (either party may, with a reason).
+    terminated_party: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # Batch A: the winning provider's confirmation of the terms as they stand
+    # (effective date, reference, deliverables). Any change by the owner side
+    # clears it; the agreement can only be put in force while it is set.
+    provider_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    provider_confirmed_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     # Stage 7.5: execution start -- when the work actually began (server
     # time, recorded once), by which side and member, with an optional note.
     # The execution status is derived: not started / in progress / terminated.
@@ -111,7 +118,7 @@ EXECUTION_UPDATE_KINDS = ("started", "progress", "on_hold", "resumed", "delivere
 # Stage 7.13: the transaction's other business events, recorded in the same
 # numbered log so the history's order is the order the server applied them.
 TRANSACTION_EVENT_KINDS = (
-    "in_force", "document", "change_proposed", "change_agreed", "change_rejected", "change_withdrawn", "change_lapsed",
+    "terms_confirmed", "in_force", "document", "change_proposed", "change_agreed", "change_rejected", "change_withdrawn", "change_lapsed",
     "terminated", "completed",
 )
 

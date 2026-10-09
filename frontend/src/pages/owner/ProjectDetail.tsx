@@ -538,7 +538,7 @@ export function OwnerProjectDetailPage() {
             {project.tender_type === "sealed" ? t("owner.projectDetail.sealedBadge") : t("owner.projectDetail.ownerVisibleBadge")}
           </span>
           <span className={`font-mono text-[10px] uppercase tracking-wide px-2.5 py-1 rounded-full ${statusBadgeClasses(project.status)}`}>
-            {outcomeLabel(t, project.status, project.closure_reason)}
+            {outcomeLabel(t, project.status, project.closure_reason, project.transaction_status)}
           </span>
         </div>
       </div>

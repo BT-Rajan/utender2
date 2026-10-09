@@ -71,6 +71,18 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.en: ("Change {state} on {project_title}", "A change to the work awarded on {project_title} was {state}."),
         Language.ar: ("{state_ar}: {project_title}", "{state_ar} تغيير على العمل المُرسى في {project_title}."),
     },
+    NotificationType.agreement_terms_confirmed: {
+        Language.en: ("Agreement terms confirmed on {project_title}", "The service provider confirmed the agreement's terms on {project_title}. You can now put the agreement in force."),
+        Language.ar: ("تم تأكيد شروط الاتفاقية في {project_title}", "أكّد مزوّد الخدمة شروط الاتفاقية في {project_title}. يمكنك الآن جعل الاتفاقية سارية."),
+    },
+    NotificationType.agreement_in_force: {
+        Language.en: ("Agreement in force on {project_title}", "The agreement for {project_title} is in force from {effective_date}. Work can be recorded as started from that date."),
+        Language.ar: ("الاتفاقية سارية في {project_title}", "اتفاقية {project_title} سارية اعتبارًا من {effective_date}. يمكن تسجيل بدء العمل من ذلك التاريخ."),
+    },
+    NotificationType.agreement_terminated: {
+        Language.en: ("Agreement terminated on {project_title}", "The {party} terminated the agreement for {project_title}. Reason: {reason}"),
+        Language.ar: ("تم إنهاء الاتفاقية في {project_title}", "أنهى {party_ar} اتفاقية {project_title}. السبب: {reason}"),
+    },
     NotificationType.review_received: {
         Language.en: ("New review on {project_title}", "The {party} reviewed the completed work on {project_title}."),
         Language.ar: ("تقييم جديد على {project_title}", "قيّم {party_ar} العمل المكتمل في {project_title}."),

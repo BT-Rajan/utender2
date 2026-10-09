@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ProviderServicesPanel } from "@/components/ProviderServices";
 import { apiFetch } from "@/api/client";
-import type { ClosureReason, ServiceProviderProfile, OfferStatus, ProjectStatus } from "@/api/types";
+import type { ClosureReason, ServiceProviderProfile, OfferStatus, ProjectStatus, TransactionStatus } from "@/api/types";
 import { PageLoading } from "@/components/PageLoading";
 import { PreviousOwners } from "@/components/PreviousOwners";
 import { Reputation } from "@/components/Reputation";
@@ -28,6 +28,7 @@ interface MyBid {
   project_address: string;
   project_status: ProjectStatus;
   closure_reason?: ClosureReason | null;
+  transaction_status?: TransactionStatus | null; // Batch A
   project_suspended?: boolean;
   bid_deadline: string;
   offer_id: string;
@@ -240,7 +241,7 @@ export function ServiceProviderDashboardPage() {
                   </div>
                   <div className="flex items-center justify-between font-mono text-xs">
                     <span className="text-navy font-semibold">{money(b.amount)}</span>
-                    <span className="text-steel-light">{b.project_suspended ? t("closure.labelSuspended") : outcomeLabel(t, b.project_status, b.closure_reason)}</span>
+                    <span className="text-steel-light">{b.project_suspended ? t("closure.labelSuspended") : outcomeLabel(t, b.project_status, b.closure_reason, b.transaction_status)}</span>
                   </div>
                   {/* Stage 5.16: when -- first submitted, and the last change (a revision or the withdrawal). */}
                   <p className="font-mono text-[10.5px] text-steel-light mt-1.5 mb-3" data-testid="bid-timing">

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile
 from sqlalchemy import case
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.db import get_db
 from app.deps import get_owner_profile, require_owner
@@ -17,7 +17,7 @@ from app.models.offer_shortlist import OfferShortlist
 from app.models.notification import Notification
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import DocumentRequirement
-from app.models.enums import DocumentStatus, NotificationType, OfferStatus, ProjectStatus, UserRole
+from app.models.enums import DocumentStatus, NotificationType, OfferStatus, ProjectStatus, UserRole, VerificationStatus
 from app.models.offer import Offer, OfferRevision, tendered
 from app.models.owner import OwnerProfile
 from app.models.project import Project, ProjectDrawing, ProjectItem
@@ -49,7 +49,7 @@ from app.services.verification import (
     profile_state_fields,
 )
 from app.services.storage import get_storage
-from app.services.tender_lifecycle import interested_providers, is_sealed_and_open, lock_project, publish, sync_expired_projects
+from app.services.tender_lifecycle import interested_providers, is_sealed_and_open, lock_project, publish, sync_expired_projects, transaction_status
 
 logger = logging.getLogger(__name__)
 
@@ -611,6 +611,19 @@ def approve_offer(
         raise HTTPException(status_code=400, detail="Only a live bid can be awarded.")
     if winning_offer.is_suspended:
         raise HTTPException(status_code=400, detail="This offer has been suspended by an admin and cannot be awarded.")
+    # Batch A: the provider must still be in good standing when it is awarded
+    # the work -- a suspended, unverified or closed account could not take the
+    # agreement up, and the transaction would be stuck from its first step.
+    winner_profile = db.get(ServiceProviderProfile, winning_offer.service_provider_id)
+    winner_user = db.get(User, winning_offer.service_provider_id)
+    if (
+        not winner_profile or winner_profile.is_suspended or winner_profile.verification_status != VerificationStatus.approved
+        or (winner_user is not None and winner_user.deactivated_at is not None)
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="This provider's account isn't in good standing (suspended, closed or its verification is under review), so it can't be awarded the work now.",
+        )
     # Stage 6.13: never silently award an offer priced against an earlier
     # version of the requirement as if it answered the current one.
     if winning_offer.based_on_material_revision < project.material_revision and not (payload and payload.acknowledge_earlier_version):
@@ -1184,4 +1197,5 @@ def _project_fields(p: Project) -> dict:
         closure_reason=p.closure_reason,
         closure_note=p.closure_note,  # owner side only (this router)
         restarted_from_id=p.restarted_from_id,
+        transaction_status=transaction_status(object_session(p), p),
     )

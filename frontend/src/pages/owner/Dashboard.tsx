@@ -177,7 +177,7 @@ export function OwnerDashboardPage() {
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <span className={`font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full ${badgeClasses(p.status)}`}>
-                    {outcomeLabel(t, p.status, p.closure_reason)}
+                    {outcomeLabel(t, p.status, p.closure_reason, p.transaction_status)}
                   </span>
                   {p.tender_type === "sealed" && (
                     <span className="font-mono text-[9px] uppercase text-steel-light">{t("owner.dashboard.sealed")}</span>

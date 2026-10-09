@@ -18,7 +18,8 @@ from app.models.project import Project
 from app.routers import completion as completion_router
 from tests.test_stage3_bid_integrity import needs_mysql
 from tests.test_stage4_9_participation import _account, _admin
-from tests.test_stage5_13_revise import _d, _submitted, _tender
+from tests.stage7_helpers import put_in_force
+from tests.test_stage5_13_revise import _submitted, _tender
 
 REPORT = ("completion-report.pdf", b"%PDF completion", "application/pdf")
 
@@ -54,8 +55,7 @@ def _started(db, milestones=()):
     for title in milestones:
         r = owner.post(f"/projects/{pid}/agreement/milestones", json={"title": title}, headers=_v(owner, pid))
         ids.append(r.json()["milestones"][-1]["id"])
-    owner.patch(f"/projects/{pid}/agreement", json={"effective_date": _d(1)}, headers=_v(owner, pid))
-    owner.post(f"/projects/{pid}/agreement/activate", headers=_v(owner, pid))
+    put_in_force(owner, a, pid)  # Batch A: effective date (Kuwait today), provider confirms, owner activates
     assert a.post(f"/projects/{pid}/agreement/start-work", json={}, headers=_v(a, pid)).status_code == 200
     return owner, a, b, pid, wid, ids
 

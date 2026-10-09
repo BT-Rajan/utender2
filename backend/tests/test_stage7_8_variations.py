@@ -19,6 +19,7 @@ from app.models.project import Project
 from tests.test_stage3_bid_integrity import needs_mysql
 from tests.test_stage4_9_participation import _account, _admin
 from tests.test_stage5_13_revise import DECL, _d, _tender
+from tests.stage7_helpers import put_in_force
 
 PDF = ("change-order.pdf", b"%PDF change order", "application/pdf")
 
@@ -62,8 +63,7 @@ def _in_force(db, with_milestone=False):
     if with_milestone:
         r = owner.post(f"/projects/{pid}/agreement/milestones", json={"title": "Panels installed", "due_date": _d(60)}, headers=_v(owner, pid))
         mid = r.json()["milestones"][0]["id"]
-    owner.patch(f"/projects/{pid}/agreement", json={"effective_date": _d(1)}, headers=_v(owner, pid))
-    assert owner.post(f"/projects/{pid}/agreement/activate", headers=_v(owner, pid)).status_code == 200
+    put_in_force(owner, a, pid)  # Batch A: effective today (Kuwait), confirmed by the provider, then activated
     assert a.post(f"/projects/{pid}/agreement/start-work", json={}, headers=_v(a, pid)).status_code == 200
     return owner, a, b, pid, wid, mid
 
@@ -185,8 +185,7 @@ def test_nobody_else_and_no_other_transaction(db):
     _offer(a, pid2, "500")
     owner.post(f"/owner/projects/{pid2}/close")
     owner.post(f"/owner/projects/{pid2}/offers/{a.get(f'/projects/{pid2}/offers/mine').json()['id']}/approve")
-    owner.patch(f"/projects/{pid2}/agreement", json={"effective_date": _d(1)}, headers=_v(owner, pid2))
-    owner.post(f"/projects/{pid2}/agreement/activate", headers=_v(owner, pid2))
+    put_in_force(owner, a, pid2)  # Batch A: the provider confirms before activation
     assert a.post(f"/projects/{pid2}/agreement/variations/{vid}/agree", json={}).status_code == 404
     assert a.post(f"/projects/{pid2}/agreement/documents", data={"kind": "change_order", "variation_id": vid}, files={"file": PDF}).status_code == 404
     assert db.get(Variation, vid).status == "proposed" and db.query(AgreementDocument).count() == 0
@@ -217,7 +216,8 @@ def test_terminal_or_unready_transactions_take_no_changes(db):
 
 def test_an_accepted_deliverable_cannot_be_rescheduled(db):
     owner, a, b, pid, wid, mid = _in_force(db, with_milestone=True)
-    vid = _propose(owner, pid, description="Move the panels date.", milestone_id=mid, milestone_due_date=_d(90)).json()["variations"][0]["id"]
+    # Batch A: a revised due date can't fall after the completion date in force (_d(80)), so _d(70) instead of _d(90).
+    vid = _propose(owner, pid, description="Move the panels date.", milestone_id=mid, milestone_due_date=_d(70)).json()["variations"][0]["id"]
     m = _a(a, pid)["milestones"][0]
     a.post(f"/projects/{pid}/agreement/milestones/{mid}/deliver", json={}, headers={"If-Match": str(m["version"])})
     m = _a(owner, pid)["milestones"][0]

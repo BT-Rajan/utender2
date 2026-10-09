@@ -40,7 +40,7 @@ class TimelineEntry(BaseModel):
 
     at: UTCDateTime
     kind: Literal[
-        "awarded", "in_force", "document", "started", "progress", "on_hold", "resumed",
+        "awarded", "terms_confirmed", "in_force", "document", "started", "progress", "on_hold", "resumed",
         "delivered", "accepted", "returned", "change_proposed", "change_agreed", "change_rejected",
         "change_withdrawn", "change_lapsed", "terminated", "completed",
     ]
@@ -100,6 +100,30 @@ class VariationOut(BaseModel):
     version: int
 
 
+class PaymentStageTerm(BaseModel):
+    """Batch A: a payment stage of the tender's commercial terms, with its
+    share of the current agreed value. Payments themselves are settled between
+    the parties outside U-Tender; this states what was agreed."""
+    milestone: str
+    percent: Decimal
+    amount: Decimal
+
+
+class CommercialTerms(BaseModel):
+    """Batch A: the requirement's commercial conditions (fixed when it was
+    published) as they apply to this agreement."""
+    offer_validity_days: int | None = None
+    payment_stages: list[PaymentStageTerm] = []
+    retention_percent: Decimal | None = None
+    retention_amount: Decimal | None = None
+    retention_months: int | None = None
+    warranty_months: int | None = None
+    # Once the work is accepted as complete: when the defects-liability
+    # (warranty) period ends and when the retention falls due for release.
+    warranty_until: date | None = None
+    retention_release_on: date | None = None
+
+
 class AgreementOut(BaseModel):
     """Stage 7.3: the agreement, with the award it governs read straight from
     the award record -- never a copy that could drift from it."""
@@ -111,6 +135,9 @@ class AgreementOut(BaseModel):
     activated_at: UTCDateTime | None
     terminated_at: UTCDateTime | None
     termination_reason: str | None
+    terminated_party: str | None = None  # Batch A: owner / provider
+    provider_confirmed_at: UTCDateTime | None = None  # Batch A: the provider confirmed the terms as they stand
+    commercial_terms: CommercialTerms | None = None  # Batch A: the tender's commercial conditions, carried into the agreement
     version: int
     created_at: UTCDateTime
     updated_at: UTCDateTime | None

@@ -10,7 +10,7 @@ from app.db import get_db
 from app.deps import get_current_user, require_approved_service_provider, require_service_provider, require_verified_owner
 from app.models.award_record import AwardRecord
 from app.models.service_provider import ServiceProviderProfile
-from app.models.enums import NotificationType, OfferStatus, PricingBasis, ProjectStatus, TenderType, UserRole
+from app.models.enums import NotificationType, OfferStatus, PricingBasis, ProjectStatus, TenderType, UserRole, VerificationStatus
 from app.models.organization import Organization
 from app.models.offer import Offer, tendered
 from app.models.owner import OwnerProfile
@@ -51,7 +51,7 @@ from app.services.notify import notify, notify_team
 from app.services.team import acting_id, acting_profile, can_access, mine, org_of, owns
 from app.services import requirement_quality
 from app.services.storage import drawing_url_expiry_seconds, get_storage
-from app.services.tender_lifecycle import interested_providers, is_sealed_and_open, lock_project, now_for, publish, sync_expired_projects
+from app.services.tender_lifecycle import interested_providers, is_sealed_and_open, lock_project, now_for, publish, sync_expired_projects, transaction_status
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -77,7 +77,7 @@ def _can_view_project(user: User, project: Project, db: Session) -> bool:
     if project.status == ProjectStatus.draft or project.is_suspended:
         return False
     profile = acting_profile(db, user)
-    if not (profile and profile.is_verified_active):
+    if not profile:
         return False
     has_bid = (
         db.query(Offer.id).filter(Offer.project_id == project.id, mine(db, user, Offer, Offer.service_provider_id), tendered()).first() is not None
@@ -86,8 +86,14 @@ def _can_view_project(user: User, project: Project, db: Session) -> bool:
     # canceled, expired -- including a draft that expired unpublished), only
     # providers who took part can still open it, to see what happened to
     # their bid. Nobody else needs the exact address and scope any more.
+    # Batch A: that needs an account in good standing, not a live
+    # subscription -- the subscription buys access to new opportunities, and a
+    # winner whose payment lapses mid-job still needs the scope and drawings
+    # of the work it is doing.
     if project.status != ProjectStatus.open:
-        return has_bid
+        return has_bid and profile.verification_status == VerificationStatus.approved and not profile.is_suspended
+    if not profile.is_verified_active:
+        return False
     # Stage 3.9: open, and eligible for this particular requirement -- or
     # already bidding on it (so a lapsed qualification never hides a
     # provider's own bid; it only stops new or revised offers).
@@ -1229,6 +1235,7 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
         for d in drawing_rows
     ]
     return ProjectDetailOut(
+        transaction_status=transaction_status(db, project),
         id=project.id,
         owner_id=project.owner_id,
         title=project.title,

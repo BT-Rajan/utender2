@@ -37,7 +37,8 @@ def test_the_whole_story_in_order(db):
         seen = _a(client, pid)
         story = _story(seen)
         kinds = [k for k, _, _ in story]
-        assert kinds[:2] == ["awarded", "in_force"]
+        assert kinds[:3] == ["awarded", "terms_confirmed", "in_force"]  # Batch A: the provider confirms the terms before they take effect
+        assert ("terms_confirmed", "provider", None) in story
         assert kinds[-2:] == ["accepted", "completed"] and kinds.count("completed") == 1
         assert ("change_proposed", "owner", 1) in story and ("change_agreed", "provider", 1) in story
         assert ("document", "owner", None) in story and ("started", "provider", None) in story

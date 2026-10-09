@@ -42,7 +42,7 @@ from app.services.verification import (
     profile_state_fields,
 )
 from app.services.storage import get_storage
-from app.services.tender_lifecycle import is_sealed_and_open, sync_expired_projects
+from app.services.tender_lifecycle import is_sealed_and_open, sync_expired_projects, transaction_status
 
 router = APIRouter(prefix="/service-provider", tags=["service_provider"])
 
@@ -463,6 +463,7 @@ def my_bids(
             project_address=p.address,
             project_status=p.status,
             closure_reason=p.closure_reason,
+            transaction_status=transaction_status(db, p),
             project_suspended=p.is_suspended,
             bid_deadline=p.bid_deadline,
             offer_id=o.id,

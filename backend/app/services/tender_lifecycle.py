@@ -213,3 +213,14 @@ def interested_providers(db: Session, project: Project) -> list:
     if not ids:
         return []
     return db.query(User).filter(User.id.in_(ids), User.role == UserRole.service_provider).order_by(User.id).all()
+
+
+def transaction_status(db: Session, project: Project) -> str | None:
+    """Batch A: the awarded requirement's transaction state (the agreement's
+    status), or None before an award."""
+    if project.status != ProjectStatus.awarded:
+        return None
+    from app.models.agreement import Agreement
+
+    row = db.query(Agreement.status).filter(Agreement.project_id == project.id).first()
+    return row[0] if row else None

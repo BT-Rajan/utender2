@@ -400,6 +400,27 @@ AR: dict[str, str] = {
     "Billing isn't configured yet — a Stripe price ID is missing.": "لم يتم إعداد الفوترة بعد — معرّف السعر في Stripe مفقود.",
     "Internal server error.": "خطأ داخلي في الخادم.",
     "Invalid request.": "طلب غير صالح.",
+    # Batch A: contract and execution order.
+    "A deliverable can't be due after the work's completion date. Move the completion date in the same change if needed.": "لا يمكن أن يستحق تسليم بعد تاريخ إنجاز العمل. انقل تاريخ الإنجاز في التعديل نفسه إن لزم.",
+    "A deliverable that was delivered or decided can't be rewritten.": "لا يمكن تعديل تسليم تم تسليمه أو البت فيه.",
+    "A revised completion date can't be in the past or before the agreement takes effect and the work starts.": "لا يمكن أن يكون تاريخ الإنجاز المعدّل في الماضي أو قبل سريان الاتفاقية وبدء العمل.",
+    "A revised due date can't be in the past.": "لا يمكن أن يكون تاريخ الاستحقاق المعدّل في الماضي.",
+    "Only the parties to the agreement can terminate it.": "لا يمكن إنهاء الاتفاقية إلا من قِبل طرفيها.",
+    "Only the service provider confirms the agreement's terms.": "مقدم الخدمة وحده هو من يؤكد شروط الاتفاقية.",
+    "The agreement can't take effect before the award.": "لا يمكن أن تسري الاتفاقية قبل تاريخ الترسية.",
+    "The agreement isn't in force yet. The provider confirms its terms and the owner puts it in force first.": "الاتفاقية ليست سارية بعد. يؤكد مقدم الخدمة شروطها ثم يجعلها المالك سارية أولًا.",
+    "The agreement isn't in force yet.": "الاتفاقية ليست سارية بعد.",
+    "The owner hasn't set the date the agreement takes effect yet.": "لم يحدد المالك بعد تاريخ سريان الاتفاقية.",
+    "The service provider hasn't confirmed the agreement's terms as they now stand. Ask them to confirm first.": "لم يؤكد مقدم الخدمة شروط الاتفاقية بصيغتها الحالية. اطلب منه التأكيد أولًا.",
+    "This provider's account isn't in good standing (suspended, closed or its verification is under review), so it can't be awarded the work now.": "حساب مقدم الخدمة هذا ليس في وضع سليم (موقوف أو مغلق أو توثيقه قيد المراجعة)، لذا لا يمكن ترسية العمل عليه الآن.",
+    "The terms were already confirmed (by a colleague or from another tab).": "تم تأكيد الشروط بالفعل (من قِبل زميل أو من علامة تبويب أخرى).",
+    "This agreement has been terminated.": "تم إنهاء هذه الاتفاقية.",
+    "This agreement is no longer being prepared.": "لم تعد هذه الاتفاقية قيد الإعداد.",
+    "The work was submitted as complete and is awaiting the owner's review. The owner accepts it or returns it for correction before either party can terminate.": "تم تقديم العمل على أنه مكتمل وهو بانتظار مراجعة المالك. يقبله المالك أو يعيده للتصحيح قبل أن يتمكن أي طرف من الإنهاء.",
+    "A deliverable is not accepted yet, so the work can't be accepted as complete.": "لم يُقبل أحد التسليمات بعد، لذا لا يمكن قبول العمل على أنه مكتمل.",
+    "A proposed change is still awaiting an answer.": "لا يزال تعديل مقترح بانتظار الرد.",
+    "Settle it first.": "يجب البت فيه أولًا.",
+    "The work can be recorded as started from that date.": "يمكن تسجيل بدء العمل اعتبارًا من ذلك التاريخ.",
 }
 
 _GENERIC_INVALID = {"en": 'Check the value of "{field}".', "ar": "تحقق من قيمة «{field}»."}
@@ -441,6 +462,7 @@ PATTERNS: list[tuple[re.Pattern, object]] = [
     (re.compile(r'^This requirement needs a valid "(.+)"; yours expired on (.+)\.$'), lambda m: f'يتطلب هذا الطلب "{m[1]}" ساري المفعول؛ انتهت صلاحية مستندك في {m[2]}.'),
     (re.compile(r'^This requirement is for "(.+)"; your profile doesn\'t list it among your services\.$'), lambda m: f'هذا الطلب لأعمال "{m[1]}"، وهي ليست ضمن الخدمات المدرجة في ملفك.'),
     (re.compile(r"^This requirement is in (.+), which isn't among the governorates your profile says you serve\.$"), lambda m: f"هذا الطلب في محافظة {_gov(m[1])}، وهي ليست ضمن المحافظات التي يذكر ملفك أنك تخدمها."),
+    (re.compile(r"^The agreement takes effect on (\d{4}-\d{2}-\d{2})\.$"), lambda m: f"تسري الاتفاقية في {m[1]}."),
     (re.compile(r'^Check the value of "(.+)"\.$'), lambda m: _GENERIC_INVALID["ar"].format(field=m[1])),
 ]
 

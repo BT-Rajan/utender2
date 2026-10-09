@@ -66,6 +66,7 @@ class MyBidOut(BaseModel):
     project_address: str
     project_status: ProjectStatus
     closure_reason: str | None = None
+    transaction_status: str | None = None  # Batch A: preparing / active / completed / terminated after an award
     project_suspended: bool = False  # Stage 3.18: hidden by an admin -- why it can't be opened
     bid_deadline: UTCDateTime
     offer_id: str

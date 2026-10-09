@@ -14,6 +14,7 @@ from app.models.audit_log import AuditLog
 from app.models.award_record import AwardRecord
 from app.models.enums import ProjectStatus
 from app.models.project import Project
+from tests.stage7_helpers import put_in_force
 from tests.test_stage3_bid_integrity import needs_mysql
 from tests.test_stage4_9_participation import _account, _admin
 from tests.test_stage7_10_completion import _a, _do, _milestone, _relogin, _started, _v
@@ -141,8 +142,7 @@ def test_two_owner_users_completing_at_once_close_it_once(db):
     _submitted(a, pid)
     fahad.post(f"/owner/projects/{pid}/close")
     fahad.post(f"/owner/projects/{pid}/offers/{a.get(f'/projects/{pid}/offers/mine').json()['id']}/approve")
-    fahad.patch(f"/projects/{pid}/agreement", json={"effective_date": (datetime.utcnow().date() + timedelta(days=1)).isoformat()}, headers=_v(fahad, pid))
-    fahad.post(f"/projects/{pid}/agreement/activate", headers=_v(fahad, pid))
+    put_in_force(fahad, a, pid)  # Batch A: effective date (Kuwait today), provider confirms, owner activates
     a.post(f"/projects/{pid}/agreement/start-work", json={}, headers=_v(a, pid))
     _do(a, pid, "submit")
     calls = [lambda: _relogin("fahad@gulf.example").post(f"/projects/{pid}/agreement/completion/accept", json={}),

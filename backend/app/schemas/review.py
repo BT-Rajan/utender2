@@ -60,6 +60,7 @@ class ProviderReputationOut(BaseModel):
     and the latest owner reviews, each as rating, comment and date only."""
     company_name: str | None
     completed_transactions: int
+    terminated_transactions: int = 0  # Batch A: agreements ended before completion, by either party
     review_count: int
     avg_rating: float | None
     recent_reviews: list[ReceivedReviewOut]
@@ -75,6 +76,7 @@ class OwnerReputationOut(BaseModel):
     providers weighing a requirement don't yet know whose it is (Stage 7.2),
     and review text could tell them."""
     completed_transactions: int
+    terminated_transactions: int = 0  # Batch A: agreements ended before completion, by either party
     review_count: int
     avg_rating: float | None
     recent_reviews: list[ReceivedReviewOut]

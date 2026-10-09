@@ -22,7 +22,7 @@ from app.models.agreement import Agreement, AgreementDocument, Milestone
 from app.models.enums import NotificationType
 from app.models.project import ProjectItem
 from app.models.user import User
-from app.routers.agreements import _best_effort, _check_version, _load, _out, _record, _require_owner, _touch
+from app.routers.agreements import _best_effort, _check_version, _clear_confirmation, _load, _out, _record, _require_owner, _touch, require_in_force
 from app.schemas.agreement import AgreementOut, MilestoneIn, MilestoneNote
 from app.services import audit
 from app.services import notify as notify_service
@@ -113,6 +113,7 @@ def add_milestone(
     last = db.query(Milestone.position).filter(Milestone.agreement_id == agreement.id).order_by(Milestone.position.desc()).first()
     m = Milestone(agreement_id=agreement.id, position=(last[0] if last else 0) + 1, created_by=user.id, **fields)
     db.add(m)
+    _clear_confirmation(agreement)
     _touch(agreement, user)
     db.flush()
     audit.log_action(db, actor_id=user.id, action="milestone.create", target_type="agreement", target_id=agreement.id, new_value=f"{m.id}:{m.title}")
@@ -130,11 +131,14 @@ def edit_milestone(
     m = _milestone(db, agreement, milestone_id)
     _editable(agreement)
     _check(m, if_match)
+    if m.status != "pending":  # Batch A: what was delivered or decided stays as it was
+        raise HTTPException(status_code=400, detail="A deliverable that was delivered or decided can't be rewritten.")
     fields = _fields(db, project, award, payload)
     before = f"{m.title} due:{m.due_date}"
     for k, v in fields.items():
         setattr(m, k, v)
     _bump(m)
+    _clear_confirmation(agreement)
     _touch(agreement, user)
     audit.log_action(db, actor_id=user.id, action="milestone.update", target_type="agreement", target_id=agreement.id,
                      previous_value=f"{m.id}:{before}", new_value=f"{m.id}:{m.title} due:{m.due_date}")
@@ -156,6 +160,7 @@ def remove_milestone(
         raise HTTPException(status_code=400, detail="A deliverable that was delivered or has evidence stays on record.")
     title = m.title
     db.delete(m)
+    _clear_confirmation(agreement)
     _touch(agreement, user)
     audit.log_action(db, actor_id=user.id, action="milestone.remove", target_type="agreement", target_id=agreement.id, previous_value=f"{milestone_id}:{title}")
     db.refresh(agreement)
@@ -173,8 +178,7 @@ def deliver_milestone(
     if side != "provider":
         raise HTTPException(status_code=403, detail="Only the service provider delivers a deliverable.")
     m = _milestone(db, agreement, milestone_id)
-    if agreement.status == "terminated":
-        raise HTTPException(status_code=400, detail=f"This agreement has been terminated. {LATEST}")
+    require_in_force(agreement)
     if agreement.work_started_at is None:
         raise HTTPException(status_code=400, detail="The work hasn't started yet. Record its start first.")
     if agreement.on_hold_at is not None:
@@ -202,8 +206,7 @@ def _decide(db: Session, project_id: str, milestone_id: str, user: User, note: s
     project, agreement, award, winner, side = _load(db, project_id, user, lock=True)
     _require_owner(side)
     m = _milestone(db, agreement, milestone_id)
-    if agreement.status == "terminated":
-        raise HTTPException(status_code=400, detail=f"This agreement has been terminated. {LATEST}")
+    require_in_force(agreement)
     if m.status == "accepted":
         raise HTTPException(status_code=409, detail=f"This deliverable was already accepted (by a colleague or from another tab). {LATEST}")
     if m.status == "returned":

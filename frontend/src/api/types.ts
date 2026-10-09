@@ -1,3 +1,4 @@
+export type TransactionStatus = "preparing" | "active" | "completed" | "terminated";
 export type ProjectStatus =
   | "draft"
   | "open"
@@ -44,6 +45,8 @@ export interface Project {
   closed_at?: string | null;
   // Stage 3.16: why it ended without a U-Tender award (canceled / no_award only).
   closure_reason?: ClosureReason | null;
+  // Batch A: after an award, how the transaction stands.
+  transaction_status?: TransactionStatus | null;
   closure_note?: string | null; // the owner side only
   restarted_from_id?: string | null; // the owner side only
   material_revision?: number;
@@ -439,6 +442,7 @@ export interface AdminOffer {
   project_id: string;
   project_title: string;
   project_status: ProjectStatus;
+  transaction_status?: TransactionStatus | null; // Batch A
   tender_type: TenderType;
   service_provider_id: string | null;
   service_provider_company_name: string | null;
