@@ -1,5 +1,6 @@
 import type { VerificationState } from "@/api/types";
 import { useI18n } from "@/i18n/I18nContext";
+import { SupportContact } from "@/components/SupportContact";
 
 // The account holder's checklist, built server-side from the admin's
 // verification policy for this account's role and stakeholder type
@@ -37,6 +38,7 @@ export function VerificationStateBanner({ state, note }: { state: VerificationSt
       <div className="font-mono text-[10px] uppercase tracking-wide text-steel">{t("verification.stateLabel")}</div>
       <div className="font-display font-semibold text-navy">{t(`verification.state_${state}`)}</div>
       {state === "rejected" && <p className="text-sm text-steel mt-1">{t("verification.rejectedBody")}</p>}
+      {state === "rejected" && <SupportContact />}
       {note && (
         <p className="text-sm text-navy mt-1">
           <span className="text-steel">{t("verification.reviewerMessage")}</span> {note}

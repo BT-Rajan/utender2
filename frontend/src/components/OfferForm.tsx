@@ -8,7 +8,7 @@ import { OfferPreview, SECTION_ANCHORS } from "@/components/OfferPreview";
 import { OutdatedOfferNotice } from "@/components/PostPublication";
 import { useI18n } from "@/i18n/I18nContext";
 import { fullDate } from "@/lib/format";
-import { money } from "@/lib/money";
+import { money, normalizeAmountInput } from "@/lib/money";
 
 // The provider's offer form. Shared by the provider's page and the owner's
 // preview (Stage 3.13), where it is shown read-only: the owner sees exactly
@@ -133,7 +133,7 @@ export function OfferForm({
   });
 
   const perItem = project.pricing_basis === "per_item";
-  const clean = (v: string) => v.replace(/[^0-9.]/g, "");
+  const clean = normalizeAmountInput;
   // Shown as a guide only; the server computes the authoritative total.
   const lineTotal = (rate: string, quantity: string | null) => {
     if (!clean(rate)) return null;

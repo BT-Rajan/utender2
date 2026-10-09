@@ -1559,4 +1559,40 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - a wrong-credential run and a failed off-server copy were both detected.
   - **Tests:** `tests/test_stage9_12_backup_status.py`. The Stage 9.1 overview test was updated for the new background fields.
 
+- **9.13 Kuwait launch readiness:**
+  - **Audited** as real Kuwait customers would use it:
+    - on a phone-sized browser (390×844), English and Arabic, against a fresh MySQL install;
+    - the owner signs up, establishes identity, verifies, publishes in Arabic, answers a question, closes, awards, completes and reviews;
+    - two providers sign up as a company and as an individual, verify, get access, find the requirement, ask, offer (one typing the price in Arabic digits) and get the decision;
+    - the operator approves, grants access, checks the provider and diagnoses.
+  - **Confirmed by direct API probes:** competitors and other owners get 403/404 on offers, prices, notes, compare and admin; no competitor-readable response contains another price or name.
+  - **Gaps found:**
+    - **Provider verification lost data:** the trading name and licence number were wiped when a document was uploaded after typing them, and submitted empty.
+    - **Double billing:** a provider whose payment failed was offered "Start subscription", which would start a second Stripe subscription.
+    - **Money in Arabic:** an offer price typed in Arabic-Indic digits (٠-٩, ٫) was silently stripped. The admin amount field was labelled USD.
+    - **Deadlines:** the deadline input read the device's clock while every deadline is shown in Kuwait time.
+    - **Language:** raw codes (`payment_required`, `not_approved`) and English chrome (load error, notifications, status badges) reached Arabic users; the provider role description was garbled; the form examples were US-style.
+    - **Dead ends:** "contact support" with no contact anywhere; no Stripe meant a dead-end subscribe page.
+    - **Deployment:** `deploy.sh` could only serve plain http, overwriting any https address.
+  - **Fixed:**
+    - **Verification:** fields are seeded once.
+    - **Billing:**
+      - checkout refuses (409) while a subscription is active, trialing or past due;
+      - a past-due provider is shown "payment failed — update payment method" (the billing portal);
+      - without Stripe the page says the team can activate access.
+    - **Money and time:**
+      - Arabic digits are normalised in offer amounts;
+      - KWD on the admin amount field;
+      - deadline inputs are Kuwait time (UTC+3), with a hint.
+    - **Language:**
+      - access codes are turned into messages in both languages;
+      - translated load error, loading text, notifications and status badges;
+      - the countdown is hidden once offers close;
+      - Kuwait-style examples; role wording fixed.
+    - **Support contact:** admin-editable `support_contact` content, shown where customers are told to contact the team.
+    - **Deployment:** `deploy.sh` takes `PUBLIC_APP_URL` / `PUBLIC_API_URL` for a TLS proxy, keeps https, binds to localhost behind it, and warns on plain http.
+    - **Test fix:** the 9.6 billing test no longer depends on same-second notification order (it failed CI once on MySQL).
+  - **Operator steps** (HTTPS, categories, documents, contact, billing route, email, reminders, backups): `docs/pilot-launch.md`.
+  - **Tests:** `tests/test_stage9_13_pilot_readiness.py`.
+
 _Later Stage 9 steps are added as they are implemented._

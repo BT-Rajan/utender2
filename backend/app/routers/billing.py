@@ -18,6 +18,9 @@ settings = get_settings()
 logger = logging.getLogger("billing")
 
 
+LIVE_SUBSCRIPTION = (SubscriptionStatus.trialing, SubscriptionStatus.active, SubscriptionStatus.past_due)
+
+
 @router.post("/billing/checkout-session")
 def create_checkout_session(
     plan: str = "monthly", user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)
@@ -27,6 +30,15 @@ def create_checkout_session(
         raise HTTPException(status_code=400, detail="Billing isn't configured yet — a Stripe price ID is missing.")
 
     cp = get_service_provider_profile(user, db)
+    # Stage 9.13: a subscription that is still live -- including one whose
+    # payment failed and that Stripe is still retrying -- is fixed in the
+    # billing portal. A second checkout would start a second subscription
+    # and bill the organisation twice.
+    if cp.subscription_status in LIVE_SUBSCRIPTION and cp.stripe_customer_id:
+        raise HTTPException(
+            status_code=409,
+            detail="You already have a subscription. Use Manage billing to update your payment method or plan.",
+        )
 
     session = stripe.checkout.Session.create(
         mode="subscription",

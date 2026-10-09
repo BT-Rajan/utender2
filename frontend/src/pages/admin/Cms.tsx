@@ -11,6 +11,7 @@ interface CmsEntry {
 }
 
 const KEY_LABELS: Record<string, string> = {
+  support_contact: "How customers contact support (email / phone) -- shown on verification, suspension and billing problems",
   hero_heading: "Homepage headline",
   hero_subheading: "Homepage subheading",
   how_it_works_title: "\"How it works\" title",

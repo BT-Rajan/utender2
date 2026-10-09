@@ -392,6 +392,8 @@ AR: dict[str, str] = {
     "This project can no longer be closed.": "لم يعد من الممكن إغلاق هذا المشروع.",
     # --- billing, misc ---
     "No billing account yet — subscribe first.": "لا يوجد حساب فوترة بعد — اشترك أولًا.",
+    "You already have a subscription. Use Manage billing to update your payment method or plan.": "لديك اشتراك بالفعل. استخدم «إدارة الفوترة» لتحديث وسيلة الدفع أو الخطة.",
+    "Your offer was changed somewhere else (another tab, device or team member) since you opened it.": "تم تغيير عرضك في مكان آخر (علامة تبويب أو جهاز أو عضو فريق آخر) منذ فتحته.",
     "Could not start checkout.": "تعذر بدء الدفع.",
     "Billing isn't configured yet — a Stripe price ID is missing.": "لم يتم إعداد الفوترة بعد — معرّف السعر في Stripe مفقود.",
     "Internal server error.": "خطأ داخلي في الخادم.",
@@ -420,6 +422,7 @@ def _gov(name: str) -> str:
 
 
 PATTERNS: list[tuple[re.Pattern, object]] = [
+    (re.compile(r"^Compare up to (\d+) offers at a time\.$"), lambda m: f"يمكنك مقارنة {m[1]} عروض كحد أقصى في كل مرة."),
     (re.compile(r"^Your offer is missing (.+)\.$"), _missing),
     (re.compile(r'^Item (\d+) \("(.*)"\) has a quantity but no unit\.$'), lambda m: f'البند {m[1]} ("{m[2]}") له كمية بدون وحدة.'),
     (re.compile(r'^Item (\d+) \("(.*)"\) has no quantity, so providers will price it as a lump sum\.$'), lambda m: f'البند {m[1]} ("{m[2]}") بدون كمية، لذا سيسعّره مقدمو الخدمة كمبلغ مقطوع.'),

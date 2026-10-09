@@ -6,6 +6,8 @@ import { PageLoading } from "@/components/PageLoading";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatMoney, usePricing, type PlanPrice } from "@/lib/publicInfo";
+import { fullDate } from "@/lib/format";
+import { SupportContact } from "@/components/SupportContact";
 
 function PlanToggle({
   plans,
@@ -59,7 +61,7 @@ function PlanToggle({
         {selected ? (
           <>
             <div className="font-display text-[42px] font-bold text-navy leading-none">
-              {formatMoney(Number.isInteger(perMonth) ? perMonth : perMonth.toFixed(2), selected.currency, language)}
+              {formatMoney(perMonth, selected.currency, language)}
               <span className="font-mono text-sm font-normal text-steel"> {t("pricing.perMonth")}</span>
             </div>
             <p className="text-xs text-steel mt-2 mb-5">
@@ -69,7 +71,10 @@ function PlanToggle({
             </p>
           </>
         ) : (
-          <p className="text-sm text-steel mb-5">{t("pricing.unavailable")}</p>
+          <div className="mb-5">
+            <p className="text-sm text-steel">{t("service_provider.subscribe.billingUnavailable")}</p>
+            <SupportContact />
+          </div>
         )}
         <ul className="mb-6">
           {features.map((f) => (
@@ -92,7 +97,7 @@ function PlanToggle({
 }
 
 export function ServiceProviderSubscribePage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [plan, setPlan] = useState<"monthly" | "annual">("monthly");
   const [error, setError] = useState<string | null>(null);
 
@@ -143,7 +148,23 @@ export function ServiceProviderSubscribePage() {
 
       <ErrorBanner message={error} />
 
-      {isActive ? (
+      {/* Stage 9.13: a failed payment is fixed on the existing subscription
+          (the billing portal), never by starting a second one. */}
+      {!isActive && profile.subscription_status === "past_due" ? (
+        <div className="bg-white border border-border border-t-4 border-t-red rounded px-7 py-7 max-w-md">
+          <div className="font-display font-semibold text-navy">{t("service_provider.subscribe.pastDueTitle")}</div>
+          <p className="text-sm text-steel mt-2">{t("service_provider.subscribe.pastDueBody")}</p>
+          <button
+            type="button"
+            onClick={() => portalMutation.mutate()}
+            disabled={portalMutation.isPending}
+            className="mt-5 bg-amber hover:bg-amber-dark disabled:opacity-60 text-white text-sm font-semibold rounded px-5 py-2.5"
+          >
+            {t("service_provider.subscribe.updatePayment")}
+          </button>
+          <SupportContact />
+        </div>
+      ) : isActive ? (
         <div className="bg-white border border-border border-t-4 border-t-green rounded px-7 py-7 max-w-md">
           <span className="font-mono text-[10px] uppercase px-2.5 py-1 rounded-full bg-green-tint text-green">
             {overrideOnly ? t("service_provider.subscribe.overrideBadge") : profile.subscription_status}
@@ -153,7 +174,7 @@ export function ServiceProviderSubscribePage() {
             <p className="text-sm text-steel mt-3">
               {/* Stage 9.6: a cancellation already scheduled ends access on that date -- it doesn't renew. */}
               {t(profile.subscription_cancel_at_period_end ? "service_provider.subscribe.ends" : "service_provider.subscribe.renews")}{" "}
-              {new Date(profile.subscription_current_period_end).toLocaleDateString()}
+              {fullDate(profile.subscription_current_period_end, language, false)}
               {profile.subscription_interval && ` · ${t(profile.subscription_interval === "year" ? "service_provider.subscribe.yearly" : "service_provider.subscribe.monthly")}`}
             </p>
           )}

@@ -15,6 +15,20 @@ function interfaceLanguage(): string {
   return typeof document !== "undefined" && document.documentElement.lang === "ar" ? "ar" : "en";
 }
 
+// Stage 9.13: the server answers an access gate with a bare code (the route
+// guards act on the account state). Should one reach a message -- e.g. a
+// subscription that lapsed while an offer was being prepared -- say what it means.
+const ACCESS_CODES: Record<string, { en: string; ar: string }> = {
+  payment_required: {
+    en: "Your marketplace subscription isn't active, so offers can't be saved or sent. Open Subscription to renew or update your payment.",
+    ar: "اشتراكك في السوق غير نشط، لذا لا يمكن حفظ العروض أو إرسالها. افتح صفحة الاشتراك للتجديد أو تحديث وسيلة الدفع.",
+  },
+  not_approved: {
+    en: "Your account's verification isn't approved yet, so this isn't available. See your verification status for what's needed.",
+    ar: "لم تتم الموافقة على توثيق حسابك بعد، لذا هذا غير متاح. راجع حالة التوثيق لمعرفة المطلوب.",
+  },
+};
+
 async function parseError(res: Response): Promise<never> {
   let detail = res.statusText;
   try {
@@ -23,6 +37,7 @@ async function parseError(res: Response): Promise<never> {
   } catch {
     // non-JSON error body — fall back to statusText
   }
+  if (typeof detail === "string" && ACCESS_CODES[detail]) detail = ACCESS_CODES[detail][interfaceLanguage() as "en" | "ar"];
   throw new ApiError(res.status, detail);
 }
 

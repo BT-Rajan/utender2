@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
@@ -20,8 +20,13 @@ export function ServiceProviderVerifyPage() {
     queryKey: ["service-provider-profile"],
     queryFn: () => apiFetch<ServiceProviderProfile>("/service-provider/profile"),
   });
+  // Seeded once from the saved profile. Uploading a document refetches the
+  // profile; re-seeding then would wipe a trading name or licence number the
+  // provider had typed but not yet submitted (Stage 9.13).
+  const seeded = useRef(false);
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || seeded.current) return;
+    seeded.current = true;
     setCompanyName(profile.company_name ?? "");
     setLicenseNumber(profile.license_number ?? "");
   }, [profile]);

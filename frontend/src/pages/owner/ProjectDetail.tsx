@@ -798,7 +798,8 @@ export function OwnerProjectDetailPage() {
               deadlinePassed ? "bg-red-tint text-red border-red" : "bg-blue-tint text-blue border-blue"
             }`}
           >
-            ⏱ {timeRemaining(project.bid_deadline)} — {new Date(project.bid_deadline).toLocaleString()}
+            {/* Stage 9.13: a countdown only while offers are open -- once closed early, the time left means nothing. */}
+            {project.status === "open" ? `⏱ ${timeRemaining(project.bid_deadline)} — ` : ""}{fullDate(project.bid_deadline, language)}
             {formatWorkTiming(t, project) && <div className="mt-1 text-steel">{formatWorkTiming(t, project)}</div>}
           </div>
           {project.description && (

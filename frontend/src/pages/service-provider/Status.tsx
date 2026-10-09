@@ -5,6 +5,7 @@ import type { ServiceProviderDocument, ServiceProviderProfile } from "@/api/type
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
 import { VerificationStateBanner } from "@/components/VerificationChecklist";
+import { SupportContact } from "@/components/SupportContact";
 
 function statusBadge(status: string) {
   switch (status) {
@@ -44,6 +45,7 @@ export function ServiceProviderStatusPage() {
         <div className="bg-white border border-red border-l-4 rounded px-5 py-4">
           <div className="font-display font-semibold text-navy">{t("service_provider.status.suspendedTitle")}</div>
           <p className="text-sm text-steel mt-1.5">{t("service_provider.status.suspendedBody")}</p>
+          <SupportContact />
         </div>
       </main>
     );

@@ -1,5 +1,5 @@
 export interface Dictionary {
-  common: { loading: string; save: string; cancel: string; back: string };
+  common: { loading: string; save: string; cancel: string; back: string; loadFailed: string; retry: string; notifications: string; markAllRead: string; noNotifications: string; supportContact: string };
   brand: { tagline: string };
   home: {
     login: string;
@@ -819,6 +819,11 @@ export interface Dictionary {
     error: string;
     labelCanceled: string;
     labelExpired: string;
+    labelDraft: string;
+    labelOpen: string;
+    labelClosed: string;
+    labelUnderEvaluation: string;
+    labelAwarded: string;
     labelExternal: string;
     labelNoSuitable: string;
     textCanceled: string;
@@ -1318,6 +1323,10 @@ export interface Dictionary {
       subheadingInactive: string;
       overrideBadge: string;
       overrideMessage: string;
+      pastDueTitle: string;
+      pastDueBody: string;
+      updatePayment: string;
+      billingUnavailable: string;
       renews: string;
       ends: string;
       monthly: string;
@@ -1673,6 +1682,12 @@ export const en: Dictionary = {
     save: "Save",
     cancel: "Cancel",
     back: "Back",
+    loadFailed: "Couldn't load this — check your connection and try again.",
+    retry: "Retry",
+    notifications: "Notifications",
+    markAllRead: "Mark all read",
+    noNotifications: "No notifications yet.",
+    supportContact: "Contact the U-Tender team:",
   },
   brand: {
     tagline: "Drawings in. Offers out.",
@@ -2559,6 +2574,11 @@ export const en: Dictionary = {
     error: "Couldn't end the requirement.",
     labelCanceled: "Canceled",
     labelExpired: "Expired",
+    labelDraft: "Draft",
+    labelOpen: "Open for offers",
+    labelClosed: "Closed to offers",
+    labelUnderEvaluation: "Under evaluation",
+    labelAwarded: "Awarded",
     labelExternal: "Closed outside U-Tender",
     labelNoSuitable: "No award",
     textCanceled: "The owner canceled this requirement; it won't go ahead in this form.",
@@ -3077,6 +3097,10 @@ export const en: Dictionary = {
       subheadingInactive: "One plan, full access. Cancel any time.",
       overrideBadge: "admin override",
       overrideMessage: "An administrator has granted your account full marketplace access without a paid subscription.",
+      pastDueTitle: "Your last payment failed",
+      pastDueBody: "Viewing full requirements and sending offers is paused until the payment goes through. Update your card below — your existing subscription continues; there's no need to subscribe again.",
+      updatePayment: "Update payment method",
+      billingUnavailable: "Online subscription isn't available yet. The U-Tender team can activate your marketplace access directly.",
       renews: "Renews",
       ends: "Cancelled: access ends",
       monthly: "monthly",
@@ -3163,18 +3187,18 @@ export const en: Dictionary = {
       ownerVisibleHint: "You can see bids as they come in. Locked in once the first bid arrives.",
       sealedHint: "Bids stay hidden from you until bidding closes. Locked in once the first bid arrives.",
       title: "Project title",
-      titlePlaceholder: "e.g. Maple St. Duplex — Roof Replacement",
+      titlePlaceholder: "e.g. Villa in Salwa — roof waterproofing",
       address: "Site address",
-      addressPlaceholder: "Street, city, state",
+      addressPlaceholder: "Block, street, building / plot number",
       trade: "Trade",
-      tradePlaceholder: "e.g. Roofing, Framing, Fencing",
+      tradePlaceholder: "e.g. Waterproofing, electrical, painting",
       scope: "Scope of work",
       scopePlaceholder: "Describe the work you need done. Service providers will use this alongside your drawings to price their offer.",
       drawings: "Drawings & documents",
       drawingsHint: "PDF, DWG, JPG, PNG, or a .zip folder of drawings — up to 50MB total",
       drawingsAccessNote: "Only approved, subscribed service providers can view these files.",
       deadline: "Bid deadline",
-      deadlineNote: "No offers are accepted after this time.",
+      deadlineNote: "Kuwait time. No offers are accepted after this time.",
       postProject: "Post project",
       posting: "Posting…",
       saveAsDraft: "Save as draft",
@@ -3393,7 +3417,7 @@ export const en: Dictionary = {
       actionsCol: "",
       edit: "Edit",
       editOfferHeading: "Edit offer",
-      amountFieldLabel: "Amount (USD)",
+      amountFieldLabel: "Amount (KWD)",
       timelineFieldLabel: "Timeline",
       messageFieldLabel: "Message",
       saveOffer: "Save",
@@ -3438,6 +3462,12 @@ export const ar: Dictionary = {
     save: "حفظ",
     cancel: "إلغاء",
     back: "رجوع",
+    loadFailed: "تعذّر التحميل — تحقّق من الاتصال وحاول مرة أخرى.",
+    retry: "إعادة المحاولة",
+    notifications: "الإشعارات",
+    markAllRead: "تعليم الكل كمقروء",
+    noNotifications: "لا توجد إشعارات بعد.",
+    supportContact: "تواصل مع فريق U-Tender:",
   },
   brand: {
     tagline: "المخططات تدخل، والعروض تخرج.",
@@ -4324,6 +4354,11 @@ export const ar: Dictionary = {
     error: "تعذّر إنهاء الطلب.",
     labelCanceled: "ملغى",
     labelExpired: "منتهي الصلاحية",
+    labelDraft: "مسودة",
+    labelOpen: "مفتوح للعروض",
+    labelClosed: "مغلق أمام العروض",
+    labelUnderEvaluation: "قيد التقييم",
+    labelAwarded: "تمت الترسية",
     labelExternal: "أُغلق خارج U-Tender",
     labelNoSuitable: "بلا ترسية",
     textCanceled: "ألغى المالك هذا الطلب؛ لن يُنفَّذ بهذه الصيغة.",
@@ -4842,6 +4877,10 @@ export const ar: Dictionary = {
       subheadingInactive: "باقة واحدة، وصول كامل. يمكن الإلغاء في أي وقت.",
       overrideBadge: "استثناء إداري",
       overrideMessage: "منحك أحد المسؤولين وصولاً كاملاً للسوق دون اشتراك مدفوع.",
+      pastDueTitle: "فشلت عملية الدفع الأخيرة",
+      pastDueBody: "عرض الطلبات كاملة وإرسال العروض متوقفان حتى تنجح عملية الدفع. حدّث بطاقتك من الزر أدناه — اشتراكك الحالي مستمر ولا حاجة للاشتراك مجددًا.",
+      updatePayment: "تحديث وسيلة الدفع",
+      billingUnavailable: "الاشتراك عبر الإنترنت غير متاح بعد. يمكن لفريق U-Tender تفعيل وصولك إلى السوق مباشرةً.",
       renews: "يتجدد في",
       ends: "أُلغي: ينتهي الوصول في",
       monthly: "شهري",
@@ -4928,18 +4967,18 @@ export const ar: Dictionary = {
       ownerVisibleHint: "يمكنك رؤية العروض فور ورودها. يُثبَّت النوع بمجرد وصول أول عرض.",
       sealedHint: "تبقى العروض مخفية عنك حتى يُغلق تقديم العروض. يُثبَّت النوع بمجرد وصول أول عرض.",
       title: "عنوان المشروع",
-      titlePlaceholder: "مثال: دوبلكس شارع مابل — استبدال السقف",
+      titlePlaceholder: "مثال: فيلا في سلوى — عزل السطح",
       address: "عنوان الموقع",
-      addressPlaceholder: "الشارع، المدينة، المنطقة",
+      addressPlaceholder: "القطعة، الشارع، رقم المبنى / القسيمة",
       trade: "التخصص",
-      tradePlaceholder: "مثال: أسقف، هياكل، أسوار",
+      tradePlaceholder: "مثال: عزل، كهرباء، أصباغ",
       scope: "نطاق العمل",
       scopePlaceholder: "صف العمل المطلوب. سيستخدم مزوّدو الخدمات هذا الوصف مع مخططاتك لتسعير عروضهم.",
       drawings: "المخططات والمستندات",
       drawingsHint: "PDF أو DWG أو JPG أو PNG أو ملف .zip للمخططات — حتى 50 ميغابايت إجمالاً",
       drawingsAccessNote: "فقط مزوّدو الخدمات المعتمدون والمشتركون يمكنهم عرض هذه الملفات.",
       deadline: "الموعد النهائي لتقديم العروض",
-      deadlineNote: "لا تُقبل العروض بعد هذا الوقت.",
+      deadlineNote: "بتوقيت الكويت. لا تُقبل العروض بعد هذا الوقت.",
       postProject: "نشر المشروع",
       posting: "جارٍ النشر…",
       saveAsDraft: "حفظ كمسودة",
@@ -5158,7 +5197,7 @@ export const ar: Dictionary = {
       actionsCol: "",
       edit: "تعديل",
       editOfferHeading: "تعديل العرض",
-      amountFieldLabel: "القيمة (بالدولار)",
+      amountFieldLabel: "القيمة (بالدينار الكويتي)",
       timelineFieldLabel: "الجدول الزمني",
       messageFieldLabel: "الرسالة",
       saveOffer: "حفظ",

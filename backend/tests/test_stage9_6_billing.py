@@ -93,8 +93,10 @@ def test_billing_follows_stripe_onto_the_organisation(db, monkeypatch):
     db.expire_all()
     assert db.get(ServiceProviderProfile, x_id).is_verified_active is True
     # Told again -- as one refreshed unread notice, not a second copy (9.5 de-duplication).
-    latest = db.query(Notification).filter(Notification.user_id == x_id).order_by(Notification.created_at.desc()).first()
-    assert n(N.payment_activated) == 1 and latest.type == N.payment_activated
+    # (Compared by time, not "the newest row": the award notice can share its second.)
+    notice = lambda kind: db.query(Notification).filter(Notification.user_id == x_id, Notification.type == kind).one()  # noqa: E731
+    activated, won = notice(N.payment_activated), notice(N.award_won)
+    assert n(N.payment_activated) == 1 and not activated.is_read and activated.created_at >= won.created_at
 
     # E. Cancellation: scheduled (still active, shown), then ended -- access goes, history stays.
     _post(_event("customer.subscription.updated", _sub("active", cancel=True), t0 + 30, "evt_4"))

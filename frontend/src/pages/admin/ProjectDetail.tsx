@@ -10,13 +10,7 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
 import { money } from "@/lib/money";
-
-// datetime-local inputs want "YYYY-MM-DDTHH:mm" with no timezone suffix.
-function toLocalInputValue(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+import { localInputToUtcIso, toLocalInputValue } from "@/lib/dates";
 
 const OFFER_STATUS_BADGE: Record<string, string> = {
   submitted: "bg-blue-tint text-blue",
@@ -241,7 +235,7 @@ export function AdminProjectDetailPage() {
           address,
           description: description || null,
           trade: trade || null,
-          bid_deadline: new Date(bidDeadline).toISOString(),
+          bid_deadline: localInputToUtcIso(bidDeadline),
         },
       }),
     onSuccess: invalidate,

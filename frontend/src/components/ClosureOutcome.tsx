@@ -15,7 +15,12 @@ export function outcomeLabel(t: T, status: ProjectStatus, reason?: ClosureReason
   if (status === "no_award") return reason === "closed_externally" ? t("closure.labelExternal") : t("closure.labelNoSuitable");
   if (status === "canceled") return t("closure.labelCanceled");
   if (status === "expired") return t("closure.labelExpired");
-  return status.replace(/_/g, " ");
+  // Stage 9.13: every other state in the interface language, not the raw code.
+  const label: Partial<Record<ProjectStatus, string>> = {
+    draft: "closure.labelDraft", open: "closure.labelOpen", closed: "closure.labelClosed",
+    under_evaluation: "closure.labelUnderEvaluation", awarded: "closure.labelAwarded",
+  };
+  return label[status] ? t(label[status] as string) : status.replace(/_/g, " ");
 }
 
 // Stage 6.16: a provider's own offer, as its status reads once the requirement

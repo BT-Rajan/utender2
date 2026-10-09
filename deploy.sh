@@ -10,6 +10,11 @@
 #
 # Optional: DB_HOST (127.0.0.1), DB_PORT (3306), APP_PORT (8080),
 # API_PORT (8081), PUBLIC_HOST (auto-detected public IP, or a domain).
+# HTTPS (Stage 9.13): terminate TLS in a reverse proxy (see
+# docs/pilot-launch.md) and pass the public addresses once --
+#   PUBLIC_APP_URL='https://utender.example.com' PUBLIC_API_URL='https://api.utender.example.com' ./deploy.sh
+# They are remembered in backend/.env; an https address there is never
+# replaced by a plain-http one on a later run.
 # Passing DB_* or *_PORT again later updates backend/.env with the new values.
 set -euo pipefail
 
@@ -82,13 +87,22 @@ app_port="${APP_PORT:-$(get_env PUBLIC_HTTP_PORT)}"; app_port="${app_port:-$(fre
 api_port="${API_PORT:-$(get_env PUBLIC_API_PORT)}";  api_port="${api_port:-$(free_port $((app_port + 1)))}"
 public_host="${PUBLIC_HOST:-$(curl -fsS --max-time 5 https://api.ipify.org || hostname -I | awk '{print $1}')}"
 [ -n "$public_host" ] || fail "Couldn't detect the server address. Re-run with PUBLIC_HOST=your.server.ip"
+# Public addresses: given now, else an https one already remembered, else plain http on the ports.
+keep_https() { case "$1" in https://*) echo "$1" ;; esac; }
+app_url="${PUBLIC_APP_URL:-$(keep_https "$(get_env APP_URL)")}"; app_url="${app_url:-http://${public_host}:${app_port}}"
+api_url="${PUBLIC_API_URL:-$(keep_https "$(get_env API_URL)")}"; api_url="${api_url:-http://${public_host}:${api_port}}"
+app_url="${app_url%/}"; api_url="${api_url%/}"
+# Behind an HTTPS proxy the services listen on this machine only, so nobody
+# reaches them over plain http around the proxy.
+case "$app_url" in https://*) bind_host=127.0.0.1 ;; *) bind_host=0.0.0.0 ;; esac
 
 set_env PUBLIC_HTTP_PORT "$app_port"
 set_env PUBLIC_API_PORT "$api_port"
-set_env APP_URL "http://${public_host}:${app_port}"
-set_env API_URL "http://${public_host}:${api_port}"
-set_env CORS_ORIGINS "http://${public_host}:${app_port}"
-ok "App http://${public_host}:${app_port}, API http://${public_host}:${api_port}"
+set_env APP_URL "$app_url"
+set_env API_URL "$api_url"
+set_env CORS_ORIGINS "$app_url"
+ok "App $app_url, API $api_url"
+case "$app_url" in https://*) ;; *) echo "    WARNING: plain http -- passwords and documents cross the network unencrypted. Put HTTPS in front before real customers (docs/pilot-launch.md)." ;; esac
 
 step "Backend: dependencies and migrations"
 cd "$repo_root/backend"
@@ -102,7 +116,7 @@ ok "Database schema is up to date."
 step "Frontend: build"
 cd "$repo_root/frontend"
 npm ci --silent
-VITE_API_URL="http://${public_host}:${api_port}" npm run build --silent
+VITE_API_URL="$api_url" npm run build --silent
 ok "Built frontend/dist."
 
 step "Starting services"
@@ -113,7 +127,7 @@ After=network.target mariadb.service mysql.service
 
 [Service]
 WorkingDirectory=$repo_root/backend
-ExecStart=$repo_root/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port $api_port
+ExecStart=$repo_root/backend/.venv/bin/uvicorn app.main:app --host $bind_host --port $api_port
 Restart=always
 RestartSec=3
 
@@ -128,7 +142,7 @@ After=network.target
 
 [Service]
 WorkingDirectory=$repo_root/frontend
-ExecStart=$(command -v serve) -s dist -l $app_port
+ExecStart=$(command -v serve) -s dist -l tcp://$bind_host:$app_port
 Restart=always
 RestartSec=3
 
@@ -166,7 +180,7 @@ systemctl enable --quiet utender-backend utender-frontend
 systemctl enable --quiet --now utender-backup.timer
 systemctl restart utender-backend utender-frontend
 
-if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
+if [ "$bind_host" = 0.0.0.0 ] && command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
     ufw allow "${app_port}/tcp" >/dev/null
     ufw allow "${api_port}/tcp" >/dev/null
 fi
@@ -183,8 +197,8 @@ fi
 
 echo
 echo -e "\033[36mU-Tender is running:\033[0m"
-echo "  App:  http://${public_host}:${app_port}"
-echo "  API:  http://${public_host}:${api_port}"
+echo "  App:  $app_url"
+echo "  API:  $api_url"
 echo
 echo "Logs:     journalctl -u utender-backend -f"
 echo "Restart:  systemctl restart utender-backend utender-frontend"
