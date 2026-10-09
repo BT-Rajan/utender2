@@ -463,7 +463,7 @@ def my_bids(
             project_address=p.address,
             project_status=p.status,
             closure_reason=p.closure_reason,
-            transaction_status=transaction_status(db, p),
+            transaction_status=transaction_status(db, p) if o.status == OfferStatus.approved else None,  # only the winner's own transaction
             project_suspended=p.is_suspended,
             bid_deadline=p.bid_deadline,
             offer_id=o.id,

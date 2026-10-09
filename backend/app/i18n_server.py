@@ -427,6 +427,8 @@ AR: dict[str, str] = {
     "This provider has already made an offer on this requirement.": "قدّم مقدم الخدمة هذا عرضًا على هذا الطلب بالفعل.",
     "You are already the organization's representative.": "أنت ممثل المؤسسة بالفعل.",
     "You can invite a provider you have completed work with.": "يمكنك دعوة مقدم خدمة أنجزت معه عملًا.",
+    "Reload the agreement and confirm the terms as shown.": "أعد تحميل الاتفاقية وأكّد الشروط كما هي معروضة.",
+    "This provider has already been invited to this requirement.": "تمت دعوة مقدم الخدمة هذا إلى هذا الطلب بالفعل.",
     # Batch B: tender fairness.
     "Confirmation can be asked for only while offers are being evaluated.": "لا يمكن طلب التأكيد إلا أثناء تقييم العروض.",
     "Price every item above zero. If an item's cost is included in another item, give it the smallest price (0.001 KWD) and say so in your assumptions.": "سعّر كل بند بأكثر من صفر. إذا كانت تكلفة بند مشمولة في بند آخر، فأعطه أصغر سعر (0.001 د.ك) واذكر ذلك في افتراضاتك.",

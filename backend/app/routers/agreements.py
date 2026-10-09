@@ -438,6 +438,10 @@ def confirm_terms(
         raise HTTPException(status_code=403, detail="Only the service provider confirms the agreement's terms.")
     if agreement.status != "preparing":
         raise HTTPException(status_code=400, detail="This agreement is no longer being prepared. This page now shows the latest.")
+    # Security: a confirmation binds the provider to terms, so it must name the
+    # version it was read at -- never confirm whatever the terms are by now.
+    if not if_match:
+        raise HTTPException(status_code=428, detail="Reload the agreement and confirm the terms as shown.")
     _check_version(agreement, if_match)
     if agreement.effective_date is None:
         raise HTTPException(status_code=400, detail="The owner hasn't set the date the agreement takes effect yet.")

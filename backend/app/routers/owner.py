@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, object_session
 from app.db import get_db
 from app.deps import get_owner_profile, require_owner
 from app.models.agreement import Agreement
+from app.models.audit_log import AuditLog
 from app.models.award_record import AwardRecord
 from app.models.common import gen_uuid
 from app.models.clarification import Clarification
@@ -366,6 +367,11 @@ def invite_previous_provider(project_id: str, service_provider_id: str, user: Us
         raise HTTPException(status_code=400, detail="This provider doesn't meet this requirement's conditions, so it can't be invited.")
     if db.query(Offer.id).filter(Offer.project_id == project_id, Offer.service_provider_id == service_provider_id, tendered()).first():
         raise HTTPException(status_code=409, detail="This provider has already made an offer on this requirement.")
+    # Security: one invitation per provider per requirement -- an invitation
+    # can't be repeated to flood a provider's notices.
+    if db.query(AuditLog.id).filter(AuditLog.action == "project.invite_provider", AuditLog.target_id == project_id,
+                                    AuditLog.new_value == service_provider_id).first():
+        raise HTTPException(status_code=409, detail="This provider has already been invited to this requirement.")
     log_action(db, actor_id=user.id, action="project.invite_provider", target_type="project", target_id=project_id, new_value=service_provider_id)
 
     def tell():

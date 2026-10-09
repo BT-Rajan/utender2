@@ -1256,6 +1256,7 @@ export interface Dictionary {
     publishForAll: string;
     materialHint: string;
     sharedNote: string;
+    privateQuestion: string;
     answerSharedNote: string;
     becauseOf: string;
     notBecauseOf: string;
@@ -3080,6 +3081,7 @@ export const en: Dictionary = {
     publishForAll: "Publish this question and answer to every provider (the asker stays anonymous)",
     materialHint: "If the answer changes the scope, quantities, documents, timing or who can respond, change the requirement itself too (Change the published requirement) and choose this question there.",
     sharedNote: "Every answer is published to all providers. Your name is never shown.",
+    privateQuestion: "Asked privately before answers were shared with everyone: only the answer is shown.",
     answerSharedNote: "Your answer is published to every provider, so all of them price on the same information. The asker stays anonymous.",
     becauseOf: "Because of a question (optional)",
     notBecauseOf: "Not because of a question",
@@ -4912,6 +4914,7 @@ export const ar: Dictionary = {
     publishForAll: "انشر هذا السؤال وإجابته لجميع مقدّمي الخدمة (يبقى السائل مجهولًا)",
     materialHint: "إن غيّرت الإجابة نطاق العمل أو الكميات أو المستندات أو التوقيت أو من يمكنه الرد، فعدّل الطلب نفسه أيضًا (تعديل الطلب المنشور) واختر هذا السؤال هناك.",
     sharedNote: "تُنشر كل إجابة لجميع مقدمي الخدمة. لا يظهر اسمك أبدًا.",
+    privateQuestion: "طُرح بشكل خاص قبل أن تُنشر الإجابات للجميع: تظهر الإجابة فقط.",
     answerSharedNote: "تُنشر إجابتك لجميع مقدمي الخدمة ليسعّروا على المعلومات نفسها. يبقى السائل مجهولًا.",
     becauseOf: "بسبب سؤال (اختياري)",
     notBecauseOf: "ليس بسبب سؤال",

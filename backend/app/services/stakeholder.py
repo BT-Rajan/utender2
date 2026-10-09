@@ -413,7 +413,12 @@ def hand_over(user: User, db: Session, member_id: str) -> None:
     representative does -- and stays on as a member. The organization's
     records, verification and history are unchanged: they belong to the
     organization, not to whoever set it up."""
-    membership = _require_representative(user, db)
+    _require_representative(user, db)
+    # Security: under the representative's own row lock, so two hand-overs at
+    # once can't leave the organization with two representatives.
+    membership = db.query(OrganizationMembership).filter(OrganizationMembership.user_id == user.id).populate_existing().with_for_update().first()
+    if membership is None or membership.role != MembershipRole.admin:
+        raise HTTPException(status_code=403, detail="Only the organization's authorized representative can manage its members.")
     if member_id == user.id:
         raise HTTPException(status_code=400, detail="You are already the organization's representative.")
     target = (

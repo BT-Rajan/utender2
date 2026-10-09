@@ -296,6 +296,12 @@ def get_project(project_id: str, user: User = Depends(get_current_user), db: Ses
     elif user.role == UserRole.service_provider:
         if is_sealed_and_open(project):
             detail.offer_count = None  # a sealed tender doesn't tell competitors how many offers are in
+        # Batch A/security: how the transaction stands is the parties' business --
+        # a provider that didn't win sees the requirement as awarded, nothing more.
+        if detail.transaction_status is not None and not db.query(Offer.id).filter(
+            Offer.project_id == project.id, mine(db, user, Offer, Offer.service_provider_id), Offer.status == OfferStatus.approved
+        ).first():
+            detail.transaction_status = None
         # Stage 4.4: whether this provider may respond, and if not why -- the
         # same check the offer endpoints enforce. (Only ever their own.)
         profile = acting_profile(db, user)

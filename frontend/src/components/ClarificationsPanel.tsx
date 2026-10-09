@@ -105,7 +105,7 @@ export function ClarificationsPanel({
                 {!c.shared_with_all && <span className="font-mono text-[9px] uppercase text-amber-dark">{t("clarifications.privateTag")}</span>}
                 <span className="font-mono text-[10px] text-steel-light">{formatDeadline(c.created_at)}</span>
               </div>
-              <p dir="auto" className="text-[13px] text-navy whitespace-pre-wrap break-words">{c.question}</p>
+              <p dir="auto" className="text-[13px] text-navy whitespace-pre-wrap break-words">{c.question || <span className="italic text-steel">{t("clarifications.privateQuestion")}</span>}</p>
               <AttachmentLinks files={c.attachments?.filter((a) => a.part === "question")} />
               {c.answer ? (
                 <div className="mt-1.5 ps-3 border-s-2 border-blue">
