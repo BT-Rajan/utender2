@@ -130,8 +130,13 @@ def test_pass13_award_workflow():
     # no-award and cancel are audited too
     r3 = owner_client.post("/projects", data={"title": "Third job", "address": "3 Pine Rd", "bid_deadline": future, "status": "open"})
     project3_id = r3.json()["id"]
-    owner_client.post(f"/owner/projects/{project3_id}/close")
-    owner_client.post(f"/owner/projects/{project3_id}/no-award")
+    # Batch B: closing with no live offer now expires the requirement (no-award is then refused),
+    # so a provider submits first and the close leaves it waiting on the owner's decision.
+    c2.post(f"/projects/{project3_id}/offers", json={"amount": "900.00"})
+    r = owner_client.post(f"/owner/projects/{project3_id}/close")
+    check("close with a live offer leaves it closed (Batch B)", r.status_code == 200 and r.json()["status"] == "closed")
+    r = owner_client.post(f"/owner/projects/{project3_id}/no-award")
+    check("no-award from closed succeeds (Batch B)", r.status_code == 200 and r.json()["status"] == "no_award")
     no_award_audit = db.query(AuditLog).filter_by(action="project.no_award", target_id=project3_id).first()
     check("no-award action is audited", no_award_audit is not None)
 

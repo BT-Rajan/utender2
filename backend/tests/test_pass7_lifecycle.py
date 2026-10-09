@@ -142,7 +142,11 @@ def test_pass7_lifecycle():
         "/projects", data={"title": "Fence repair", "address": "456 Oak Ave", "bid_deadline": future, "status": "open"}
     )
     project2_id = r.json()["id"]
-    owner_client.post(f"/owner/projects/{project2_id}/close")
+    # Batch B: closing with no live offer now expires the requirement (and no-award is then refused),
+    # so a provider bids first and the early close leaves it closed, awaiting the owner's decision.
+    service_provider_client.post(f"/projects/{project2_id}/offers", json={"amount": "700.00"})
+    r = owner_client.post(f"/owner/projects/{project2_id}/close")
+    check("early close with a live offer leaves it closed (Batch B)", r.status_code == 200 and r.json()["status"] == "closed")
 
     r = owner_client.post(f"/owner/projects/{project2_id}/no-award")
     check("no-award from closed succeeds", r.status_code == 200 and r.json()["status"] == "no_award")

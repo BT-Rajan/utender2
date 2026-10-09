@@ -105,7 +105,8 @@ def test_the_stage3_journey(db):
     assert owner.post(f"/owner/projects/{pid}/start-evaluation").status_code == 200
     assert db.query(AuditLog).filter(AuditLog.action == "project.start_evaluation").count() == 1
     assert owner.post(f"/owner/projects/{pid}/no-award").json()["status"] == "no_award"
-    assert sorted(o.status.value for o in db.query(Offer).filter_by(project_id=pid)) == ["submitted", "submitted"]
+    # Batch B: no-award sets both live submitted offers to "closed" (kept, not erased, not approved).
+    assert sorted(o.status.value for o in db.query(Offer).filter_by(project_id=pid)) == ["closed", "closed"]
 
     # 17. Nothing reopens it.
     for action in OWNER_ACTIONS:

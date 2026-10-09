@@ -70,6 +70,8 @@ def test_pass9_clarifications_amendments():
 
     r = c1.post(f"/projects/{project_id}/clarifications", json={"question": "Can I email you directly?", "shared_with_all": False})
     check("service_provider 1 asks a private question", r.status_code == 201)
+    # Batch B: every new question is stored shared, whatever the request says.
+    check("a question asked as private is stored shared_with_all=True (Batch B)", r.json()["shared_with_all"] is True)
     q1_private_id = r.json()["id"]
 
     # unanswered question: visible to asker, invisible to other service providers
@@ -94,13 +96,30 @@ def test_pass9_clarifications_amendments():
     # owner answers the private one too
     owner_client.post(f"/projects/{project_id}/clarifications/{q1_private_id}/answer", json={"answer": "sure, email me"})
     r = c2.get(f"/projects/{project_id}/clarifications")
-    check("private question STILL invisible to others even after being answered", all(q["id"] != q1_private_id for q in r.json()))
+    # Batch B: answering publishes every question to all providers; the asker stays anonymous.
+    seen_private = [q for q in r.json() if q["id"] == q1_private_id]
+    check("question asked as private is visible to others once answered (Batch B)", len(seen_private) == 1 and seen_private[0]["answer"] == "sure, email me")
+    check("...with the asker kept anonymous (Batch B)", seen_private and seen_private[0]["service_provider_id"] is None and seen_private[0]["service_provider_company_name"] is None and seen_private[0]["mine"] is False)
+
+    # Batch B: a question stored privately BEFORE this rule keeps its text private once answered:
+    # others see only the answer, with question == "".
+    from app.models.clarification import Clarification as _Clarification
+
+    r = c1.post(f"/projects/{project_id}/clarifications", json={"question": "Legacy private: my margin is thin"})
+    legacy_id = r.json()["id"]
+    db.get(_Clarification, legacy_id).shared_with_all = False
+    db.commit()
+    owner_client.post(f"/projects/{project_id}/clarifications/{legacy_id}/answer", json={"answer": "noted"})
+    legacy_seen = [q for q in c2.get(f"/projects/{project_id}/clarifications").json() if q["id"] == legacy_id]
+    check("legacy private question: others see the answer but not the question text (Batch B)", len(legacy_seen) == 1 and legacy_seen[0]["question"] == "" and legacy_seen[0]["answer"] == "noted" and "margin" not in str(legacy_seen))
+    legacy_mine = [q for q in c1.get(f"/projects/{project_id}/clarifications").json() if q["id"] == legacy_id]
+    check("legacy private question: the asker still sees its own text (Batch B)", len(legacy_mine) == 1 and "margin" in legacy_mine[0]["question"])
 
     r = owner_client.get(f"/projects/{project_id}/clarifications")
-    check("owner sees all 2 questions regardless of sharing", len(r.json()) == 2)
+    check("owner sees all 3 questions regardless of sharing", len(r.json()) == 3)  # Batch B: +1 legacy-private question above
 
     r = admin_client.get(f"/projects/{project_id}/clarifications")
-    check("admin sees all questions too", len(r.json()) == 2)
+    check("admin sees all questions too", len(r.json()) == 3)  # Batch B: +1 legacy-private question above
 
     # a service provider answering someone else's question is rejected (owner-only)
     r = c2.post(f"/projects/{project_id}/clarifications/{q1_id}/answer", json={"answer": "nope"})
