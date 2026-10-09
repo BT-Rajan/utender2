@@ -3,12 +3,13 @@ open with no offers, competing offers (and the version each priced), an
 amendment, the award, the transaction it started and its history, the
 completed or ended outcome -- from the authoritative records, never a stale
 "open". Admin actions keep to the lifecycle; nobody else reaches any of it."""
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.models.project import Project
+from tests.stage7_helpers import put_in_force
 from tests.test_stage4_9_participation import _account
 from tests.test_stage5_13_revise import _submitted, _tender
 from tests.test_stage7_10_completion import _v
@@ -51,10 +52,17 @@ def test_an_admin_follows_a_requirement_through_its_life(db):
     db.commit()
     assert _detail(admin, pid)["project"]["status"] in ("closed", "under_evaluation")
     win = a.get(f"/projects/{pid}/offers/mine").json()["id"]
+    # Batch B: an offer on an earlier version can't be awarded on the owner's
+    # word alone (409); the provider confirms it still stands, then it's awarded.
+    r = owner.post(f"/owner/projects/{pid}/offers/{win}/approve", json={"acknowledge_earlier_version": True})
+    assert r.status_code == 409 and "Ask the provider to confirm it still stands" in r.json()["detail"]
+    assert a.post(f"/projects/{pid}/offers/confirm").status_code == 200
     assert owner.post(f"/owner/projects/{pid}/offers/{win}/approve", json={"acknowledge_earlier_version": True}).status_code == 200
     d = _detail(admin, pid)
     assert d["project"]["status"] == "awarded"
-    assert (d["award"]["offer_id"], d["award"]["service_provider_id"], d["award"]["offer_priced_on"]) == (win, a.get("/auth/me").json()["id"], 0)
+    # Batch B: the provider's confirmation re-bases the offer on the current
+    # version, so the award records it as priced on revision 1.
+    assert (d["award"]["offer_id"], d["award"]["service_provider_id"], d["award"]["offer_priced_on"]) == (win, a.get("/auth/me").json()["id"], 1)
     assert d["transaction"]["status"] == "preparing"
     assert {o["id"]: o["status"] for o in d["offers"]}[win] == "approved"
 
@@ -65,8 +73,7 @@ def test_an_admin_follows_a_requirement_through_its_life(db):
 
     # D. Execution: the transaction's own history is readable to the admin.
     base = f"/projects/{pid}/agreement"
-    owner.patch(base, json={"effective_date": (date.today() + timedelta(days=1)).isoformat()}, headers=_v(owner, pid))
-    assert owner.post(f"{base}/activate", headers=_v(owner, pid)).status_code == 200
+    put_in_force(owner, a, pid)  # Batch A: effective today (Kuwait), provider confirms, owner activates
     assert a.post(f"{base}/start-work", json={}, headers=_v(a, pid)).status_code == 200
     assert _detail(admin, pid)["transaction"]["status"] == "active"
     kinds = [e["kind"] for e in admin.get(base).json()["timeline"]]

@@ -112,8 +112,13 @@ def test_only_while_offers_are_open_and_only_ones_own(db):
     admin.post(f"/admin/projects/{pids['suspended']}/suspend", json={"suspended": True})
     owner.post(f"/owner/projects/{pids['paused']}/pause", json={"reason": "Permit."})
     for state, pid in pids.items():
-        assert sp.post(W.format(pid)).status_code == 400, state
-        assert db.query(Offer).filter(Offer.project_id == pid).one().status == OfferStatus.submitted, state
+        r = sp.post(W.format(pid))
+        assert r.status_code == 400, state
+        # Batch B: cancelling sets every live offer to "closed"; withdrawing a closed offer is "already been decided".
+        expected = OfferStatus.closed if state == "canceled" else OfferStatus.submitted
+        if state == "canceled":
+            assert "already been decided" in r.json()["detail"]  # Batch B
+        assert db.query(Offer).filter(Offer.project_id == pid).one().status == expected, state
     # Someone else's offer: another provider (with its ids in the request), the owner, a draft.
     pid = _tender(owner, "Open")
     mine = _submitted(sp, pid)

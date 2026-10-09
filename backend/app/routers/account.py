@@ -116,3 +116,11 @@ def remove_member(member_id: str, user: User = Depends(get_current_user), db: Se
     stakeholder_service.remove_member(user, db, member_id)
     db.commit()
     return stakeholder_service.list_members(user, db)
+
+
+@router.post("/organization/representative/{member_id}", response_model=list[MemberOut])
+def hand_over_representative(member_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Batch C: the representative hands the role to another member."""
+    stakeholder_service.hand_over(user, db, member_id)
+    db.commit()
+    return stakeholder_service.list_members(user, db)

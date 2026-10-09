@@ -75,6 +75,15 @@ class Settings(BaseSettings):
         return self.app_url.lower().startswith("https://")
 
     @model_validator(mode="after")
+    def _shared_secret_algorithms_only(self):
+        # Security: tokens are signed with the shared JWT_SECRET, so only the
+        # HMAC algorithms make sense -- never "none" or an asymmetric one a
+        # misconfiguration could turn into a forgery.
+        if self.jwt_algorithm not in ("HS256", "HS384", "HS512"):
+            raise ValueError("JWT_ALGORITHM must be HS256, HS384 or HS512.")
+        return self
+
+    @model_validator(mode="after")
     def _refuse_placeholder_secrets_in_production(self):
         if self.environment.strip().lower() != "production":
             return self

@@ -158,7 +158,9 @@ def test_removed_while_someone_opens_it_and_kept_once_in_force(db, awarded):
     kept = _attach(a, pid, "signed_agreement").json()["documents"][0]["id"]
     v = owner.get(f"/projects/{pid}/agreement").json()["version"]
     owner.patch(f"/projects/{pid}/agreement", json={"effective_date": "2026-11-01"}, headers={"If-Match": str(v)})
-    assert owner.post(f"/projects/{pid}/agreement/activate", headers={"If-Match": str(v + 1)}).status_code == 200
+    # Batch A: the provider confirms the terms before the owner can put it in force.
+    assert a.post(f"/projects/{pid}/agreement/confirm", headers={"If-Match": str(v + 1)}).status_code == 200
+    assert owner.post(f"/projects/{pid}/agreement/activate", headers={"If-Match": str(v + 2)}).status_code == 200
     assert a.delete(f"/projects/{pid}/agreement/documents/{kept}").status_code == 400  # in force: on record
     assert _attach(owner, pid, "purchase_order").status_code == 200  # still attachable while in force
 

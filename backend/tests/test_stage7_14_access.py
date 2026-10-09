@@ -7,14 +7,13 @@ the signed-out) is refused on every child endpoint, whatever ids they send;
 the winner never reaches the owner's Stage 6 evaluation records or a losing
 offer; admins read but never write; completion leaves reading intact and
 writing closed."""
-from datetime import date, timedelta
-
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.models.offer import Offer, OfferDocument
 from app.models.owner import OwnerProfile
 from app.models.service_provider import ServiceProviderProfile
+from tests.stage7_helpers import put_in_force
 from tests.test_organization_sharing import _organization
 from tests.test_stage4_9_participation import _account, _admin
 from tests.test_stage5_13_revise import _submitted, _tender
@@ -41,8 +40,7 @@ def _world(db):
     assert fahad.post(f"/owner/projects/{pid}/offers/{wid}/approve").status_code == 200
     mid = noura.post(f"/projects/{pid}/agreement/milestones", json={"title": "Panels"}, headers=_v(noura, pid)).json()["milestones"][0]["id"]
     doc = fahad.post(f"/projects/{pid}/agreement/documents", data={"kind": "signed_agreement"}, files={"file": PDF}).json()["documents"][0]["id"]
-    fahad.patch(f"/projects/{pid}/agreement", json={"effective_date": (date.today() + timedelta(days=1)).isoformat()}, headers=_v(fahad, pid))
-    fahad.post(f"/projects/{pid}/agreement/activate", headers=_v(fahad, pid))
+    put_in_force(fahad, amal, pid)  # Batch A: effective today (Kuwait), the provider confirms, the owner activates
     sami.post(f"/projects/{pid}/agreement/start-work", json={}, headers=_v(sami, pid))  # a member, not the representative
     vid = sami.post(f"/projects/{pid}/agreement/variations", json={"description": "Extra.", "value_change": "100"}, headers=_v(sami, pid)).json()["variations"][0]["id"]
     return dict(fahad=fahad, noura=noura, amal=amal, sami=sami, loser=loser, pid=pid, wid=wid, lid=lid, mid=mid, doc=doc, vid=vid,
@@ -103,7 +101,8 @@ def test_both_sides_every_member_and_admin_read_only(db):
     assert all(r.status_code == 403 for r in writes), [(r.request.url.path, r.status_code) for r in writes if r.status_code != 403]
     # A role can't be borrowed: the winner can't do the owner's part, nor the owner the provider's.
     base = f"/projects/{w['pid']}/agreement"
-    assert w["sami"].post(f"{base}/terminate", json={"reason": "x"}, headers={}).status_code == 403
+    # Batch A: either party may now terminate, so the owner-only step checked here is putting the agreement in force.
+    assert w["sami"].post(f"{base}/activate", headers={}).status_code == 403
     assert w["sami"].post(f"{base}/variations/{w['vid']}/agree", json={}, headers={}).status_code == 403  # its own side's proposal
     assert w["noura"].post(f"{base}/milestones/{w['mid']}/deliver", json={}, headers={}).status_code == 403
 

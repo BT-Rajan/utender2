@@ -21,6 +21,7 @@ from app.routers import agreements as agreements_router
 from tests.test_stage4_9_participation import _account, _admin
 from tests.test_stage5_13_revise import _d, _submitted, _tender
 from tests.test_stage3_bid_integrity import needs_mysql
+from tests.stage7_helpers import put_in_force
 
 
 def _relogin(email):
@@ -29,7 +30,7 @@ def _relogin(email):
     return c
 
 
-def _awarded(db):
+def _awarded(db, in_force=True):
     owner = _account(db, "owner", "owner@example.com", organization="Gulf Holdings W.L.L.")
     a, b = _account(db, "service_provider", "amal@example.com"), _account(db, "service_provider", "badr@example.com")
     pid = _tender(owner)
@@ -38,6 +39,8 @@ def _awarded(db):
     assert owner.post(f"/owner/projects/{pid}/close").status_code == 200
     wid = a.get(f"/projects/{pid}/offers/mine").json()["id"]
     assert owner.post(f"/owner/projects/{pid}/offers/{wid}/approve").status_code == 200
+    if in_force:  # Batch A: the work is done only under an agreement in force
+        put_in_force(owner, a, pid)
     return owner, a, b, pid, wid
 
 
@@ -46,7 +49,11 @@ def _v(client, pid):
 
 
 def test_the_winner_starts_the_work_and_both_see_the_same(db):
-    owner, a, b, pid, wid = _awarded(db)
+    owner, a, b, pid, wid = _awarded(db, in_force=False)
+    # Batch A: the work can't start while the agreement is still being prepared.
+    r = a.post(f"/projects/{pid}/agreement/start-work", json={}, headers=_v(a, pid))
+    assert r.status_code == 400 and "isn't in force yet" in r.json()["detail"]
+    put_in_force(owner, a, pid)
     award_before = db.query(AwardRecord).one().amount
     before = a.get(f"/projects/{pid}/agreement").json()
     assert (before["execution_status"], before["work_started_at"]) == ("not_started", None)
@@ -103,9 +110,10 @@ def test_nobody_else_sees_or_starts_it(db):
 
 
 def test_repeats_stale_tabs_and_endings(db):
-    owner, a, b, pid, wid = _awarded(db)
+    owner, a, b, pid, wid = _awarded(db, in_force=False)
     stale = _v(owner, pid)
     owner.patch(f"/projects/{pid}/agreement", json={"reference": "PO-1"}, headers=stale)  # another tab moved it on
+    put_in_force(owner, a, pid)  # Batch A: in force (the details can't change once it is)
     assert a.post(f"/projects/{pid}/agreement/start-work", json={}, headers=stale).status_code == 409
     fresh = _v(a, pid)
     assert a.post(f"/projects/{pid}/agreement/start-work", json={}, headers=fresh).status_code == 200

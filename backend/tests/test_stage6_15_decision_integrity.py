@@ -45,7 +45,8 @@ def _consistent(db, pid):
         assert len(awards) == 1 and statuses == ["approved", "rejected"]
         assert db.get(Offer, awards[0].offer_id).status == OfferStatus.approved
     else:
-        assert project.status in (ProjectStatus.no_award, ProjectStatus.canceled) and awards == [] and statuses == ["submitted", "submitted"]
+        # Batch B: ending without an award closes the live offers.
+        assert project.status in (ProjectStatus.no_award, ProjectStatus.canceled) and awards == [] and statuses == ["closed", "closed"]
     return project
 
 

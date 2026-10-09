@@ -8,6 +8,7 @@ terminated. Read by the requirement's owner side, the winning provider's side
 and admins (the award's own audience); everyone else gets a 404, whatever id
 they send. Completion, payments and variations are later stages."""
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import RedirectResponse
@@ -26,7 +27,7 @@ from app.models.project import Project, ProjectItem
 from app.models.service_provider import ServiceProviderProfile
 from app.models.user import User
 from app.routers.owner import _best_effort
-from app.schemas.agreement import AgreementDocumentOut, AgreementOut, AgreementTerminate, AgreementUpdate, ExecutionProgress, ExecutionUpdateOut, MilestoneOut, TimelineEntry, VariationOut, WorkStart
+from app.schemas.agreement import AgreementDocumentOut, AgreementOut, CommercialTerms, PaymentStageTerm, AgreementTerminate, AgreementUpdate, ExecutionProgress, ExecutionUpdateOut, MilestoneOut, TimelineEntry, VariationOut, WorkStart
 from app.services.audit import log_action
 from app.services.notify import notify_team
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name, sanitize_path_segment
@@ -74,7 +75,10 @@ def _load(db: Session, project_id: str, user: User, *, lock: bool = False):
         if side == "admin":
             raise HTTPException(status_code=403, detail="Only the parties to the agreement can change it.")
         profile = acting_profile(db, user)
-        if not profile or profile.verification_status.value != "approved" or profile.is_suspended:
+        # Batch A: a live transaction continues while the account's documents
+        # are being re-reviewed (changes requested, pending review) -- only a
+        # suspended or rejected account stops acting on it.
+        if not profile or profile.verification_status.value == "rejected" or profile.is_suspended:
             raise HTTPException(status_code=403, detail="not_approved")
         if project.is_suspended:
             raise HTTPException(status_code=400, detail="This requirement is suspended.")
@@ -85,6 +89,42 @@ def _load(db: Session, project_id: str, user: User, *, lock: bool = False):
         if agreement.status == "completed":
             raise HTTPException(status_code=409, detail="This transaction is completed and closed; nothing more can be changed. This page now shows the latest.")
     return project, agreement, award, winner, side
+
+
+def kuwait_today():
+    """The calendar date in Kuwait (UTC+3, no daylight saving) -- the date the
+    parties' agreement dates are written in."""
+    return (datetime.utcnow() + timedelta(hours=3)).date()
+
+
+def require_in_force(agreement: Agreement) -> None:
+    """Batch A: the work is done under an agreement in force -- never one still
+    being prepared (its terms not yet confirmed by both sides) or terminated."""
+    if agreement.status == "terminated":
+        raise HTTPException(status_code=400, detail="This agreement has been terminated. This page now shows the latest.")
+    if agreement.status != "active":
+        raise HTTPException(
+            status_code=400,
+            detail="The agreement isn't in force yet. The provider confirms its terms and the owner puts it in force first.",
+        )
+
+
+def _clear_confirmation(agreement: Agreement) -> None:
+    """Batch A: the provider confirmed the terms as they were; any change by the
+    owner side means they must confirm again before the agreement can take force."""
+    agreement.provider_confirmed_at = agreement.provider_confirmed_by = None
+
+
+def _tell_other(db: Session, project: Project, winner: Offer, side: str, kind: NotificationType, **params) -> None:
+    def send():
+        if side == "owner":
+            notify_team(db, db.get(User, winner.service_provider_id), kind, link=f"/service-provider/projects/{project.id}/offer",
+                        organization_id=winner.organization_id, project_title=project.title, **params)
+        else:
+            notify_team(db, db.get(User, project.owner_id), kind, link=f"/owner/projects/{project.id}",
+                        organization_id=project.organization_id, project_title=project.title, **params)
+
+    _best_effort(db, send, f"agreement notifications for {project.id}")
 
 
 def _require_owner(side: str) -> None:
@@ -139,6 +179,9 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
         activated_at=agreement.activated_at,
         terminated_at=agreement.terminated_at,
         termination_reason=agreement.termination_reason,
+        terminated_party=agreement.terminated_party,
+        provider_confirmed_at=agreement.provider_confirmed_at,
+        commercial_terms=_commercial_terms(project, agreement, current_amount),
         version=agreement.version,
         created_at=agreement.created_at,
         updated_at=agreement.updated_at,
@@ -195,6 +238,44 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
             )
             for d in docs
         ],
+    )
+
+
+def _add_months(day, months: int):
+    """The same day `months` later, clamped to the month's last day."""
+    import calendar
+
+    month = day.month - 1 + months
+    year, month = day.year + month // 12, month % 12 + 1
+    return day.replace(year=year, month=month, day=min(day.day, calendar.monthrange(year, month)[1]))
+
+
+def _commercial_terms(project: Project, agreement: Agreement, current_amount) -> CommercialTerms | None:
+    """Batch A: the requirement's commercial conditions (fixed at publication)
+    as they apply to this agreement -- each payment stage's share and the
+    retention worked out on the current agreed value, and, once the work is
+    accepted as complete, when the warranty period ends and the retention is
+    due for release. U-Tender doesn't take or track the payments themselves."""
+    c = project.commercial_conditions or {}
+    if not any(c.get(k) for k in ("offer_validity_days", "payment_stages", "retention_percent", "retention_months", "warranty_months")):
+        return None
+    cents = Decimal("0.001")
+    stages = [
+        PaymentStageTerm(milestone=st["milestone"], percent=Decimal(str(st["percent"])),
+                         amount=(current_amount * Decimal(str(st["percent"])) / 100).quantize(cents))
+        for st in c.get("payment_stages") or []
+    ]
+    retention = Decimal(str(c["retention_percent"])) if c.get("retention_percent") is not None else None
+    done = (agreement.completed_at + timedelta(hours=3)).date() if agreement.completed_at else None
+    return CommercialTerms(
+        offer_validity_days=c.get("offer_validity_days"),
+        payment_stages=stages,
+        retention_percent=retention,
+        retention_amount=(current_amount * retention / 100).quantize(cents) if retention is not None else None,
+        retention_months=c.get("retention_months"),
+        warranty_months=c.get("warranty_months"),
+        warranty_until=_add_months(done, c["warranty_months"]) if done and c.get("warranty_months") else None,
+        retention_release_on=_add_months(done, c["retention_months"]) if done and retention is not None and c.get("retention_months") else None,
     )
 
 
@@ -329,11 +410,51 @@ def update_agreement(
         raise HTTPException(status_code=400, detail="This agreement is no longer being prepared, so its details can't be changed. This page now shows the latest.")
     _check_version(agreement, if_match)
     before = f"reference:{agreement.reference} effective:{agreement.effective_date}"
-    agreement.reference = (payload.reference or "").strip() or None
-    agreement.effective_date = payload.effective_date
+    fields = payload.model_fields_set
+    reference = (payload.reference or "").strip() or None if "reference" in fields else agreement.reference
+    effective = payload.effective_date if "effective_date" in fields else agreement.effective_date
+    award_day = (award.created_at + timedelta(hours=3)).date()
+    if effective is not None and effective < award_day:
+        raise HTTPException(status_code=400, detail="The agreement can't take effect before the award.")
+    if (reference, effective) != (agreement.reference, agreement.effective_date):
+        _clear_confirmation(agreement)
+    agreement.reference, agreement.effective_date = reference, effective
     _touch(agreement, user)
     log_action(db, actor_id=user.id, action="agreement.update", target_type="agreement", target_id=agreement.id,
                previous_value=before, new_value=f"reference:{agreement.reference} effective:{agreement.effective_date}")
+    return _out(db, project, agreement, award, winner, side)
+
+
+@router.post("/confirm", response_model=AgreementOut)
+def confirm_terms(
+    project_id: str, if_match: str | None = Header(None, alias="If-Match"),
+    user: User = Depends(get_current_user), db: Session = Depends(get_db),
+):
+    """Batch A: the winning provider's side confirms the agreement's terms as
+    they now stand -- effective date, reference and deliverables. The owner
+    side can put the agreement in force only while this confirmation stands."""
+    project, agreement, award, winner, side = _load(db, project_id, user, lock=True)
+    if side != "provider":
+        raise HTTPException(status_code=403, detail="Only the service provider confirms the agreement's terms.")
+    if agreement.status != "preparing":
+        raise HTTPException(status_code=400, detail="This agreement is no longer being prepared. This page now shows the latest.")
+    # Security: a confirmation binds the provider to terms, so it must name the
+    # version it was read at -- never confirm whatever the terms are by now.
+    if not if_match:
+        raise HTTPException(status_code=428, detail="Reload the agreement and confirm the terms as shown.")
+    _check_version(agreement, if_match)
+    if agreement.effective_date is None:
+        raise HTTPException(status_code=400, detail="The owner hasn't set the date the agreement takes effect yet.")
+    if agreement.provider_confirmed_at is not None:
+        raise HTTPException(status_code=409, detail="The terms were already confirmed (by a colleague or from another tab). This page now shows the latest.")
+    now = datetime.utcnow().replace(microsecond=0)
+    agreement.provider_confirmed_at, agreement.provider_confirmed_by = now, user.id
+    _record(db, agreement, "terms_confirmed", side, user, None, now)
+    _touch(agreement, user)
+    log_action(db, actor_id=user.id, action="agreement.confirm_terms", target_type="agreement", target_id=agreement.id,
+               new_value=f"effective:{agreement.effective_date} reference:{agreement.reference}")
+    _tell_other(db, project, winner, side, NotificationType.agreement_terms_confirmed)
+    db.refresh(agreement)
     return _out(db, project, agreement, award, winner, side)
 
 
@@ -350,11 +471,15 @@ def activate_agreement(
     _check_version(agreement, if_match)
     if agreement.effective_date is None:
         raise HTTPException(status_code=400, detail="Enter the date the agreement takes effect first.")
+    if agreement.provider_confirmed_at is None:
+        raise HTTPException(status_code=400, detail="The service provider hasn't confirmed the agreement's terms as they now stand. Ask them to confirm first.")
     agreement.status, agreement.activated_at = "active", datetime.utcnow().replace(microsecond=0)
     _record(db, agreement, "in_force", side, user, None, agreement.activated_at)
     _touch(agreement, user)
     log_action(db, actor_id=user.id, action="agreement.activate", target_type="agreement", target_id=agreement.id,
                previous_value="preparing", new_value="active")
+    _tell_other(db, project, winner, side, NotificationType.agreement_in_force, effective_date=agreement.effective_date.isoformat())
+    db.refresh(agreement)
     return _out(db, project, agreement, award, winner, side)
 
 
@@ -363,20 +488,28 @@ def terminate_agreement(
     project_id: str, payload: AgreementTerminate, if_match: str | None = Header(None, alias="If-Match"),
     user: User = Depends(get_current_user), db: Session = Depends(get_db),
 ):
-    """The agreement ended before the work was completed. The award stays on
-    record exactly as it was made: the requirement remains awarded."""
+    """The agreement ended before the work was completed. Either party may
+    terminate it, with a reason (Batch A). The award stays on record exactly
+    as it was made: the requirement remains awarded."""
     project, agreement, award, winner, side = _load(db, project_id, user, lock=True)
-    _require_owner(side)
+    if side not in ("owner", "provider"):
+        raise HTTPException(status_code=403, detail="Only the parties to the agreement can terminate it.")
     if agreement.status == "terminated":
         raise HTTPException(status_code=400, detail="This agreement was already terminated. This page now shows the latest.")
     if agreement.completion_status == "accepted":  # Stage 7.10
         raise HTTPException(status_code=409, detail="The work was already accepted as complete, so the agreement can't be terminated. This page now shows the latest.")
+    if agreement.completion_status == "submitted":  # Batch A: submitted work is answered, not walked away from
+        raise HTTPException(
+            status_code=409,
+            detail="The work was submitted as complete and is awaiting the owner's review. The owner accepts it or returns it for correction before either party can terminate.",
+        )
     _check_version(agreement, if_match)
     reason = payload.reason.strip()
     if not reason:
         raise HTTPException(status_code=400, detail="Give the reason the agreement was terminated.")
     previous = agreement.status
     agreement.status, agreement.terminated_at, agreement.termination_reason = "terminated", datetime.utcnow().replace(microsecond=0), reason
+    agreement.terminated_party = side
     # Stage 7.8: an open proposal can no longer be agreed; it lapses (never silently agreed).
     for v in db.query(Variation).filter(Variation.agreement_id == agreement.id, Variation.status == "proposed"):
         v.status, v.version = "lapsed", v.version + 1
@@ -385,6 +518,9 @@ def terminate_agreement(
     _touch(agreement, user)
     log_action(db, actor_id=user.id, action="agreement.terminate", target_type="agreement", target_id=agreement.id,
                previous_value=previous, new_value="terminated", reason=reason)
+    _tell_other(db, project, winner, side, NotificationType.agreement_terminated, reason=reason,
+                party="owner" if side == "owner" else "service provider", party_ar="المالك" if side == "owner" else "مقدم الخدمة")
+    db.refresh(agreement)
     return _out(db, project, agreement, award, winner, side)
 
 
@@ -396,8 +532,9 @@ def start_work(
     """Stage 7.5: either party records that the awarded work has started --
     once, at the server's time. The other party is told."""
     project, agreement, award, winner, side = _load(db, project_id, user, lock=True)
-    if agreement.status == "terminated":
-        raise HTTPException(status_code=400, detail="This agreement has been terminated. This page now shows the latest.")
+    require_in_force(agreement)
+    if agreement.effective_date and kuwait_today() < agreement.effective_date:
+        raise HTTPException(status_code=400, detail=f"The agreement takes effect on {agreement.effective_date.isoformat()}. The work can be recorded as started from that date.")
     if agreement.work_started_at is not None:
         raise HTTPException(status_code=400, detail="The start of the work was already recorded (by the other party, a colleague or another tab). This page now shows the latest.")
     _check_version(agreement, if_match)
@@ -435,8 +572,7 @@ def record_progress(
     or resumes it. The award, the winning offer and the requirement never
     change. Putting on hold and resuming tell the other party."""
     project, agreement, award, winner, side = _load(db, project_id, user, lock=True)
-    if agreement.status == "terminated":
-        raise HTTPException(status_code=400, detail="This agreement has been terminated. This page now shows the latest.")
+    require_in_force(agreement)
     if agreement.work_started_at is None:
         raise HTTPException(status_code=400, detail="The work hasn't started yet. Record its start first.")
     if agreement.completion_status == "accepted":  # Stage 7.10

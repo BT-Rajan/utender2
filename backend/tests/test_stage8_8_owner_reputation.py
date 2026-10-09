@@ -26,7 +26,7 @@ def test_owner_reputation_follows_completed_work_and_provider_reviews_only(db):
     mine = lambda: owner.get("/owner/reputation").json()  # noqa: E731
 
     # 1. Zero history.
-    assert mine() == {"completed_transactions": 0, "review_count": 0, "avg_rating": None, "recent_reviews": []}
+    assert mine() == {"completed_transactions": 0, "terminated_transactions": 0, "review_count": 0, "avg_rating": None, "recent_reviews": []}
 
     # 2-4. Completed with X; X reviews 4/5. Awarded alone doesn't count; the owner's own review of X doesn't either.
     p1 = _tender(owner, title="Tower maintenance")
@@ -43,6 +43,9 @@ def test_owner_reputation_follows_completed_work_and_provider_reviews_only(db):
     _award(noura, y, p2)
     complete_transaction(noura, y, p2)
     assert y.post("/service-provider/reviews", json={"project_id": p2, "rating": 5, "comment": "Paid promptly."}).status_code == 200
+    # Batch C: Y's review is sealed until the owner side reviews back (or 14 days pass).
+    assert (mine()["review_count"], mine()["avg_rating"]) == (1, 4.0)
+    assert noura.post("/owner/reviews", json={"project_id": p2, "rating": 5}).status_code == 200  # Batch C: reveals both
     r = mine()
     assert (r["completed_transactions"], r["review_count"], r["avg_rating"]) == (2, 2, 4.5)
     assert sorted(x["rating"] for x in r["recent_reviews"]) == [4, 5]
@@ -65,7 +68,7 @@ def test_owner_reputation_follows_completed_work_and_provider_reviews_only(db):
     # 11. Provider B, weighing a new requirement: counts and average only -- no review text, no owner identity.
     p5 = _tender(owner, title="New tender")
     seen = b.get(f"/projects/{p5}/owner-reputation")
-    assert seen.json() == {"completed_transactions": 2, "review_count": 2, "avg_rating": 4.5, "recent_reviews": []}
+    assert seen.json() == {"completed_transactions": 2, "terminated_transactions": 0, "review_count": 2, "avg_rating": 4.5, "recent_reviews": []}
     for private in ("Gulf Holdings", "Fair, clear scope.", "Tower maintenance", p1):
         assert private not in seen.text
     # The owner side on its own requirement, and admin, see the reviews too.

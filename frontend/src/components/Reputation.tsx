@@ -6,6 +6,7 @@ import { fullDate } from "@/lib/format";
 
 interface Reputation {
   completed_transactions: number;
+  terminated_transactions?: number; // Batch A: agreements ended before completion
   review_count: number;
   avg_rating: number | null;
   completed_with_you?: number | null;
@@ -24,7 +25,12 @@ export function Reputation({ url, of, own = false }: { url: string; of: "provide
     <section className="border border-border rounded px-4 py-3 bg-white text-ink" data-testid={`${of}-reputation`}>
       <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-2">{own ? t("reputation.heading") : k("heading")}</h3>
       {data.completed_transactions === 0 ? (
-        <p className="text-sm text-steel">{t("reputation.none")}</p>
+        <>
+          <p className="text-sm text-steel">{t("reputation.none")}</p>
+          {!!data.terminated_transactions && (
+            <p className="text-sm text-red mt-1" data-testid="terminated-transactions">{t("reputation.terminated").replace("{n}", String(data.terminated_transactions))}</p>
+          )}
+        </>
       ) : (
         <>
           <p className="text-sm">
@@ -34,6 +40,9 @@ export function Reputation({ url, of, own = false }: { url: string; of: "provide
               ? k("noReviews")
               : t("reputation.summary").replace("{avg}", data.avg_rating.toFixed(1)).replace("{n}", String(data.review_count))}
           </p>
+          {!!data.terminated_transactions && (
+            <p className="text-sm text-red mt-1" data-testid="terminated-transactions">{t("reputation.terminated").replace("{n}", String(data.terminated_transactions))}</p>
+          )}
           {data.recent_reviews.length > 0 && (
             <ul className="mt-2 grid gap-2">
               {data.recent_reviews.map((r, i) => (

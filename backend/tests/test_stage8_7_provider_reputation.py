@@ -30,7 +30,7 @@ def test_reputation_follows_completed_work_and_owner_reviews_only(db):
     mine = lambda: amal.get("/service-provider/reputation").json()  # noqa: E731
 
     # 1. Zero history: "none yet", not a 0 rating.
-    assert mine() == {"company_name": "Amal Contracting", "completed_transactions": 0, "review_count": 0, "avg_rating": None, "recent_reviews": [], "completed_with_you": None}
+    assert mine() == {"company_name": "Amal Contracting", "completed_transactions": 0, "terminated_transactions": 0, "review_count": 0, "avg_rating": None, "recent_reviews": [], "completed_with_you": None}
 
     # 2-4. First transaction: awarded is not completed; completed counts; a 4/5 owner review.
     p1 = _tender(owner, title="Tower maintenance")
@@ -46,10 +46,15 @@ def test_reputation_follows_completed_work_and_owner_reviews_only(db):
     assert (r["completed_transactions"], r["review_count"], r["avg_rating"]) == (1, 1, 4.0)
 
     # 5-7. Second transaction, 5/5: the simple average of two.
-    p2 = _tender(owner, title="Warehouse roof")
-    _award(owner, amal, p2)
-    complete_transaction(owner, amal, p2)
-    assert owner.post("/owner/reviews", json={"project_id": p2, "rating": 5, "comment": "Excellent."}).status_code == 200
+    # Batch C: only the latest review per owner counts, so the second review comes from a
+    # second owner; and it is sealed until the provider reviews back (or 14 days pass).
+    owner2 = _account(db, "owner", "second-owner@example.com", organization="Second Owner Co")
+    p2 = _tender(owner2, title="Warehouse roof")
+    _award(owner2, amal, p2)
+    complete_transaction(owner2, amal, p2)
+    assert owner2.post("/owner/reviews", json={"project_id": p2, "rating": 5, "comment": "Excellent."}).status_code == 200
+    assert (mine()["review_count"], mine()["avg_rating"]) == (1, 4.0)  # Batch C: sealed, not counted yet
+    assert amal.post("/service-provider/reviews", json={"project_id": p2, "rating": 5}).status_code == 200  # Batch C: reveals both
     r = mine()
     assert (r["completed_transactions"], r["review_count"], r["avg_rating"]) == (2, 2, 4.5)
     assert [(x["rating"], x["comment"]) for x in r["recent_reviews"]] in ([(5, "Excellent."), (4, "Solid work.")], [(4, "Solid work."), (5, "Excellent.")])

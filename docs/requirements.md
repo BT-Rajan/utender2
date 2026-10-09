@@ -1624,4 +1624,74 @@ be added as its prompts (5.1, 5.2, …) are delivered.
     - Sign-up records the interface language; the frontend sends it.
   - **Tests:** `tests/test_stage9_14_stress_fixes.py`.
 
+- **Batch A — contract and execution logic (post-9.15 business-logic review):** an end-to-end review found the post-award transaction could run in an order no real contract would; each fault is now refused or corrected.
+  - **Agreement first:**
+    - start, progress, deliverables and completion require the agreement to be in force;
+    - work can't be recorded as started before the effective date;
+    - the effective date can't precede the award;
+    - the agreement PATCH is now a partial update.
+  - **Both sides agree:**
+    - the provider confirms the terms (`POST /agreement/confirm`, history event `terms_confirmed`);
+    - the owner can put the agreement in force only while that confirmation stands;
+    - any owner change to reference, date or deliverables clears it.
+  - **Deliverables are what was agreed:** only pending deliverables can be edited; completion acceptance re-checks that every deliverable is accepted and no change is pending.
+  - **Termination:**
+    - either party may terminate, with a reason (`terminated_party`);
+    - not while submitted work awaits the owner's answer;
+    - the other party is told;
+    - terminations count on both sides' track records (`terminated_transactions`).
+  - **Notifications:** `agreement_terms_confirmed`, `agreement_in_force` and `agreement_terminated` (migration 0065).
+  - **Award and access:**
+    - no award to a suspended, unverified or closed provider account;
+    - a provider that took part keeps access to a closed or awarded requirement on verification alone (a lapsed subscription no longer locks a winner out of its own job);
+    - a live transaction continues while an account's documents are re-reviewed; only suspension or rejection stops it.
+  - **Commercial terms:** the requirement's payment stages, retention and warranty are carried into the agreement (`commercial_terms`). Stage amounts and retention are worked out on the current agreed value; the warranty end and retention release dates appear once the work is accepted. Payments stay outside U-Tender.
+  - **Outcome shown:** requirement and my-bids responses carry `transaction_status`, so a finished job reads "Completed" (or "agreement in force / terminated"), not "Awarded".
+  - **Schedule:** a change's completion date can't be in the past or before the effective date or the work start; a deliverable can't be rescheduled past the completion date.
+  - **Tests:** `tests/test_batch_a_contract_logic.py`. Earlier stage tests that asserted the old order were updated to the corrected rules.
+
+- **Batch B — tender, offers and award (post-9.15 business-logic review):** the tender now treats every provider alike, and its outcome is plain.
+  - **Q&A:**
+    - every answer is published to all providers (the asker stays anonymous), including one asked "privately";
+    - an offer made before a published answer is flagged to its provider and the owner (`answers_since`);
+    - a material change reopens questions for at least two days when the question cut-off has passed.
+  - **Offer validity:**
+    - an offer holds its price for the requirement's validity period, from the close (`valid_until`, `validity_lapsed`);
+    - past it, the owner can't award it until the provider confirms it still stands (`POST /offers/confirm`, now also after the close);
+    - the provider may instead withdraw a lapsed offer;
+    - the owner can ask for confirmation (`POST /owner/projects/{id}/offers/{offer}/request-confirmation`, notification `offer_confirmation_requested`).
+  - **Earlier versions:** an offer made against an earlier version of the requirement is awarded only once its provider confirms it; the owner's own acknowledgement no longer suffices.
+  - **Outcomes:**
+    - a requirement cancelled or ended without award closes its live offers (offer status `closed`);
+    - closing early with no live offer expires it;
+    - starting evaluation tells the bidders (`evaluation_started`);
+    - offer counts leave withdrawn offers out.
+  - **Fair timing:**
+    - the deadline can't move earlier once published;
+    - offers can't be closed early while a provider is still preparing one, and providers who were told about the requirement hear it closed.
+  - **Offers:**
+    - two withdrawals are final (`withdrawal_count`, `withdrawals_left`);
+    - every item is priced above zero;
+    - the owner's offer table shows the committed duration or completion date.
+  - Migration 0066.
+  - **Tests:** `tests/test_batch_b_tender_fairness.py`.
+
+- **Batch C — trust, notifications and accounts (post-9.15 business-logic review):**
+  - **Notices:** an unread notice is merged only with an identical one. A notice that says something different is its own notice: "deliverable A returned for correction" is never replaced by "deliverable B accepted". Deliverable notices name the deliverable.
+  - **Double-blind reviews:**
+    - a review is sealed from the other side (`revealed`, `reveals_on`) until both sides have reviewed, or 14 days after it was written;
+    - sealed reviews don't count in ratings;
+    - the hourly cron reveals due reviews and recounts ratings (`reviews.revealed_at`).
+  - **Ratings can't be farmed:** only the latest review from each counterparty counts in a provider's or owner's rating and review count. (Batch A already means a transaction can't be completed without an agreement in force and the provider's confirmation.)
+  - **Organisations:**
+    - document and verification decisions and payment overrides reach every member, not only the account that set the organisation up;
+    - the representative can hand the role to another member (`POST /account/organization/representative/{member}`) and stays on as a member.
+  - **Start similar:** the old expected start and completion dates are no longer copied; only the duration carries over.
+  - **Repeat business:**
+    - on an open requirement the owner can invite a provider it completed work with (`POST /owner/projects/{id}/invitations/{provider}`, notification `requirement_invitation`);
+    - eligibility rules apply as for anyone, and the offer is weighed like the rest.
+  - **Owner dashboard:** no stray "0" when there are no requirements.
+  - Migration 0067.
+  - **Tests:** `tests/test_batch_c_trust_accounts.py`.
+
 _Later Stage 9 steps are added as they are implemented._

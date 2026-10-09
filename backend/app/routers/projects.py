@@ -10,9 +10,9 @@ from app.db import get_db
 from app.deps import get_current_user, require_approved_service_provider, require_service_provider, require_verified_owner
 from app.models.award_record import AwardRecord
 from app.models.service_provider import ServiceProviderProfile
-from app.models.enums import NotificationType, OfferStatus, PricingBasis, ProjectStatus, TenderType, UserRole
+from app.models.enums import NotificationType, OfferStatus, PricingBasis, ProjectStatus, TenderType, UserRole, VerificationStatus
 from app.models.organization import Organization
-from app.models.offer import Offer, tendered
+from app.models.offer import Offer, tendered, counted
 from app.models.owner import OwnerProfile
 from app.models.clarification import Clarification
 from app.models.participation import Participation as ParticipationRecord
@@ -51,7 +51,7 @@ from app.services.notify import notify, notify_team
 from app.services.team import acting_id, acting_profile, can_access, mine, org_of, owns
 from app.services import requirement_quality
 from app.services.storage import drawing_url_expiry_seconds, get_storage
-from app.services.tender_lifecycle import interested_providers, is_sealed_and_open, lock_project, now_for, publish, sync_expired_projects
+from app.services.tender_lifecycle import interested_providers, is_sealed_and_open, lock_project, now_for, publish, sync_expired_projects, transaction_status
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -77,7 +77,7 @@ def _can_view_project(user: User, project: Project, db: Session) -> bool:
     if project.status == ProjectStatus.draft or project.is_suspended:
         return False
     profile = acting_profile(db, user)
-    if not (profile and profile.is_verified_active):
+    if not profile:
         return False
     has_bid = (
         db.query(Offer.id).filter(Offer.project_id == project.id, mine(db, user, Offer, Offer.service_provider_id), tendered()).first() is not None
@@ -86,8 +86,14 @@ def _can_view_project(user: User, project: Project, db: Session) -> bool:
     # canceled, expired -- including a draft that expired unpublished), only
     # providers who took part can still open it, to see what happened to
     # their bid. Nobody else needs the exact address and scope any more.
+    # Batch A: that needs an account in good standing, not a live
+    # subscription -- the subscription buys access to new opportunities, and a
+    # winner whose payment lapses mid-job still needs the scope and drawings
+    # of the work it is doing.
     if project.status != ProjectStatus.open:
-        return has_bid
+        return has_bid and profile.verification_status == VerificationStatus.approved and not profile.is_suspended
+    if not profile.is_verified_active:
+        return False
     # Stage 3.9: open, and eligible for this particular requirement -- or
     # already bidding on it (so a lapsed qualification never hides a
     # provider's own bid; it only stops new or revised offers).
@@ -290,6 +296,12 @@ def get_project(project_id: str, user: User = Depends(get_current_user), db: Ses
     elif user.role == UserRole.service_provider:
         if is_sealed_and_open(project):
             detail.offer_count = None  # a sealed tender doesn't tell competitors how many offers are in
+        # Batch A/security: how the transaction stands is the parties' business --
+        # a provider that didn't win sees the requirement as awarded, nothing more.
+        if detail.transaction_status is not None and not db.query(Offer.id).filter(
+            Offer.project_id == project.id, mine(db, user, Offer, Offer.service_provider_id), Offer.status == OfferStatus.approved
+        ).first():
+            detail.transaction_status = None
         # Stage 4.4: whether this provider may respond, and if not why -- the
         # same check the offer endpoints enforce. (Only ever their own.)
         profile = acting_profile(db, user)
@@ -354,6 +366,9 @@ MATERIAL_FIELDS = {
     "expected_start_date", "expected_completion_date", "expected_duration_days", "documents",
 }
 MATERIAL_NOTICE = timedelta(days=3)
+# Batch B: after a material change, providers can ask about it -- questions
+# (when the requirement takes them) stay open at least this long.
+QUESTIONS_AFTER_CHANGE = timedelta(days=2)
 
 
 # Stage 3.17: the fields an amendment can change, whose before/after is kept
@@ -392,6 +407,12 @@ def _record_amendment(
     project.revision += 1
     if material:
         project.material_revision += 1
+        # Batch B: a question cut-off already passed (or about to) reopens, so
+        # providers can ask about what changed before they price it.
+        if project.questions_allowed and project.questions_deadline is not None:
+            reopen_until = datetime.utcnow().replace(microsecond=0) + QUESTIONS_AFTER_CHANGE
+            if project.questions_deadline < reopen_until:
+                project.questions_deadline = min(reopen_until, project.bid_deadline - timedelta(hours=1))
     amendment = ProjectAmendment(
         project_id=project.id,
         amendment_number=amendment_number,
@@ -548,6 +569,10 @@ def amend_project(
         # bidders who priced against the original window.
         if new_deadline < project.bid_deadline and project.tender_type_locked:
             raise HTTPException(status_code=400, detail="Cannot move the deadline earlier once bids have been submitted.")
+        # Batch B: nor once published -- providers may already be preparing
+        # against the deadline they were given, without having submitted yet.
+        if new_deadline < project.bid_deadline and project.status != ProjectStatus.draft:
+            raise HTTPException(status_code=400, detail="The offer deadline can't be moved earlier once the requirement is published. Providers plan their offers on it.")
         if new_deadline <= datetime.utcnow():
             raise HTTPException(status_code=400, detail="The offer deadline must be in the future.")
         # Stage 3.10: questions close before offers do.
@@ -1201,7 +1226,7 @@ def drawing_history(project_id: str, user: User = Depends(get_current_user), db:
 
 def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
     # Stage 6.3: an admin-suspended offer is out of sight, and out of the count.
-    offer_count = db.query(Offer).filter(Offer.project_id == project.id, tendered(), Offer.is_suspended.is_(False)).count()
+    offer_count = db.query(Offer).filter(Offer.project_id == project.id, counted(), Offer.is_suspended.is_(False)).count()
     storage = get_storage()
     expiry = drawing_url_expiry_seconds(project.bid_deadline)
     # Current revisions only — superseded ones are never lost, just not
@@ -1229,6 +1254,7 @@ def _serialize_detail(project: Project, db: Session) -> ProjectDetailOut:
         for d in drawing_rows
     ]
     return ProjectDetailOut(
+        transaction_status=transaction_status(db, project),
         id=project.id,
         owner_id=project.owner_id,
         title=project.title,

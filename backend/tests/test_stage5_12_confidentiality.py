@@ -38,7 +38,21 @@ def _submit(sp, pid, amount, method, assumptions="", period="", doc=("m.pdf", b"
 
 
 def _get_routes():
-    return sorted({r.path for r in app.routes if isinstance(r, APIRoute) and "GET" in r.methods and not r.path.startswith("/files/")})
+    gets = {r.path for r in app.routes if isinstance(r, APIRoute) and "GET" in r.methods}
+    nested = {path for path, route in _flat_get_routes(app.routes)}
+    paths = sorted(p for p in gets | nested if not p.startswith("/files/"))
+    assert len(paths) > 50, "the route sweep must see the app's GET routes"
+    return paths
+
+
+def _flat_get_routes(routes, prefix=""):
+    for r in routes:
+        if isinstance(r, APIRoute):
+            if "GET" in r.methods:
+                yield prefix + r.path, r
+        elif getattr(r, "original_router", None) is not None:
+            context = getattr(r, "include_context", None)
+            yield from _flat_get_routes(r.original_router.routes, prefix + (getattr(context, "prefix", "") or ""))
 
 
 def _sweep(client, ids: dict) -> list[str]:

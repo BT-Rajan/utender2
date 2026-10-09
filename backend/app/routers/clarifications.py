@@ -110,8 +110,15 @@ def list_clarifications(project_id: str, user: User = Depends(get_current_user),
             out.append(_serialize(db, c, cp.company_name, mine=True))
         elif is_owner:
             out.append(_serialize(db, c, cp.company_name, redact=sealed, owner_side=True))
-        elif c.shared_with_all and c.answer is not None:
-            out.append(_serialize(db, c, None, redact=True))
+        elif c.answer is not None:
+            # Batch B: every answer reaches every provider. Security: a question
+            # asked privately before that rule keeps its wording private -- its
+            # asker was promised that -- only the answer is published.
+            shown = _serialize(db, c, None, redact=True)
+            if not c.shared_with_all:
+                shown.question = ""
+                shown.attachments = [a for a in shown.attachments if a.part == "answer"]
+            out.append(shown)
     return out
 
 
@@ -150,7 +157,10 @@ def ask_clarification(
         service_provider_id=asker,
         organization_id=org_of(db, user.id),
         question=question,
-        shared_with_all=payload.shared_with_all,
+        # Batch B: every answer is published to all providers (the asker stays
+        # anonymous) -- a private answer would let one bidder price against
+        # information the others never see.
+        shared_with_all=True,
     )
     db.add(clarification)
     db.commit()
@@ -197,15 +207,14 @@ def answer_clarification(
     clarification.answer = answer
     clarification.answered_at = datetime.utcnow()
     clarification.answered_by = user.id
-    # The owner may publish a privately asked question for everyone (its
-    # asker stays anonymous) -- never make a shared one private.
+    # Batch B: every answer is published for every provider (the asker stays
+    # anonymous). A question asked privately before this rule keeps its flag:
+    # its answer is published without its wording (list_clarifications).
     asked_privately = not clarification.shared_with_all
-    if payload.shared_with_all:
-        clarification.shared_with_all = True
     # log_action commits: the answer and its audit entry land together.
     log_action(
         db, actor_id=user.id, action="clarification.answer", target_type="clarification", target_id=clarification.id,
-        previous_value="private" if asked_privately else "shared", new_value="shared" if clarification.shared_with_all else "private",
+        previous_value="private" if asked_privately else "shared", new_value="answer published to all" + ("" if clarification.shared_with_all else " (question kept private)"),
     )
     db.refresh(clarification)
 
@@ -221,8 +230,7 @@ def answer_clarification(
             project_title=project.title,
         )
 
-    if clarification.shared_with_all:
-        _tell_the_field(db, project, clarification)
+    _tell_the_field(db, project, clarification)
 
     profile = db.get(ServiceProviderProfile, clarification.service_provider_id)
     return _serialize(db, clarification, profile.company_name if profile else None, redact=is_sealed_and_open(project), owner_side=True)

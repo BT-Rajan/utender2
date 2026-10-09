@@ -40,14 +40,21 @@ def test_each_side_sees_what_it_wrote_and_what_it_received_and_no_one_else_does(
     assert owner.post("/owner/reviews", json={"project_id": pid, "rating": 5, "comment": OWNER_TEXT}).status_code == 200
     assert owner.post("/owner/reviews", json={"project_id": pid, "rating": 1}).status_code == 409  # still one review
     assert colleague.get(f"/owner/projects/{pid}/review").json()["comment"] == OWNER_TEXT
+    # Batch C: double-blind -- sealed from the winning side until it has reviewed too (or 14 days pass).
+    written = colleague.get(f"/owner/projects/{pid}/review").json()
+    assert written["revealed"] is False and written["reveals_on"] is not None
     for client in (amal, sami):
-        assert _received(client, "service-provider", pid).json() == {
-            "rating": 5, "comment": OWNER_TEXT, "created_at": db.query(Review).one().created_at.isoformat() + "Z",
-            "response": None, "response_at": None}
+        assert _received(client, "service-provider", pid).json() is None
     # Provider -> owner, symmetrically.
     assert owner.get(f"/owner/projects/{pid}/review/received").json() is None
     assert sami.post("/service-provider/reviews", json={"project_id": pid, "rating": 4, "comment": PROVIDER_TEXT}).status_code == 200
     assert amal.get(f"/service-provider/projects/{pid}/review").json()["comment"] == PROVIDER_TEXT
+    # Batch C: the second review reveals both; now the whole winning side sees what it received.
+    owner_review = db.query(Review).filter(Review.direction == "owner_to_provider").one()
+    for client in (amal, sami):
+        assert _received(client, "service-provider", pid).json() == {
+            "rating": 5, "comment": OWNER_TEXT, "created_at": owner_review.created_at.isoformat() + "Z",
+            "response": None, "response_at": None}
     for client in (owner, colleague):
         got = _received(client, "owner", pid).json()
         assert set(got) == {"rating", "comment", "created_at", "response", "response_at"} and (got["rating"], got["comment"]) == (4, PROVIDER_TEXT)

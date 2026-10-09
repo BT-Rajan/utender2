@@ -125,7 +125,17 @@ def test_lifecycle_and_amendment_block_submission(db):
     closed, suspended, expired, at_deadline, canceled, amended = (_tender(owner, t) for t in ("Closed", "Suspended", "Expired", "AtDeadline", "Canceled", "Amended"))
     for pid in (closed, suspended, expired, at_deadline, canceled, amended):
         _ready(sp, pid)
-    owner.post(f"/owner/projects/{closed}/close")  # 4. closed early by the owner
+    # Batch B: closing early is refused while a provider is still preparing (sp's draft).
+    r = owner.post(f"/owner/projects/{closed}/close")
+    assert r.status_code == 409 and "still preparing" in r.json()["detail"]
+    # Batch B: the requirement still closes at its deadline with the draft in hand;
+    # a rival's submitted offer makes it "closed" (not "expired").
+    rival = _account(db, "service_provider", "rival@example.com")
+    _ready(rival, closed)
+    assert rival.post(SUBMIT.format(closed)).status_code == 200
+    db.get(Project, closed).bid_deadline = datetime.utcnow() - timedelta(minutes=1)
+    db.commit()
+    assert owner.post(f"/owner/projects/{closed}/close").json()["status"] == "closed"  # 4. closed by the owner
     admin.post(f"/admin/projects/{suspended}/suspend", json={"suspended": True})  # 5
     db.get(Project, expired).bid_deadline = datetime.utcnow() - timedelta(minutes=1)  # 6/7. deadline passed (server clock)
     # Exactly at the deadline: too late. Whole seconds, as the column stores them
@@ -144,7 +154,9 @@ def test_lifecycle_and_amendment_block_submission(db):
     sp.post(f"/projects/{amended}/participate")
     submitted = sp.post(SUBMIT.format(amended)).json()
     assert submitted["status"] == "submitted" and submitted["based_on_material_revision"] == 1
-    assert {o.project_id for o in db.query(Offer).filter(Offer.status == OfferStatus.submitted)} == {amended}
+    # Batch B: only sp's own offers -- the rival's offer on `closed` is submitted.
+    sp_id = sp.get("/auth/me").json()["id"]
+    assert {o.project_id for o in db.query(Offer).filter(Offer.status == OfferStatus.submitted, Offer.service_provider_id == sp_id)} == {amended}
     assert all(o.submitted_at is None for o in db.query(Offer).filter(Offer.status == OfferStatus.draft))
 
 
@@ -202,8 +214,11 @@ def test_submission_racing_the_owners_close_has_one_outcome(db):
         s, c = submit.result(), close.result()
     db.expire_all()
     offer, project = db.query(Offer).one(), db.get(Project, pid)
-    if s.status_code == 200:  # submitted first: in, then closed with it (closed, not expired)
-        assert offer.status == OfferStatus.submitted and c.status_code == 200
-    else:  # closed first: never accepted after closing
-        assert offer.status == OfferStatus.draft and offer.submitted_at is None
-    assert project.status.value in ("closed", "expired")
+    # Batch B: closing early is refused while the draft is still being prepared,
+    # so the close can never get in ahead of the submission; the offer always goes in.
+    assert s.status_code == 200 and offer.status == OfferStatus.submitted and offer.submitted_at is not None
+    if c.status_code == 200:  # submitted first: in, then closed with it (closed, not expired)
+        assert project.status.value == "closed"
+    else:  # Batch B: close tried first: refused, nothing closed, the offer accepted afterwards
+        assert c.status_code == 409 and "still preparing" in c.json()["detail"]
+        assert project.status.value == "open"

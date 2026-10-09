@@ -89,6 +89,7 @@ def test_every_lifecycle_state_blocks_every_change(db):
     owner = _account(db, "owner", "owner@example.com")
     sp = _account(db, "service_provider", "noor@example.com")
     admin = _admin(db)
+    rival = _account(db, "service_provider", "rival@example.com", organization="Rival Co")  # Batch B
     pids = {s: (_tender(owner, s + "-d"), _tender(owner, s + "-o")) for s in ("suspended", "paused", "canceled", "closed_early")}
     for drafting, offered in pids.values():
         _draft(sp, drafting)
@@ -101,11 +102,28 @@ def test_every_lifecycle_state_blocks_every_change(db):
                 owner.post(f"/owner/projects/{pid}/pause", json={"reason": "Permit."})
             elif state == "canceled":
                 owner.post(f"/owner/projects/{pid}/cancel", json={"reason": "not_needed"})
-            else:
+            elif pid == offered:
                 owner.post(f"/owner/projects/{pid}/close")
+            else:
+                # Batch B: closing early is refused while sp's draft is still being prepared.
+                r = owner.post(f"/owner/projects/{pid}/close")
+                assert r.status_code == 409 and "still preparing" in r.json()["detail"]
+                # Batch B: it closes at its deadline instead, draft in hand; a rival's live
+                # offer makes it "closed" rather than "expired".
+                _submitted(rival, pid)
+                db.get(Project, pid).bid_deadline = datetime.utcnow() - timedelta(minutes=1)
+                db.commit()
+                assert owner.post(f"/owner/projects/{pid}/close").json()["status"] == "closed"
         for name, method, url, kw in _draft_changes(drafting) + _offer_changes(offered):
             assert getattr(sp, method)(url, **kw).status_code == 400, (state, name)
-    assert all(o.status in (OfferStatus.draft, OfferStatus.submitted) and o.revision == 1 for o in db.query(Offer))
+    # Batch B: cancelling sets the live offer to "closed"; nothing else changed.
+    canceled_offer = pids["canceled"][1]
+    for o in db.query(Offer):
+        assert o.revision == 1
+        if o.project_id == canceled_offer:
+            assert o.status == OfferStatus.closed  # Batch B
+        else:
+            assert o.status in (OfferStatus.draft, OfferStatus.submitted)
 
 
 def test_confirming_after_an_amendment_rechecks_the_commitment(db):

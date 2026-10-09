@@ -18,7 +18,8 @@ from app.models.project import Project
 from app.routers import agreements as agreements_router
 from app.services.storage import get_storage
 from tests.test_stage4_9_participation import _account, _admin
-from tests.test_stage5_13_revise import _d, _submitted, _tender
+from tests.test_stage5_13_revise import _submitted, _tender
+from tests.stage7_helpers import put_in_force
 
 PHOTO = ("level-3-progress.jpg", b"\xff\xd8\xff photo", "image/jpeg")
 REPORT = ("inspection.pdf", b"%PDF inspection", "application/pdf")
@@ -53,6 +54,7 @@ def test_progress_and_inspection_evidence_seen_by_both_parties_only(db):
     owner, a, b, pid, wid = _awarded(db)
     mid = owner.post(f"/projects/{pid}/agreement/milestones", json={"title": "Level 3 slab"}, headers=_v(owner, pid)).json()["milestones"][0]["id"]
     owner.post(f"/projects/{pid}/agreement/documents", data={"kind": "signed_agreement"}, files={"file": ("signed.pdf", b"%PDF s", "application/pdf")})
+    put_in_force(owner, a, pid)  # Batch A: work starts only under an agreement in force
     assert _evidence(a, pid, "progress_photo").status_code == 400  # before the work starts: no execution evidence
     a.post(f"/projects/{pid}/agreement/start-work", json={}, headers=_v(a, pid))
     update_id = a.post(f"/projects/{pid}/agreement/progress", json={"action": "update", "note": "Slab poured."}, headers=_v(a, pid)).json()["execution_history"][-1]["id"]
@@ -92,6 +94,7 @@ def test_evidence_never_lands_on_another_transaction_or_two_contexts(db):
     _, _, _, pid2, _ = _awarded(db, title="Second", owner=owner, a=a, b=b)
     m2 = owner.post(f"/projects/{pid2}/agreement/milestones", json={"title": "Other job"}, headers=_v(owner, pid2)).json()["milestones"][0]["id"]
     for p in (pid, pid2):
+        put_in_force(owner, a, p)  # Batch A: work starts only under an agreement in force
         a.post(f"/projects/{p}/agreement/start-work", json={}, headers=_v(a, p))
     u2 = _a(a, pid2)["execution_history"][0]["id"]
     assert _evidence(a, pid, "progress_photo", execution_update_id=u2).status_code == 404  # the other job's update
@@ -108,6 +111,7 @@ def test_evidence_never_lands_on_another_transaction_or_two_contexts(db):
 
 def test_evidence_through_hold_termination_and_failures(db, monkeypatch):
     owner, a, b, pid, wid = _awarded(db)
+    put_in_force(owner, a, pid)  # Batch A: in force before the start (previously activated after the work had started)
     a.post(f"/projects/{pid}/agreement/start-work", json={}, headers=_v(a, pid))
     a.post(f"/projects/{pid}/agreement/progress", json={"action": "hold", "note": "Storm damage."}, headers=_v(a, pid))
     r = _evidence(a, pid, "site_report", REPORT)  # on hold: evidence of why is welcome
@@ -124,8 +128,6 @@ def test_evidence_through_hold_termination_and_failures(db, monkeypatch):
     monkeypatch.undo()
     assert db.query(AgreementDocument).count() == 1  # the failed upload left nothing
 
-    owner.patch(f"/projects/{pid}/agreement", json={"effective_date": _d(1)}, headers=_v(owner, pid))
-    owner.post(f"/projects/{pid}/agreement/activate", headers=_v(owner, pid))
     assert a.delete(f"/projects/{pid}/agreement/documents/{keep}").status_code == 400  # in force: evidence stays on record
     owner.post(f"/projects/{pid}/agreement/terminate", json={"reason": "Stopped."}, headers=_v(owner, pid))
     assert _evidence(a, pid, "progress_photo").status_code == 400  # terminated: no more evidence
@@ -137,6 +139,7 @@ def test_evidence_through_hold_termination_and_failures(db, monkeypatch):
 
 def test_file_safety_is_the_existing_one(db):
     owner, a, b, pid, wid = _awarded(db)
+    put_in_force(owner, a, pid)  # Batch A: work starts only under an agreement in force
     a.post(f"/projects/{pid}/agreement/start-work", json={}, headers=_v(a, pid))
     assert _evidence(a, pid, "progress_photo", ("payload.exe", b"MZ", "application/octet-stream")).status_code == 400
     assert _evidence(a, pid, "progress_photo", ("photo.jpg", b"", "image/jpeg")).status_code == 400

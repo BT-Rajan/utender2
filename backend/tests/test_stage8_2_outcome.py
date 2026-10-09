@@ -10,7 +10,7 @@ from app.models.award_record import AwardRecord
 from app.models.offer import Offer
 from app.models.project import Project
 from app.services.transactions import completed_transaction
-from tests.stage7_helpers import complete_transaction
+from tests.stage7_helpers import complete_transaction, put_in_force
 from tests.test_organization_sharing import _organization
 from tests.test_stage4_9_participation import _account, _admin
 from tests.test_stage5_13_revise import _submitted, _tender
@@ -33,8 +33,7 @@ def test_a_completed_transaction_answers_who_what_value_how_and_when(db):
     owner.post(f"/owner/projects/{pid}/close")
     wid = winner.get(f"/projects/{pid}/offers/mine").json()["id"]
     owner.post(f"/owner/projects/{pid}/offers/{wid}/approve")
-    owner.patch(f"/projects/{pid}/agreement", json={"effective_date": "2030-01-01"}, headers=_v(owner, pid))
-    owner.post(f"/projects/{pid}/agreement/activate", headers=_v(owner, pid))
+    put_in_force(owner, winner, pid)  # Batch A: effective today (Kuwait) + provider confirmation before activation
     winner.post(f"/projects/{pid}/agreement/start-work", json={}, headers=_v(winner, pid))
     _agree(winner, owner, pid, "300")    # two variations, agreed by the other party each time
     _agree(colleague, winner, pid, "-100")

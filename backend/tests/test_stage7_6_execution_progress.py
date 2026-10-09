@@ -20,6 +20,7 @@ from app.routers import agreements as agreements_router
 from tests.test_stage3_bid_integrity import needs_mysql
 from tests.test_stage4_9_participation import _account, _admin
 from tests.test_stage5_13_revise import _submitted, _tender
+from tests.stage7_helpers import put_in_force
 
 
 def _relogin(email):
@@ -45,6 +46,7 @@ def _started(db, start=True):
     assert owner.post(f"/owner/projects/{pid}/close").status_code == 200
     wid = a.get(f"/projects/{pid}/offers/mine").json()["id"]
     assert owner.post(f"/owner/projects/{pid}/offers/{wid}/approve").status_code == 200
+    put_in_force(owner, a, pid)  # Batch A: the work is done only under an agreement in force
     if start:
         assert a.post(f"/projects/{pid}/agreement/start-work", json={"note": "On site."}, headers=_v(a, pid)).status_code == 200
     return owner, a, b, pid, wid
@@ -95,7 +97,7 @@ def test_progress_hold_and_resume_seen_alike_by_both(db):
     award = db.query(AwardRecord).one()
     assert (award.amount, award.offer_id, award.offer_revision) == before
     assert (db.get(Project, pid).status, db.get(Offer, wid).status) == (ProjectStatus.awarded, OfferStatus.approved)
-    assert db.query(AgreementDocument).count() == 1 and db.query(Agreement).one().status == "preparing"
+    assert db.query(AgreementDocument).count() == 1 and db.query(Agreement).one().status == "active"  # Batch A: in force (put there before the start)
 
 
 def test_nobody_else_sees_or_moves_it(db):
@@ -108,7 +110,8 @@ def test_nobody_else_sees_or_moves_it(db):
     assert _admin(db).post(f"/projects/{pid}/agreement/progress", json={"action": "hold"}).status_code == 403
     other = _tender(owner, title="Never awarded")
     assert owner.post(f"/projects/{other}/agreement/progress", json={"action": "update", "note": "x"}).status_code == 404
-    assert db.query(ExecutionUpdate).count() == 1  # just the start
+    # Batch A: the confirmation and the putting in force are on the history too.
+    assert [u.kind for u in db.query(ExecutionUpdate).order_by(ExecutionUpdate.sequence)] == ["terms_confirmed", "in_force", "started"]  # just the start
 
 
 def test_invalid_transitions_are_refused(db):
@@ -168,7 +171,7 @@ def test_stale_tabs_double_clicks_and_failures(db, monkeypatch):
     monkeypatch.undo()
     db.expire_all()
     assert a.get(f"/projects/{pid}/agreement").json()["execution_status"] == "on_hold"  # nothing half-applied
-    assert [u.kind for u in db.query(ExecutionUpdate).order_by(ExecutionUpdate.sequence)] == ["started", "on_hold", "resumed", "on_hold"]
+    assert [u.kind for u in db.query(ExecutionUpdate).order_by(ExecutionUpdate.sequence)] == ["terms_confirmed", "in_force", "started", "on_hold", "resumed", "on_hold"]  # Batch A: confirmation and in-force recorded first
 
 
 @needs_mysql

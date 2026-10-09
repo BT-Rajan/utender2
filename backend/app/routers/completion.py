@@ -20,7 +20,7 @@ from app.deps import get_current_user
 from app.models.agreement import Milestone, Variation
 from app.models.enums import NotificationType
 from app.models.user import User
-from app.routers.agreements import _best_effort, _check_version, _load, _out, _record, _require_owner, _touch
+from app.routers.agreements import _best_effort, _check_version, _load, _out, _record, _require_owner, _touch, require_in_force
 from app.schemas.agreement import AgreementOut, MilestoneNote
 from app.services import audit
 from app.services import notify as notify_service
@@ -48,11 +48,6 @@ def _tell(db: Session, project, winner, to: str, state: str, state_ar: str) -> N
     _best_effort(db, send, f"completion notifications for {project.id}")
 
 
-def _not_terminated(agreement) -> None:
-    if agreement.status == "terminated":
-        raise HTTPException(status_code=400, detail=f"This agreement has been terminated. {LATEST}")
-
-
 @router.post("/submit", response_model=AgreementOut)
 def submit_completion(
     project_id: str, payload: MilestoneNote, if_match: str | None = Header(None, alias="If-Match"),
@@ -61,7 +56,7 @@ def submit_completion(
     project, agreement, award, winner, side = _load(db, project_id, user, lock=True)
     if side != "provider":
         raise HTTPException(status_code=403, detail="Only the service provider submits the work as complete.")
-    _not_terminated(agreement)
+    require_in_force(agreement)
     if agreement.completion_status == "submitted":
         raise HTTPException(status_code=409, detail=f"The work was already submitted as complete (by a colleague or from another tab) and is awaiting review. {LATEST}")
     if agreement.completion_status == "accepted":
@@ -92,7 +87,7 @@ def submit_completion(
 def _decide(db: Session, project_id: str, user: User, note: str | None, if_match: str | None, accept: bool):
     project, agreement, award, winner, side = _load(db, project_id, user, lock=True)
     _require_owner(side)
-    _not_terminated(agreement)
+    require_in_force(agreement)
     if agreement.completion_status == "accepted":
         raise HTTPException(status_code=409, detail=f"The work was already accepted as complete (by a colleague or from another tab). {LATEST}")
     if agreement.completion_status == "returned":
@@ -108,10 +103,14 @@ def _decide(db: Session, project_id: str, user: User, note: str | None, if_match
     agreement.completion_status, agreement.completion_decided_at, agreement.completion_decided_by = kind, now, user.id
     agreement.completion_decision_note = note
     if accept:
-        # Stage 7.11: acceptance is the owner's completion action. Every
-        # condition for completion was checked when the work was submitted
-        # (started, every deliverable accepted, no change awaiting an answer)
-        # and nothing could change it since; the transaction closes now.
+        # Stage 7.11: acceptance is the owner's completion action and closes the
+        # transaction. Batch A: the conditions are checked again here, not
+        # trusted from submission -- every deliverable accepted, no change
+        # awaiting an answer.
+        if db.query(Milestone.id).filter(Milestone.agreement_id == agreement.id, Milestone.status != "accepted").first():
+            raise HTTPException(status_code=409, detail=f"A deliverable is not accepted yet, so the work can't be accepted as complete. {LATEST}")
+        if db.query(Variation.id).filter(Variation.agreement_id == agreement.id, Variation.status == "proposed").first():
+            raise HTTPException(status_code=409, detail=f"A proposed change is still awaiting an answer. Settle it first. {LATEST}")
         agreement.status, agreement.completed_at = "completed", now
     _record(db, agreement, kind, side, user, note, now)
     if accept:

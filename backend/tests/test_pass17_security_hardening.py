@@ -87,11 +87,18 @@ def test_pass17_security_hardening():
     r = c2.get("/service-provider/profile")
     check("c2's review_count is untouched by the forged review attempt", r.json()["review_count"] == 0)
 
+    # Batch C: the review is sealed (not counted) until c1 reviews back; c1's review reveals both.
+    r = c1.get("/service-provider/profile")
+    check("c1's review_count doesn't count the sealed review yet", r.json()["review_count"] == 0)
+    r = c1.post("/service-provider/reviews", json={"project_id": project_id, "rating": 4})
+    check("c1 reviews the owner back", r.status_code == 200)
+
     # c1's profile DID get the legitimate review.
     r = c1.get("/service-provider/profile")
     check("c1 (the real winner) received the review", r.json()["review_count"] == 1)
 
-    review_row = db.query(Review).filter_by(project_id=project_id).first()
+    # Batch C: two rows now (one each way) -- read the owner's review.
+    review_row = db.query(Review).filter_by(project_id=project_id, direction="owner_to_provider").first()
     check("the persisted Review row's service_provider_id is the real winner, not the forged one", review_row.service_provider_id == c1_id)
 
     # A project with no award record at all cannot be reviewed regardless of payload.

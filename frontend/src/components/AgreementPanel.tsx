@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiFetch } from "@/api/client";
 import { Completion } from "@/components/Completion";
@@ -53,6 +53,62 @@ export interface TimelineEntry {
 }
 
 // Stage 7.13: what each history entry says.
+// Batch A: today's date in Kuwait (UTC+3, no daylight saving), as YYYY-MM-DD.
+function kuwaitToday(): string {
+  return new Date(Date.now() + 3 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+// Batch A: the requirement's commercial conditions as they apply to this agreement.
+function CommercialTermsBlock({ terms, currency }: { terms: CommercialTerms; currency: string }) {
+  const { t, language } = useI18n();
+  const c = "agreement";
+  const day = (d: string) => fullDate(`${d}T09:00:00Z`, language, false);
+  return (
+    <div className="border-t border-border mt-4 pt-3" data-testid="commercial-terms">
+      <div className="font-mono text-[11px] uppercase tracking-wide text-navy mb-1">{t(`${c}.commercialHeading`)}</div>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-[13px]">
+        {terms.payment_stages.map((st, i) => (
+          <Fragment key={i}>
+            <dt className="text-steel">{t(`${c}.paymentStage`)} {i + 1}</dt>
+            <dd dir="auto">{st.milestone} · {Number(st.percent)}% · <span className="font-mono">{money(st.amount, currency)}</span></dd>
+          </Fragment>
+        ))}
+        {terms.retention_percent && (
+          <>
+            <dt className="text-steel">{t(`${c}.retention`)}</dt>
+            <dd>{Number(terms.retention_percent)}%{terms.retention_amount && <> · <span className="font-mono">{money(terms.retention_amount, currency)}</span></>}{terms.retention_months ? ` · ${terms.retention_months} m` : ""}</dd>
+          </>
+        )}
+        {terms.retention_release_on && (
+          <>
+            <dt className="text-steel">{t(`${c}.retentionRelease`)}</dt>
+            <dd>{day(terms.retention_release_on)}</dd>
+          </>
+        )}
+        {terms.warranty_months && (
+          <>
+            <dt className="text-steel">{t(`${c}.warranty`)}</dt>
+            <dd>{terms.warranty_months} m</dd>
+          </>
+        )}
+        {terms.warranty_until && (
+          <>
+            <dt className="text-steel">{t(`${c}.warrantyUntil`)}</dt>
+            <dd data-testid="warranty-until">{day(terms.warranty_until)}</dd>
+          </>
+        )}
+        {terms.offer_validity_days && (
+          <>
+            <dt className="text-steel">{t(`${c}.offerValidity`)}</dt>
+            <dd>{terms.offer_validity_days} d</dd>
+          </>
+        )}
+      </dl>
+      <p className="text-xs text-steel-light mt-1">{t(`${c}.paymentsNote`)}</p>
+    </div>
+  );
+}
+
 function historyLabel(t: (k: string) => string, h: TimelineEntry): string {
   if (["delivered", "accepted", "returned"].includes(h.kind)) {
     return h.milestone_title ? t(`execution.kind.${h.kind}`) : t(`completion.history.${h.kind}`);
@@ -103,6 +159,17 @@ export interface Variation {
   version: number;
 }
 
+export interface CommercialTerms {
+  offer_validity_days: number | null;
+  payment_stages: { milestone: string; percent: string; amount: string }[];
+  retention_percent: string | null;
+  retention_amount: string | null;
+  retention_months: number | null;
+  warranty_months: number | null;
+  warranty_until: string | null;
+  retention_release_on: string | null;
+}
+
 export interface Agreement {
   id: string;
   status: "preparing" | "active" | "completed" | "terminated";
@@ -111,6 +178,9 @@ export interface Agreement {
   activated_at: string | null;
   terminated_at: string | null;
   termination_reason: string | null;
+  terminated_party: "owner" | "provider" | null; // Batch A: either party may terminate
+  provider_confirmed_at: string | null; // Batch A: the provider confirmed the terms as they stand
+  commercial_terms: CommercialTerms | null; // Batch A: the requirement's commercial conditions
   version: number;
   award_id: string;
   awarded_at: string;
@@ -198,6 +268,11 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
     onSuccess: done,
     onError: failed,
   });
+  const confirmTerms = useMutation({
+    mutationFn: () => apiFetch<Agreement>(`${base}/confirm`, { method: "POST", headers: ifMatch() }),
+    onSuccess: done,
+    onError: failed,
+  });
   const terminate = useMutation({
     mutationFn: (reason: string) => apiFetch<Agreement>(`${base}/terminate`, { method: "POST", body: { reason }, headers: ifMatch() }),
     onSuccess: (next) => { setEnding(null); done(next); },
@@ -234,7 +309,7 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
   const c = "agreement";
   const owner = a.side === "owner";
   const party = a.side !== "admin";
-  const busy = save.isPending || activate.isPending || terminate.isPending || startWork.isPending || progress.isPending;
+  const busy = save.isPending || confirmTerms.isPending || activate.isPending || terminate.isPending || startWork.isPending || progress.isPending;
   const e = "execution";
   const day = (d: string) => fullDate(`${d}T12:00:00Z`, language, false);
   const execTone = a.execution_status === "in_progress" || a.execution_status === "completed" ? "text-green" : a.execution_status === "terminated" ? "text-red" : "text-amber-dark";
@@ -303,11 +378,39 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
           <>
             <dt className="text-steel">{t(`${c}.terminatedOn`)}</dt>
             <dd>{a.terminated_at && fullDate(a.terminated_at, language)}</dd>
+            {a.terminated_party && (
+              <>
+                <dt className="text-steel">{t(`${c}.terminatedBy`)}</dt>
+                <dd>{t(`execution.party.${a.terminated_party}`)}</dd>
+              </>
+            )}
             <dt className="text-steel">{t(`${c}.reason`)}</dt>
             <dd dir="auto" className="whitespace-pre-wrap break-words">{a.termination_reason}</dd>
           </>
         )}
       </dl>
+
+      {a.commercial_terms && <CommercialTermsBlock terms={a.commercial_terms} currency={a.currency} />}
+
+      {/* Batch A: the provider confirms the terms; the owner puts them in force only then. */}
+      {a.status === "preparing" && (
+        <p className={`text-xs mt-3 ${a.provider_confirmed_at ? "text-green" : "text-amber-dark"}`} data-testid="agreement-confirmation">
+          {a.provider_confirmed_at
+            ? `✓ ${t(`${c}.termsConfirmed`)} · ${fullDate(a.provider_confirmed_at, language)}`
+            : owner ? t(`${c}.awaitingConfirmation`) : a.effective_date ? t(`${c}.confirmTermsHelp`) : t(`${c}.needsDate`)}
+        </p>
+      )}
+      {a.side === "provider" && a.status === "preparing" && a.effective_date && !a.provider_confirmed_at && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void confirm({ title: t(`${c}.confirmTerms`), body: t(`${c}.confirmTermsBody`), confirmLabel: t(`${c}.confirmTerms`) }).then((ok) => ok && confirmTerms.mutate())}
+          className="mt-2 bg-green text-white text-xs font-semibold rounded px-3 py-1.5 disabled:opacity-60"
+          data-testid="agreement-confirm-terms"
+        >
+          {t(`${c}.confirmTerms`)}
+        </button>
+      )}
 
       {owner && a.status === "preparing" && (details ? (
         <form className="grid gap-2 mt-3 max-w-md" onSubmit={(e) => { e.preventDefault(); save.mutate(details); }}>
@@ -329,8 +432,8 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
           <button type="button" onClick={() => setDetails({ reference: a.reference ?? "", effective_date: a.effective_date ?? "" })} className="text-xs text-blue underline">{t(`${c}.editDetails`)}</button>
           <button
             type="button"
-            disabled={busy || !a.effective_date}
-            title={!a.effective_date ? t(`${c}.needsDate`) : undefined}
+            disabled={busy || !a.effective_date || !a.provider_confirmed_at}
+            title={!a.effective_date ? t(`${c}.needsDate`) : !a.provider_confirmed_at ? t(`${c}.needsConfirmation`) : undefined}
             onClick={() => void confirm({ title: t(`${c}.activateConfirm`), body: t(`${c}.activateConfirmBody`), confirmLabel: t(`${c}.activate`) }).then((ok) => ok && activate.mutate())}
             className="bg-green text-white text-xs font-semibold rounded px-3 py-1.5 disabled:opacity-60"
             data-testid="agreement-activate"
@@ -339,7 +442,10 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
           </button>
         </div>
       ))}
-      {owner && !["terminated", "completed"].includes(a.status) && (ending === null ? (
+      {a.side !== "admin" && !["terminated", "completed"].includes(a.status) && a.completion_status === "submitted" && (
+        <p className="text-xs text-steel mt-2">{t(`${c}.submittedBlocksTermination`)}</p>
+      )}
+      {a.side !== "admin" && !["terminated", "completed"].includes(a.status) && a.completion_status !== "submitted" && (ending === null ? (
         <button type="button" disabled={busy} onClick={() => setEnding("")} className="block mt-2 text-xs text-red underline">
           {t(`${c}.terminate`)}
         </button>
@@ -429,7 +535,13 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
             )}
           </div>
         ))}
-        {party && a.execution_status === "not_started" && (starting === null ? (
+        {party && a.execution_status === "not_started" && a.status === "preparing" && (
+          <p className="text-xs text-steel mt-2">{t(`${c}.notInForce`)}</p>
+        )}
+        {party && a.execution_status === "not_started" && a.status === "active" && a.effective_date && a.effective_date > kuwaitToday() && (
+          <p className="text-xs text-steel mt-2">{t(`${c}.startsOn`).replace("{date}", day(a.effective_date))}</p>
+        )}
+        {party && a.execution_status === "not_started" && a.status === "active" && !(a.effective_date && a.effective_date > kuwaitToday()) && (starting === null ? (
           <>
             <p className="text-xs text-steel mt-2">{t(`${e}.next`)}</p>
             <button type="button" disabled={busy} onClick={() => setStarting("")} className="mt-1 bg-navy text-white text-xs font-semibold rounded px-3 py-1.5 disabled:opacity-60" data-testid="execution-start">

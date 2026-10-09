@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
-import type { ClosureReason, ProjectDetail, ProjectStatus } from "@/api/types";
+import type { ClosureReason, ProjectDetail, ProjectStatus, TransactionStatus } from "@/api/types";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
@@ -11,7 +11,11 @@ type T = (key: string) => string;
 
 // Stage 3.16: a short label for where a requirement stands, telling apart the
 // ways it can end without a U-Tender award.
-export function outcomeLabel(t: T, status: ProjectStatus, reason?: ClosureReason | null): string {
+export function outcomeLabel(t: T, status: ProjectStatus, reason?: ClosureReason | null, transaction?: TransactionStatus | null): string {
+  // Batch A: once awarded, the label follows the transaction -- a finished job reads "Completed", not "Awarded".
+  if (status === "awarded" && transaction) {
+    return t({ preparing: "closure.labelTxPreparing", active: "closure.labelTxActive", completed: "closure.labelTxCompleted", terminated: "closure.labelTxTerminated" }[transaction]);
+  }
   if (status === "no_award") return reason === "closed_externally" ? t("closure.labelExternal") : t("closure.labelNoSuitable");
   if (status === "canceled") return t("closure.labelCanceled");
   if (status === "expired") return t("closure.labelExpired");
@@ -28,6 +32,8 @@ export function outcomeLabel(t: T, status: ProjectStatus, reason?: ClosureReason
 // without an award (no suitable offer, outside U-Tender, cancelled, expired)
 // is shown with that outcome -- never as an offer still in play.
 export function offerStatusLabel(t: T, offerStatus: string, projectStatus: ProjectStatus, reason?: ClosureReason | null): string {
+  // Batch B: an offer on a requirement that ended without an award is closed -- the outcome says why.
+  if (offerStatus === "closed") return outcomeLabel(t, projectStatus, reason);
   if (offerStatus === "submitted") {
     if (projectStatus === "no_award" || projectStatus === "canceled" || projectStatus === "expired") return outcomeLabel(t, projectStatus, reason);
     return t("service_provider.feed.bidPlaced");
@@ -43,13 +49,13 @@ export function outcomeText(t: T, status: ProjectStatus, reason?: ClosureReason 
   return null;
 }
 
-export function ClosureOutcome({ project }: { project: Pick<ProjectDetail, "status" | "closure_reason" | "closure_note"> }) {
+export function ClosureOutcome({ project }: { project: Pick<ProjectDetail, "status" | "closure_reason" | "closure_note" | "transaction_status"> }) {
   const { t } = useI18n();
   const text = outcomeText(t, project.status, project.closure_reason);
   if (!text) return null;
   return (
     <div className="border border-border bg-border/30 rounded px-4 py-3 mb-6 text-sm text-steel max-w-2xl" data-testid="closure-outcome">
-      <strong className="font-display text-navy block">{outcomeLabel(t, project.status, project.closure_reason)}</strong>
+      <strong className="font-display text-navy block">{outcomeLabel(t, project.status, project.closure_reason, project.transaction_status)}</strong>
       {text}
       <p className="text-xs text-steel-light mt-1">{t("closure.offersKept")}</p>
       {project.closure_note && (

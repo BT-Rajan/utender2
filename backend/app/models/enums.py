@@ -69,6 +69,9 @@ class OfferStatus(str, enum.Enum):
     approved = "approved"
     rejected = "rejected"
     withdrawn = "withdrawn"
+    # Batch B: a live offer on a requirement that ended without an award
+    # (cancelled, or no award) -- no longer under consideration.
+    closed = "closed"
 
 
 class VerificationStatus(str, enum.Enum):
@@ -160,3 +163,10 @@ class NotificationType(str, enum.Enum):
     variation_updated = "variation_updated"  # Stage 7.8: proposed / agreed / rejected / withdrawn, to the other party
     review_received = "review_received"  # Stage 8.3/8.4: the other party reviewed the completed work
     review_response = "review_response"  # Stage 8.9: the reviewed party responded to the review
+    # Batch A: the agreement's own steps, told to the other party.
+    agreement_terms_confirmed = "agreement_terms_confirmed"
+    agreement_in_force = "agreement_in_force"
+    agreement_terminated = "agreement_terminated"
+    offer_confirmation_requested = "offer_confirmation_requested"  # Batch B: the owner asks a provider to confirm its offer still stands
+    evaluation_started = "evaluation_started"  # Batch B: bidders are told their offers are being evaluated
+    requirement_invitation = "requirement_invitation"  # Batch C: an owner invites a provider it completed work with

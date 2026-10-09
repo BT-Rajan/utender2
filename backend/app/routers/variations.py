@@ -13,7 +13,7 @@ applied -- while each variation keeps what it changed from. The award, the
 requirement, the winning offer and the original agreement are never
 rewritten. Every action is under the requirement's lock with the variation's
 version; audit-logged; the other party is told."""
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -24,7 +24,7 @@ from app.deps import get_current_user
 from app.models.agreement import Agreement, Milestone, Variation
 from app.models.enums import NotificationType
 from app.models.user import User
-from app.routers.agreements import _best_effort, _check_version, _load, _out, _record, _touch, current_terms, planned_completion
+from app.routers.agreements import _best_effort, _check_version, _load, _out, _record, _touch, current_terms, kuwait_today, planned_completion
 from app.schemas.agreement import AgreementOut, MilestoneNote, VariationIn
 from app.services import audit
 from app.services import notify as notify_service
@@ -121,6 +121,20 @@ def propose_variation(
             raise HTTPException(status_code=400, detail="An accepted deliverable can't be rescheduled.")
         if not payload.milestone_due_date or payload.milestone_due_date < awarded_on:
             raise HTTPException(status_code=400, detail="A revised date can't be before the award.")
+    # Batch A: a change keeps the schedule coherent -- a new completion date
+    # can't be in the past or before the work could start, and a deliverable
+    # can't be rescheduled past the completion date in force (or this change's).
+    today = kuwait_today()
+    earliest = max(d for d in (today, agreement.effective_date, (agreement.work_started_at + timedelta(hours=3)).date() if agreement.work_started_at else None) if d)
+    if payload.completion_date and payload.completion_date < earliest:
+        raise HTTPException(status_code=400, detail="A revised completion date can't be in the past or before the agreement takes effect and the work starts.")
+    if milestone and payload.milestone_due_date:
+        if payload.milestone_due_date < today:
+            raise HTTPException(status_code=400, detail="A revised due date can't be in the past.")
+        _, completion_now = current_terms(award, planned_completion(project, winner)[0], variations)
+        finish = payload.completion_date or completion_now
+        if finish and payload.milestone_due_date > finish:
+            raise HTTPException(status_code=400, detail="A deliverable can't be due after the work's completion date. Move the completion date in the same change if needed.")
     added = (payload.add_deliverable or "").strip() or None
     last = db.query(Variation.number).filter(Variation.agreement_id == agreement.id).order_by(Variation.number.desc()).first()
     v = Variation(

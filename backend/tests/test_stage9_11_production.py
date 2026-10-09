@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
-from jose import jwt
+import jwt
 
 from app.config import Settings, get_settings
 from app.main import app

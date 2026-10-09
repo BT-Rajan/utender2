@@ -405,3 +405,34 @@ def remove_member(user: User, db: Session, member_id: str) -> None:
     log_action(
         db, actor_id=user.id, action="organization.member_removed", target_type="organization", target_id=membership.organization_id, previous_value=member_id
     )
+
+
+def hand_over(user: User, db: Session, member_id: str) -> None:
+    """Batch C: the authorized representative hands the role to another
+    current member -- who then manages members and receives what the
+    representative does -- and stays on as a member. The organization's
+    records, verification and history are unchanged: they belong to the
+    organization, not to whoever set it up."""
+    _require_representative(user, db)
+    # Security: under the representative's own row lock, so two hand-overs at
+    # once can't leave the organization with two representatives.
+    membership = db.query(OrganizationMembership).filter(OrganizationMembership.user_id == user.id).populate_existing().with_for_update().first()
+    if membership is None or membership.role != MembershipRole.admin:
+        raise HTTPException(status_code=403, detail="Only the organization's authorized representative can manage its members.")
+    if member_id == user.id:
+        raise HTTPException(status_code=400, detail="You are already the organization's representative.")
+    target = (
+        db.query(OrganizationMembership)
+        .filter(OrganizationMembership.organization_id == membership.organization_id, OrganizationMembership.user_id == member_id)
+        .with_for_update()
+        .first()
+    )
+    successor = db.get(User, member_id) if target else None
+    if not target or successor is None or successor.deactivated_at is not None:
+        raise HTTPException(status_code=404, detail="Not a member of this organization.")
+    target.role, membership.role = MembershipRole.admin, MembershipRole.member
+    db.flush()
+    log_action(
+        db, actor_id=user.id, action="organization.representative_changed", target_type="organization",
+        target_id=membership.organization_id, previous_value=user.id, new_value=member_id,
+    )

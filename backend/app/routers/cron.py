@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.models.enums import NotificationType, ProjectStatus
-from app.models.offer import Offer, tendered
+from app.models.offer import Offer, tendered, counted
 from app.models.project import Project
 from app.models.user import User
 from app.services.email import notify_owner_deadline_approaching
@@ -42,7 +42,7 @@ def deadline_reminders(authorization: str | None = Header(default=None), db: Ses
 
     sent = 0
     for p in projects:
-        offer_count = db.query(Offer).filter(Offer.project_id == p.id, tendered()).count()
+        offer_count = db.query(Offer).filter(Offer.project_id == p.id, counted()).count()
         owner = db.get(User, p.owner_id)
         if owner:
             notify_owner_deadline_approaching(owner.email, p.title, p.id, offer_count)
@@ -50,5 +50,8 @@ def deadline_reminders(authorization: str | None = Header(default=None), db: Ses
         p.deadline_reminder_sent = True
         sent += 1
     db.commit()
+    # Batch C: reviews whose sealed period has passed are revealed.
+    from app.services.reviews import reveal_due
 
-    return {"checked": len(projects), "sent": sent}
+    revealed = reveal_due(db)
+    return {"checked": len(projects), "sent": sent, "reviews_revealed": revealed}

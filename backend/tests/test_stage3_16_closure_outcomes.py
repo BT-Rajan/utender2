@@ -60,7 +60,8 @@ def test_cancel(db):
     assert beta.post(f"/projects/{pid}/offers", json={"amount": "2000"}).status_code == 400
     assert all(p["id"] != pid for p in beta.get("/service-provider/feed").json()["items"])
     mine = alpha.get(f"/projects/{pid}/offers/mine").json()
-    assert (mine["amount"], mine["message"], mine["status"]) == ("3000.000", "Our quotation.", "submitted")
+    # Batch B: ending without an award sets the live submitted offer to "closed"; its content stays.
+    assert (mine["amount"], mine["message"], mine["status"]) == ("3000.000", "Our quotation.", "closed")
     # The bidder sees it was canceled -- but not the owner's private note.
     seen = alpha.get(f"/projects/{pid}").json()
     assert (seen["status"], seen["closure_reason"]) == ("canceled", "postponed") and "Bank" not in str(seen)
@@ -94,7 +95,8 @@ def test_closed_outside_u_tender(db):
     assert r.status_code == 200 and (r.json()["status"], r.json()["closure_reason"]) == ("no_award", "closed_externally")
     assert _no_award_recorded(db, pid)  # no U-Tender award pretended
     assert alpha.post(f"/projects/{pid}/offers", json={"amount": "2500"}).status_code == 400
-    assert db.query(Offer).one().status.value == "submitted"
+    assert db.query(Offer).one().status.value == "closed"  # Batch B: close-externally closes live submitted offers
+    assert str(db.query(Offer).one().amount) == "3000.000"  # Batch B: ...without erasing what was submitted
     assert alpha.get(f"/projects/{pid}").json()["closure_reason"] == "closed_externally"
     # It can't then be awarded on U-Tender after all.
     oid = db.query(Offer).one().id
@@ -117,7 +119,9 @@ def test_none_of_the_offers_is_suitable(db):
     owner.post(f"/owner/projects/{pid}/close")
     r = owner.post(f"/owner/projects/{pid}/no-award", json={"note": "All far above budget."})
     assert (r.json()["status"], r.json()["closure_reason"]) == ("no_award", "no_suitable_offer")
-    assert _no_award_recorded(db, pid) and db.query(Offer).one().status.value == "submitted"
+    # Batch B: no-award sets the live submitted offer to "closed"; its amount stays.
+    assert _no_award_recorded(db, pid) and db.query(Offer).one().status.value == "closed"
+    assert str(db.query(Offer).one().amount) == "9999.000"
 
 
 def test_terminal_outcomes_stay_terminal(db):

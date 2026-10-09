@@ -52,8 +52,9 @@ def test_status_version_and_counts_follow_the_persisted_offer(db):
     db.query(Offer).filter(Offer.id == now["dana"]["id"]).one().is_suspended = True
     db.commit()
     assert set(_inbox(owner, pid)) == {"amal", "badr"}
-    assert owner.get(f"/projects/{pid}").json()["offer_count"] == 2
-    assert next(p for p in owner.get("/owner/projects").json() if p["id"] == pid)["offer_count"] == 2
+    # Batch B: offer_count now leaves out withdrawn offers too: only A's live offer counts (B withdrawn, C suspended).
+    assert owner.get(f"/projects/{pid}").json()["offer_count"] == 1  # Batch B:
+    assert next(p for p in owner.get("/owner/projects").json() if p["id"] == pid)["offer_count"] == 1  # Batch B:
 
 
 def test_an_amendment_never_makes_an_old_offer_look_current(db):

@@ -5,16 +5,17 @@ lock; this records the review against the transaction's own parties (never
 ids from the request), keeps the provider's public rating in step, writes the
 audit entry in the same transaction, and tells the reviewed party."""
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.award_record import AwardRecord
 from app.models.enums import NotificationType
 from app.models.offer import Offer
 from app.models.project import Project
-from app.models.review import Review, ReviewReport
+from app.models.review import REVEAL_AFTER, Review, ReviewReport
 from app.models.service_provider import ServiceProviderProfile
 from app.models.user import User
 from app.services import audit
@@ -31,6 +32,27 @@ PROVIDER_TO_OWNER = "provider_to_owner"
 REPORT_REASONS = ("abusive", "private_information", "not_about_this_transaction", "other")
 
 
+# Batch C: a review stays sealed from the other side (and from ratings) until
+# both sides have reviewed or this long has passed since it was written -- so
+# neither review can be written in answer to the other.
+def revealed():
+    """SQL condition: reviews the other side and the public may see."""
+    return or_(Review.revealed_at.isnot(None), Review.created_at <= datetime.utcnow() - REVEAL_AFTER)
+
+
+def is_revealed(review: Review) -> bool:
+    return review.is_revealed_now
+
+
+def one_per_reviewer(reviews: list[Review], key) -> list[Review]:
+    """Batch C: the latest review from each counterparty only -- repeated
+    transactions between the same two parties can't stack up a rating."""
+    latest: dict[str, Review] = {}
+    for r in sorted(reviews, key=lambda r: (r.created_at or datetime.min, r.id)):
+        latest[key(r)] = r
+    return sorted(latest.values(), key=lambda r: (r.created_at or datetime.min, r.id), reverse=True)
+
+
 def review_of(db: Session, project_id: str, direction: str) -> Review | None:
     """The review on record in one direction, hidden or not -- what the
     one-review rule and the reviewer's own view rest on."""
@@ -40,7 +62,7 @@ def review_of(db: Session, project_id: str, direction: str) -> Review | None:
 def shown_review_of(db: Session, project_id: str, direction: str) -> Review | None:
     """Stage 8.15: the review as others may see it -- none once an admin has hidden it."""
     review = review_of(db, project_id, direction)
-    return review if review is not None and review.hidden_at is None else None
+    return review if review is not None and review.hidden_at is None and is_revealed(review) else None
 
 
 def _recount_provider(db: Session, profile: ServiceProviderProfile | None, service_provider_id: str) -> None:
@@ -48,8 +70,9 @@ def _recount_provider(db: Session, profile: ServiceProviderProfile | None, servi
     reviews (never an incremental counter). The caller holds the profile row."""
     if profile is None:
         return
-    ratings = [r for (r,) in db.query(Review.rating).filter(
-        Review.service_provider_id == service_provider_id, Review.direction == OWNER_TO_PROVIDER, Review.hidden_at.is_(None))]
+    shown = db.query(Review).filter(
+        Review.service_provider_id == service_provider_id, Review.direction == OWNER_TO_PROVIDER, Review.hidden_at.is_(None), revealed()).all()
+    ratings = [r.rating for r in one_per_reviewer(shown, lambda r: r.owner_id)]
     profile.review_count = len(ratings)
     profile.avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else 0
 
@@ -75,14 +98,12 @@ def record_review(db: Session, project: Project, direction: str, reviewer: User,
     # the requirement's owner stakeholder and the award's provider (the PASS 17
     # IDOR fix, now for both directions).
     award = db.query(AwardRecord).filter(AwardRecord.project_id == project.id).first()
-    profile = None
-    if direction == OWNER_TO_PROVIDER:
-        # Stage 8.10: owners of different requirements may review the same
-        # provider at once. Taking its profile row first (after the
-        # requirement's lock, always in that order) queues them, so each
-        # recount below sees the reviews before it -- without it they
-        # deadlocked on the row or stored a stale rating.
-        profile = _lock_provider(db, award.service_provider_id)
+    # Stage 8.10: owners of different requirements may review the same
+    # provider at once. Taking its profile row first (after the requirement's
+    # lock, always in that order) queues them, so each recount below sees the
+    # reviews before it -- without it they deadlocked on the row or stored a
+    # stale rating. Batch C: either direction may reveal the owner's review.
+    profile = _lock_provider(db, award.service_provider_id)
     review = Review(
         project_id=project.id,
         owner_id=project.owner_id,
@@ -94,10 +115,17 @@ def record_review(db: Session, project: Project, direction: str, reviewer: User,
     )
     db.add(review)
     db.flush()
-    if direction == OWNER_TO_PROVIDER:
-        # Recompute the provider's public average from its owner reviews rather
-        # than trusting an incrementally-maintained counter.
-        _recount_provider(db, profile, award.service_provider_id)
+    # Batch C: the second review reveals both at once.
+    other = review_of(db, project.id, PROVIDER_TO_OWNER if direction == OWNER_TO_PROVIDER else OWNER_TO_PROVIDER)
+    if other is not None:
+        now = datetime.utcnow().replace(microsecond=0)
+        review.revealed_at = now
+        if other.revealed_at is None:
+            other.revealed_at = now
+        db.flush()
+    # Recompute the provider's public average from its owner reviews rather
+    # than trusting an incrementally-maintained counter.
+    _recount_provider(db, profile, award.service_provider_id)
     # log_action commits: the review, the rating and the audit entry land together.
     audit.log_action(db, actor_id=reviewer.id, action=f"review.{direction}", target_type="project", target_id=project.id,
                      new_value=f"{review.id} rating:{review.rating} owner:{review.owner_id} service_provider:{review.service_provider_id}")
@@ -214,3 +242,20 @@ def _tell(db: Session, project: Project, award: AwardRecord, *, to_provider: boo
     except Exception:  # noqa: BLE001 -- notifying must never undo or fail the review
         db.rollback()
         logger.exception("Could not send review notification for %s", project.id)
+
+
+def reveal_due(db: Session) -> int:
+    """Batch C (hourly, with the other scheduled jobs): reviews whose sealed
+    period has passed are marked revealed and their providers' stored
+    ratings recounted. Reads already apply the same rule; this keeps the
+    stored average in step."""
+    due = db.query(Review).filter(Review.revealed_at.is_(None), Review.created_at <= datetime.utcnow() - REVEAL_AFTER).all()
+    providers = set()
+    for review in due:
+        review.revealed_at = review.created_at + REVEAL_AFTER
+        providers.add(review.service_provider_id)
+    db.flush()
+    for provider_id in sorted(providers):
+        _recount_provider(db, _lock_provider(db, provider_id), provider_id)
+    db.commit()
+    return len(due)

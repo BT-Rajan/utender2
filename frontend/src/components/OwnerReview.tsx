@@ -16,6 +16,8 @@ interface ReviewRecord {
   response?: string | null;
   response_at?: string | null;
   hidden?: boolean;
+  revealed?: boolean; // Batch C: sealed from the owner until both reviewed, or reveals_on
+  reveals_on?: string | null;
 }
 
 // Stage 8.4: the winning provider reviews the owner -- once the transaction is
@@ -60,6 +62,11 @@ export function OwnerReview({ projectId }: { projectId: string }) {
           {review.comment && <p className="text-sm text-steel mt-1 whitespace-pre-wrap break-words" dir="auto">{review.comment}</p>}
           <div className="font-mono text-[10px] text-steel mt-1">{t("ownerReview.submitted")} {fullDate(review.created_at, language)}</div>
           {review.hidden && <p className="text-xs text-amber-dark mt-1">{t("report.hiddenNote")}</p>}
+          {review.revealed === false && (
+            <p className="text-xs text-steel mt-1" data-testid="review-sealed">
+              {t("review.sealed").replace("{date}", review.reveals_on ? fullDate(review.reveals_on, language, false) : "")}
+            </p>
+          )}
           <ReviewResponse response={review.response} at={review.response_at} label={t("review.theirResponse")} reportBase={`/service-provider/projects/${projectId}`} />
         </div>
       ) : (

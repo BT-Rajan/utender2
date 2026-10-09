@@ -126,8 +126,10 @@ def test_material_changes_dont_silently_alter_submitted_offers(db):
     assert mine["based_on_material_revision"] == 0 and mine["amount"] == "5000.000" and mine["message"] == "Priced for 60 m."
     flagged = owner.get(f"/owner/projects/{pid}/offers").json()[0]
     assert flagged["based_on_material_revision"] < r.json()["material_revision"]
-    note = db.query(Notification).filter(Notification.type == "tender_amendment").order_by(Notification.created_at.desc()).first()
-    assert "Review your offer" in note.body
+    # Batch C: the scope change is its own notice -- it no longer overwrites the
+    # unread title notice, and neither is lost.
+    bodies = [n.body for n in db.query(Notification).filter(Notification.type == "tender_amendment")]
+    assert any("Review your offer" in b for b in bodies) and "Updated title." in bodies
 
     # The provider confirms it stands (or revises it).
     assert alpha.post(f"/projects/{pid}/offers/confirm").json()["based_on_material_revision"] == 1

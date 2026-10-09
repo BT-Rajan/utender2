@@ -58,6 +58,9 @@ def test_the_whole_way_from_award_to_an_agreement_in_force(db):
     assert owner.post(f"/projects/{pid}/agreement/activate", headers=_v(owner, pid)).status_code == 400  # no date yet
     r = owner.patch(f"/projects/{pid}/agreement", json={"reference": " PO-2026-114 ", "effective_date": "2026-11-01"}, headers=_v(owner, pid))
     assert r.status_code == 200 and r.json()["reference"] == "PO-2026-114"
+    # Batch A: the provider must confirm the terms before the owner can put it in force.
+    assert owner.post(f"/projects/{pid}/agreement/activate", headers=_v(owner, pid)).status_code == 400  # not confirmed
+    assert win.post(f"/projects/{pid}/agreement/confirm", headers=_v(win, pid)).status_code == 200
     r = owner.post(f"/projects/{pid}/agreement/activate", headers=_v(owner, pid))
     assert r.status_code == 200 and r.json()["status"] == "active" and r.json()["activated_at"].endswith("Z")
 
@@ -67,7 +70,8 @@ def test_the_whole_way_from_award_to_an_agreement_in_force(db):
         assert (a["status"], a["reference"], a["effective_date"], a["side"], len(a["documents"])) == ("active", "PO-2026-114", "2026-11-01", side, 2)
         assert client.get(f"/projects/{pid}/agreement/documents/{a['documents'][0]['id']}/file", follow_redirects=False).status_code == 303
     actions = {r.action for r in db.query(AuditLog).filter(AuditLog.target_id == agreement.id)}
-    assert actions == {"agreement.document_add", "agreement.update", "agreement.activate"}
+    # Batch A: the provider's confirmation is audited too.
+    assert actions == {"agreement.document_add", "agreement.update", "agreement.confirm_terms", "agreement.activate"}
 
     # The award and the history it rests on are untouched.
     db.expire_all()
@@ -122,6 +126,8 @@ def test_stale_tabs_double_clicks_and_endings(db):
     stale = _v(owner, pid)
     assert owner.patch(f"/projects/{pid}/agreement", json={"effective_date": "2026-11-01"}, headers=stale).status_code == 200
     assert owner.patch(f"/projects/{pid}/agreement", json={"effective_date": "2027-01-01"}, headers=stale).status_code == 409  # the other tab
+    # Batch A: the provider confirms the terms before the owner can put it in force.
+    assert win.post(f"/projects/{pid}/agreement/confirm", headers=_v(win, pid)).status_code == 200
     fresh = _v(owner, pid)
     assert owner.post(f"/projects/{pid}/agreement/activate", headers=fresh).status_code == 200
     assert owner.post(f"/projects/{pid}/agreement/activate", headers=fresh).status_code == 400  # the double-click
@@ -147,7 +153,8 @@ def test_documents_bad_kind_bad_type_and_removal(db):
     assert owner.delete(f"/projects/{pid}/agreement/documents/{doc_id}").json()["documents"] == []  # while preparing
     doc_id = owner.post(f"/projects/{pid}/agreement/documents", data={"kind": "work_order"}, files={"file": PDF}).json()["documents"][0]["id"]
     owner.patch(f"/projects/{pid}/agreement", json={"effective_date": "2026-11-01"}, headers=_v(owner, pid))
-    owner.post(f"/projects/{pid}/agreement/activate", headers=_v(owner, pid))
+    win.post(f"/projects/{pid}/agreement/confirm", headers=_v(win, pid))  # Batch A: the provider confirms first
+    assert owner.post(f"/projects/{pid}/agreement/activate", headers=_v(owner, pid)).status_code == 200
     assert owner.delete(f"/projects/{pid}/agreement/documents/{doc_id}").status_code == 400  # in force: on record
 
 

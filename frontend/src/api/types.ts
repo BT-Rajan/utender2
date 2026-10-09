@@ -1,3 +1,4 @@
+export type TransactionStatus = "preparing" | "active" | "completed" | "terminated";
 export type ProjectStatus =
   | "draft"
   | "open"
@@ -8,7 +9,7 @@ export type ProjectStatus =
   | "canceled"
   | "expired";
 export type TenderType = "sealed" | "owner_visible";
-export type OfferStatus = "draft" | "submitted" | "approved" | "rejected" | "withdrawn";
+export type OfferStatus = "draft" | "submitted" | "approved" | "rejected" | "withdrawn" | "closed";
 export type VerificationStatus = "incomplete" | "pending_review" | "changes_requested" | "approved" | "rejected";
 export type DocumentStatus = "not_submitted" | "pending" | "approved" | "rejected";
 export type SubscriptionStatus = "trialing" | "active" | "past_due" | "canceled";
@@ -44,6 +45,8 @@ export interface Project {
   closed_at?: string | null;
   // Stage 3.16: why it ended without a U-Tender award (canceled / no_award only).
   closure_reason?: ClosureReason | null;
+  // Batch A: after an award, how the transaction stands.
+  transaction_status?: TransactionStatus | null;
   closure_note?: string | null; // the owner side only
   restarted_from_id?: string | null; // the owner side only
   material_revision?: number;
@@ -312,6 +315,11 @@ export interface Offer {
   assumptions: string | null;
   declarations_accepted: string[] | null;
   documents: OfferDocument[];
+  // Batch B: validity after the close, answers published since it was put forward, withdrawals left.
+  valid_until?: string | null;
+  validity_lapsed?: boolean;
+  answers_since?: number;
+  withdrawals_left?: number | null;
 }
 
 export interface OfferRevision {
@@ -439,6 +447,7 @@ export interface AdminOffer {
   project_id: string;
   project_title: string;
   project_status: ProjectStatus;
+  transaction_status?: TransactionStatus | null; // Batch A
   tender_type: TenderType;
   service_provider_id: string | null;
   service_provider_company_name: string | null;

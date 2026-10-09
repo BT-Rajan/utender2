@@ -15,7 +15,7 @@ from app.models.cms_content import CmsContent
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import ServiceProviderDocument, DocumentRequirement, OwnerDocument
 from app.models.enums import DocumentStatus, Language, NotificationType, OfferStatus, PricingBasis, ProjectStatus, StakeholderType, UserRole, VerificationStatus
-from app.models.offer import Offer, OfferRevision, tendered
+from app.models.offer import Offer, OfferRevision, tendered, counted
 from app.models.owner import OwnerProfile
 from app.models.payment_override import PaymentOverride
 from app.models.project import Project, ProjectDrawing
@@ -270,7 +270,8 @@ def _decide_document(db: Session, admin: User, profile, requirement_id: str, dec
         kind = NotificationType.owner_document_approved if is_owner else NotificationType.document_approved
     else:
         kind = NotificationType.owner_document_rejected if is_owner else NotificationType.document_rejected
-    notify(db, profile.user, kind, link=link, requirement_name=req.name, note=note or "")
+    # Batch C: everyone who acts for the stakeholder is told, not only the account that set it up.
+    notify_team(db, profile.user, kind, link=link, organization_id=profile.organization_id, requirement_name=req.name, note=note or "")
     db.refresh(doc)
     return doc, req
 
@@ -306,10 +307,10 @@ def _decide_application(db: Session, admin: User, profile, status: VerificationS
     )
     if status == VerificationStatus.approved:
         kind = NotificationType.owner_verification_activated if is_owner else NotificationType.verification_activated
-        notify(db, profile.user, kind, link="/owner/dashboard" if is_owner else "/service-provider/dashboard")
+        notify_team(db, profile.user, kind, link="/owner/dashboard" if is_owner else "/service-provider/dashboard", organization_id=profile.organization_id)
     else:
         kind = NotificationType.verification_changes_requested if status == VerificationStatus.changes_requested else NotificationType.verification_rejected
-        notify(db, profile.user, kind, link=link, note=note or "")
+        notify_team(db, profile.user, kind, link=link, organization_id=profile.organization_id, note=note or "")
     db.refresh(profile)
 
 
@@ -635,7 +636,7 @@ def grant_payment_override(
 
     user = db.get(User, service_provider_id)
     if user:
-        notify(db, user, NotificationType.payment_override_granted, link="/service-provider/dashboard")
+        notify_team(db, user, NotificationType.payment_override_granted, link="/service-provider/dashboard", organization_id=cp.organization_id)
     return ServiceProviderProfileOut(**_profile_fields(cp), email=user.email if user else None)
 
 
@@ -679,7 +680,7 @@ def revoke_payment_override(
 
     user = db.get(User, service_provider_id)
     if user:
-        notify(db, user, NotificationType.payment_override_revoked, link="/service-provider/dashboard")
+        notify_team(db, user, NotificationType.payment_override_revoked, link="/service-provider/dashboard", organization_id=cp.organization_id)
     return ServiceProviderProfileOut(**_profile_fields(cp), email=user.email if user else None)
 
 
@@ -1148,7 +1149,7 @@ def _offer_admin_fields(o: Offer, p: Project | None, cp: ServiceProviderProfile 
 def list_all_projects(db: Session = Depends(get_db)):
     sync_expired_projects(db)  # Stage 9.3: no requirement listed "open" past its deadline
     rows = db.query(Project, User).join(User, Project.owner_id == User.id).order_by(Project.created_at.desc()).all()
-    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(tendered()).group_by(Offer.project_id).all())
+    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(counted()).group_by(Offer.project_id).all())
     return [{**_project_admin_fields(p, u), "offer_count": offer_counts.get(p.id, 0)} for p, u in rows]
 
 
@@ -1161,7 +1162,7 @@ def list_owner_projects(owner_id: str, db: Session = Depends(get_db)):
     _get_active_owner_profile(db, owner_id)  # 404s outright for a since-promoted admin account
     owner_user = db.get(User, owner_id)
     rows = db.query(Project).filter(Project.owner_id == owner_id).order_by(Project.created_at.desc()).all()
-    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(tendered()).group_by(Offer.project_id).all())
+    offer_counts = dict(db.query(Offer.project_id, func.count(Offer.id)).filter(counted()).group_by(Offer.project_id).all())
     return [{**_project_admin_fields(p, owner_user), "offer_count": offer_counts.get(p.id, 0)} for p in rows]
 
 

@@ -78,6 +78,9 @@ export interface Dictionary {
     pOther: string;
   };
   organization: {
+    handOver: string;
+    handOverConfirm: string;
+    handOverBody: string;
     heading: string;
     hint: string;
     representative: string;
@@ -240,6 +243,11 @@ export interface Dictionary {
     count: string;
     row: string;
   };
+  offerTiming: { days: string; by: string };
+  offerValidity: {
+    until: string; lapsed: string; answersSince: string; answersSinceProvider: string; asked: string; ask: string; askHint: string;
+    standsHeading: string; lapsedBody: string; outdatedBody: string; confirm: string; withdraw: string; lastWithdrawal: string; noMoreResubmission: string;
+  };
   award: {
     confirmTitle: string;
     confirmBody: string;
@@ -257,6 +265,7 @@ export interface Dictionary {
     error: string;
   };
   review: {
+    sealed: string;
     confirmTitle: string;
     confirmBody: string;
     receivedHeading: string;
@@ -276,6 +285,7 @@ export interface Dictionary {
     summary: string;
     completed: string;
     none: string;
+    terminated: string;
     noReviews: string;
     verified: string;
     note: string;
@@ -285,6 +295,11 @@ export interface Dictionary {
     noteOwner: string;
   };
   previous: {
+    inviteHeading: string;
+    invite: string;
+    invited: string;
+    inviteNote: string;
+    inviteError: string;
     heading: string;
     together: string;
     last: string;
@@ -463,6 +478,7 @@ export interface Dictionary {
   history: {
     heading: string;
     awarded: string;
+    terms_confirmed: string;
     in_force: string;
     document: string;
     change_proposed: string;
@@ -603,6 +619,24 @@ export interface Dictionary {
     activateConfirmBody: string;
     terminate: string;
     terminatePrompt: string;
+    confirmTerms: string;
+    confirmTermsHelp: string;
+    confirmTermsBody: string;
+    termsConfirmed: string;
+    awaitingConfirmation: string;
+    needsConfirmation: string;
+    terminatedBy: string;
+    notInForce: string;
+    startsOn: string;
+    submittedBlocksTermination: string;
+    commercialHeading: string;
+    paymentStage: string;
+    retention: string;
+    retentionRelease: string;
+    warranty: string;
+    warrantyUntil: string;
+    offerValidity: string;
+    paymentsNote: string;
     documents: string;
     noDocuments: string;
     kindLabel: string;
@@ -824,6 +858,10 @@ export interface Dictionary {
     labelClosed: string;
     labelUnderEvaluation: string;
     labelAwarded: string;
+    labelTxPreparing: string;
+    labelTxActive: string;
+    labelTxCompleted: string;
+    labelTxTerminated: string;
     labelExternal: string;
     labelNoSuitable: string;
     textCanceled: string;
@@ -1217,6 +1255,9 @@ export interface Dictionary {
     cameWithChange: string;
     publishForAll: string;
     materialHint: string;
+    sharedNote: string;
+    privateQuestion: string;
+    answerSharedNote: string;
     becauseOf: string;
     notBecauseOf: string;
     attachFiles: string;
@@ -1769,6 +1810,9 @@ export const en: Dictionary = {
     pOther: "Other conditions",
   },
   organization: {
+    handOver: "Make representative",
+    handOverConfirm: "Hand over the representative role?",
+    handOverBody: "They will manage members and receive the organization's account notices as its representative. You stay on as a member.",
     heading: "Organization members",
     hint: "Everyone here acts for the organization and shares everything done for it: its verification, requirements, offers and questions.",
     representative: "Authorized representative",
@@ -1931,6 +1975,23 @@ export const en: Dictionary = {
     count: "{n} shortlisted",
     row: "On your shortlist",
   },
+  offerTiming: { days: "{n} days", by: "by {date}" },
+  offerValidity: {
+    until: "Valid until {date}",
+    lapsed: "Validity ended",
+    answersSince: "{n} answer(s) published after this offer",
+    answersSinceProvider: "{n} answer(s) were published to every provider after you submitted. Check the Q&A: revise your offer if they change it.",
+    asked: "Asked the provider to confirm",
+    ask: "Ask to confirm",
+    askHint: "Made on an earlier version or past its validity: the provider confirms it stands before it can be awarded.",
+    standsHeading: "Confirm your offer still stands",
+    lapsedBody: "Your offer's validity period has ended. The owner can award it only if you confirm its price and terms still stand (valid again from today). You may withdraw it instead.",
+    outdatedBody: "The requirement changed after you made this offer. The owner can award it only if you confirm it still stands, unchanged, against the current version.",
+    confirm: "Confirm it still stands",
+    withdraw: "Withdraw my offer",
+    lastWithdrawal: "If you withdraw this offer again, it can't be put forward again on this requirement.",
+    noMoreResubmission: "This offer was withdrawn twice, so it can't be put forward again on this requirement.",
+  },
   award: {
     confirmTitle: "Award this requirement to {provider}?",
     confirmBody: "This is your final decision on this requirement: {provider}'s offer of {amount} is accepted as submitted, every other live offer is marked not selected, and every provider is told. It can't be undone. It isn't a contract or a payment.",
@@ -1948,6 +2009,7 @@ export const en: Dictionary = {
     error: "The review couldn't be submitted.",
   },
   review: {
+    sealed: "Hidden from the other party until they review too, or until {date}. Reviews are revealed together, so neither is written in answer to the other.",
     confirmTitle: "Submit this review?",
     confirmBody: "Your rating and comment are recorded against this completed transaction and count towards the service provider's rating, which owners see when weighing its offers. A review can't be changed afterwards.",
     receivedHeading: "{party}'s review of you",
@@ -1967,6 +2029,7 @@ export const en: Dictionary = {
     summary: "{avg} / 5 · {n} reviews",
     completed: "{n} completed U-Tender transactions",
     none: "No completed U-Tender transactions yet",
+    terminated: "{n} agreement(s) terminated before completion",
     noReviews: "No owner reviews yet",
     verified: "Owner review · completed U-Tender transaction",
     note: "For information only: it doesn't affect eligibility, verification or award, and offers are never ordered by it.",
@@ -1976,6 +2039,11 @@ export const en: Dictionary = {
     noteOwner: "From the owner's completed U-Tender transactions and the reviews its providers left. For information only.",
   },
   previous: {
+    inviteHeading: "Invite a provider you have worked with",
+    invite: "Invite",
+    invited: "Invited",
+    inviteNote: "They are told about this requirement. Its conditions apply as for anyone, and their offer is weighed like every other.",
+    inviteError: "Could not send the invitation.",
     heading: "Providers you've completed work with",
     together: "Completed work together: {n}",
     last: "last",
@@ -2186,6 +2254,7 @@ export const en: Dictionary = {
   history: {
     heading: "History",
     awarded: "Awarded",
+    terms_confirmed: "Terms confirmed by the service provider",
     in_force: "Agreement in force",
     document: "Document added",
     change_proposed: "Change {n} proposed",
@@ -2339,6 +2408,24 @@ export const en: Dictionary = {
     activateConfirmBody: "Do this once both parties have agreed. Its reference and effective date can't be changed afterwards.",
     terminate: "Terminate the agreement",
     terminatePrompt: "Why was the agreement terminated?",
+    confirmTerms: "Confirm these terms",
+    confirmTermsHelp: "Check the effective date, reference and deliverables above. Once you confirm, the owner can put the agreement in force; if the owner changes anything, you'll be asked to confirm again.",
+    confirmTermsBody: "You confirm the agreement's effective date, reference and deliverables as shown. The owner can then put it in force.",
+    termsConfirmed: "Terms confirmed by the service provider",
+    awaitingConfirmation: "Waiting for the service provider to confirm these terms. You can put the agreement in force once they do.",
+    needsConfirmation: "The service provider confirms the terms first.",
+    terminatedBy: "Terminated by",
+    notInForce: "The work can be recorded as started once the agreement is in force.",
+    startsOn: "The agreement takes effect on {date}; the start of the work can be recorded from that day.",
+    submittedBlocksTermination: "The work was submitted as complete. The owner accepts it or returns it for correction before either party can terminate.",
+    commercialHeading: "Commercial terms (from the requirement)",
+    paymentStage: "Payment stage",
+    retention: "Retention",
+    retentionRelease: "Retention due for release",
+    warranty: "Warranty (defects liability)",
+    warrantyUntil: "Warranty ends",
+    offerValidity: "Offer validity",
+    paymentsNote: "Amounts are worked out on the current agreed value. Payments are made between the parties outside U-Tender.",
     documents: "Agreement documents",
     noDocuments: "No documents attached yet.",
     kindLabel: "Document",
@@ -2579,6 +2666,10 @@ export const en: Dictionary = {
     labelClosed: "Closed to offers",
     labelUnderEvaluation: "Under evaluation",
     labelAwarded: "Awarded",
+    labelTxPreparing: "Awarded · agreement being prepared",
+    labelTxActive: "Awarded · agreement in force",
+    labelTxCompleted: "Completed",
+    labelTxTerminated: "Awarded · agreement terminated",
     labelExternal: "Closed outside U-Tender",
     labelNoSuitable: "No award",
     textCanceled: "The owner canceled this requirement; it won't go ahead in this form.",
@@ -2989,6 +3080,9 @@ export const en: Dictionary = {
     cameWithChange: "This answer came with a change to the requirement (change #{n}) — see the changes above.",
     publishForAll: "Publish this question and answer to every provider (the asker stays anonymous)",
     materialHint: "If the answer changes the scope, quantities, documents, timing or who can respond, change the requirement itself too (Change the published requirement) and choose this question there.",
+    sharedNote: "Every answer is published to all providers. Your name is never shown.",
+    privateQuestion: "Asked privately before answers were shared with everyone: only the answer is shown.",
+    answerSharedNote: "Your answer is published to every provider, so all of them price on the same information. The asker stays anonymous.",
     becauseOf: "Because of a question (optional)",
     notBecauseOf: "Not because of a question",
     attachFiles: "Attach files (optional, up to 5: PDF, images, drawings, Excel, Word)",
@@ -3549,6 +3643,9 @@ export const ar: Dictionary = {
     pOther: "شروط أخرى",
   },
   organization: {
+    handOver: "تعيينه ممثلًا",
+    handOverConfirm: "تسليم دور الممثل؟",
+    handOverBody: "سيدير الأعضاء ويتلقى إشعارات حساب المؤسسة بصفته ممثلها. وتبقى أنت عضوًا.",
     heading: "أعضاء الجهة",
     hint: "كل من هنا يعمل باسم الجهة ويشارك كل ما يتم باسمها: توثيقها وطلباتها وعروضها وأسئلتها.",
     representative: "الممثل المفوض",
@@ -3711,6 +3808,23 @@ export const ar: Dictionary = {
     count: "{n} في القائمة المختصرة",
     row: "في قائمتك المختصرة",
   },
+  offerTiming: { days: "{n} يومًا", by: "بحلول {date}" },
+  offerValidity: {
+    until: "ساري حتى {date}",
+    lapsed: "انتهت مدة السريان",
+    answersSince: "{n} إجابة نُشرت بعد هذا العرض",
+    answersSinceProvider: "نُشرت {n} إجابة لجميع مقدمي الخدمة بعد تقديم عرضك. راجع الأسئلة والأجوبة وعدّل عرضك إن غيّرته.",
+    asked: "طُلب من مقدم الخدمة التأكيد",
+    ask: "اطلب التأكيد",
+    askHint: "قُدّم على إصدار سابق أو انتهت مدة سريانه: يؤكد مقدم الخدمة أنه ما زال قائمًا قبل ترسيته.",
+    standsHeading: "أكّد أن عرضك ما زال قائمًا",
+    lapsedBody: "انتهت مدة سريان عرضك. لا يمكن للمالك ترسيته إلا إذا أكدت أن سعره وشروطه ما زالت قائمة (ساري مجددًا من اليوم). ويمكنك سحبه بدلًا من ذلك.",
+    outdatedBody: "تغيّر الطلب بعد تقديم عرضك. لا يمكن للمالك ترسيته إلا إذا أكدت أنه ما زال قائمًا دون تغيير على الإصدار الحالي.",
+    confirm: "أكّد أنه ما زال قائمًا",
+    withdraw: "اسحب عرضي",
+    lastWithdrawal: "إذا سحبت هذا العرض مرة أخرى فلن يمكن تقديمه مجددًا على هذا الطلب.",
+    noMoreResubmission: "سُحب هذا العرض مرتين، لذا لا يمكن تقديمه مجددًا على هذا الطلب.",
+  },
   award: {
     confirmTitle: "ترسية هذا المتطلب على {provider}؟",
     confirmBody: "هذا قرارك النهائي في هذا المتطلب: يُقبل عرض {provider} بقيمة {amount} كما قُدّم، ويُعلَّم كل عرض قائم آخر بأنه لم يُختر، ويُبلَّغ كل المزوّدين. لا يمكن التراجع عنه. وهو ليس عقدًا ولا دفعًا.",
@@ -3728,6 +3842,7 @@ export const ar: Dictionary = {
     error: "تعذر إرسال التقييم.",
   },
   review: {
+    sealed: "مخفي عن الطرف الآخر حتى يقيّم هو أيضًا، أو حتى {date}. تُكشف التقييمات معًا، فلا يُكتب أحدها ردًا على الآخر.",
     confirmTitle: "إرسال هذا التقييم؟",
     confirmBody: "يُسجَّل تقييمك وتعليقك على هذه المعاملة المكتملة ويُحتسب ضمن تقييم مقدم الخدمة الذي يراه الملاك عند دراسة عروضه. لا يمكن تغيير التقييم بعد ذلك.",
     receivedHeading: "تقييم {party} لك",
@@ -3747,6 +3862,7 @@ export const ar: Dictionary = {
     summary: "{avg} / 5 · {n} تقييمات",
     completed: "{n} معاملات مكتملة على U-Tender",
     none: "لا توجد معاملات مكتملة على U-Tender بعد",
+    terminated: "{n} اتفاقية أُنهيت قبل الإكمال",
     noReviews: "لا توجد تقييمات من الملاك بعد",
     verified: "تقييم مالك · معاملة مكتملة على U-Tender",
     note: "للعلم فقط: لا يؤثر في الأهلية أو التحقق أو الترسية، ولا تُرتَّب العروض بحسبه.",
@@ -3756,6 +3872,11 @@ export const ar: Dictionary = {
     noteOwner: "من معاملات المالك المكتملة على U-Tender والتقييمات التي تركها مقدمو الخدمة. للعلم فقط.",
   },
   previous: {
+    inviteHeading: "ادعُ مقدم خدمة عملت معه",
+    invite: "دعوة",
+    invited: "تمت الدعوة",
+    inviteNote: "سيتم إبلاغه بهذا الطلب. تسري شروطه كما على أي مقدم خدمة، ويُقيَّم عرضه كأي عرض آخر.",
+    inviteError: "تعذّر إرسال الدعوة.",
     heading: "مقدمو خدمة أنجزت معهم أعمالًا",
     together: "أعمال مكتملة معًا: {n}",
     last: "آخرها",
@@ -3966,6 +4087,7 @@ export const ar: Dictionary = {
   history: {
     heading: "السجل",
     awarded: "تمت الترسية",
+    terms_confirmed: "أكّد مقدم الخدمة الشروط",
     in_force: "سريان الاتفاقية",
     document: "أُضيف مستند",
     change_proposed: "اقتُرح التغيير {n}",
@@ -4119,6 +4241,24 @@ export const ar: Dictionary = {
     activateConfirmBody: "قم بذلك بعد اتفاق الطرفين. لا يمكن تغيير المرجع وتاريخ السريان بعد ذلك.",
     terminate: "إنهاء الاتفاقية",
     terminatePrompt: "لماذا تم إنهاء الاتفاقية؟",
+    confirmTerms: "تأكيد هذه الشروط",
+    confirmTermsHelp: "راجع تاريخ السريان والمرجع والمخرجات أعلاه. بعد تأكيدك يمكن للمالك جعل الاتفاقية سارية؛ وإذا غيّر المالك أي شيء فسيُطلب منك التأكيد مجددًا.",
+    confirmTermsBody: "تؤكد تاريخ سريان الاتفاقية ومرجعها ومخرجاتها كما هي معروضة. يمكن للمالك بعدها جعلها سارية.",
+    termsConfirmed: "أكّد مقدم الخدمة الشروط",
+    awaitingConfirmation: "بانتظار تأكيد مقدم الخدمة لهذه الشروط. يمكنك جعل الاتفاقية سارية بعد تأكيده.",
+    needsConfirmation: "يؤكد مقدم الخدمة الشروط أولًا.",
+    terminatedBy: "أنهاها",
+    notInForce: "يمكن تسجيل بدء العمل بعد سريان الاتفاقية.",
+    startsOn: "تسري الاتفاقية في {date}؛ ويمكن تسجيل بدء العمل اعتبارًا من ذلك اليوم.",
+    submittedBlocksTermination: "قُدّم العمل على أنه مكتمل. يقبله المالك أو يعيده للتصحيح قبل أن يتمكن أي طرف من الإنهاء.",
+    commercialHeading: "الشروط التجارية (من الطلب)",
+    paymentStage: "دفعة",
+    retention: "المحتجزات",
+    retentionRelease: "موعد الإفراج عن المحتجزات",
+    warranty: "الضمان (مسؤولية العيوب)",
+    warrantyUntil: "ينتهي الضمان في",
+    offerValidity: "صلاحية العرض",
+    paymentsNote: "المبالغ محسوبة على القيمة المتفق عليها الحالية. تتم المدفوعات بين الطرفين خارج U-Tender.",
     documents: "مستندات الاتفاقية",
     noDocuments: "لم يتم إرفاق أي مستندات بعد.",
     kindLabel: "المستند",
@@ -4359,6 +4499,10 @@ export const ar: Dictionary = {
     labelClosed: "مغلق أمام العروض",
     labelUnderEvaluation: "قيد التقييم",
     labelAwarded: "تمت الترسية",
+    labelTxPreparing: "تمت الترسية · الاتفاقية قيد الإعداد",
+    labelTxActive: "تمت الترسية · الاتفاقية سارية",
+    labelTxCompleted: "مكتمل",
+    labelTxTerminated: "تمت الترسية · أُنهيت الاتفاقية",
     labelExternal: "أُغلق خارج U-Tender",
     labelNoSuitable: "بلا ترسية",
     textCanceled: "ألغى المالك هذا الطلب؛ لن يُنفَّذ بهذه الصيغة.",
@@ -4769,6 +4913,9 @@ export const ar: Dictionary = {
     cameWithChange: "جاءت هذه الإجابة مع تعديل على الطلب (التعديل رقم {n}) — اطّلع على التعديلات أعلاه.",
     publishForAll: "انشر هذا السؤال وإجابته لجميع مقدّمي الخدمة (يبقى السائل مجهولًا)",
     materialHint: "إن غيّرت الإجابة نطاق العمل أو الكميات أو المستندات أو التوقيت أو من يمكنه الرد، فعدّل الطلب نفسه أيضًا (تعديل الطلب المنشور) واختر هذا السؤال هناك.",
+    sharedNote: "تُنشر كل إجابة لجميع مقدمي الخدمة. لا يظهر اسمك أبدًا.",
+    privateQuestion: "طُرح بشكل خاص قبل أن تُنشر الإجابات للجميع: تظهر الإجابة فقط.",
+    answerSharedNote: "تُنشر إجابتك لجميع مقدمي الخدمة ليسعّروا على المعلومات نفسها. يبقى السائل مجهولًا.",
     becauseOf: "بسبب سؤال (اختياري)",
     notBecauseOf: "ليس بسبب سؤال",
     attachFiles: "إرفاق ملفات (اختياري، حتى 5: PDF أو صور أو مخططات أو Excel أو Word)",

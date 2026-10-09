@@ -22,9 +22,7 @@ export function ClarificationsPanel({
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [question, setQuestion] = useState("");
-  const [sharedWithAll, setSharedWithAll] = useState(true);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [publish, setPublish] = useState<Record<string, boolean>>({});
   // Stage 4.7 follow-up: files for the question being asked, and for each answer.
   const [questionFiles, setQuestionFiles] = useState<File[]>([]);
   const [answerFiles, setAnswerFiles] = useState<Record<string, File[]>>({});
@@ -50,7 +48,7 @@ export function ClarificationsPanel({
     mutationFn: async () => {
       const asked = await apiFetch<Clarification>(`/projects/${projectId}/clarifications`, {
         method: "POST",
-        body: { question, shared_with_all: sharedWithAll },
+        body: { question },
       });
       await upload(asked.id, questionFiles);
     },
@@ -68,7 +66,7 @@ export function ClarificationsPanel({
       await upload(clarificationId, answerFiles[clarificationId] ?? []);
       return apiFetch(`/projects/${projectId}/clarifications/${clarificationId}/answer`, {
         method: "POST",
-        body: { answer: drafts[clarificationId] || "", shared_with_all: publish[clarificationId] ? true : null },
+        body: { answer: drafts[clarificationId] || "" },
       });
     },
     onSuccess: (_, clarificationId) => {
@@ -107,7 +105,7 @@ export function ClarificationsPanel({
                 {!c.shared_with_all && <span className="font-mono text-[9px] uppercase text-amber-dark">{t("clarifications.privateTag")}</span>}
                 <span className="font-mono text-[10px] text-steel-light">{formatDeadline(c.created_at)}</span>
               </div>
-              <p dir="auto" className="text-[13px] text-navy whitespace-pre-wrap break-words">{c.question}</p>
+              <p dir="auto" className="text-[13px] text-navy whitespace-pre-wrap break-words">{c.question || <span className="italic text-steel">{t("clarifications.privateQuestion")}</span>}</p>
               <AttachmentLinks files={c.attachments?.filter((a) => a.part === "question")} />
               {c.answer ? (
                 <div className="mt-1.5 ps-3 border-s-2 border-blue">
@@ -137,12 +135,8 @@ export function ClarificationsPanel({
                     className="border border-border rounded px-2.5 py-1.5 text-xs"
                   />
                   <FilePicker id={`answer-files-${c.id}`} files={answerFiles[c.id] ?? []} onChange={(files) => setAnswerFiles((f) => ({ ...f, [c.id]: files }))} />
-                  {!c.shared_with_all && (
-                    <label className="flex items-center gap-1.5 text-[11.5px] text-steel">
-                      <input type="checkbox" checked={!!publish[c.id]} onChange={(e) => setPublish((p) => ({ ...p, [c.id]: e.target.checked }))} />
-                      {t("clarifications.publishForAll")}
-                    </label>
-                  )}
+                  {/* Batch B: every answer reaches every provider, so all of them price on the same information. */}
+                  <p className="text-[11px] text-steel">{t("clarifications.answerSharedNote")}</p>
                   <p className="text-[11px] text-steel-light">{t("clarifications.materialHint")}</p>
                   <button
                     type="button"
@@ -175,10 +169,7 @@ export function ClarificationsPanel({
             <FilePicker id="question-files" files={questionFiles} onChange={setQuestionFiles} />
           </div>
           <div className="flex items-center justify-between gap-2">
-            <label className="flex items-center gap-1.5 text-[11.5px] text-steel">
-              <input type="checkbox" checked={sharedWithAll} onChange={(e) => setSharedWithAll(e.target.checked)} />
-              {t("clarifications.shareCheckboxLabel")}
-            </label>
+            <p className="text-[11.5px] text-steel">{t("clarifications.sharedNote")}</p>
             <button
               type="button"
               onClick={() => askMutation.mutate()}

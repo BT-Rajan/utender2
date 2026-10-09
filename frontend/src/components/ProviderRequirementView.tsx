@@ -50,7 +50,7 @@ export function ProviderRequirementView({ project, closed }: { project: ProjectD
             {project.paused_at && project.status === "open"
               ? t("postPub.pausedPill")
               : ended && project.status !== "closed"
-                ? outcomeLabel(t, project.status, project.closure_reason)
+                ? outcomeLabel(t, project.status, project.closure_reason, project.transaction_status)
                 : closed
                   ? t("service_provider.offer.closed")
                   : timeLeft(t, project.bid_deadline)}

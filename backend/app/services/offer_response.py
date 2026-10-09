@@ -54,6 +54,14 @@ def priced_total(project: Project, payload: OfferCreate) -> tuple[Decimal | None
     rates = {p.item_id: p.rate for p in payload.item_prices or []}
     if set(rates) != items or len(rates) != len(payload.item_prices or []):
         raise HTTPException(status_code=400, detail="Give a rate for every item listed in the requirement, once each.")
+    # Batch B: an item priced at nothing makes the offer's total compare as
+    # lower than it is. An item whose cost is carried by another is priced at
+    # the smallest amount and the assumptions say so.
+    if any(rate <= 0 for rate in rates.values()):
+        raise HTTPException(
+            status_code=400,
+            detail="Price every item above zero. If an item's cost is included in another item, give it the smallest price (0.001 KWD) and say so in your assumptions.",
+        )
     lines = _lines(project, rates)
     return sum(Decimal(line["line_total"]) for line in lines), lines
 
@@ -232,6 +240,8 @@ def readiness(db: Session, project: Project, profile, offer) -> list:
             add("price", "That item isn't part of this requirement.")
         if items - priced:
             add("price", "Give a rate for every item listed in the requirement, once each.")
+        elif any(Decimal(str(line["rate"])) <= 0 for line in offer.item_prices or []):  # Batch B
+            add("price", "Price every item above zero. If an item's cost is included in another item, give it the smallest price (0.001 KWD) and say so in your assumptions.")
         elif offer.amount is None or not (Decimal(0) < offer.amount < AMOUNT_LIMIT):
             add("price", "Enter a valid bid amount.")
     elif offer.amount is None or not (Decimal(0) < offer.amount < AMOUNT_LIMIT):

@@ -38,6 +38,9 @@ class ReviewOut(BaseModel):
     response: str | None = Field(default=None, validation_alias="shown_response")
     response_at: UTCDateTime | None = Field(default=None, validation_alias="shown_response_at")
     hidden: bool = Field(default=False, validation_alias="is_hidden")  # Stage 8.15: an admin hid this review
+    # Batch C: sealed from the other side until both have reviewed, or until reveals_on.
+    revealed: bool = Field(default=True, validation_alias="is_revealed_now")
+    reveals_on: UTCDateTime | None = None
 
 
 class ReceivedReviewOut(BaseModel):
@@ -60,6 +63,7 @@ class ProviderReputationOut(BaseModel):
     and the latest owner reviews, each as rating, comment and date only."""
     company_name: str | None
     completed_transactions: int
+    terminated_transactions: int = 0  # Batch A: agreements ended before completion, by either party
     review_count: int
     avg_rating: float | None
     recent_reviews: list[ReceivedReviewOut]
@@ -75,6 +79,7 @@ class OwnerReputationOut(BaseModel):
     providers weighing a requirement don't yet know whose it is (Stage 7.2),
     and review text could tell them."""
     completed_transactions: int
+    terminated_transactions: int = 0  # Batch A: agreements ended before completion, by either party
     review_count: int
     avg_rating: float | None
     recent_reviews: list[ReceivedReviewOut]
@@ -89,6 +94,7 @@ class PreviousTransactionOut(BaseModel):
 class PreviousProviderOut(BaseModel):
     """Stage 8.12: a provider the owner organisation completed work with --
     its name and those completed requirements, nothing else of them."""
+    service_provider_id: str | None = None  # Batch C: to invite it to a new requirement
     company_name: str | None
     completed_transactions: int
     last_completed_at: UTCDateTime | None

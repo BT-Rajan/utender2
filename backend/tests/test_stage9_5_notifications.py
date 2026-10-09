@@ -71,6 +71,11 @@ def test_events_reach_the_right_people_and_failures_change_nothing(db, monkeypat
     db.commit()
     owner.get("/owner/projects")
     win = sami.get(f"/projects/{pid}/offers/mine").json()["id"]
+    # Batch B: an offer on an earlier version can't be awarded on the owner's
+    # word alone (409); the provider confirms it still stands, then it's awarded.
+    r = owner.post(f"/owner/projects/{pid}/offers/{win}/approve", json={"acknowledge_earlier_version": True})
+    assert r.status_code == 409 and "Ask the provider to confirm it still stands" in r.json()["detail"]
+    assert sami.post(f"/projects/{pid}/offers/confirm").status_code == 200
     assert owner.post(f"/owner/projects/{pid}/offers/{win}/approve", json={"acknowledge_earlier_version": True}).status_code == 200
     assert _got(db, amal, N.award_won) and _got(db, sami, N.award_won)
     assert _got(db, b, N.award_lost) and not _got(db, b, N.award_won)
@@ -87,6 +92,10 @@ def test_events_reach_the_right_people_and_failures_change_nothing(db, monkeypat
     assert sami.get("/notifications").status_code == 200 and old.id in {n["id"] for n in sami.get("/notifications").json()}
     assert sami.get(f"/projects/{pid}/agreement").status_code in (403, 404)
     # ...and gets nothing new about the organisation.
+    # Batch C: the owner's review is sealed, so it can't be responded to yet (404);
+    # Amal's own review of the owner reveals both.
+    assert amal.post(f"/service-provider/projects/{pid}/review/received/response", json={"response": "Thanks."}).status_code == 404
+    assert amal.post("/service-provider/reviews", json={"project_id": pid, "rating": 5}).status_code == 200
     assert sami.post(f"/service-provider/projects/{pid}/review/received/response", json={"response": "x"}).status_code in (403, 404)
     assert amal.post(f"/service-provider/projects/{pid}/review/received/response", json={"response": "Thanks."}).status_code == 200
     assert _got(db, owner, N.review_response) and not _got(db, sami, N.review_response)
