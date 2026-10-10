@@ -89,9 +89,13 @@ def _can_view_project(user: User, project: Project, db: Session) -> bool:
     # Batch A: that needs an account in good standing, not a live
     # subscription -- the subscription buys access to new opportunities, and a
     # winner whose payment lapses mid-job still needs the scope and drawings
-    # of the work it is doing.
+    # of the work it is doing. The same goes for documents sent back for
+    # re-review: only a rejected or suspended account loses sight of it,
+    # exactly as with the agreement (agreements._load), which is shown on this
+    # page -- otherwise the winner couldn't reach it to confirm terms, start
+    # work or deliver.
     if project.status != ProjectStatus.open:
-        return has_bid and profile.verification_status == VerificationStatus.approved and not profile.is_suspended
+        return has_bid and profile.verification_status != VerificationStatus.rejected and not profile.is_suspended
     if not profile.is_verified_active:
         return False
     # Stage 3.9: open, and eligible for this particular requirement -- or

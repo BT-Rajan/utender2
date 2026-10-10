@@ -398,6 +398,20 @@ def remove_member(user: User, db: Session, member_id: str) -> None:
     )
     if not target:
         raise HTTPException(status_code=404, detail="Not a member of this organization.")
+    # The organization's profile (its verification, payment and trading name)
+    # is held by the account that established it. Removing that person would
+    # leave their account still resolving to the organization's profile and so
+    # still acting for it (and still receiving its emails), so it can't be
+    # removed until the profile is moved to someone else.
+    holds_profile = any(
+        db.query(model.user_id).filter(model.organization_id == membership.organization_id, model.user_id == member_id).first()
+        for model in (OwnerProfile, ServiceProviderProfile)
+    )
+    if holds_profile:
+        raise HTTPException(
+            status_code=409,
+            detail="This person set up the organization and its profile is tied to their account, so they can't be removed.",
+        )
     # They stop acting for the organization; it keeps everything recorded
     # under it. Their own account is as it was before they joined.
     db.delete(target)

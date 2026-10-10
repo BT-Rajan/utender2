@@ -109,10 +109,28 @@ def require_in_force(agreement: Agreement) -> None:
         )
 
 
+COMPLETION_REVIEW_DAYS = 30
+
+
+def _review_overdue(agreement: Agreement) -> bool:
+    """Batch D: submitted work has waited COMPLETION_REVIEW_DAYS for the owner's answer."""
+    return agreement.completion_submitted_at is not None and agreement.completion_submitted_at <= datetime.utcnow() - timedelta(days=COMPLETION_REVIEW_DAYS)
+
+
 def _clear_confirmation(agreement: Agreement) -> None:
     """Batch A: the provider confirmed the terms as they were; any change by the
     owner side means they must confirm again before the agreement can take force."""
     agreement.provider_confirmed_at = agreement.provider_confirmed_by = None
+
+
+def _reconfirm_after_paper_change(agreement: Agreement, side: str, user: User) -> None:
+    """Batch D: the signed papers are part of the terms the provider confirmed.
+    When the owner side adds or removes one while the agreement is still being
+    prepared, the provider must confirm again -- otherwise the owner could put
+    the agreement in force on different paperwork than was confirmed."""
+    if side == "owner" and agreement.status == "preparing" and agreement.provider_confirmed_at is not None:
+        _clear_confirmation(agreement)
+        _touch(agreement, user)
 
 
 def _tell_other(db: Session, project: Project, winner: Offer, side: str, kind: NotificationType, **params) -> None:
@@ -198,6 +216,7 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
         provider_name=provider_name,
         execution_status=_execution_status(agreement),
         completion_status=agreement.completion_status,
+        completion_review_overdue=agreement.completion_status == "submitted" and _review_overdue(agreement),
         completed_at=agreement.completed_at,
         completion_submitted_at=agreement.completion_submitted_at,
         completion_note=agreement.completion_note,
@@ -498,10 +517,13 @@ def terminate_agreement(
         raise HTTPException(status_code=400, detail="This agreement was already terminated. This page now shows the latest.")
     if agreement.completion_status == "accepted":  # Stage 7.10
         raise HTTPException(status_code=409, detail="The work was already accepted as complete, so the agreement can't be terminated. This page now shows the latest.")
-    if agreement.completion_status == "submitted":  # Batch A: submitted work is answered, not walked away from
+    # Batch A: submitted work is answered, not walked away from. Batch D: but an
+    # owner who never answers can't hold the provider there forever -- after
+    # COMPLETION_REVIEW_DAYS without an answer either party may terminate.
+    if agreement.completion_status == "submitted" and not _review_overdue(agreement):
         raise HTTPException(
             status_code=409,
-            detail="The work was submitted as complete and is awaiting the owner's review. The owner accepts it or returns it for correction before either party can terminate.",
+            detail=f"The work was submitted as complete and is awaiting the owner's review. The owner accepts it or returns it for correction before either party can terminate (or, if there is no answer for {COMPLETION_REVIEW_DAYS} days, after that).",
         )
     _check_version(agreement, if_match)
     reason = payload.reason.strip()
@@ -672,6 +694,7 @@ async def attach_agreement_document(
         if not (milestone_id or variation_id or execution_update_id) and kind not in EVIDENCE_KINDS:
             # Stage 7.13: the agreement's own papers are part of its history.
             _record(db, agreement, "document", side, user, doc.file_name, doc.uploaded_at or datetime.utcnow().replace(microsecond=0), document_id=doc.id)
+            _reconfirm_after_paper_change(agreement, side, user)
         # log_action commits: the document and its audit entry land together.
         log_action(db, actor_id=user.id, action="agreement.document_add", target_type="agreement", target_id=agreement.id, new_value=f"{doc.id}:{kind}")
     except Exception:  # never leave a stored file no record points to
@@ -697,6 +720,8 @@ def remove_agreement_document(project_id: str, document_id: str, user: User = De
     if agreement.status != "preparing":
         raise HTTPException(status_code=400, detail="Documents of an agreement in force or terminated stay on record.")
     path = doc.file_path
+    if not (doc.milestone_id or doc.variation_id or doc.execution_update_id) and doc.kind not in EVIDENCE_KINDS:
+        _reconfirm_after_paper_change(agreement, side, user)
     db.delete(doc)
     log_action(db, actor_id=user.id, action="agreement.document_remove", target_type="agreement", target_id=agreement.id, previous_value=f"{document_id}:{doc.kind}")
     try:

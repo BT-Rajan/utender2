@@ -192,6 +192,7 @@ export interface Agreement {
   // Stage 7.5: execution
   execution_status: "not_started" | "in_progress" | "on_hold" | "completed" | "terminated";
   completion_status: "submitted" | "accepted" | "returned" | null;
+  completion_review_overdue?: boolean; // Batch D: unanswered for 30 days, so termination is open again
   completed_at: string | null; // Stage 7.11: when the transaction closed
   completion_submitted_at: string | null;
   completion_note: string | null;
@@ -442,10 +443,10 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
           </button>
         </div>
       ))}
-      {a.side !== "admin" && !["terminated", "completed"].includes(a.status) && a.completion_status === "submitted" && (
+      {a.side !== "admin" && !["terminated", "completed"].includes(a.status) && a.completion_status === "submitted" && !a.completion_review_overdue && (
         <p className="text-xs text-steel mt-2">{t(`${c}.submittedBlocksTermination`)}</p>
       )}
-      {a.side !== "admin" && !["terminated", "completed"].includes(a.status) && a.completion_status !== "submitted" && (ending === null ? (
+      {a.side !== "admin" && !["terminated", "completed"].includes(a.status) && (a.completion_status !== "submitted" || a.completion_review_overdue) && (ending === null ? (
         <button type="button" disabled={busy} onClick={() => setEnding("")} className="block mt-2 text-xs text-red underline">
           {t(`${c}.terminate`)}
         </button>
