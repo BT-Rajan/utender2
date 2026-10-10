@@ -210,3 +210,24 @@ def notify_provider_requirement_ended(to_email: str, language: str, project_titl
         subject = f"Requirement ended on U-Tender: {project_title}"
         html = f'<p>The owner ended <strong>{title}</strong> before its deadline. It is no longer open for offers.</p><p><a href="{link}">View the requirement</a></p>'
     _send(to_email, subject, html)
+
+
+def notify_email_change_code(to_email: str, new_email: str, code: str) -> None:
+    """Sent to the CURRENT address: proof that whoever asks still controls it."""
+    _send(
+        to_email,
+        "Your U-Tender email change code",
+        f"<p>Someone asked to change the sign-in email on your U-Tender account to <strong>{new_email}</strong>.</p>"
+        f"<p>Your code is: <strong style=\"font-size:20px;letter-spacing:3px\">{code}</strong></p>"
+        f"<p>It expires in 15 minutes. If this wasn't you, don't share the code, and change your password.</p>",
+    )
+
+
+def notify_email_changed(old_email: str, new_email: str) -> None:
+    """Sent to the address being replaced, after the change took effect."""
+    _send(
+        old_email,
+        "The email on your U-Tender account was changed",
+        f"<p>The sign-in email on your U-Tender account was changed to <strong>{new_email}</strong>.</p>"
+        f"<p>If you didn't expect this, contact U-Tender support straight away.</p>",
+    )

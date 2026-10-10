@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ApiError, apiFetch } from "@/api/client";
 import { useI18n } from "@/i18n/I18nContext";
 
 interface Found {
-  user: { id: string; email: string; full_name: string | null; role: string; email_verified: boolean; deactivated_at: string | null };
+  user: { id: string; email: string; full_name: string | null; role: string; email_verified: boolean; deactivated_at: string | null; phone: string | null; language: string };
   acts_for: { stakeholder_id: string; display_name: string | null; organization: { legal_name: string } | null; standing: Record<string, unknown> | null } | null;
   membership: { role: string; position: string | null } | null;
 }
@@ -17,6 +17,56 @@ async function lookup(email: string): Promise<Found | null> {
     if (e instanceof ApiError && e.status === 404) return null;
     throw e;
   }
+}
+
+// Correcting a person's details -- the way back in for someone who has lost
+// the mailbox their account was opened with. Only changed fields are sent; a
+// changed email becomes unverified and gets a verification link.
+function EditPerson({ user }: { user: Found["user"] }) {
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [state, setState] = useState<{ pending: boolean; error: string | null; saved: boolean }>({ pending: false, error: null, saved: false });
+
+  async function save(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const body: Record<string, string> = {};
+    for (const [field, current] of [["full_name", user.full_name ?? ""], ["email", user.email], ["phone", user.phone ?? ""], ["language", user.language]] as const) {
+      const value = String(form.get(field) ?? "").trim();
+      if (value !== current) body[field] = value;
+    }
+    const reason = String(form.get("reason") ?? "").trim();
+    if (reason) body.reason = reason;
+    setState({ pending: true, error: null, saved: false });
+    try {
+      await apiFetch(`/admin/users/${user.id}`, { method: "PATCH", body });
+      setState({ pending: false, error: null, saved: true });
+      await queryClient.invalidateQueries({ queryKey: ["admin-find"] });
+    } catch (err) {
+      setState({ pending: false, error: err instanceof ApiError ? err.message : t("support.failed"), saved: false });
+    }
+  }
+
+  if (!open) {
+    return <button type="button" onClick={() => setOpen(true)} className="mt-3 border border-navy text-navy text-xs font-semibold rounded px-3 py-1.5">{t("support.editHeading")}</button>;
+  }
+  const input = "border border-border rounded px-3 py-1.5 text-sm w-full";
+  const label = "block font-mono text-[10.5px] uppercase tracking-wide text-steel mb-1";
+  return (
+    <form key={`${user.id}:${user.email}:${user.full_name}:${user.phone}:${user.language}`} onSubmit={save} className="mt-3 grid gap-2.5 max-w-md" data-testid="edit-person">
+      <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy">{t("support.editHeading")}</h3>
+      <div><label className={label} htmlFor="ep-name">{t("support.editName")}</label><input id="ep-name" name="full_name" defaultValue={user.full_name ?? ""} required className={input} dir="auto" /></div>
+      <div><label className={label} htmlFor="ep-email">{t("support.editEmail")}</label><input id="ep-email" name="email" type="email" defaultValue={user.email} required className={input} dir="ltr" /><p className="text-[11.5px] text-steel mt-1">{t("support.editEmailNote")}</p></div>
+      <div><label className={label} htmlFor="ep-phone">{t("support.editPhone")}</label><input id="ep-phone" name="phone" defaultValue={user.phone ?? ""} className={input} dir="ltr" /></div>
+      <div><label className={label} htmlFor="ep-lang">{t("support.editLanguage")}</label>
+        <select id="ep-lang" name="language" defaultValue={user.language} className={input}><option value="en">English</option><option value="ar">العربية</option></select></div>
+      <div><label className={label} htmlFor="ep-reason">{t("support.editReason")}</label><input id="ep-reason" name="reason" maxLength={500} className={input} /></div>
+      {state.error && <p role="alert" className="text-red text-xs">{state.error}</p>}
+      {state.saved && <p className="text-green text-xs">{t("support.editSaved")}</p>}
+      <button type="submit" disabled={state.pending} className="border border-navy text-navy text-xs font-semibold rounded px-3 py-1.5 w-fit disabled:opacity-60">{state.pending ? t("support.editSaving") : t("support.editSave")}</button>
+    </form>
+  );
 }
 
 // Stage 9.4: find a person by email -- who they are, what they act for, and
@@ -53,6 +103,7 @@ export function FindPerson() {
           )}
         </dl>
       )}
+      {data && data.user.role !== "admin" && <EditPerson user={data.user} />}
     </section>
   );
 }

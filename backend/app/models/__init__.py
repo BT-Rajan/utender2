@@ -1,6 +1,7 @@
 from app.models.agreement import Agreement, AgreementDocument, ExecutionUpdate, Milestone, Variation
 from app.models.audit_log import AuditLog
 from app.models.auth_token import AuthToken
+from app.models.email_change import EmailChangeRequest
 from app.models.award_record import AwardRecord
 from app.models.category import ServiceCategory
 from app.models.clarification import Clarification, ClarificationAttachment
@@ -29,6 +30,7 @@ __all__ = [
     "Variation",
     "User",
     "AuthToken",
+    "EmailChangeRequest",
     "ServiceProviderProfile",
     "DocumentRequirement",
     "ServiceProviderDocument",

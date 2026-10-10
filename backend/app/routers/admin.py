@@ -3,7 +3,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
@@ -1701,6 +1702,79 @@ def _account_target(db: Session, user_id: str, admin: User) -> User:
     return target
 
 
+class AccountDetailsPatch(BaseModel):
+    """What an admin may correct on a person's account. Never the role or the
+    password; admin accounts aren't editable here at all."""
+
+    full_name: str | None = Field(default=None, min_length=1, max_length=255)
+    email: EmailStr | None = None
+    phone: str | None = Field(default=None, max_length=50)
+    language: Language | None = None
+    reason: str | None = Field(default=None, max_length=500)
+
+
+@router.patch("/users/{user_id}")
+def edit_account_details(user_id: str, payload: AccountDetailsPatch, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Correct a person's name, phone, language or sign-in email -- the way
+    back in for someone who has lost access to their old mailbox (the
+    self-service route needs a code sent to it). A changed email is treated
+    like a new one: unverified until its link is used, with a verification
+    link sent there and a notice to the old address. Everything changed is
+    written to the audit trail with who did it and why. Only fields that are
+    sent change; sending a field with its current value changes nothing."""
+    from sqlalchemy import func
+
+    from app.models.enums import AuthTokenType
+    from app.services.auth_tokens import issue_token
+    from app.services.email import notify_email_changed, notify_verify_email
+
+    target = _account_target(db, user_id, admin)
+    sent = payload.model_dump(exclude_unset=True, exclude={"reason"})
+    changes: dict[str, tuple] = {}
+    for field, value in sent.items():
+        if field == "email":
+            value = value.strip().lower() if value else None
+        elif isinstance(value, str):
+            value = value.strip() or None
+        if field == "full_name" and not value:
+            raise HTTPException(status_code=400, detail="Name can't be empty.")
+        if field == "email" and not value:
+            raise HTTPException(status_code=400, detail="Email can't be empty.")
+        current = getattr(target, field)
+        current = current.value if hasattr(current, "value") else current
+        new = value.value if hasattr(value, "value") else value
+        if new != current:
+            changes[field] = (current, new)
+    if not changes:
+        raise HTTPException(status_code=400, detail="Nothing to change.")
+
+    old_email = target.email
+    if "email" in changes:
+        taken = db.query(User.id).filter(func.lower(User.email) == changes["email"][1], User.id != target.id).first()
+        if taken:
+            raise HTTPException(status_code=409, detail="An account with this email already exists.")
+    for field, (_, new) in changes.items():
+        setattr(target, field, Language(new) if field == "language" else new)
+    if "email" in changes:
+        target.email_verified = False
+    try:
+        db.flush()
+    except IntegrityError:  # the same address was taken a moment ago
+        db.rollback()
+        raise HTTPException(status_code=409, detail="An account with this email already exists.")
+    log_action(
+        db, actor_id=admin.id, action="account.updated_by_admin", target_type="user", target_id=target.id,
+        previous_value=json.dumps({f: c[0] for f, c in changes.items()}), new_value=json.dumps({f: c[1] for f, c in changes.items()}),
+        reason=(payload.reason or None),
+    )
+    if "email" in changes:
+        notify_verify_email(target.email, issue_token(db, target.id, AuthTokenType.email_verify))
+        notify_email_changed(old_email, target.email)
+    db.refresh(target)
+    return {"user_id": target.id, "email": target.email, "full_name": target.full_name, "phone": target.phone,
+            "language": target.language.value, "email_verified": target.email_verified}
+
+
 @router.post("/users/{user_id}/deactivate")
 def deactivate_account(user_id: str, payload: AccountStatePatch | None = None, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     """Stage 9.2: stop one person -- every session at once (checked on each
@@ -1762,7 +1836,8 @@ def find_account(email: str = Query(..., min_length=3, max_length=255), db: Sess
                     "can_publish": profile.is_verified_active}
     return {
         "user": {"id": user.id, "email": user.email, "full_name": user.full_name, "role": user.role.value,
-                 "email_verified": user.email_verified, "created_at": user.created_at, "deactivated_at": user.deactivated_at},
+                 "email_verified": user.email_verified, "created_at": user.created_at, "deactivated_at": user.deactivated_at,
+                 "phone": user.phone, "language": user.language.value},
         "acts_for": {"stakeholder_id": profile.user_id, **describe(profile, user, db, viewer_id=user.id), "standing": standing} if profile else None,
         "membership": membership,
     }

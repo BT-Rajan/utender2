@@ -424,6 +424,16 @@ export interface Dictionary {
     person: string;
     deactivated: string;
     emailUnverified: string;
+    editHeading: string;
+    editName: string;
+    editEmail: string;
+    editPhone: string;
+    editLanguage: string;
+    editReason: string;
+    editEmailNote: string;
+    editSave: string;
+    editSaving: string;
+    editSaved: string;
     actsFor: string;
     notEstablished: string;
     standing: string;
@@ -1233,6 +1243,21 @@ export interface Dictionary {
       success: string;
     };
     emailVerifyBanner: { message: string; resend: string; sent: string };
+    changeEmail: {
+      heading: string;
+      intro: string;
+      newEmail: string;
+      currentPassword: string;
+      sendCode: string;
+      sending: string;
+      codeSent: string;
+      code: string;
+      confirm: string;
+      confirming: string;
+      success: string;
+      back: string;
+      lostAccess: string;
+    };
   };
   clarifications: {
     heading: string;
@@ -2200,6 +2225,16 @@ export const en: Dictionary = {
     person: "Person",
     deactivated: "deactivated",
     emailUnverified: "email not verified",
+    editHeading: "Edit details",
+    editName: "Name",
+    editEmail: "Email",
+    editPhone: "Phone",
+    editLanguage: "Language",
+    editReason: "Reason (kept in the audit trail)",
+    editEmailNote: "Changing the email marks it unverified and sends a verification link to the new address.",
+    editSave: "Save changes",
+    editSaving: "Saving…",
+    editSaved: "Saved.",
     actsFor: "Acts for",
     notEstablished: "not set up as an owner or provider yet",
     standing: "Standing",
@@ -3057,6 +3092,21 @@ export const en: Dictionary = {
       message: "Please verify your email address.",
       resend: "Resend verification email",
       sent: "Verification email sent.",
+    },
+    changeEmail: {
+      heading: "Change email address",
+      intro: "We'll send a 6-digit code to your current email address to confirm it's you.",
+      newEmail: "New email address",
+      currentPassword: "Current password",
+      sendCode: "Send code",
+      sending: "Sending…",
+      codeSent: "We sent a 6-digit code to",
+      code: "6-digit code",
+      confirm: "Change email",
+      confirming: "Changing…",
+      success: "Email changed. Check your new address for a verification link.",
+      back: "Start over",
+      lostAccess: "Can't open your current email? Ask U-Tender support to change it for you.",
     },
   },
   clarifications: {
@@ -4033,6 +4083,16 @@ export const ar: Dictionary = {
     person: "الشخص",
     deactivated: "مُعطَّل",
     emailUnverified: "البريد غير موثَّق",
+    editHeading: "تعديل البيانات",
+    editName: "الاسم",
+    editEmail: "البريد الإلكتروني",
+    editPhone: "الهاتف",
+    editLanguage: "اللغة",
+    editReason: "السبب (يُحفظ في سجل التدقيق)",
+    editEmailNote: "تغيير البريد الإلكتروني يجعله غير موثَّق ويرسل رابط تحقق إلى العنوان الجديد.",
+    editSave: "حفظ التغييرات",
+    editSaving: "جارٍ الحفظ…",
+    editSaved: "تم الحفظ.",
     actsFor: "يعمل باسم",
     notEstablished: "لم يُعدّ كمالك أو مقدم خدمة بعد",
     standing: "الوضع",
@@ -4890,6 +4950,21 @@ export const ar: Dictionary = {
       message: "يرجى تأكيد بريدك الإلكتروني.",
       resend: "إعادة إرسال رسالة التحقق",
       sent: "تم إرسال رسالة التحقق.",
+    },
+    changeEmail: {
+      heading: "تغيير البريد الإلكتروني",
+      intro: "سنرسل رمزًا من 6 أرقام إلى بريدك الإلكتروني الحالي للتأكد من هويتك.",
+      newEmail: "البريد الإلكتروني الجديد",
+      currentPassword: "كلمة المرور الحالية",
+      sendCode: "إرسال الرمز",
+      sending: "جارٍ الإرسال…",
+      codeSent: "أرسلنا رمزًا من 6 أرقام إلى",
+      code: "الرمز المكوَّن من 6 أرقام",
+      confirm: "تغيير البريد",
+      confirming: "جارٍ التغيير…",
+      success: "تم تغيير البريد الإلكتروني. تحقق من عنوانك الجديد لرابط التحقق.",
+      back: "البدء من جديد",
+      lostAccess: "لا يمكنك فتح بريدك الحالي؟ اطلب من دعم U-Tender تغييره لك.",
     },
   },
   clarifications: {

@@ -42,3 +42,12 @@ class VerifyEmailRequest(BaseModel):
 
 class LanguageUpdate(BaseModel):
     language: Language
+
+
+class EmailChangeRequestIn(BaseModel):
+    new_email: EmailStr
+    current_password: str
+
+
+class EmailChangeConfirmIn(BaseModel):
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")

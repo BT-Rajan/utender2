@@ -119,6 +119,94 @@ function ChangePasswordForm() {
   );
 }
 
+// Changing the sign-in email: a code goes to the CURRENT address first, so
+// someone who only has a signed-in browser can't quietly move the account.
+function ChangeEmailForm() {
+  const { t } = useI18n();
+  const { refresh } = useAuth();
+  const [step, setStep] = useState<"ask" | "confirm" | "done">("ask");
+  const [sentTo, setSentTo] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function handleAsk(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setPending(true);
+    const form = new FormData(e.currentTarget);
+    try {
+      const r = await apiFetch<{ sent_to: string }>("/auth/email-change/request", {
+        method: "POST",
+        body: { new_email: form.get("new_email"), current_password: form.get("current_password") },
+      });
+      setSentTo(r.sent_to);
+      setStep("confirm");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : t("auth.changeEmail.heading"));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleConfirm(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setPending(true);
+    const form = new FormData(e.currentTarget);
+    try {
+      await apiFetch("/auth/email-change/confirm", { method: "POST", body: { code: String(form.get("code") ?? "").trim() } });
+      setStep("done");
+      await refresh();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : t("auth.changeEmail.heading"));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  const input = "w-full border border-border rounded px-3 py-2.5 text-sm";
+  const label = "block font-mono text-[11px] uppercase tracking-wide text-steel mb-1";
+  const button = "bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 mt-2 w-fit";
+
+  return (
+    <div className="bg-white border border-border rounded px-5 py-4.5 max-w-xl mt-8" data-testid="change-email">
+      <h2 className="font-display text-lg font-semibold text-navy mb-1">{t("auth.changeEmail.heading")}</h2>
+      {error && <div role="alert" className="text-xs text-red bg-red-tint border border-red rounded px-3 py-2 mb-4">{error}</div>}
+      {step === "ask" && (
+        <>
+          <p className="text-[13px] text-steel mb-3">{t("auth.changeEmail.intro")}</p>
+          <form onSubmit={handleAsk} className="flex flex-col gap-3.5">
+            <div>
+              <label htmlFor="account-new-email" className={label}>{t("auth.changeEmail.newEmail")}</label>
+              <input id="account-new-email" type="email" name="new_email" required className={input} />
+            </div>
+            <div>
+              <label htmlFor="account-email-password" className={label}>{t("auth.changeEmail.currentPassword")}</label>
+              <input id="account-email-password" type="password" name="current_password" required className={input} />
+            </div>
+            <button type="submit" disabled={pending} className={button}>{pending ? t("auth.changeEmail.sending") : t("auth.changeEmail.sendCode")}</button>
+          </form>
+          <p className="text-[12px] text-steel mt-4">{t("auth.changeEmail.lostAccess")}</p>
+        </>
+      )}
+      {step === "confirm" && (
+        <form onSubmit={handleConfirm} className="flex flex-col gap-3.5">
+          <p className="text-[13px] text-steel">{t("auth.changeEmail.codeSent")} <strong dir="ltr">{sentTo}</strong></p>
+          <div>
+            <label htmlFor="account-email-code" className={label}>{t("auth.changeEmail.code")}</label>
+            <input id="account-email-code" name="code" required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} className={`${input} tracking-[0.3em] font-mono`} />
+          </div>
+          <div className="flex gap-3 items-center">
+            <button type="submit" disabled={pending} className={button}>{pending ? t("auth.changeEmail.confirming") : t("auth.changeEmail.confirm")}</button>
+            <button type="button" onClick={() => { setStep("ask"); setError(null); }} className="text-xs underline text-steel mt-2">{t("auth.changeEmail.back")}</button>
+          </div>
+        </form>
+      )}
+      {step === "done" && <p className="text-[13px] text-green">{t("auth.changeEmail.success")}</p>}
+    </div>
+  );
+}
+
 // Who is logged in, and who they act as on the marketplace.
 function IdentityCard() {
   const { t } = useI18n();
@@ -152,6 +240,7 @@ export function AccountPage() {
         <IdentityCard />
         <MembersIfOrganization />
         <ChangePasswordForm />
+        <ChangeEmailForm />
       </main>
     </div>
   );

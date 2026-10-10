@@ -23,6 +23,8 @@ from app.models.revoked_token import RevokedToken
 from app.models.user import User
 from app.schemas.auth import (
     ChangePasswordRequest,
+    EmailChangeConfirmIn,
+    EmailChangeRequestIn,
     ForgotPasswordRequest,
     LanguageUpdate,
     LoginRequest,
@@ -37,6 +39,7 @@ from app.services.audit import log_action
 from app.services.email import notify_password_reset, notify_verify_email
 from app.services.login_throttle import login_throttle
 from app.services.token_cleanup import purge_expired_revoked_tokens
+from app.services import email_change as email_change_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
@@ -307,6 +310,20 @@ def change_password(
     # who just changed their password isn't logged out of the tab they used.
     _set_auth_cookies(response, user)
     return {"ok": True}
+
+
+@router.post("/email-change/request")
+def request_email_change(payload: EmailChangeRequestIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Step 1: a code goes to the CURRENT email address. Needs the current password."""
+    sent_to = email_change_service.request_change(db, user, payload.new_email, payload.current_password)
+    return {"ok": True, "sent_to": sent_to}
+
+
+@router.post("/email-change/confirm", response_model=UserOut)
+def confirm_email_change(payload: EmailChangeConfirmIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Step 2: the code from the current address switches the account to the
+    new one. The new address is then unverified until its link is used."""
+    return email_change_service.confirm_change(db, user, payload.code)
 
 
 @router.patch("/language", response_model=UserOut)

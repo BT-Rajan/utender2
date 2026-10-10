@@ -162,6 +162,24 @@ The same hourly run also deletes revoked-refresh-token rows whose token has
 already expired (reported as `revoked_tokens_purged`); logout does a small
 bounded purge too, so the table stays small even if the cron isn't scheduled.
 
+## Changing a sign-in email
+
+Self-service: signed in, the person enters the new address and their current
+password (`POST /auth/email-change/request`); a 6-digit code goes to their
+**current** address, and entering it (`POST /auth/email-change/confirm`)
+switches the account. The new address is then unverified until its link is
+used, and the old address is told about the change. The code expires after 15
+minutes or 5 wrong tries, a new request replaces the old one, and requests are
+limited to one a minute and five an hour. Whether the new address is already
+taken is only revealed at confirmation, after the old mailbox has been proved.
+
+If they've lost the old mailbox, an admin corrects the account instead
+(`PATCH /admin/users/{id}` -- name, email, phone, language; also under
+Support > Find person > Edit details). A changed email is handled the same
+way (unverified, link sent, old address notified), the role and password can't
+be edited this way, admin accounts aren't editable, and what changed is on
+the audit trail with the admin's reason.
+
 ## Sign-in and session audit
 
 Sign-in and session events are written to the audit trail (visible per account
