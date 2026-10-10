@@ -158,6 +158,20 @@ emails owners when a project's deadline is under 24 hours away. It's
 intentionally host-agnostic — point any scheduler at it (system cron, a
 GitHub Actions scheduled workflow, etc.) roughly once an hour.
 
+The same hourly run also deletes revoked-refresh-token rows whose token has
+already expired (reported as `revoked_tokens_purged`); logout does a small
+bounded purge too, so the table stays small even if the cron isn't scheduled.
+
+## Sign-in and session audit
+
+Sign-in and session events are written to the audit trail (visible per account
+at `GET /admin/users/{id}/audit`), each with the client address and user agent:
+`login.success`, `login.failed`, `login.locked` (once, when the lockout
+starts), `login.blocked_deactivated`, `session.logout` and
+`session.refresh_replayed` (a retired refresh token presented again).
+Failed logins for unknown emails and refused retries during a lockout are not
+stored (application log only), and successful refreshes are not audited.
+
 ## Architecture notes
 
 This app was restacked from Next.js/Supabase onto Python/React/MySQL. The

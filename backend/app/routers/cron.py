@@ -11,6 +11,7 @@ from app.models.project import Project
 from app.models.user import User
 from app.services.email import notify_owner_deadline_approaching
 from app.services.notify import notify, notify_team
+from app.services.token_cleanup import purge_expired_revoked_tokens
 
 router = APIRouter(tags=["cron"])
 settings = get_settings()
@@ -54,4 +55,7 @@ def deadline_reminders(authorization: str | None = Header(default=None), db: Ses
     from app.services.reviews import reveal_due
 
     revealed = reveal_due(db)
-    return {"checked": len(projects), "sent": sent, "reviews_revealed": revealed}
+    # Housekeeping on the same hourly run: drop revoked-refresh-token rows
+    # whose token has expired anyway (they can never matter again).
+    purged = purge_expired_revoked_tokens(db, max_batches=20)
+    return {"checked": len(projects), "sent": sent, "reviews_revealed": revealed, "revoked_tokens_purged": purged}

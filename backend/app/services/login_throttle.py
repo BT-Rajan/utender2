@@ -48,14 +48,23 @@ class LoginThrottle:
                     wait = max(wait, int(hits[0] + self.window - now) + 1)
         return wait
 
-    def record_failure(self, ip: str, email: str) -> None:
+    def record_failure(self, ip: str, email: str) -> bool:
+        """Records a failed attempt. Returns True when this very failure is
+        the one that tips the account or the address into lockout, so the
+        caller can audit the lockout once instead of on every refused retry."""
         now = time.monotonic()
+        locked_now = False
         with self._lock:
             if len(self._failures) > 10_000:  # opportunistic sweep so keys can't pile up forever
                 for key in list(self._failures):
                     self._live(key, now)
-            for key in self._keys(ip, email):
-                self._failures.setdefault(key, deque()).append(now)
+            acct_key, ip_key = self._keys(ip, email)
+            for key, limit in ((acct_key, self.max_per_account), (ip_key, self.max_per_ip)):
+                hits = self._failures.setdefault(key, deque())
+                hits.append(now)
+                if len(hits) == limit:
+                    locked_now = True
+        return locked_now
 
     def record_success(self, ip: str, email: str) -> None:
         with self._lock:

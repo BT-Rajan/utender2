@@ -11,7 +11,7 @@ from app.db import Base
 # is otherwise still valid (and usable via /auth/refresh) until it expires
 # on its own, even after "logout". Rows past their own expiry are inert
 # (decode_token already rejects an expired token before this table is even
-# consulted) and are safe to prune periodically; nothing prunes them yet.
+# consulted) and are pruned by services.token_cleanup (hourly cron + opportunistically on logout).
 class RevokedToken(Base):
     __tablename__ = "revoked_tokens"
 

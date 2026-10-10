@@ -1,3 +1,6 @@
+import json
+import logging
+
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -33,8 +36,10 @@ from app.services.documents import ensure_document_rows, ensure_owner_document_r
 from app.services.audit import log_action
 from app.services.email import notify_password_reset, notify_verify_email
 from app.services.login_throttle import login_throttle
+from app.services.token_cleanup import purge_expired_revoked_tokens
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 ACCESS_TTL_SECONDS = settings.jwt_access_ttl_minutes * 60
@@ -57,23 +62,41 @@ def _set_auth_cookies(response: Response, user: User) -> None:
     )
 
 
-def _revoke_refresh_token(db: Session, refresh_token: str | None) -> None:
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _audit_session(db: Session, request: Request, user: User, action: str, reason: str | None = None) -> None:
+    """Security trail for sign-in and session events. Only for accounts that
+    exist (the audit row needs a real user to hang on): who, what, and from
+    which address / client. Never the password or a token. Best-effort: a
+    failure to write the trail must not turn a login into an error."""
+    try:
+        detail = json.dumps({"ip": _client_ip(request), "ua": (request.headers.get("user-agent") or "")[:200]})
+        log_action(db, actor_id=user.id, action=action, target_type="user", target_id=user.id, new_value=detail, reason=reason)
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        logger.exception("could not record audit event %s", action)
+
+
+def _revoke_refresh_token(db: Session, refresh_token: str | None) -> str | None:
     """Best-effort: marks the given refresh token's jti as revoked so it
     can never be used again via /auth/refresh, even though it's still
     cryptographically valid until it naturally expires. Silently no-ops on
     a missing/garbled/already-expired token — there's nothing meaningful to
     revoke in that case."""
     if not refresh_token:
-        return
+        return None
     payload = decode_token_payload(refresh_token, expected_type="refresh")
     if not payload:
-        return
+        return None
     # Ignore a duplicate insert (e.g. a double-submitted logout) rather
     # than erroring on it.
     if db.get(RevokedToken, payload.jti):
-        return
+        return None
     db.add(RevokedToken(jti=payload.jti, expires_at=payload.expires_at.replace(tzinfo=None)))
     db.commit()
+    return payload.user_id
 
 
 @router.post("/signup", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -129,8 +152,11 @@ def signup(payload: SignupRequest, response: Response, db: Session = Depends(get
 @router.post("/login", response_model=UserOut)
 def login(payload: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     email = payload.email.strip().lower()
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = _client_ip(request)
 
+    # Refused retries during a lockout are deliberately not audited (an
+    # attacker could otherwise flood the trail); the lockout itself is, once,
+    # at the moment it starts (below).
     wait = login_throttle.retry_after(client_ip, email)
     if wait:
         raise HTTPException(
@@ -141,20 +167,30 @@ def login(payload: LoginRequest, request: Request, response: Response, db: Sessi
 
     user = db.query(User).filter(User.email == email).first()
     if not user or not verify_password(payload.password, user.password_hash):
-        login_throttle.record_failure(client_ip, email)
+        locked_now = login_throttle.record_failure(client_ip, email)
+        if user:
+            _audit_session(db, request, user, "login.failed")
+            if locked_now:
+                _audit_session(db, request, user, "login.locked")
+        else:
+            # No account to attach a row to, and unauthenticated input
+            # shouldn't grow the audit table: application log only.
+            logger.warning("failed login for unknown account from %s", client_ip)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
 
     login_throttle.record_success(client_ip, email)
     if user.deactivated_at is not None:  # Stage 9.2: right password, but no session for a deactivated account
         from app.deps import DEACTIVATED
 
+        _audit_session(db, request, user, "login.blocked_deactivated")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=DEACTIVATED)
     _set_auth_cookies(response, user)
+    _audit_session(db, request, user, "login.success")
     return user
 
 
 @router.post("/refresh")
-def refresh(response: Response, refresh_token: str | None = Cookie(default=None), db: Session = Depends(get_db)):
+def refresh(request: Request, response: Response, refresh_token: str | None = Cookie(default=None), db: Session = Depends(get_db)):
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
@@ -163,6 +199,11 @@ def refresh(response: Response, refresh_token: str | None = Cookie(default=None)
     if not payload or not user or not token_matches_password(payload, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
     if db.get(RevokedToken, payload.jti):
+        # A retired refresh token coming back is either a stale tab or a
+        # stolen copy being replayed -- worth a line on the trail either way.
+        # (Successful refreshes happen every access-token lifetime and are
+        # not audited, to keep the trail readable.)
+        _audit_session(db, request, user, "session.refresh_replayed")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
     if user.deactivated_at is not None:  # Stage 9.2
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
@@ -178,8 +219,20 @@ def refresh(response: Response, refresh_token: str | None = Cookie(default=None)
 
 
 @router.post("/logout")
-def logout(response: Response, refresh_token: str | None = Cookie(default=None), db: Session = Depends(get_db)):
-    _revoke_refresh_token(db, refresh_token)
+def logout(request: Request, response: Response, refresh_token: str | None = Cookie(default=None), db: Session = Depends(get_db)):
+    user_id = _revoke_refresh_token(db, refresh_token)
+    if user_id:
+        user = db.get(User, user_id)
+        if user:
+            _audit_session(db, request, user, "session.logout")
+    # Housekeeping: rows for tokens that have expired on their own are inert.
+    # Cheap (indexed, bounded) and keeps the table small even where the
+    # hourly cron isn't scheduled.
+    try:
+        purge_expired_revoked_tokens(db, max_batches=1)
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        logger.exception("could not purge expired revoked tokens")
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
     return {"ok": True}
