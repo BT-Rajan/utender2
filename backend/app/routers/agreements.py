@@ -523,7 +523,7 @@ def terminate_agreement(
     if agreement.completion_status == "submitted" and not _review_overdue(agreement):
         raise HTTPException(
             status_code=409,
-            detail=f"The work was submitted as complete and is awaiting the owner's review. The owner accepts it or returns it for correction before either party can terminate (or, if there is no answer for {COMPLETION_REVIEW_DAYS} days, after that).",
+            detail="The work was submitted as complete and is awaiting the owner's review. The owner accepts it or returns it for correction before either party can terminate (or, if there is no answer for 30 days, after that).",
         )
     _check_version(agreement, if_match)
     reason = payload.reason.strip()
