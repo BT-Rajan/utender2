@@ -35,6 +35,7 @@ AR: dict[str, str] = {
     "Too many incorrect attempts. Request a new code.": "محاولات خاطئة كثيرة. اطلب رمزًا جديدًا.",
     "That email address can't be used.": "لا يمكن استخدام عنوان البريد الإلكتروني هذا.",
     "Nothing to change.": "لا يوجد ما يمكن تغييره.",
+    "Verify your email address before accepting this invitation.": "تحقّق من بريدك الإلكتروني قبل قبول هذه الدعوة.",
     "Name can't be empty.": "لا يمكن أن يكون الاسم فارغًا.",
     "Email can't be empty.": "لا يمكن أن يكون البريد الإلكتروني فارغًا.",
     "Too many failed login attempts.": "محاولات تسجيل دخول فاشلة كثيرة.",

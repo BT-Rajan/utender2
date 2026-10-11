@@ -180,6 +180,15 @@ way (unverified, link sent, old address notified), the role and password can't
 be edited this way, admin accounts aren't editable, and what changed is on
 the audit trail with the admin's reason.
 
+## Accepting an organization invitation
+
+The invitation email carries a one-time link, but a link can be forwarded or
+shared by the representative, so accepting also needs a signed-in account
+whose email matches the invited address **and has been verified**. An
+unverified account gets a "verify your email first" notice (with a resend
+button) on the invitation page instead of the accept button; the invitation is
+not used up and can be accepted once the email is verified.
+
 ## Sign-in and session audit
 
 Sign-in and session events are written to the audit trail (visible per account

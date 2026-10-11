@@ -12,6 +12,7 @@ from app.models.notification import Notification
 from app.models.offer import Offer
 from app.models.owner import OwnerProfile
 from app.models.service_provider import ServiceProviderProfile
+from tests._verified import verify_email
 
 DEADLINE = (datetime.utcnow() + timedelta(days=14)).isoformat() + "Z"
 
@@ -19,6 +20,7 @@ DEADLINE = (datetime.utcnow() + timedelta(days=14)).isoformat() + "Z"
 def _account(role: str, email: str) -> tuple[TestClient, str]:
     c = TestClient(app)
     r = c.post("/auth/signup", json={"email": email, "password": "password123", "full_name": email.split("@")[0].title(), "role": role})
+    verify_email(email)
     return c, r.json()["id"]
 
 

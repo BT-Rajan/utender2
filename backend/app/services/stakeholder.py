@@ -374,6 +374,13 @@ def accept_invitation(user: User, db: Session, token: str) -> None:
     invitation = _live_invitation(db, token)
     if user.email.strip().lower() != invitation.email:
         raise HTTPException(status_code=403, detail="This invitation is for a different email address.")
+    # The link carries a secret, but a link can be forwarded or shared on
+    # purpose; the email on the account is then the only thing tying it to the
+    # invited person -- so it has to be one the account holder has proved they
+    # control. (Otherwise an account opened in advance with a colleague's
+    # address would pass the match above.)
+    if not user.email_verified:
+        raise HTTPException(status_code=403, detail="Verify your email address before accepting this invitation.")
     if user.role != invitation.role:
         raise HTTPException(status_code=400, detail="This invitation is for an account on the other side of the marketplace.")
     _check_can_join(user, db)

@@ -17,6 +17,7 @@ from app.models.participation import Participation
 from app.models.project import Project
 from app.models.service_provider import ServiceProviderProfile
 from app.models.user import User
+from tests._verified import verify_email
 
 needs_mysql = pytest.mark.skipif(not os.environ.get("TEST_DATABASE_URL"), reason="needs real row locking (MySQL)")
 
@@ -28,6 +29,8 @@ def _when(days: float) -> str:
 def _account(db, role, email, organization=None, joining=False, approve=True, paid=True):
     c = TestClient(app)
     uid = c.post("/auth/signup", json={"email": email, "password": "password123", "full_name": "N", "role": role}).json()["id"]
+    if joining:
+        verify_email(email)  # a colleague accepting an invitation needs a verified email
     if not joining:
         c.put("/account/stakeholder", json={"type": "organization", "legal_name": organization, "authorized": True} if organization else {"type": "individual"})
     if approve and not joining:

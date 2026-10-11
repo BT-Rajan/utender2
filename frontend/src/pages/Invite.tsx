@@ -33,6 +33,17 @@ export function InvitePage() {
     retry: false,
   });
 
+  const [verificationSent, setVerificationSent] = useState(false);
+
+  async function resendVerification() {
+    try {
+      await apiFetch("/auth/request-email-verification", { method: "POST" });
+      setVerificationSent(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : t("invite.acceptError"));
+    }
+  }
+
   async function accept() {
     setPending(true);
     setError(null);
@@ -70,9 +81,21 @@ export function InvitePage() {
           <ErrorBanner message={error} />
           {user ? (
             user.email.toLowerCase() === invite.email ? (
-              <button type="button" onClick={accept} disabled={pending} className="bg-navy hover:bg-navy-deep disabled:opacity-50 text-white text-sm font-semibold rounded px-5 py-2.5">
-                {t("invite.accept").replace("{organization}", invite.organization_name)}
-              </button>
+              user.email_verified ? (
+                <button type="button" onClick={accept} disabled={pending} className="bg-navy hover:bg-navy-deep disabled:opacity-50 text-white text-sm font-semibold rounded px-5 py-2.5">
+                  {t("invite.accept").replace("{organization}", invite.organization_name)}
+                </button>
+              ) : (
+                // The link alone isn't enough: the account's email has to be one its holder has verified.
+                <div className="text-sm">
+                  <p className="text-amber-dark mb-3">{verificationSent ? t("invite.verificationSent") : t("invite.verifyFirst").replace("{email}", invite.email)}</p>
+                  {!verificationSent && (
+                    <button type="button" onClick={resendVerification} className="border border-navy text-navy text-sm font-semibold rounded px-5 py-2.5">
+                      {t("invite.resendVerification")}
+                    </button>
+                  )}
+                </div>
+              )
             ) : (
               <p className="text-sm text-amber-dark">{t("invite.wrongAccount").replace("{email}", invite.email)}</p>
             )

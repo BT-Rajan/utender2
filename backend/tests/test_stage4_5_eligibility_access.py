@@ -16,6 +16,7 @@ from app.models.owner import OwnerProfile
 from app.models.project import Project
 from app.models.service_provider import ServiceProviderProfile
 from app.models.user import User
+from tests._verified import verify_email
 
 
 def _when(days: float) -> str:
@@ -25,6 +26,8 @@ def _when(days: float) -> str:
 def _account(role, email, organization=None, joining=False):
     c = TestClient(app)
     uid = c.post("/auth/signup", json={"email": email, "password": "password123", "full_name": "N", "role": role}).json()["id"]
+    if joining:
+        verify_email(email)  # a colleague accepting an invitation needs a verified email
     if not joining:  # someone joining an organization doesn't establish their own stakeholder
         c.put("/account/stakeholder", json={"type": "organization", "legal_name": organization, "authorized": True} if organization else {"type": "individual"})
     return c, uid

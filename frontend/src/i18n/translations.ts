@@ -146,6 +146,9 @@ export interface Dictionary {
     wrongAccount: string;
     invalid: string;
     acceptError: string;
+    verifyFirst: string;
+    resendVerification: string;
+    verificationSent: string;
   };
   preview: {
     heading: string;
@@ -1904,6 +1907,9 @@ export const en: Dictionary = {
     wrongAccount: "You're signed in with a different account. Log out and sign in as {email} to accept.",
     invalid: "This invitation link is invalid, has expired or was withdrawn. Ask for a new one.",
     acceptError: "Could not accept the invitation.",
+    verifyFirst: "Verify your email address first. We sent a verification link to {email}; open it, then come back to this invitation.",
+    resendVerification: "Resend verification email",
+    verificationSent: "Verification email sent. Open the link in it, then return to this invitation.",
   },
   preview: {
     heading: "Provider preview",
@@ -3763,6 +3769,9 @@ export const ar: Dictionary = {
     wrongAccount: "أنت مسجل الدخول بحساب مختلف. سجّل الخروج وادخل باسم {email} لقبول الدعوة.",
     invalid: "رابط الدعوة غير صالح أو منتهي أو تم سحبه. اطلب رابطًا جديدًا.",
     acceptError: "تعذر قبول الدعوة.",
+    verifyFirst: "تحقّق من بريدك الإلكتروني أولًا. أرسلنا رابط التحقق إلى {email}؛ افتحه ثم عد إلى هذه الدعوة.",
+    resendVerification: "إعادة إرسال رسالة التحقق",
+    verificationSent: "تم إرسال رسالة التحقق. افتح الرابط فيها ثم عد إلى هذه الدعوة.",
   },
   preview: {
     heading: "معاينة مقدم الخدمة",
