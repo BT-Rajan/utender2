@@ -37,6 +37,7 @@ from app.schemas.document import (
 from app.schemas.owner import OwnerProfileOut
 from app.schemas.common import utc_iso
 from app.services.audit import log_action
+from app.services import stakeholder as stakeholder_service
 from app.services.stakeholder import describe as describe_stakeholder
 from app.services.verification import assert_ready_to_approve, checklist, document_out_fields, is_added_qualification, profile_state_fields
 from app.services.notify import notify, notify_team
@@ -498,6 +499,7 @@ def service_provider_detail(service_provider_id: str, db: Session = Depends(get_
         "service_provider": ServiceProviderProfileOut(**_profile_fields(cp), email=user.email if user else None),
         "stakeholder": describe_stakeholder(cp, user, db) if user else None,
         "members": _members(db, cp),  # Stage 9.2
+        "organization_id": cp.organization_id,
         "documents": [
             {
                 **ServiceProviderDocumentOut(**document_out_fields(d, r)).model_dump(),
@@ -925,6 +927,7 @@ def owner_detail(owner_id: str, db: Session = Depends(get_db)):
         "owner": OwnerProfileOut(**_owner_fields(op, user), project_count=project_count),
         "stakeholder": describe_stakeholder(op, user, db),
         "members": _members(db, op),  # Stage 9.2
+        "organization_id": op.organization_id,
         "documents": _owner_documents(db, owner_id),
     }
 
@@ -1775,6 +1778,36 @@ def edit_account_details(user_id: str, payload: AccountDetailsPatch, admin: User
             "language": target.language.value, "email_verified": target.email_verified}
 
 
+class OrganizationMemberAdd(BaseModel):
+    email: EmailStr
+    representative: bool = False
+    position: str | None = Field(default=None, max_length=150)
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class RepresentativeAppoint(BaseModel):
+    user_id: str
+    reason: str | None = Field(default=None, max_length=500)
+
+
+@router.post("/organizations/{organization_id}/members", status_code=201)
+def add_organization_member(organization_id: str, payload: OrganizationMemberAdd, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Add an existing person to an organization, as a member or as its
+    representative (replacing the current one, who stays on as a member).
+    The way to restore an organization that has no working representative."""
+    person = stakeholder_service.admin_add_member(db, admin, organization_id, payload.email, payload.representative, payload.position, payload.reason)
+    db.commit()
+    return {"user_id": person.id, "organization_id": organization_id, "role": "admin" if payload.representative else "member"}
+
+
+@router.post("/organizations/{organization_id}/representative")
+def appoint_organization_representative(organization_id: str, payload: RepresentativeAppoint, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Name an existing active member the organization's representative."""
+    stakeholder_service.admin_appoint_representative(db, admin, organization_id, payload.user_id, payload.reason)
+    db.commit()
+    return {"organization_id": organization_id, "representative": payload.user_id}
+
+
 @router.post("/users/{user_id}/deactivate")
 def deactivate_account(user_id: str, payload: AccountStatePatch | None = None, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     """Stage 9.2: stop one person -- every session at once (checked on each
@@ -1783,6 +1816,11 @@ def deactivate_account(user_id: str, payload: AccountStatePatch | None = None, a
     managed here. Repeating it changes nothing."""
     target = _account_target(db, user_id, admin)
     if target.deactivated_at is None:
+        if stakeholder_service.deactivation_would_strand_organization(db, target):
+            raise HTTPException(
+                status_code=409,
+                detail="This person is what keeps their organization manageable. Add or appoint another representative first.",
+            )
         target.deactivated_at = datetime.utcnow().replace(microsecond=0)
         log_action(db, actor_id=admin.id, action="account.deactivate", target_type="user", target_id=target.id,
                    new_value=(payload.reason if payload and payload.reason else None))

@@ -189,6 +189,24 @@ unverified account gets a "verify your email first" notice (with a resend
 button) on the invitation page instead of the accept button; the invitation is
 not used up and can be accepted once the email is verified.
 
+## An organization always has a working representative
+
+The representative (membership role `admin`) invites, removes and hands over;
+without one nobody can manage the organization. So:
+
+- an admin can't deactivate an organization's representative (or its last
+  active person while the representative is already deactivated): they first
+  appoint or add another representative (409 with that instruction);
+- a representative (or anyone) can't switch the account to "individual" while
+  other people still act for the organization;
+- an admin can put a representative back: `POST /admin/organizations/{id}/members`
+  adds an existing person (active account, verified email, the organization's
+  side, not already in an organization) as a member or, with
+  `"representative": true`, as the representative (the previous one stays on as
+  a member); `POST /admin/organizations/{id}/representative` names an existing
+  active member the representative. Both are on the audit trail with the reason,
+  and are in the admin page of an owner/provider organization (People acting for it).
+
 ## Sign-in and session audit
 
 Sign-in and session events are written to the audit trail (visible per account

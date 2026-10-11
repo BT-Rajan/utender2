@@ -402,6 +402,17 @@ export interface Dictionary {
     reactivateTitle: string;
     reactivateBody: string;
     error: string;
+    makeRepresentative: string;
+    makeRepresentativeTitle: string;
+    makeRepresentativeBody: string;
+    addHeading: string;
+    addEmail: string;
+    addPosition: string;
+    addAsRepresentative: string;
+    addReason: string;
+    addSubmit: string;
+    adding: string;
+    added: string;
   };
   trace: {
     heading: string;
@@ -2189,6 +2200,17 @@ export const en: Dictionary = {
     reactivateTitle: "Reactivate this person's account?",
     reactivateBody: "They can sign in again, with exactly the organization and rights they had before.",
     error: "The account couldn't be changed.",
+    makeRepresentative: "Make representative",
+    makeRepresentativeTitle: "Make this person the organization's representative?",
+    makeRepresentativeBody: "They will manage the organization's people from now on. The current representative stays on as an ordinary member. Everything recorded stays as it is.",
+    addHeading: "Add a person to this organization",
+    addEmail: "Email of an existing account (verified)",
+    addPosition: "Position (optional)",
+    addAsRepresentative: "Make them the representative",
+    addReason: "Reason (kept in the audit trail)",
+    addSubmit: "Add person",
+    adding: "Adding…",
+    added: "Added.",
   },
   trace: {
     heading: "Decision and transaction",
@@ -4051,6 +4073,17 @@ export const ar: Dictionary = {
     reactivateTitle: "إعادة تفعيل حساب هذا الشخص؟",
     reactivateBody: "يمكنه تسجيل الدخول مجددًا، بالمنظمة والصلاحيات نفسها التي كانت لديه تمامًا.",
     error: "تعذر تغيير الحساب.",
+    makeRepresentative: "تعيين ممثلًا",
+    makeRepresentativeTitle: "تعيين هذا الشخص ممثلًا للجهة؟",
+    makeRepresentativeBody: "سيدير أشخاص الجهة من الآن فصاعدًا. يبقى الممثل الحالي عضوًا عاديًا. يبقى كل ما سُجّل كما هو.",
+    addHeading: "إضافة شخص إلى هذه الجهة",
+    addEmail: "البريد الإلكتروني لحساب موجود (موثَّق)",
+    addPosition: "المنصب (اختياري)",
+    addAsRepresentative: "تعيينه ممثلًا",
+    addReason: "السبب (يُحفظ في سجل التدقيق)",
+    addSubmit: "إضافة الشخص",
+    adding: "جارٍ الإضافة…",
+    added: "تمت الإضافة.",
   },
   trace: {
     heading: "القرار والمعاملة",

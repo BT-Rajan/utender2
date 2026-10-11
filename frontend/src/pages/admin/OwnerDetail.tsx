@@ -33,7 +33,7 @@ export function AdminOwnerDetailPage() {
 
   const { data: detail } = useQuery({
     queryKey: ["admin-owner", id],
-    queryFn: () => apiFetch<{ owner: OwnerProfile; stakeholder: Stakeholder; members: Member[]; documents: OwnerDocument[] }>(`/admin/owners/${id}`),
+    queryFn: () => apiFetch<{ owner: OwnerProfile; stakeholder: Stakeholder; members: Member[]; organization_id?: string | null; documents: OwnerDocument[] }>(`/admin/owners/${id}`),
     enabled: !!id,
   });
 
@@ -105,7 +105,7 @@ export function AdminOwnerDetailPage() {
         <div className="bg-white border border-border rounded px-5 py-4.5 mb-6">
           <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-3">{t("stakeholder.adminHeading")}</h3>
           <StakeholderSummary stakeholder={detail.stakeholder} viewerIsAdmin />
-          <AdminOrganizationMembers members={detail.members ?? []} queryKey={["admin-owner", id]} />
+          <AdminOrganizationMembers organizationId={detail.organization_id} members={detail.members ?? []} queryKey={["admin-owner", id]} />
         </div>
       )}
       {/* Stage 9.7: the account's recorded trail (verification, suspension, membership, security). */}

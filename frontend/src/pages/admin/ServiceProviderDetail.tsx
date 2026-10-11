@@ -184,7 +184,7 @@ export function AdminServiceProviderDetailPage() {
 
   const { data: detail } = useQuery({
     queryKey: ["admin-service-provider", id],
-    queryFn: () => apiFetch<{ service_provider: ServiceProviderProfile; stakeholder: Stakeholder; members: Member[] }>(`/admin/service-providers/${id}`),
+    queryFn: () => apiFetch<{ service_provider: ServiceProviderProfile; stakeholder: Stakeholder; members: Member[]; organization_id?: string | null }>(`/admin/service-providers/${id}`),
     enabled: !!id,
   });
   const service_provider = detail?.service_provider;
@@ -257,7 +257,7 @@ export function AdminServiceProviderDetailPage() {
         <div className="bg-white border border-border rounded px-5 py-4.5 mb-6">
           <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-3">{t("stakeholder.adminHeading")}</h3>
           <StakeholderSummary stakeholder={detail.stakeholder} viewerIsAdmin />
-          <AdminOrganizationMembers members={detail.members ?? []} queryKey={["admin-service-provider", id]} />
+          <AdminOrganizationMembers organizationId={detail.organization_id} members={detail.members ?? []} queryKey={["admin-service-provider", id]} />
         </div>
       )}
 

@@ -175,6 +175,14 @@ def establish(
         if isinstance(profile, ServiceProviderProfile):
             profile.company_name = name  # default trading name; editable when submitting for review
     else:
+        if profile.organization_id and (
+            db.query(OrganizationMembership)
+            .filter(OrganizationMembership.organization_id == profile.organization_id, OrganizationMembership.user_id != user.id)
+            .first()
+        ):
+            # Leaving would detach the organization's profile from the people who still act
+            # for it, and (if this is the representative) leave it with nobody in charge.
+            raise HTTPException(status_code=409, detail="Other people still act for this organization. Remove them first.")
         _leave_organization(profile, user, db)
         if isinstance(profile, ServiceProviderProfile):
             profile.company_name = user.full_name or profile.company_name
@@ -457,3 +465,126 @@ def hand_over(user: User, db: Session, member_id: str) -> None:
         db, actor_id=user.id, action="organization.representative_changed", target_type="organization",
         target_id=membership.organization_id, previous_value=user.id, new_value=member_id,
     )
+
+
+# ---------- an organization is never left without a working representative ----------
+# The representative (membership admin) is who invites, removes and hands over.
+# Without one, nobody can manage the organization, so these rules keep one in
+# place, and give an admin the way to put one back (add a person, or appoint a
+# member) for an organization that has lost its representative some other way.
+
+
+def _representative_membership(db: Session, organization_id: str) -> OrganizationMembership | None:
+    return (
+        db.query(OrganizationMembership)
+        .filter(OrganizationMembership.organization_id == organization_id, OrganizationMembership.role == MembershipRole.admin)
+        .first()
+    )
+
+
+def deactivation_would_strand_organization(db: Session, target: User) -> bool:
+    """True if deactivating this account would leave its organization with no
+    working representative: it is the representative, or it is the last
+    active person while the representative is already deactivated."""
+    membership = db.query(OrganizationMembership).filter(OrganizationMembership.user_id == target.id).first()
+    if membership is None:
+        return False
+    if membership.role == MembershipRole.admin:
+        return True
+    rep = _representative_membership(db, membership.organization_id)
+    rep_user = db.get(User, rep.user_id) if rep else None
+    if rep_user is not None and rep_user.deactivated_at is None:
+        return False  # a working representative remains
+    others_active = (
+        db.query(OrganizationMembership.user_id)
+        .join(User, User.id == OrganizationMembership.user_id)
+        .filter(
+            OrganizationMembership.organization_id == membership.organization_id,
+            OrganizationMembership.user_id != target.id,
+            User.deactivated_at.is_(None),
+        )
+        .first()
+    )
+    return others_active is None
+
+
+def _lock_organization(db: Session, organization_id: str) -> Organization:
+    org = db.query(Organization).filter(Organization.id == organization_id).with_for_update().first()
+    if org is None:
+        raise HTTPException(status_code=404, detail="Organization not found.")
+    return org
+
+
+def _make_representative(db: Session, organization_id: str, new_rep: OrganizationMembership) -> str | None:
+    """Exactly one representative: the current one (if any) becomes an
+    ordinary member. Returns the previous representative's user id."""
+    previous = _representative_membership(db, organization_id)
+    previous_id = previous.user_id if previous else None
+    if previous is not None and previous is not new_rep:
+        previous.role = MembershipRole.member
+    new_rep.role = MembershipRole.admin
+    db.flush()
+    return previous_id
+
+
+def admin_appoint_representative(db: Session, admin: User, organization_id: str, user_id: str, reason: str | None) -> None:
+    """An admin names an existing, active member the representative -- the way
+    back for an organization whose representative can no longer act."""
+    _lock_organization(db, organization_id)
+    target = (
+        db.query(OrganizationMembership)
+        .filter(OrganizationMembership.organization_id == organization_id, OrganizationMembership.user_id == user_id)
+        .with_for_update()
+        .first()
+    )
+    person = db.get(User, user_id) if target else None
+    if target is None or person is None:
+        raise HTTPException(status_code=404, detail="Not a member of this organization.")
+    if person.deactivated_at is not None:
+        raise HTTPException(status_code=409, detail="That account is deactivated.")
+    if target.role == MembershipRole.admin:
+        raise HTTPException(status_code=400, detail="That person is already the organization's representative.")
+    previous_id = _make_representative(db, organization_id, target)
+    log_action(
+        db, actor_id=admin.id, action="organization.representative_changed", target_type="organization", target_id=organization_id,
+        previous_value=previous_id, new_value=user_id, reason=reason or None,
+    )
+
+
+def admin_add_member(db: Session, admin: User, organization_id: str, email: str, as_representative: bool, position: str | None, reason: str | None) -> User:
+    """An admin adds an existing person to an organization -- as a member, or
+    as its representative. The person must already have an account that is
+    active and has a verified email (the admin attests who they are; the
+    platform still needs to know the mailbox is theirs), on the organization's
+    side of the marketplace, and not already belong to an organization."""
+    org = _lock_organization(db, organization_id)
+    side = (
+        db.query(OwnerProfile.user_id).filter(OwnerProfile.organization_id == organization_id).first()
+        and UserRole.owner
+        or db.query(ServiceProviderProfile.user_id).filter(ServiceProviderProfile.organization_id == organization_id).first()
+        and UserRole.service_provider
+    )
+    person = db.query(User).filter(func.lower(User.email) == email.strip().lower()).first()
+    if person is None:
+        raise HTTPException(status_code=404, detail="No account with that email. They need to sign up first.")
+    if side and person.role != side:
+        raise HTTPException(status_code=400, detail="That account is on the other side of the marketplace.")
+    if person.deactivated_at is not None:
+        raise HTTPException(status_code=409, detail="That account is deactivated.")
+    if not person.email_verified:
+        raise HTTPException(status_code=409, detail="That account's email isn't verified yet.")
+    _check_can_join(person, db)
+    membership = OrganizationMembership(organization_id=org.id, user_id=person.id, role=MembershipRole.member, position=(position or "").strip() or None)
+    db.add(membership)
+    db.flush()
+    previous_id = _make_representative(db, org.id, membership) if as_representative else None
+    log_action(
+        db, actor_id=admin.id, action="organization.member_added_by_admin", target_type="organization", target_id=org.id,
+        new_value=person.id, reason=reason or None,
+    )
+    if as_representative:
+        log_action(
+            db, actor_id=admin.id, action="organization.representative_changed", target_type="organization", target_id=org.id,
+            previous_value=previous_id, new_value=person.id, reason=reason or None,
+        )
+    return person
