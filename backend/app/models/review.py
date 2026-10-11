@@ -38,7 +38,10 @@ class Review(Base):
     reviewer_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     rating: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # Batch D: stamped in UTC by the application, not by the database server's
+    # clock (NOW() is the server's local time) -- REVEAL_AFTER is measured
+    # against utcnow(), so a server not on UTC would unseal reviews hours late.
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow().replace(microsecond=0), server_default=func.now())
     # Batch C: reviews are double-blind -- neither side sees the other's until
     # both have reviewed, or REVEAL_AFTER has passed since this one was written.
     revealed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

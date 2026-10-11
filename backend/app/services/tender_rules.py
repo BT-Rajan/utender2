@@ -58,17 +58,33 @@ def validity_lapsed(project: Project, offer) -> bool:
     return until is not None and datetime.utcnow() > until
 
 
+def start_date_passed(offer) -> bool:
+    """Batch D: the start date the provider proposed is already behind us
+    (Kuwait's calendar day, UTC+3), so the offer commits to work that can no
+    longer begin as it says -- it can't be confirmed or awarded as it stands."""
+    start = getattr(offer, "proposed_start_date", None)
+    return start is not None and start < (datetime.utcnow() + timedelta(hours=3)).date()
+
+
+START_PASSED_DETAIL = "This offer's proposed start date has already passed, so it can no longer be awarded as it stands."
+
+
 def answers_since(db, project: Project, offer) -> int:
     """Batch B: answers published to every provider after this offer was last
-    put forward or confirmed -- they may change how it should be read."""
+    put forward or confirmed -- they may change how it should be read. Batch D:
+    also the answers to this provider's own private questions, which only
+    they were sent."""
+    from sqlalchemy import or_
+
     from app.models.clarification import Clarification
 
     if offer.updated_at is None:
         return 0
+    own_private = (Clarification.shared_with_all.is_(False)) & (Clarification.service_provider_id == offer.service_provider_id)
     return (
         db.query(Clarification)
         .filter(
-            Clarification.project_id == project.id, Clarification.offer_id.is_(None), Clarification.shared_with_all.is_(True),
+            Clarification.project_id == project.id, Clarification.offer_id.is_(None), or_(Clarification.shared_with_all.is_(True), own_private),
             Clarification.answered_at.isnot(None), Clarification.answered_at >= offer.updated_at,  # same second counts (MySQL keeps whole seconds)
         )
         .count()

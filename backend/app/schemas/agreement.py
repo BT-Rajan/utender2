@@ -159,6 +159,7 @@ class AgreementOut(BaseModel):
     execution_status: Literal["not_started", "in_progress", "on_hold", "completed", "terminated"]
     # Stage 7.10: the whole work's completion and what is still outstanding.
     completion_status: Literal["submitted", "accepted", "returned"] | None = None
+    completion_review_overdue: bool = False  # Batch D: submitted work unanswered for 30 days -- termination is open again
     completed_at: UTCDateTime | None = None  # Stage 7.11: when the transaction closed
     completion_submitted_at: UTCDateTime | None = None
     completion_note: str | None = None

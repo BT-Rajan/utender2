@@ -809,6 +809,7 @@ export interface Dictionary {
     offer_draft: string;
     offer_approved: string;
     offer_rejected: string;
+    offer_closed: string;
   };
   versions: {
     version: string;
@@ -2452,7 +2453,7 @@ export const en: Dictionary = {
     terminatedBy: "Terminated by",
     notInForce: "The work can be recorded as started once the agreement is in force.",
     startsOn: "The agreement takes effect on {date}; the start of the work can be recorded from that day.",
-    submittedBlocksTermination: "The work was submitted as complete. The owner accepts it or returns it for correction before either party can terminate.",
+    submittedBlocksTermination: "The work was submitted as complete. The owner accepts it or returns it for correction before either party can terminate (or, with no answer for 30 days, after that).",
     commercialHeading: "Commercial terms (from the requirement)",
     paymentStage: "Payment stage",
     retention: "Retention",
@@ -2642,6 +2643,7 @@ export const en: Dictionary = {
     offer_draft: "Offer in progress",
     offer_approved: "Awarded",
     offer_rejected: "Not selected",
+    offer_closed: "Closed without an award",
   },
   versions: {
     version: "Version {n}",
@@ -4310,7 +4312,7 @@ export const ar: Dictionary = {
     terminatedBy: "أنهاها",
     notInForce: "يمكن تسجيل بدء العمل بعد سريان الاتفاقية.",
     startsOn: "تسري الاتفاقية في {date}؛ ويمكن تسجيل بدء العمل اعتبارًا من ذلك اليوم.",
-    submittedBlocksTermination: "قُدّم العمل على أنه مكتمل. يقبله المالك أو يعيده للتصحيح قبل أن يتمكن أي طرف من الإنهاء.",
+    submittedBlocksTermination: "قُدّم العمل على أنه مكتمل. يقبله المالك أو يعيده للتصحيح قبل أن يتمكن أي طرف من الإنهاء (أو بعد 30 يومًا دون رد).",
     commercialHeading: "الشروط التجارية (من الطلب)",
     paymentStage: "دفعة",
     retention: "المحتجزات",
@@ -4500,6 +4502,7 @@ export const ar: Dictionary = {
     offer_draft: "عرض قيد الإعداد",
     offer_approved: "تمت الترسية",
     offer_rejected: "لم يُختر",
+    offer_closed: "أُغلق دون ترسية",
   },
   versions: {
     version: "النسخة {n}",

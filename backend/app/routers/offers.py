@@ -28,7 +28,7 @@ from app.services.offer_response import (
 )
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import bidding_is_open, lock_project, sync_expired_projects
-from app.services.tender_rules import answers_since, offer_valid_until, validity_lapsed
+from app.services.tender_rules import START_PASSED_DETAIL, answers_since, offer_valid_until, start_date_passed, validity_lapsed
 
 router = APIRouter(prefix="/projects/{project_id}/offers", tags=["offers"])
 
@@ -735,12 +735,15 @@ def submit_draft(
 
 
 @router.post("/confirm", response_model=OfferOut)
-def confirm_offer(project_id: str, user: User = Depends(require_marketplace_active_service_provider), db: Session = Depends(get_db)):
+def confirm_offer(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
     """Stage 3.15: after a material change to the requirement, the provider
     confirms their offer still stands as submitted -- its price and content
     unchanged -- against the requirement as it now is. (To change anything,
-    they revise the offer instead.) The same rules as revising apply: only
-    while bidding is open, and only for an eligible provider."""
+    they revise the offer instead.) While bidding is open the same rules as
+    revising apply: an eligible provider with active access. After the close
+    (Batch B) the owner can't award until the provider confirms, so that needs
+    only an account in good standing -- a lapsed subscription must not leave
+    the award, and so the other side's work, stuck."""
     project = lock_project(db, project_id)
     offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
     if not project or not offer or offer.status != OfferStatus.submitted:
@@ -749,7 +752,10 @@ def confirm_offer(project_id: str, user: User = Depends(require_marketplace_acti
         return _confirm_after_close(db, user, project, offer)
     if not bidding_is_open(project):
         raise HTTPException(status_code=400, detail="Bidding on this project is closed.")
-    assert_eligible(db, project, acting_profile(db, user))
+    profile = acting_profile(db, user)
+    if not profile or not profile.is_verified_active:
+        raise HTTPException(status_code=403, detail="payment_required")  # same code and gate as require_marketplace_active_service_provider
+    assert_eligible(db, project, profile)
     if offer.based_on_material_revision >= project.material_revision:
         raise HTTPException(status_code=400, detail="Your offer is already up to date with the requirement.")
     # Stage 5.15: confirming re-states the offer against the requirement as it
@@ -777,6 +783,8 @@ def _confirm_after_close(db: Session, user: User, project: Project, offer: Offer
     within its validity period. Confirming re-states it, unchanged, against
     the current version and restarts its validity from now. Only the
     provider confirms; the owner can ask (request-confirmation)."""
+    if start_date_passed(offer):  # Batch D: confirming would re-open an offer the owner can't award
+        raise HTTPException(status_code=400, detail=START_PASSED_DETAIL)
     if offer.based_on_material_revision >= project.material_revision and not validity_lapsed(project, offer) and offer_valid_until(project, offer) is None:
         raise HTTPException(status_code=400, detail="Your offer is already up to date with the requirement.")
     previous = offer.based_on_material_revision
