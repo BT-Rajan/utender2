@@ -65,6 +65,12 @@ import app.services.storage as storage_module
 
 from fastapi.testclient import TestClient
 from app.main import app as fastapi_app  # imported once for the whole session
+from app.auth.security import pwd_context
+
+# bcrypt at its production cost takes ~0.25s per hash and per check, and most
+# tests sign up and log in several people -- it was most of the suite's time.
+# Tests only need hashing to be correct, not slow.
+pwd_context.update(bcrypt__rounds=4)
 
 
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -121,12 +127,14 @@ def mysql_engine():
 def _truncate_all_mysql_tables(engine) -> None:
     """Back to the empty state SQLite's create_all starts every test in. This
     also clears rows the migrations seed (e.g. default document
-    requirements), which the SQLite path never has."""
+    requirements), which the SQLite path never has. DELETE, not TRUNCATE: a
+    test leaves only a few rows, and TRUNCATE recreates every table (~0.5s a
+    test, against ~0.04s). Keys are UUIDs, so no auto-increment to reset."""
     with engine.begin() as conn:
         conn.execute(text("SET FOREIGN_KEY_CHECKS=0"))
         for name in _mysql_table_names(conn):
             if name != "alembic_version":
-                conn.execute(text(f"TRUNCATE TABLE `{name}`"))
+                conn.execute(text(f"DELETE FROM `{name}`"))
         conn.execute(text("SET FOREIGN_KEY_CHECKS=1"))
 
 
@@ -161,7 +169,7 @@ def isolated_backend(tmp_path, mysql_engine):
         # Many tests open `db_module.SessionLocal()` directly and never close
         # it. SQLite's single shared connection hides that; on MySQL the
         # leaked session's open transaction holds a metadata lock that blocks
-        # the next test's TRUNCATE forever. Release them all here.
+        # the next test's reset forever. Release them all here.
         close_all_sessions()
     else:
         engine.dispose()
