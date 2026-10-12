@@ -1,9 +1,17 @@
-# U-Tender — Requirements and features (Stages 1–4)
+# U-Tender — Requirements and features
 
-Stages 1 and 2 were built before the Stage 3–4 work and are reconstructed here
-from the code and test suite. Stages 3 and 4 record what was built against the
-numbered prompts (3.1 … 4.10). Stage 5 (offer submission and competition) will
-be added as its prompts (5.1, 5.2, …) are delivered.
+What U-Tender does, stage by stage:
+
+- **Stages 1–2:** platform foundation; onboarding, identity and verification.
+- **Stage 3:** requirements, from first draft to publication and its lifecycle (3.1–3.18).
+- **Stage 4:** provider discovery and access (4.1–4.10).
+- **Stage 5:** offer submission and competition.
+- **Stage 6:** offer evaluation and award.
+- **Stage 7:** post-award, from handover to completion.
+- **Stage 8:** trust and reputation.
+- **Stage 9:** operations (9.1–9.14), followed by the fixes from the business-logic review (Batches A–C).
+
+Stages 1 and 2 were built before the numbered stage-by-stage work and are reconstructed from the code and test suite. From Stage 3 on, each entry records what was built against its numbered step. New steps are added as they are implemented.
 
 ---
 
