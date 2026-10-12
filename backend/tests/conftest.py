@@ -65,6 +65,12 @@ import app.services.storage as storage_module
 
 from fastapi.testclient import TestClient
 from app.main import app as fastapi_app  # imported once for the whole session
+from app.auth.security import pwd_context
+
+# bcrypt at its production cost takes ~0.25s per hash and per check, and most
+# tests sign up and log in several people -- it was most of the suite's time.
+# Tests only need hashing to be correct, not slow.
+pwd_context.update(bcrypt__rounds=4)
 
 
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
