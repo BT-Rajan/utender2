@@ -348,10 +348,11 @@ def documents_out(db: Session, project_id: str, organization_id: str | None, pro
     ]
 
 
-def submitted_documents_out(db: Session, offer) -> list[OfferDocumentOut]:
+def submitted_documents_out(db: Session, offer, viewer: str = "owner") -> list[OfferDocumentOut]:
     """Stage 5.13: the documents that went with the offer's current
-    submitted version -- what the owner receives. An offer submitted before
-    these were recorded falls back to its current documents."""
+    submitted version -- what the owner receives (each opened through
+    `viewer`'s own download route). An offer submitted before these were
+    recorded falls back to its current documents."""
     if offer.submitted_documents is None:
         rows = _side_documents(db, offer.project_id, offer.organization_id, offer.service_provider_id).order_by(OfferDocument.label.asc()).all()
         docs = [(d.label, d.file_name, d.uploaded_at, d.material_revision) for d in rows]
@@ -360,7 +361,7 @@ def submitted_documents_out(db: Session, offer) -> list[OfferDocumentOut]:
     return [
         OfferDocumentOut(
             id=f"{offer.id}:{label}", label=label, file_name=file_name, uploaded_at=uploaded_at,
-            url=offer_file_link("owner", offer.project_id, offer.id, label), material_revision=material_revision,
+            url=offer_file_link(viewer, offer.project_id, offer.id, label), material_revision=material_revision,
         )
         for label, file_name, uploaded_at, material_revision in docs
     ]

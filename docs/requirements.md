@@ -1765,7 +1765,7 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
   - **Dates:** award days and offer-deadline days are Kuwait dates (`app/clock.py`).
   - **Tests:** `tests/test_review_fixes_accounts.py`, `tests/test_review_fixes_transactions.py`.
 
-- **Provider-journey review — fixes #1–#10:**
+- **Provider-journey review — fixes #1–#15:**
   - **Job page during re-review:** a provider whose documents are back under review (changes requested, pending review) keeps sight of its own offer, its history, documents and clarifications, and its reviews (`require_service_provider_in_standing`), so the job page shows its offer and agreement. It can answer the owner's clarification of its offer. Submitting, withdrawing, confirming and reviewing still need an approved account. Only a rejected or suspended account loses sight of it. On a requirement still open for offers, such an account is sent to its verification status page.
   - **One subscription at a time:** checkout locks the provider's profile and expires a checkout it started earlier that hasn't completed (`stripe_checkout_session_id`, migration 0072), so two checkouts (two colleagues, two tabs) can't both create a subscription. One that already completed refuses a new checkout until it shows. A second completed subscription never replaces a live one held, and a subscription event about a subscription other than the one held doesn't change the provider's access.
   - **Billing always reachable:** the billing portal opens for every provider account, suspended, rejected or sent back included, and the verification status page links to it while a subscription is live, so nobody is billed with no way to cancel.
@@ -1776,6 +1776,11 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
   - **Reviews stay double-blind:** once one side's review is published because its sealed period ran out, the other side can no longer review that transaction, so it can't answer it. A rating counts, from each owner, the review of the most recently completed job, not the one written last.
   - **Suspended offers wait:** while an admin has an offer suspended, it can't be revised or withdrawn, even while offers are open.
   - **Sealed means sealed:** `tender_type_locked` (set by the first offer) isn't sent to providers, so a sealed tender doesn't tell competitors whether anyone has bid.
+  - **The offer as the owner received it:** once offers have closed, the provider's own view of its offer lists the documents that went with its submitted version, not files attached since that never went. While offers are open it shows the current files, which a revision would send.
+  - **Renewing a qualification:** uploading a renewal of an optional qualification whose approval is still in date keeps that approval counting until the renewal is decided (`previous_file_path`, `previous_expires_on`, migration 0073). If the renewal is refused, the approval it would have renewed stands as it was, with the admin's note. If it is approved, the new file and expiry take over.
+  - **An organisation's own services and areas:** eligibility, the opportunities feed, new-requirement notices and the "my services/areas" filters use the organisation's own declared services and governorates, which any member edits. A colleague's personal ones from before joining don't count.
+  - **Only what can be put right:** a missing or expired qualification is offered as one the provider can put right only when it can upload it now, not when it is a required document of a verified account, applies only to the other kind of account, or has been retired.
+  - **After a hand-over:** the organisation's current representative can correct its identity (legal name) when the application is sent back. The "Change" option is offered to the representative only, not to the founder once a member, nor to other members.
   - **Tests:** `tests/test_provider_journey_fixes.py`.
 
 _Later Stage 9 steps are added as they are implemented._

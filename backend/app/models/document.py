@@ -62,8 +62,22 @@ class ServiceProviderDocument(Base):
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     expires_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # A renewal of a still-valid approved qualification is reviewed like any
+    # upload, but the approval it renews keeps counting until it is decided:
+    # its file and expiry are kept here, and restored if the renewal is refused.
+    previous_file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    previous_expires_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     requirement = relationship("DocumentRequirement")
+
+    def approved_until(self, today: date) -> tuple[bool, date | None]:
+        """(whether an approval counts today, the expiry it runs to) -- the
+        document's own, or, while a renewal awaits review, the one it renews."""
+        if self.status == DocumentStatus.approved and (self.expires_on is None or self.expires_on >= today):
+            return True, self.expires_on
+        if self.previous_file_path and (self.previous_expires_on is None or self.previous_expires_on >= today):
+            return True, self.previous_expires_on
+        return self.status == DocumentStatus.approved, self.expires_on
 
 
 class OwnerDocument(Base):

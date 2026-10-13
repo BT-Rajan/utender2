@@ -109,7 +109,10 @@ def describe(profile, user: User, db: Session, viewer_id: str | None = None) -> 
             "verification_status": profile.verification_status.value,
             "marketplace_status": profile.marketplace_status,
         },
-        "editable": profile.verification_status in EDITABLE_STATUSES and not profile.is_suspended,
+        # An organization's identity is the representative's to change; for an
+        # individual, their own.
+        "editable": profile.verification_status in EDITABLE_STATUSES and not profile.is_suspended
+        and (organization is None or (organization["membership"] or {}).get("role") == MembershipRole.admin.value),
     }
 
 
@@ -146,8 +149,14 @@ def establish(
         raise HTTPException(status_code=403, detail="Only owner or service provider accounts represent a stakeholder.")
     joined = db.query(OrganizationMembership).filter(OrganizationMembership.user_id == user.id).first()
     if joined and profile.organization_id != joined.organization_id:
-        # A member acts for the organization they were added to.
-        raise HTTPException(status_code=409, detail="You act for an organization. Ask its representative to remove you first.")
+        if joined.role != MembershipRole.admin or stakeholder_type != StakeholderType.organization:
+            # A member acts for the organization they were added to.
+            raise HTTPException(status_code=409, detail="You act for an organization. Ask its representative to remove you first.")
+        # The representative the role was handed to (its own row isn't the
+        # organization's profile) corrects the organization's details.
+        from app.services.team import acting_profile
+
+        profile = acting_profile(db, user)
     if profile.verification_status not in EDITABLE_STATUSES or profile.is_suspended:
         raise HTTPException(
             status_code=409,
@@ -194,7 +203,7 @@ def establish(
         actor_id=user.id,
         action="stakeholder.set",
         target_type=f"{user.role.value}_profile",
-        target_id=user.id,
+        target_id=profile.user_id,
         previous_value=previous,
         new_value=stakeholder_type.value if stakeholder_type == StakeholderType.individual else f"organization:{legal_name}",
     )

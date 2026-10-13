@@ -23,8 +23,10 @@ all built on what the platform already records:
 Nothing here names a specific licence, certificate or document. The same
 function decides both what a provider is told and what the server enforces.
 """
+from datetime import date
 
 from fastapi import HTTPException
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.models.document import DocumentRequirement, ServiceProviderDocument
@@ -34,6 +36,24 @@ from app.models.service_provider import ServiceProviderProfile
 from app.services.team import team_ids
 from app.schemas.project import EligibilityQualification, EligibilityReason, ProviderEligibilityIn, ProviderEligibilityOut
 from app.clock import kuwait_today
+
+
+def _can_supply(db: Session, profile, requirement_id: str) -> bool:
+    """Whether the provider can put a missing or expired qualification right
+    itself -- upload it now from its verification page: it applies to this
+    kind of account and is still asked for, and the account may upload it.
+    Otherwise the reason isn't offered as one it can fix."""
+    from app.models.enums import UserRole as Role
+    from app.services.verification import applicable_requirements, assert_can_upload
+
+    requirement = next((r for r in applicable_requirements(db, Role.service_provider, profile.stakeholder_type) if r.id == requirement_id), None)
+    if requirement is None:
+        return False
+    try:
+        assert_can_upload(profile, requirement)
+    except HTTPException:
+        return False
+    return True
 
 
 def rules_for(project: Project) -> ProviderEligibilityIn:
@@ -95,40 +115,41 @@ def ineligibility_reasons(db: Session, project: Project, profile: ServiceProvide
         # An organization's qualification counts for every member, whoever
         # in it holds the approved document.
         team = team_ids(db, profile.user_id)
-        held: dict[str, ServiceProviderDocument] = {}
+        today = kuwait_today()
+        held: dict[str, date | None] = {}  # requirement -> the expiry of the best approval held
         for d in db.query(ServiceProviderDocument).filter(
             ServiceProviderDocument.service_provider_id.in_(team),
             ServiceProviderDocument.requirement_id.in_(rules.qualifications),
-            ServiceProviderDocument.status == DocumentStatus.approved,
+            or_(ServiceProviderDocument.status == DocumentStatus.approved, ServiceProviderDocument.previous_file_path.isnot(None)),
         ):
-            best = held.get(d.requirement_id)
-            if best is None or (best.expires_on is not None and (d.expires_on is None or d.expires_on > best.expires_on)):
-                held[d.requirement_id] = d
-        today = kuwait_today()
+            counts, until = d.approved_until(today)  # a renewal under review keeps the approval it renews
+            if not counts:
+                continue
+            if d.requirement_id not in held or (held[d.requirement_id] is not None and (until is None or until > held[d.requirement_id])):
+                held[d.requirement_id] = until
         for q in rules.qualifications:
             name = names.get(q, "a required qualification")
-            doc = held.get(q)
-            if not doc:
+            expires = held.get(q)
+            if q not in held:
                 reasons.append(EligibilityReason(
                     code="qualification_missing",
-                    fixable=True,
+                    fixable=_can_supply(db, profile, q),
                     name=name,
                     message=f'This requirement needs a platform-approved "{name}"; your verification doesn\'t include an approved one.',
                 ))
-            elif doc.expires_on is not None and doc.expires_on < today:
+            elif expires is not None and expires < today:
                 reasons.append(EligibilityReason(
                     code="qualification_expired",
-                    fixable=True,
+                    fixable=_can_supply(db, profile, q),
                     name=name,
-                    date=doc.expires_on.isoformat(),
-                    message=f'This requirement needs a valid "{name}"; yours expired on {doc.expires_on.isoformat()}.',
+                    date=expires.isoformat(),
+                    message=f'This requirement needs a valid "{name}"; yours expired on {expires.isoformat()}.',
                 ))
     # A rule whose subject was later cleared from the requirement restricts nothing.
-    team_profiles = (
-        db.query(ServiceProviderProfile).filter(ServiceProviderProfile.user_id.in_(team_ids(db, profile.user_id))).all()
-        if (rules.match_category or rules.match_governorate)
-        else [profile]
-    )
+    # What the provider declared: its own profile's services and areas -- an
+    # organization's, which any member edits -- never a member's own row
+    # (what a colleague set before joining no one can see or clear).
+    team_profiles = [profile]
     offered = {c for p in team_profiles for c in (p.service_categories or [])}
     if rules.match_category and project.category_id and project.category_id not in offered:
         reasons.append(EligibilityReason(
@@ -170,15 +191,20 @@ def feed_condition(db: Session, profile: ServiceProviderProfile):
         d.requirement_id
         for d in db.query(ServiceProviderDocument).filter(
             ServiceProviderDocument.service_provider_id.in_(team_ids(db, profile.user_id)),
-            ServiceProviderDocument.status == DocumentStatus.approved,
-            or_(ServiceProviderDocument.expires_on.is_(None), ServiceProviderDocument.expires_on >= today),
+            or_(
+                and_(ServiceProviderDocument.status == DocumentStatus.approved,
+                     or_(ServiceProviderDocument.expires_on.is_(None), ServiceProviderDocument.expires_on >= today)),
+                # a renewal under review keeps the approval it renews
+                and_(ServiceProviderDocument.previous_file_path.isnot(None),
+                     or_(ServiceProviderDocument.previous_expires_on.is_(None), ServiceProviderDocument.previous_expires_on >= today)),
+            ),
         )
     })
     remaining = Project.elig_quals
     for requirement_id in held:  # strike each held one from ",a,b,"; all held leaves ","
         remaining = func.replace(remaining, f",{requirement_id},", ",")
     conditions.append(or_(Project.elig_quals.is_(None), remaining == ","))
-    team_profiles = db.query(ServiceProviderProfile).filter(ServiceProviderProfile.user_id.in_(team_ids(db, profile.user_id))).all()
+    team_profiles = [profile]  # the acting profile's own declaration, as in ineligibility_reasons
     offered = sorted({c for p in team_profiles for c in (p.service_categories or [])})
     conditions.append(or_(Project.elig_match_category.is_(False), Project.category_id.is_(None), Project.category_id.in_(offered)))
     served = sorted({g for p in team_profiles for g in (p.service_governorates or [])})
@@ -272,7 +298,7 @@ def matching_providers(db: Session, project: Project) -> list[ServiceProviderPro
     for profile in db.query(ServiceProviderProfile).filter(ServiceProviderProfile.verification_status == "approved").all():
         if not profile.is_verified_active or ineligibility_reasons(db, project, profile):
             continue
-        team = db.query(ServiceProviderProfile).filter(ServiceProviderProfile.user_id.in_(team_ids(db, profile.user_id))).all()
+        team = [profile]  # its own declaration, as in ineligibility_reasons
         if project.category_id not in {c for p in team for c in (p.service_categories or [])}:
             continue
         served = {g for p in team for g in (p.service_governorates or [])}

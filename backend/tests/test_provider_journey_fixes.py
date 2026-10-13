@@ -20,13 +20,26 @@ review of the service provider's journey, now corrected:
    the other can't answer it with its own; and a rating counts each owner's
    review of the latest completed job, not the one written last;
 9. an admin-suspended offer can't be revised or withdrawn while offers are open;
-10. a sealed tender doesn't tell competitors whether anyone has bid."""
+10. a sealed tender doesn't tell competitors whether anyone has bid;
+11. once offers have closed, the provider's own view of its offer lists the
+    documents the owner received, not files attached since;
+12. renewing a still-valid qualification keeps its approval counting until
+    the renewal is decided (restored if the renewal is refused);
+13. an organisation's eligibility rests on its own declared services and
+    areas, not a colleague's personal ones from before joining;
+14. a missing or expired qualification is offered as one to put right only
+    when the provider can upload it;
+15. after the representative role is handed over, the new representative
+    can correct the organisation's identity (and only it is offered to)."""
 import time
 from datetime import datetime, timedelta
 
 import stripe
 
 from app.config import get_settings
+from app.models.category import ServiceCategory
+from app.models.document import DocumentRequirement, ServiceProviderDocument
+from app.models.enums import DocumentStatus, StakeholderType, UserRole
 from app.models.enums import VerificationStatus
 from app.models.agreement import Agreement, Milestone
 from app.models.offer import Offer
@@ -39,7 +52,7 @@ from tests.test_stage4_9_participation import _admin
 from app.models.service_provider import ServiceProviderProfile
 from tests.stage7_helpers import complete_transaction
 from tests.test_batch_c_trust_accounts import _me
-from tests.test_stage4_9_participation import _account
+from tests.test_stage4_9_participation import _account, _when
 from tests.test_organization_sharing import _organization
 from tests.test_stage5_13_revise import DECL, _d, _submitted, _tender
 from tests.test_stage9_6_billing import SECRET, _event, _post, _sub
@@ -337,3 +350,115 @@ def test_a_sealed_tender_doesnt_say_whether_anyone_has_bid(db):
     card = next(c for c in rival.get("/service-provider/feed").json()["items"] if c["id"] == pid)
     assert card["tender_type_locked"] is False
     assert owner.get(f"/projects/{pid}").json()["tender_type_locked"] is True  # the owner's own rule still holds
+
+
+def test_after_the_close_the_providers_own_offer_lists_what_the_owner_received(db):
+    owner = _account(db, "owner", "o-as-sent@example.com")
+    sp = _account(db, "service_provider", "s-as-sent@example.com")
+    pid = _tender(owner)
+    _submitted(sp, pid)  # with method-v1.pdf
+    _upload(sp, pid, "method-v2.pdf")  # attached later, never put forward
+    assert [d["file_name"] for d in sp.get(f"/projects/{pid}/offers/mine").json()["documents"]] == ["method-v2.pdf"]  # still open: what a revision sends
+    owner.post(f"/owner/projects/{pid}/close")
+    mine = sp.get(f"/projects/{pid}/offers/mine").json()
+    oid = mine["id"]
+    owners = owner.get(f"/owner/projects/{pid}/offers").json()
+    received = next(o for o in owners if o["id"] == oid)["documents"]
+    assert [d["file_name"] for d in mine["documents"]] == [d["file_name"] for d in received] == ["method-v1.pdf"]
+    assert "/offers/mine/documents/file" in mine["documents"][0]["url"]  # opened through the provider's own route
+
+
+def _qualification(db, **kw):
+    lic = DocumentRequirement(name=kw.pop("name", "Licence"), applies_to=UserRole.service_provider, **kw)
+    db.add(lic)
+    db.commit()
+    return lic
+
+
+def _hold(db, sp, lic, expires, path="x/old.pdf"):
+    d = db.query(ServiceProviderDocument).filter_by(service_provider_id=_me(sp), requirement_id=lic.id).first() \
+        or ServiceProviderDocument(service_provider_id=_me(sp), requirement_id=lic.id)
+    d.status, d.expires_on, d.file_path = DocumentStatus.approved, expires, path
+    db.add(d)
+    db.commit()
+
+
+def _requiring(owner, **eligibility):
+    pid = owner.post("/projects", data={"title": "Villa rewiring", "address": "Kaifan", "governorate": "ahmadi", "description": "Rewire.",
+                                        "bid_deadline": _when(10)}).json()["id"]
+    assert owner.put(f"/projects/{pid}/eligibility", json=eligibility).status_code == 200
+    assert owner.post(f"/owner/projects/{pid}/publish").status_code == 200
+    return pid
+
+
+def test_a_renewal_keeps_the_approval_it_renews_until_decided(db):
+    owner = _account(db, "owner", "o-renew@example.com")
+    sp = _account(db, "service_provider", "s-renew@example.com")
+    admin = _admin(db)
+    lic = _qualification(db, is_required=False, requires_expiry=True)
+    valid_until = kuwait_today() + timedelta(days=20)
+    _hold(db, sp, lic, valid_until)
+    pid = _requiring(owner, qualifications=[lic.id])
+    renew = lambda name: sp.post(f"/service-provider/documents/{lic.id}/upload", files={"file": (name, b"%PDF-1.4 x", "application/pdf")})  # noqa: E731
+
+    assert renew("renewal.pdf").status_code == 200
+    assert sp.get(f"/projects/{pid}/eligibility").json()["eligible"] is True  # the approval still counts
+    # Refused: the approval it would have renewed stands, as it was.
+    r = admin.post("/admin/review/documents", json={"service_provider_id": _me(sp), "requirement_id": lic.id, "decision": "rejected", "note": "Unreadable scan"})
+    assert r.status_code == 200, r.text
+    db.expire_all()
+    doc = db.query(ServiceProviderDocument).filter_by(service_provider_id=_me(sp), requirement_id=lic.id).one()
+    assert (doc.status, doc.file_path, doc.expires_on, doc.previous_file_path) == (DocumentStatus.approved, "x/old.pdf", valid_until, None)
+    assert sp.get(f"/projects/{pid}/eligibility").json()["eligible"] is True
+    # Renewed again and approved: the new file and expiry take over.
+    assert renew("renewal-2.pdf").status_code == 200
+    later = (kuwait_today() + timedelta(days=400)).isoformat()
+    r = admin.post("/admin/review/documents", json={"service_provider_id": _me(sp), "requirement_id": lic.id, "decision": "approved", "expires_on": later})
+    assert r.status_code == 200, r.text
+    db.expire_all()
+    doc = db.query(ServiceProviderDocument).filter_by(service_provider_id=_me(sp), requirement_id=lic.id).one()
+    assert doc.status == DocumentStatus.approved and doc.file_path != "x/old.pdf" and doc.expires_on.isoformat() == later and doc.previous_file_path is None
+
+
+def test_a_colleagues_personal_areas_dont_narrow_the_organisation(db):
+    owner = _account(db, "owner", "o-areas@example.com")
+    rep, colleague, org_id, _ = _organization(db, "service_provider", "Co W.L.L.", "rep@co.example", "col@co.example")
+    profile = db.get(ServiceProviderProfile, org_id)
+    profile.payment_override_active, profile.company_name, profile.service_governorates = True, "Co", []  # all of Kuwait
+    db.query(ServiceProviderProfile).filter(ServiceProviderProfile.user_id == _me(colleague)).update({ServiceProviderProfile.service_governorates: ["capital"]})
+    db.commit()  # what the colleague had set on its own account before joining
+    pid = _requiring(owner, match_governorate=True)
+    assert rep.get(f"/projects/{pid}/eligibility").json()["eligible"] is True
+    assert pid in [c["id"] for c in rep.get("/service-provider/feed").json()["items"]]
+
+
+def test_a_qualification_is_offered_to_put_right_only_when_it_can_be_uploaded(db):
+    owner = _account(db, "owner", "o-fixable@example.com")
+    sp = _account(db, "service_provider", "s-fixable@example.com")
+    required = _qualification(db, name="Commercial licence", is_required=True, requires_expiry=True)
+    _hold(db, sp, required, kuwait_today() - timedelta(days=1))  # expired; an approved account can't upload a required one
+    orgs_only = _qualification(db, name="Grade certificate", is_required=False, applies_to_stakeholder=StakeholderType.organization)
+    optional = _qualification(db, name="Safety certificate", is_required=False)
+    retired = _qualification(db, name="Old permit", is_required=False)
+    pid = _requiring(owner, qualifications=[required.id, orgs_only.id, optional.id, retired.id])
+    retired.is_active = False
+    db.commit()
+    fixable = {r["name"]: r["fixable"] for r in sp.get(f"/projects/{pid}/eligibility").json()["reasons"]}
+    assert fixable == {"Commercial licence": False, "Grade certificate": False, "Safety certificate": True, "Old permit": False}
+
+
+def test_the_new_representative_can_correct_the_organisations_identity(db):
+    founder, colleague, org_id, colleague_id = _organization(db, "service_provider", "X Contractng", "founder@x.example", "colleague@x.example")
+    assert founder.post(f"/account/organization/representative/{colleague_id}").status_code == 200
+    profile = db.get(ServiceProviderProfile, org_id)
+    profile.verification_status = VerificationStatus.changes_requested  # "legal name must match the licence"
+    db.commit()
+    assert colleague.get("/account/identity").json()["stakeholder"]["editable"] is True
+    assert founder.get("/account/identity").json()["stakeholder"]["editable"] is False  # now a member
+    body = {"type": "organization", "legal_name": "X Contracting", "authorized": True}
+    assert founder.put("/account/stakeholder", json=body).status_code in (403, 409)
+    r = colleague.put("/account/stakeholder", json=body)
+    assert r.status_code == 200, r.text
+    assert colleague.get("/account/identity").json()["stakeholder"]["organization"]["legal_name"] == "X Contracting"
+    # A member can't turn the organisation into an individual.
+    assert colleague.put("/account/stakeholder", json={"type": "individual"}).status_code == 409

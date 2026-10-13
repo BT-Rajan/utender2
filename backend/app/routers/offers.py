@@ -25,7 +25,7 @@ from app.services.notify import notify, notify_team
 from app.services.team import acting_id, acting_profile, can_access, mine, org_of
 from app.services.offer_response import (
     AMOUNT_LIMIT, OFFER_DOCUMENTS_BUCKET, _side_documents, offer_file, open_file, check_commitment, history_out, check_complete, documents_out, draft_pricing, priced_total, readiness, requirements_for,
-    timing_conflicts,
+    submitted_documents_out, timing_conflicts,
 )
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import bidding_is_open, lock_project, sync_expired_projects
@@ -47,8 +47,14 @@ def my_offer(project_id: str, user: User = Depends(require_service_provider_in_s
 
 def _with_documents(db: Session, offer: Offer) -> OfferOut:
     out = OfferOut.model_validate(offer)
-    out.documents = documents_out(db, offer.project_id, offer.organization_id, offer.service_provider_id)
     project = db.get(Project, offer.project_id)
+    if offer.status != OfferStatus.draft and project is not None and not bidding_is_open(project):
+        # Once offers have closed nothing more can go with it: the provider's
+        # own view is the documents the owner received with its submitted
+        # version, not files attached since that never went (Stage 5.16).
+        out.documents = submitted_documents_out(db, offer, viewer="provider")
+    else:
+        out.documents = documents_out(db, offer.project_id, offer.organization_id, offer.service_provider_id)
     out.timing_conflicts = timing_conflicts(project, offer) if project else []  # Stage 5.5
     if project:
         _validity(db, project, offer, out)
