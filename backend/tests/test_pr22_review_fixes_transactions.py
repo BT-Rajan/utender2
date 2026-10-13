@@ -78,6 +78,10 @@ def test_the_last_live_offer_withdrawn_after_the_close_expires_the_requirement(d
     assert audit.previous_value == "closed" and audit.new_value == "expired" and audit.actor_id == _me(sp)
     expired = _notices(db, owner, NotificationType.requirement_expired)
     assert len(expired) == 1 and expired[0].link == f"/owner/projects/{pid}"
+    # PR #26 review: it had an offer -- the notice and the page say every offer
+    # was withdrawn, never "without an offer".
+    assert "withdrawn" in expired[0].body and "without an offer" not in expired[0].body
+    assert project.closure_reason == "offers_withdrawn" and owner.get(f"/projects/{pid}").json()["closure_reason"] == "offers_withdrawn"
     # Nothing was there to judge "no suitable offer" on.
     assert owner.post(f"/owner/projects/{pid}/no-award", json={"reason": "no_suitable_offer"}).status_code == 400
 
@@ -134,3 +138,23 @@ def test_the_deadline_notice_on_only_suspended_offers_says_they_are_under_review
     ready = _notices(db, owner, NotificationType.evaluation_ready)
     assert len(ready) == 1
     assert "offer(s)" not in ready[0].body and "Open it to evaluate" not in ready[0].body and "under review by a site admin" in ready[0].body
+
+
+def test_the_owner_is_told_when_a_suspended_offer_comes_back_after_the_close(db):
+    """PR #26 review: told the offers were under review with none to evaluate,
+    the owner hears when one is reactivated."""
+    from tests.test_stage4_9_participation import _admin
+
+    admin = _admin(db)
+    owner = _account(db, "owner", "o-back@example.com")
+    sp = _account(db, "service_provider", "s-back@example.com")
+    pid = _tender(owner)
+    _submitted(sp, pid)
+    offer_id = sp.get(f"/projects/{pid}/offers/mine").json()["id"]
+    assert admin.post(f"/admin/offers/{offer_id}/suspend", json={"suspended": True}).status_code == 200
+    _deadline_passes(db, pid)
+    owner.get("/owner/projects")
+    assert len(_notices(db, owner, NotificationType.evaluation_ready)) == 1  # "under review"
+    assert admin.post(f"/admin/offers/{offer_id}/suspend", json={"suspended": False}).status_code == 200
+    ready = _notices(db, owner, NotificationType.evaluation_ready)
+    assert len(ready) == 2 and any("with 1 offer(s)" in n.body for n in ready)

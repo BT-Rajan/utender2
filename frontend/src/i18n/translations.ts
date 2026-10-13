@@ -253,7 +253,6 @@ export interface Dictionary {
     startPassedBody: string;
     newStart: string;
     offerSuspended: string;
-    requirementSuspended: string;
     completionPassedBody: string;
     newCompletion: string;
   };
@@ -900,6 +899,7 @@ export interface Dictionary {
     labelNoSuitable: string;
     textCanceled: string;
     textExpired: string;
+    textAllWithdrawn: string;
     textExternal: string;
     textNoSuitable: string;
     offersKept: string;
@@ -2047,7 +2047,6 @@ export const en: Dictionary = {
     startPassedBody: "The start date you proposed has passed, so the owner can't award this offer as it stands. Give a new start date (today or later) to confirm it: the same span of work follows it, and nothing else in your offer changes. You may withdraw it instead.",
     newStart: "New start date",
     offerSuspended: "Your offer has been suspended by a site admin. You can confirm or withdraw it once it is reactivated.",
-    requirementSuspended: "This requirement has been suspended by a site admin. You can confirm or withdraw your offer once it is reactivated.",
     completionPassedBody: "The completion date you proposed has passed, so the owner can't award this offer as it stands. Give a new completion date (today or later) to confirm it: nothing else in your offer changes. You may withdraw it instead.",
     newCompletion: "New completion date",
   },
@@ -2758,6 +2757,7 @@ export const en: Dictionary = {
     labelNoSuitable: "No award",
     textCanceled: "The owner canceled this requirement; it won't go ahead in this form.",
     textExpired: "The response period ended without any offers.",
+    textAllWithdrawn: "Every offer was withdrawn after offers closed, so the requirement expired.",
     textExternal: "The owner closed this requirement and arranged the work outside U-Tender. No offer was accepted through U-Tender.",
     textNoSuitable: "The owner ended this requirement without accepting any offer.",
     offersKept: "Offers submitted stay on record. This requirement has ended and won't reopen.",
@@ -3930,7 +3930,6 @@ export const ar: Dictionary = {
     startPassedBody: "مضى تاريخ البدء الذي اقترحته، لذا لا يستطيع المالك ترسية هذا العرض كما هو. حدّد تاريخ بدء جديدًا (اليوم أو بعده) لتأكيده: تتبعه مدة العمل نفسها، ولا يتغير شيء آخر في عرضك. يمكنك سحبه بدلًا من ذلك.",
     newStart: "تاريخ البدء الجديد",
     offerSuspended: "قام مسؤول الموقع بتعليق عرضك. يمكنك تأكيده أو سحبه بعد إعادة تفعيله.",
-    requirementSuspended: "قام مسؤول الموقع بتعليق هذا الطلب. يمكنك تأكيد عرضك أو سحبه بعد إعادة تفعيله.",
     completionPassedBody: "مضى تاريخ الإنجاز الذي اقترحته، لذا لا يستطيع المالك ترسية هذا العرض كما هو. حدّد تاريخ إنجاز جديدًا (اليوم أو بعده) لتأكيده: لا يتغير شيء آخر في عرضك. يمكنك سحبه بدلًا من ذلك.",
     newCompletion: "تاريخ الإنجاز الجديد",
   },
@@ -4641,6 +4640,7 @@ export const ar: Dictionary = {
     labelNoSuitable: "بلا ترسية",
     textCanceled: "ألغى المالك هذا الطلب؛ لن يُنفَّذ بهذه الصيغة.",
     textExpired: "انتهت فترة تقديم العروض دون أي عرض.",
+    textAllWithdrawn: "سُحبت كل العروض بعد إغلاق تقديم العروض، لذا انتهت صلاحية الطلب.",
     textExternal: "أغلق المالك هذا الطلب ورتّب تنفيذ العمل خارج U-Tender. لم يُقبل أي عرض عبر U-Tender.",
     textNoSuitable: "أنهى المالك هذا الطلب دون قبول أي عرض.",
     offersKept: "تبقى العروض المقدَّمة محفوظة. انتهى هذا الطلب ولن يُعاد فتحه.",

@@ -442,7 +442,7 @@ export interface OwnerDocument {
   url?: string | null; // admin views only: a signed, time-limited link
 }
 
-export type ClosureReason = "not_needed" | "postponed" | "other" | "no_suitable_offer" | "closed_externally";
+export type ClosureReason = "not_needed" | "postponed" | "other" | "no_suitable_offer" | "closed_externally" | "offers_withdrawn";
 
 export interface AdminOffer {
   id: string;

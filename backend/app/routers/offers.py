@@ -925,6 +925,7 @@ def withdraw_offer(project_id: str, user: User = Depends(require_approved_servic
         Offer.project_id == project.id, Offer.id != offer.id, Offer.status == OfferStatus.submitted
     ).first():
         expired_from, project.status = project.status.value, ProjectStatus.expired
+        project.closure_reason = "offers_withdrawn"  # it had offers: every one was withdrawn
         db.add(AuditLog(actor_id=user.id, action="project.expire", target_type="project", target_id=project.id,
                         previous_value=expired_from, new_value="expired", reason="The last live offer was withdrawn."))
     # Stage 9.7: withdrawn, by whom, in the same commit (with the expiry, if any).
@@ -942,6 +943,6 @@ def withdraw_offer(project_id: str, user: User = Depends(require_approved_servic
             project_title=project.title, service_provider_name="A service provider" if sealed or not profile else profile.company_name,
         )
         if expired_from:  # and that nothing is left to evaluate (the deadline notice's wording)
-            notify_team(db, owner, NotificationType.requirement_expired, link=f"/owner/projects/{project.id}",
+            notify_team(db, owner, NotificationType.requirement_expired, link=f"/owner/projects/{project.id}", variant="withdrawn",
                         organization_id=project.organization_id, project_title=project.title)
     return _with_documents(db, offer)  # Stage 5.14: the same shape as every other offer response

@@ -45,7 +45,7 @@ export function offerStatusLabel(t: T, offerStatus: string, projectStatus: Proje
 export function outcomeText(t: T, status: ProjectStatus, reason?: ClosureReason | null): string | null {
   if (status === "no_award") return reason === "closed_externally" ? t("closure.textExternal") : t("closure.textNoSuitable");
   if (status === "canceled") return `${t("closure.textCanceled")} ${t(`closure.reason_${reason ?? "other"}`)}`;
-  if (status === "expired") return t("closure.textExpired");
+  if (status === "expired") return t(reason === "offers_withdrawn" ? "closure.textAllWithdrawn" : "closure.textExpired");
   return null;
 }
 
