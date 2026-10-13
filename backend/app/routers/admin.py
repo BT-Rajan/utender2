@@ -1734,6 +1734,7 @@ def edit_account_details(user_id: str, payload: AccountDetailsPatch, admin: User
     sent change; sending a field with its current value changes nothing."""
     from sqlalchemy import func
 
+    from app.models.email_change import EmailChangeRequest
     from app.models.enums import AuthTokenType
     from app.services.auth_tokens import invalidate_tokens, issue_token
     from app.services.email import notify_email_changed, notify_verify_email
@@ -1777,6 +1778,10 @@ def edit_account_details(user_id: str, payload: AccountDetailsPatch, admin: User
         # verify/reset links stop working and every session of the account ends.
         invalidate_tokens(db, target.id)
         target.session_version = (target.session_version or 0) + 1
+        # A self-service change in flight has its code in the old mailbox too.
+        db.query(EmailChangeRequest).filter(EmailChangeRequest.user_id == target.id, EmailChangeRequest.consumed_at.is_(None)).update(
+            {EmailChangeRequest.consumed_at: datetime.utcnow()}, synchronize_session=False
+        )
     log_action(
         db, actor_id=admin.id, action="account.updated_by_admin", target_type="user", target_id=target.id,
         previous_value=json.dumps({f: c[0] for f, c in changes.items()}), new_value=json.dumps({f: c[1] for f, c in changes.items()}),
@@ -1837,6 +1842,8 @@ def deactivate_account(user_id: str, payload: AccountStatePatch | None = None, a
                 detail="This person is what keeps their organization manageable. Add or appoint another representative first.",
             )
         target.deactivated_at = datetime.utcnow().replace(microsecond=0)
+        # Nobody may join an organization whose representative can't act.
+        stakeholder_service.revoke_invitations_on_deactivation(db, admin, target)
         log_action(db, actor_id=admin.id, action="account.deactivate", target_type="user", target_id=target.id,
                    new_value=(payload.reason if payload and payload.reason else None))
     db.commit()

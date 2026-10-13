@@ -171,13 +171,13 @@ def login(payload: LoginRequest, request: Request, response: Response, db: Sessi
     user = db.query(User).filter(User.email == email).first()
     if not user or not verify_password(payload.password, user.password_hash):
         locked_now = login_throttle.record_failure(client_ip, email)
-        if locked_now == "ip":
+        if "ip" in locked_now:
             # The address as a whole, not the account that happened to tip it
             # (often one that doesn't exist): application log, not the trail.
             logger.warning("login locked for client %s after too many failed attempts", client_ip)
         if user:
             _audit_session(db, request, user, "login.failed")
-            if locked_now == "account":
+            if "account" in locked_now:
                 _audit_session(db, request, user, "login.locked")
         else:
             # No account to attach a row to, and unauthenticated input

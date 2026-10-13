@@ -415,6 +415,16 @@ def describe_invitation(db: Session, token: str) -> dict:
 
 def accept_invitation(user: User, db: Session, token: str) -> None:
     invitation = _live_invitation(db, token)
+    # Security: under the organization's row lock -- the one deactivation
+    # takes -- re-read the invitation (deactivating the representative
+    # withdraws it) and require a working representative, so nobody joins an
+    # organization that no one can manage any more.
+    _lock_organization(db, invitation.organization_id)
+    invitation = (
+        db.query(OrganizationInvitation).filter(OrganizationInvitation.id == invitation.id).populate_existing().with_for_update().first()
+    )
+    if not invitation or invitation.accepted_at or invitation.revoked_at or invitation.expires_at <= datetime.utcnow():
+        raise HTTPException(status_code=404, detail="This invitation is invalid, has expired or was withdrawn.")
     if user.email.strip().lower() != invitation.email:
         raise HTTPException(status_code=403, detail="This invitation is for a different email address.")
     # The link carries a secret, but a link can be forwarded or shared on
@@ -427,6 +437,10 @@ def accept_invitation(user: User, db: Session, token: str) -> None:
     if user.role != invitation.role:
         raise HTTPException(status_code=400, detail="This invitation is for an account on the other side of the marketplace.")
     _check_can_join(user, db)
+    if not _has_active_representative(db, invitation.organization_id):
+        raise HTTPException(
+            status_code=409, detail="This organization has no active representative right now, so the invitation can't be accepted."
+        )
     db.add(
         OrganizationMembership(
             organization_id=invitation.organization_id, user_id=user.id, role=MembershipRole.member, position=invitation.position
@@ -439,15 +453,26 @@ def accept_invitation(user: User, db: Session, token: str) -> None:
 
 def remove_member(user: User, db: Session, member_id: str) -> None:
     membership = _require_representative(user, db)
+    # Security: under the organization's row lock, like hand_over, so a removal
+    # can't interleave with an appointment or hand-over of the same person and
+    # leave the organization without a representative.
+    _lock_organization(db, membership.organization_id)
+    membership = db.query(OrganizationMembership).filter(OrganizationMembership.user_id == user.id).populate_existing().with_for_update().first()
+    if membership is None or membership.role != MembershipRole.admin:
+        raise HTTPException(status_code=403, detail="Only the organization's authorized representative can manage its members.")
     if member_id == user.id:
         raise HTTPException(status_code=400, detail="You can't remove yourself as the organization's representative.")
     target = (
         db.query(OrganizationMembership)
         .filter(OrganizationMembership.organization_id == membership.organization_id, OrganizationMembership.user_id == member_id)
+        .populate_existing()
+        .with_for_update()
         .first()
     )
     if not target:
         raise HTTPException(status_code=404, detail="Not a member of this organization.")
+    if target.role == MembershipRole.admin:
+        raise HTTPException(status_code=409, detail="The organization's representative can't be removed.")
     # The organization's profile (its verification, payment and trading name)
     # is held by the account that established it. Removing that person would
     # leave their account still resolving to the organization's profile and so
@@ -527,11 +552,19 @@ def deactivation_would_strand_organization(db: Session, target: User) -> bool:
     if membership is None:
         return False
     if membership.role == MembershipRole.admin:
-        # The sole member strands nobody: there's no one left to manage.
-        others = db.query(OrganizationMembership.user_id).filter(
-            OrganizationMembership.organization_id == membership.organization_id, OrganizationMembership.user_id != target.id
+        # The sole active member strands nobody: there's no one left to manage
+        # (deactivated colleagues can't act until reactivated, and an admin can
+        # appoint one of them then).
+        others_active = (
+            db.query(OrganizationMembership.user_id)
+            .join(User, User.id == OrganizationMembership.user_id)
+            .filter(
+                OrganizationMembership.organization_id == membership.organization_id,
+                OrganizationMembership.user_id != target.id,
+                User.deactivated_at.is_(None),
+            )
         )
-        return others.first() is not None
+        return others_active.first() is not None
     rep = _representative_membership(db, membership.organization_id)
     rep_user = db.get(User, rep.user_id) if rep else None
     if rep_user is not None and rep_user.deactivated_at is None:
@@ -547,6 +580,44 @@ def deactivation_would_strand_organization(db: Session, target: User) -> bool:
         .first()
     )
     return others_active is None
+
+
+def _has_active_representative(db: Session, organization_id: str) -> bool:
+    """Call under the organization's lock -- the one appointments, hand-overs
+    and deactivation take -- so the answer holds until commit."""
+    rep = _representative_membership(db, organization_id)
+    if rep is None:
+        return False
+    rep_user = db.query(User).filter(User.id == rep.user_id).populate_existing().first()
+    return rep_user is not None and rep_user.deactivated_at is None
+
+
+def revoke_invitations_on_deactivation(db: Session, actor: User, target: User) -> None:
+    """Deactivating an organization's representative withdraws the
+    invitations still open for it: nobody could manage whoever joined
+    through them. Call under the organization's lock."""
+    membership = db.query(OrganizationMembership).filter(OrganizationMembership.user_id == target.id).first()
+    if membership is None or membership.role != MembershipRole.admin:
+        return
+    now = datetime.utcnow()
+    pending = (
+        db.query(OrganizationInvitation)
+        .filter(
+            OrganizationInvitation.organization_id == membership.organization_id,
+            OrganizationInvitation.accepted_at.is_(None),
+            OrganizationInvitation.revoked_at.is_(None),
+            OrganizationInvitation.expires_at > now,
+        )
+        .with_for_update()
+        .all()
+    )
+    for invitation in pending:
+        invitation.revoked_at = now
+        log_action(
+            db, actor_id=actor.id, action="organization.invitation_revoked_on_deactivation", target_type="organization",
+            target_id=membership.organization_id, previous_value=invitation.email, new_value=target.id,
+        )
+    db.flush()
 
 
 def _lock_organization(db: Session, organization_id: str) -> Organization:
@@ -592,7 +663,9 @@ def admin_appoint_representative(db: Session, admin: User, organization_id: str,
         .with_for_update()
         .first()
     )
-    person = db.get(User, user_id) if target else None
+    # Security: the person under a row lock too (organization, then
+    # memberships, then people), so a concurrent deactivation can't slip in.
+    person = db.query(User).filter(User.id == user_id).populate_existing().with_for_update().first() if target else None
     if target is None or person is None:
         raise HTTPException(status_code=404, detail="Not a member of this organization.")
     if person.deactivated_at is not None:
@@ -619,7 +692,9 @@ def admin_add_member(db: Session, admin: User, organization_id: str, email: str,
         or db.query(ServiceProviderProfile.user_id).filter(ServiceProviderProfile.organization_id == organization_id).first()
         and UserRole.service_provider
     )
-    person = db.query(User).filter(func.lower(User.email) == email.strip().lower()).first()
+    # Security: read the person under a row lock (after the organization's) so
+    # a concurrent deactivation can't land between these checks and the join.
+    person = db.query(User).filter(func.lower(User.email) == email.strip().lower()).populate_existing().with_for_update().first()
     if person is None:
         raise HTTPException(status_code=404, detail="No account with that email. They need to sign up first.")
     if side and person.role != side:

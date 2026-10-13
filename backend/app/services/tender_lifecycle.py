@@ -144,9 +144,10 @@ def sync_expired_projects(db: Session) -> None:
 def _tell_owner_deadline_reached(db: Session, project: Project) -> None:
     """After the change is committed: the owner side is told its offers
     closed (and how many were made), or that nobody made one. Best-effort.
-    The count is the same live offers that closed it rather than expiring it
-    -- one an admin has suspended included: it is still an offer, held until
-    reactivated -- so a closed requirement is never reported with 0."""
+    A live offer an admin has suspended still closes it rather than expiring
+    it (it is still an offer, held until reactivated), but the owner can't
+    see it: the count is of the offers it can see, and when every one is
+    suspended the notice says they are under review instead of reporting 0."""
     import logging
 
     from app.models.enums import NotificationType
@@ -157,8 +158,9 @@ def _tell_owner_deadline_reached(db: Session, project: Project) -> None:
         owner = db.get(User, project.owner_id)
         link = f"/owner/projects/{project.id}"
         if project.status == ProjectStatus.closed:
-            count = db.query(Offer.id).filter(Offer.project_id == project.id, Offer.status == OfferStatus.submitted).count()
-            notify_team(db, owner, NotificationType.evaluation_ready, link=link, organization_id=project.organization_id, project_title=project.title, count=count)
+            count = db.query(Offer.id).filter(Offer.project_id == project.id, Offer.status == OfferStatus.submitted, Offer.is_suspended.is_(False)).count()
+            notify_team(db, owner, NotificationType.evaluation_ready, link=link, organization_id=project.organization_id, project_title=project.title, count=count,
+                        variant=None if count else "under_review")
         else:
             notify_team(db, owner, NotificationType.requirement_expired, link=link, organization_id=project.organization_id, project_title=project.title)
         db.commit()

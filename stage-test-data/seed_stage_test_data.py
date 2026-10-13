@@ -581,6 +581,10 @@ def main():
     typed = args.confirm_db if args.confirm_db is not None else input(f"Type the database name ({url.database}) to continue: ")
     if typed.strip() != (url.database or ""):
         sys.exit("Aborted: that isn't the target database's name.")
+    # The app accepts passwords of 8-72 characters; a SEED_PASSWORD outside that
+    # would fail at the first sign-up, after the admin row was already written.
+    if not 8 <= len(PASSWORD) <= 72:
+        sys.exit("SEED_PASSWORD must be 8 to 72 characters long (the app's own password rule).")
 
     try:
         requests.get(f"{args.api_url.rstrip('/')}/health", timeout=10).raise_for_status()
@@ -590,6 +594,13 @@ def main():
     taken = [e for e in [ADMIN["email"]] + [o["email"] for o in OWNERS.values()] + [p["email"] for p in PROVIDERS.values()] if db_user_exists(e)]
     if taken:
         sys.exit("Already seeded (these accounts exist): " + ", ".join(taken) + "\nThis script is deliberately one-time. Restore a clean database/backup to run it again.")
+
+    # Save the password before anything is created: if the run stops midway, the
+    # accounts already made can still be signed into.
+    manifest_path = HERE / "last_run_manifest.json"
+    manifest_path.write_text(json.dumps({"created_at": datetime.now(timezone.utc).isoformat(), "api_url": args.api_url,
+                                         "password_for_every_account": PASSWORD, "complete": False}, indent=2))
+    say(f"Password for every account (also in {manifest_path.name}): {PASSWORD}")
 
     started = time.time()
     head("Admin")
@@ -650,9 +661,9 @@ def main():
         "accounts": {"admin": ADMIN["email"], "owners": {k: v["email"] for k, v in OWNERS.items()},
                      "providers": {k: v["email"] for k, v in PROVIDERS.items()},
                      "staff": {k: [em(s[0]) for s in v["staff"]] for k, v in PROVIDERS.items()}},
-        "pending_invitations": cast["invitations"], "tenders": tenders,
+        "pending_invitations": cast["invitations"], "tenders": tenders, "complete": True,
     }
-    (HERE / "last_run_manifest.json").write_text(json.dumps(manifest, indent=2))
+    manifest_path.write_text(json.dumps(manifest, indent=2))
 
     head("Done")
     n_users = 1 + len(OWNERS) + len(PROVIDERS) + sum(len(p["staff"]) for p in PROVIDERS.values())

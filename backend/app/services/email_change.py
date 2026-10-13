@@ -85,6 +85,10 @@ def request_change(db: Session, user: User, new_email: str, current_password: st
 
 def confirm_change(db: Session, user: User, code: str) -> User:
     now = datetime.utcnow()
+    # Security: the account row first (the order the admin email edit uses:
+    # the person, then their requests), so the two can't interleave and lose
+    # one's email or session_version; the admin edit also retires this request.
+    user = db.query(User).filter(User.id == user.id).populate_existing().with_for_update().one()
     req = (
         db.query(EmailChangeRequest)
         .filter(EmailChangeRequest.user_id == user.id, EmailChangeRequest.consumed_at.is_(None))

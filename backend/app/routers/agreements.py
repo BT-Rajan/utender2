@@ -142,7 +142,7 @@ def _reconfirm_after_paper_change(agreement: Agreement, side: str, user: User) -
 
 _RECONFIRM_SUMMARY = {
     Language.en: "The owner changed the agreement after you confirmed its terms. Check it and confirm the terms again before the agreement can be put in force.",
-    Language.ar: "غيّر المالك الاتفاقية بعد أن أكّدت شروطها. راجعها وأكّد الشروط مجددًا قبل أن يمكن جعل الاتفاقية سارية.",
+    Language.ar: "غيّر المالك الاتفاقية بعد أن أكّدت شروطها. راجعها وأكّد الشروط مجددًا حتى يتمكن المالك من جعل الاتفاقية سارية.",
 }
 
 
@@ -726,11 +726,12 @@ async def attach_agreement_document(
     db.add(doc)
     try:
         db.flush()
-        if not (milestone_id or variation_id or execution_update_id) and kind not in EVIDENCE_KINDS:
-            # Stage 7.13: the agreement's own papers are part of its history.
-            _record(db, agreement, "document", side, user, doc.file_name, doc.uploaded_at or datetime.utcnow().replace(microsecond=0), document_id=doc.id)
-        if not (variation_id or execution_update_id) and kind not in EVIDENCE_KINDS:
-            # A deliverable's paper (its agreed scope, say) is part of the terms too.
+        if kind not in EVIDENCE_KINDS:
+            if not (milestone_id or variation_id or execution_update_id):
+                # Stage 7.13: the agreement's own papers are part of its history.
+                _record(db, agreement, "document", side, user, doc.file_name, doc.uploaded_at or datetime.utcnow().replace(microsecond=0), document_id=doc.id)
+            # Any paper of the terms -- whatever it is linked to -- changes what
+            # the provider confirmed while the agreement is being prepared.
             reconfirm = _reconfirm_after_paper_change(agreement, side, user)
         # log_action commits: the document and its audit entry land together.
         log_action(db, actor_id=user.id, action="agreement.document_add", target_type="agreement", target_id=agreement.id, new_value=f"{doc.id}:{kind}")
@@ -759,7 +760,7 @@ def remove_agreement_document(project_id: str, document_id: str, user: User = De
     if agreement.status != "preparing":
         raise HTTPException(status_code=400, detail="Documents of an agreement in force or terminated stay on record.")
     path, reconfirm = doc.file_path, False
-    if not (doc.variation_id or doc.execution_update_id) and doc.kind not in EVIDENCE_KINDS:  # a deliverable's paper included
+    if doc.kind not in EVIDENCE_KINDS:  # a paper of the terms, whatever it is linked to
         reconfirm = _reconfirm_after_paper_change(agreement, side, user)
     db.delete(doc)
     log_action(db, actor_id=user.id, action="agreement.document_remove", target_type="agreement", target_id=agreement.id, previous_value=f"{document_id}:{doc.kind}")

@@ -1789,5 +1789,27 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
   - **Answering the owner's questions:** each offer clarification says whether it can still be answered (`answerable`), and the provider is offered the answer form only then. "Submit again" isn't offered after an offer's final withdrawal.
   - **The 30 days pause during a suspension:** the owner side's 30 days to answer submitted work or a delivered deliverable don't run while an admin has the requirement suspended (measured from the audit log's suspend and reactivate entries).
   - **Tests:** `tests/test_provider_journey_fixes.py`.
+- **Review of PR #22:**
+  - **Organisations:**
+    - Deactivating a representative withdraws its open invitations.
+    - An invitation can't be accepted while the organisation has no active representative.
+    - The representative can't be removed.
+    - A representative whose colleagues are all deactivated can be deactivated.
+    - Adding or appointing a person and removing a member take the organisation lock and lock the person, so concurrent changes can't leave no representative, or a deactivated one.
+  - **Email change:**
+    - The self-service confirmation locks the account row.
+    - An admin email edit retires a self-service change in flight.
+  - **Login throttle:**
+    - Both lockouts are reported when they trip together.
+    - The replay cache has a hard cap with O(1) eviction.
+  - **Agreements:** a paper of the terms linked to a deliverable also needs the provider to confirm again.
+  - **Offers:**
+    - After the close, withdrawing the last live offer expires the requirement.
+    - The deadline notice counts only offers the owner can see, and says the offers are under admin review when all are suspended.
+    - Confirm and Withdraw are replaced by a note while the offer or requirement is suspended.
+  - **Seed script:**
+    - `SEED_PASSWORD` must fit the app's 8–72 rule.
+    - The password is saved before seeding starts.
+  - **Tests:** `tests/test_pr22_review_fixes_accounts.py`, `tests/test_pr22_review_fixes_transactions.py`.
 
 _Later Stage 9 steps are added as they are implemented._
