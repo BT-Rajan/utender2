@@ -825,6 +825,8 @@ def close_project(project_id: str, user: User = Depends(require_owner), db: Sess
     # since: it closed then, by itself -- not now, and not early.
     sync_expired_projects(db)
     project = _get_owned_project(project_id, user, db, lock=True)
+    if project.is_suspended:  # no decision is taken on it meanwhile, as for award and the endings
+        raise HTTPException(status_code=400, detail="This requirement has been suspended by an admin.")
     if project.status != ProjectStatus.open:
         if project.status in (ProjectStatus.closed, ProjectStatus.expired) and project.closed_at == project.bid_deadline:
             raise HTTPException(status_code=400, detail="Offers already closed at the deadline.")
@@ -880,6 +882,8 @@ def pause_project(project_id: str, payload: PauseRequest, user: User = Depends(r
     extend it (an amendment) if the pause will outlast it."""
     sync_expired_projects(db)
     project = _get_owned_project(project_id, user, db, lock=True)
+    if project.is_suspended:  # no decision is taken on it meanwhile, as for award and the endings
+        raise HTTPException(status_code=400, detail="This requirement has been suspended by an admin.")
     if project.status != ProjectStatus.open:
         raise HTTPException(status_code=400, detail="Only an open requirement can be paused.")
     if project.paused_at is not None:
@@ -899,6 +903,8 @@ def resume_project(project_id: str, user: User = Depends(require_owner), db: Ses
     or expired, and stays so)."""
     sync_expired_projects(db)
     project = _get_owned_project(project_id, user, db, lock=True)
+    if project.is_suspended:  # no decision is taken on it meanwhile, as for award and the endings
+        raise HTTPException(status_code=400, detail="This requirement has been suspended by an admin.")
     if project.status != ProjectStatus.open or project.paused_at is None:
         raise HTTPException(status_code=400, detail="Only a paused, still-open requirement can be resumed.")
     if project.bid_deadline <= datetime.utcnow():
@@ -915,6 +921,8 @@ def resume_project(project_id: str, user: User = Depends(require_owner), db: Ses
 def start_evaluation(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     sync_expired_projects(db)
     project = _get_owned_project(project_id, user, db, lock=True)
+    if project.is_suspended:  # no decision is taken on it meanwhile, as for award and the endings
+        raise HTTPException(status_code=400, detail="This requirement has been suspended by an admin.")
     if project.status != ProjectStatus.closed:
         raise HTTPException(status_code=400, detail="Only a closed project can enter evaluation.")
     project.status = ProjectStatus.under_evaluation

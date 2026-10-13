@@ -63,7 +63,8 @@ export function Variations({
     onError: failed,
   });
 
-  const inForce = a.status === "active";
+  // Stage 7.10: once the work is submitted as complete, what was agreed is what is reviewed -- no change to it.
+  const inForce = a.status === "active" && a.completion_status !== "submitted" && a.completion_status !== "accepted";
   if (a.variations.length === 0 && !(party && inForce)) return null;
   const v8 = "variations";
   const open = a.variations.some((x) => x.status === "proposed");

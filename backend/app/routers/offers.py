@@ -856,7 +856,11 @@ def withdraw_offer(project_id: str, user: User = Depends(require_approved_servic
     # Batch B: after the close an offer is held only for its validity period;
     # once that has run out (and the provider hasn't confirmed it since), the
     # provider is free to withdraw it.
-    lapsed_after_close = project.status in (ProjectStatus.closed, ProjectStatus.under_evaluation) and validity_lapsed(project, offer)
+    # Not while the requirement or the offer is suspended by an admin: every provider action waits (Stage 3.18).
+    lapsed_after_close = (
+        project.status in (ProjectStatus.closed, ProjectStatus.under_evaluation) and not project.is_suspended and not offer.is_suspended
+        and validity_lapsed(project, offer)
+    )
     if not bidding_is_open(project) and not lapsed_after_close:
         raise HTTPException(
             status_code=400, detail="Bidding on this project has closed, so this offer can no longer be withdrawn."
