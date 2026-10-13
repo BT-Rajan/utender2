@@ -5,6 +5,7 @@ import { useConfirm } from "@/components/ConfirmDialog";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { ReceivedReview, ReviewResponse } from "@/components/ReceivedReview";
 import { RatingInput } from "@/components/RatingInput";
+import { useAccountApproved } from "@/auth/ProtectedRoute";
 import { useI18n } from "@/i18n/I18nContext";
 import { fullDate } from "@/lib/format";
 
@@ -47,6 +48,7 @@ export function OwnerReview({ projectId }: { projectId: string }) {
     onSuccess: (saved) => { setError(null); queryClient.setQueryData(key, saved); },
     onError: (e: Error) => { setError(e instanceof ApiError ? e.message : t("ownerReview.error")); queryClient.invalidateQueries({ queryKey: key }); },
   });
+  const approved = useAccountApproved("service_provider");
   if (!completed) return null;
   const name = transaction?.owner_name ?? t("ownerReview.theOwner");
 
@@ -69,6 +71,8 @@ export function OwnerReview({ projectId }: { projectId: string }) {
           )}
           <ReviewResponse response={review.response} at={review.response_at} label={t("review.theirResponse")} reportBase={`/service-provider/projects/${projectId}`} />
         </div>
+      ) : approved === false ? (
+        <p className="text-sm text-steel" data-testid="review-needs-approval">{t("review.needsApproval")}</p>
       ) : (
         <form
           className="bg-white border border-border rounded px-4 py-3 grid gap-3"

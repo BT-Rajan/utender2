@@ -250,6 +250,8 @@ export interface Dictionary {
   offerValidity: {
     until: string; lapsed: string; answersSince: string; answersSinceProvider: string; asked: string; ask: string; askHint: string;
     standsHeading: string; lapsedBody: string; outdatedBody: string; confirm: string; withdraw: string; lastWithdrawal: string; noMoreResubmission: string;
+    startPassedBody: string;
+    newStart: string;
   };
   award: {
     confirmTitle: string;
@@ -282,6 +284,7 @@ export interface Dictionary {
     theirResponse: string;
     ownerResponse: string;
     providerResponse: string;
+    needsApproval: string;
   };
   reputation: {
     heading: string;
@@ -2034,6 +2037,8 @@ export const en: Dictionary = {
     withdraw: "Withdraw my offer",
     lastWithdrawal: "If you withdraw this offer again, it can't be put forward again on this requirement.",
     noMoreResubmission: "This offer was withdrawn twice, so it can't be put forward again on this requirement.",
+    startPassedBody: "The start date you proposed has passed, so the owner can't award this offer as it stands. Give a new start date (today or later) to confirm it: the same span of work follows it, and nothing else in your offer changes. You may withdraw it instead.",
+    newStart: "New start date",
   },
   award: {
     confirmTitle: "Award this requirement to {provider}?",
@@ -2066,6 +2071,7 @@ export const en: Dictionary = {
     theirResponse: "Their response",
     ownerResponse: "The owner's response",
     providerResponse: "The provider's response",
+    needsApproval: "Reviews can be written once your account verification is approved again. See your verification status for what is needed.",
   },
   reputation: {
     heading: "U-Tender track record",
@@ -3907,6 +3913,8 @@ export const ar: Dictionary = {
     withdraw: "اسحب عرضي",
     lastWithdrawal: "إذا سحبت هذا العرض مرة أخرى فلن يمكن تقديمه مجددًا على هذا الطلب.",
     noMoreResubmission: "سُحب هذا العرض مرتين، لذا لا يمكن تقديمه مجددًا على هذا الطلب.",
+    startPassedBody: "مضى تاريخ البدء الذي اقترحته، لذا لا يستطيع المالك ترسية هذا العرض كما هو. حدّد تاريخ بدء جديدًا (اليوم أو بعده) لتأكيده: تتبعه مدة العمل نفسها، ولا يتغير شيء آخر في عرضك. يمكنك سحبه بدلًا من ذلك.",
+    newStart: "تاريخ البدء الجديد",
   },
   award: {
     confirmTitle: "ترسية هذا المتطلب على {provider}؟",
@@ -3939,6 +3947,7 @@ export const ar: Dictionary = {
     theirResponse: "ردهم",
     ownerResponse: "رد المالك",
     providerResponse: "رد مقدم الخدمة",
+    needsApproval: "يمكن كتابة التقييم بعد الموافقة على توثيق حسابك مرة أخرى. راجع حالة التوثيق لمعرفة المطلوب.",
   },
   reputation: {
     heading: "السجل على U-Tender",

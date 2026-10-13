@@ -20,6 +20,7 @@ import { CategoryField } from "@/components/CategoryField";
 import { TenderRulesEditor } from "@/components/TenderRules";
 import { QualityCheck, type QualityReport } from "@/components/QualityCheck";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { useAccountApproved } from "@/auth/ProtectedRoute";
 import { AgreementPanel } from "@/components/AgreementPanel";
 import { ReceivedReview, ReviewResponse } from "@/components/ReceivedReview";
 import { TrackRecord } from "@/components/TrackRecord";
@@ -388,6 +389,7 @@ function DraftDetailsForm({ project }: { project: ProjectDetail }) {
 export function OwnerProjectDetailPage() {
   const { t, language } = useI18n();
   const { id } = useParams<{ id: string }>();
+  const accountApproved = useAccountApproved("owner"); // Batch A: under re-review, the job page stays; reviews wait
   const queryClient = useQueryClient();
   const [rating, setRating] = useState(0);
   // Stage 6.6: offers chosen for side-by-side comparison (live ones only).
@@ -464,7 +466,7 @@ export function OwnerProjectDetailPage() {
   });
 
   const addDrawingsMutation = useMutation({
-    mutationFn: (formData: FormData) => apiFetch(`/projects/${id}/drawings`, { method: "POST", formData }),
+    mutationFn: (formData: FormData) => apiFetch(`/projects/${id}/drawings`, { method: "POST", formData, headers: draftVersion(project ?? {}) }),
     onSuccess: () => {
       setError(null);
       drawingsFormRef.current?.reset();
@@ -691,6 +693,8 @@ export function OwnerProjectDetailPage() {
       {(project.status === "canceled" || project.status === "no_award" || project.status === "expired") && <StartAgain project={project} />}
       {/* Stage 8.11: the same need again, after a completed transaction -- a new draft, this one untouched. */}
       {project.status === "awarded" && reviewable && <StartAgain project={project} similar />}
+      {/* A terminated agreement can't be reopened: the unmet need comes back as a new draft. */}
+      {project.status === "awarded" && transaction?.status === "terminated" && <StartAgain project={project} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-6 items-start">
         <div>
@@ -993,7 +997,7 @@ export function OwnerProjectDetailPage() {
                     </td>
                     <td className="py-3 px-2.5">
                       {o.status !== "submitted" ? null : (project.status === "closed" || project.status === "under_evaluation") &&
-                        ((o.based_on_material_revision ?? 0) < (project.material_revision ?? 0) || o.validity_lapsed) ? (
+                        ((o.based_on_material_revision ?? 0) < (project.material_revision ?? 0) || o.validity_lapsed || o.start_passed) ? (
                         askedToConfirm.includes(o.id) ? (
                           <span className="font-mono text-[10px] text-steel" data-testid="owner-offer-confirmation-asked">{t("offerValidity.asked")}</span>
                         ) : (
@@ -1066,6 +1070,8 @@ export function OwnerProjectDetailPage() {
               )}
               <ReviewResponse response={existingReview.response} at={existingReview.response_at} label={t("review.theirResponse")} reportBase={`/owner/projects/${project.id}`} />
             </div>
+          ) : accountApproved === false ? (
+            <p className="text-sm text-steel" data-testid="review-needs-approval">{t("review.needsApproval")}</p>
           ) : (
             <form
               onSubmit={(e) => {

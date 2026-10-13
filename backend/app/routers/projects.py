@@ -1046,6 +1046,7 @@ async def add_drawings(
     # price the work (applies to every file in this upload).
     category: str = Form("drawing"),
     is_required: bool = Form(True),
+    if_match: str | None = Header(None, alias="If-Match"),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -1053,7 +1054,7 @@ async def add_drawings(
     if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
     _require_active_owner(user, db)
-    _guard_draft_write(project, None)
+    _guard_draft_write(project, if_match)
     if category not in DOCUMENT_CATEGORIES:
         raise HTTPException(status_code=400, detail="Unknown document type.")
     published = project.status != ProjectStatus.draft

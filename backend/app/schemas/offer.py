@@ -180,6 +180,9 @@ class OfferOut(BaseModel):
     # it, the provider confirms again before it can be awarded.
     valid_until: UTCDateTime | None = None
     validity_lapsed: bool = False
+    # The proposed start date is behind us: it can't be awarded until the
+    # provider confirms it with a new start date.
+    start_passed: bool = False
     # Batch B: answers published to everyone after the offer was last put forward.
     answers_since: int = 0
     # Batch B: times it can still be withdrawn (two withdrawals are final).
@@ -319,3 +322,9 @@ class ShortlistOut(BaseModel):
     material_revision: int | None = None
     added_by_name: str | None = None
     created_at: UTCDateTime | None = None
+
+
+class OfferConfirm(BaseModel):
+    """Confirming an offer after the close. When its proposed start date has
+    passed, the provider gives a new one (the same span of work follows it)."""
+    proposed_start_date: date | None = None

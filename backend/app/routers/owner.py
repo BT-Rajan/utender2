@@ -135,6 +135,7 @@ def _owner_offer_out(db: Session, project: Project, o: Offer, cp: ServiceProvide
         # Batch B: whether it still holds its price, and answers published since it was put forward.
         valid_until=offer_valid_until(project, o) if o.status == OfferStatus.submitted else None,
         validity_lapsed=o.status == OfferStatus.submitted and validity_lapsed(project, o),
+        start_passed=o.status == OfferStatus.submitted and start_date_passed(o),
         answers_since=answers_since(db, project, o) if o.status == OfferStatus.submitted else 0,
     )
 
@@ -365,7 +366,12 @@ def invite_previous_provider(project_id: str, service_provider_id: str, user: Us
     provider_user = db.get(User, service_provider_id)
     if not profile or not provider_user or not profile.is_verified_active or provider_user.deactivated_at is not None or ineligibility_reasons(db, project, profile):
         raise HTTPException(status_code=400, detail="This provider doesn't meet this requirement's conditions, so it can't be invited.")
-    if db.query(Offer.id).filter(Offer.project_id == project_id, Offer.service_provider_id == service_provider_id, tendered()).first():
+    has_bid = db.query(Offer.id).filter(Offer.project_id == project_id, Offer.service_provider_id == service_provider_id, tendered()).first() is not None
+    # On a sealed tender who has bid stays hidden until the deadline, so the
+    # answer must not depend on it: a bidder is "invited" like anyone else
+    # (recorded, so a repeat is refused the same way), just not told again.
+    sealed = is_sealed_and_open(project)
+    if has_bid and not sealed:
         raise HTTPException(status_code=409, detail="This provider has already made an offer on this requirement.")
     # Security: one invitation per provider per requirement -- an invitation
     # can't be repeated to flood a provider's notices.
@@ -379,6 +385,8 @@ def invite_previous_provider(project_id: str, service_provider_id: str, user: Us
                     organization_id=profile.organization_id, project_title=project.title,
                     deadline=project.bid_deadline.strftime("%d %b %Y %H:%M UTC"))
 
+    if has_bid:
+        return
     _best_effort(db, tell, f"invitation to {service_provider_id} for {project_id}")
 
 
@@ -768,7 +776,7 @@ def request_offer_confirmation(project_id: str, offer_id: str, user: User = Depe
         raise HTTPException(status_code=404, detail="Offer not found.")
     if offer.status != OfferStatus.submitted:
         raise HTTPException(status_code=400, detail="Only a live bid can be awarded.")
-    if offer.based_on_material_revision >= project.material_revision and not validity_lapsed(project, offer):
+    if offer.based_on_material_revision >= project.material_revision and not validity_lapsed(project, offer) and not start_date_passed(offer):
         raise HTTPException(status_code=400, detail="This offer is on the current version and within its validity period; it can be awarded as it is.")
     log_action(db, actor_id=user.id, action="offer.confirmation_requested", target_type="offer", target_id=offer.id)
 
@@ -1073,9 +1081,14 @@ def restart_project(project_id: str, payload: RestartRequest | None = None, user
     source = _get_owned_project(project_id, user, db, lock=True)
     # Stage 8.11: also a completed transaction (Stage 7's authoritative
     # completion) -- the same need again, as a new, independent requirement.
-    # Never one still open, awarded but unfinished, or a draft.
+    # Likewise a terminated one: the award can't be reopened (Stage 7.1), so
+    # the need, still unmet, comes back as a new requirement.
+    # Never one still open, awarded and still in progress, or a draft.
     ended = source.status in (ProjectStatus.canceled, ProjectStatus.no_award, ProjectStatus.expired)
-    if not ended and not (source.status == ProjectStatus.awarded and completed_transaction(db, source.id) is not None):
+    finished = source.status == ProjectStatus.awarded and (
+        completed_transaction(db, source.id) is not None or transaction_status(db, source) == "terminated"
+    )
+    if not ended and not finished:
         raise HTTPException(status_code=400, detail="Only a completed or ended requirement can be used to start a new one.")
     # Stage 8.11: content an admin has suspended isn't copied into a new requirement.
     if source.is_suspended:

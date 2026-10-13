@@ -24,13 +24,27 @@ const GATE_CONFIG: Partial<Record<UserRole, { endpoint: string; statusPath: stri
   owner: { endpoint: "/owner/profile", statusPath: "/owner/status" },
 };
 
+// gate="job": the page of a requirement and its transaction. Batch A: a live
+// job continues while the account's documents are re-reviewed (changes
+// requested, pending review), and a suspended owner keeps read-only access
+// (Stage 7.14) -- the server decides what each may see and do there. Only a
+// rejected account, or a suspended provider (the server hides the job from
+// it), is sent to the status page.
+function passesGate(role: UserRole, gate: true | "job", profile: VerificationGatedProfile): boolean {
+  if (gate === "job") {
+    if (profile.verification_status === "rejected") return false;
+    return !(profile.is_suspended && role === "service_provider");
+  }
+  return profile.verification_status === "approved" && !profile.is_suspended;
+}
+
 export function ProtectedRoute({
   role,
   gate = false,
   children,
 }: {
   role: UserRole;
-  gate?: boolean;
+  gate?: boolean | "job";
   children: ReactNode;
 }) {
   const { user, loading } = useAuth();
@@ -39,7 +53,7 @@ export function ProtectedRoute({
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["verification-gate-profile", role],
     queryFn: () => apiFetch<VerificationGatedProfile>(config!.endpoint),
-    enabled: gate && !!user && user.role === role && !!config,
+    enabled: !!gate && !!user && user.role === role && !!config,
   });
 
   if (loading) return <PageLoading />;
@@ -48,10 +62,22 @@ export function ProtectedRoute({
 
   if (gate && config) {
     if (profileLoading) return <PageLoading />;
-    if (!profile || profile.verification_status !== "approved" || profile.is_suspended) {
+    if (!profile || !passesGate(role, gate, profile)) {
       return <Navigate to={config.statusPath} replace />;
     }
   }
 
   return <>{children}</>;
+}
+
+// Whether the account is approved and active right now (the gate's own
+// query, so usually already loaded). Pages reachable under gate="job" use it
+// to hold back what the server allows only an approved account -- a review.
+export function useAccountApproved(role: "owner" | "service_provider"): boolean | undefined {
+  const config = GATE_CONFIG[role]!;
+  const { data } = useQuery({
+    queryKey: ["verification-gate-profile", role],
+    queryFn: () => apiFetch<VerificationGatedProfile>(config.endpoint),
+  });
+  return data ? data.verification_status === "approved" && !data.is_suspended : undefined;
 }

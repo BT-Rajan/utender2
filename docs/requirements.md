@@ -1165,7 +1165,7 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
     - **Completed requirements:** restart refused them; it accepted only cancelled, no-award or expired requirements.
     - **Suspended requirements:** restart didn't refuse a requirement an admin had suspended, so its content could be copied into a new requirement.
   - **Fixed:**
-    - **Completed transactions:** restart also accepts an awarded requirement whose transaction is completed (`completed_transaction`, Stage 7). Open, awarded-but-unfinished and draft requirements are still refused.
+    - **Completed transactions:** restart also accepts an awarded requirement whose transaction is completed (`completed_transaction`, Stage 7), or terminated (owner-journey review, below). Open, awarded-and-still-in-progress and draft requirements are still refused.
     - **Suspension:** a suspended requirement is refused.
     - **UI:** "Create similar requirement" (the existing `StartAgain` button, with its own confirmation wording) on a completed requirement's page. It leads into the normal draft flow.
   - **Tests:** `tests/test_stage8_11_similar_requirement.py`.
@@ -1701,5 +1701,17 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
   - **Owner dashboard:** no stray "0" when there are no requirements.
   - Migration 0067.
   - **Tests:** `tests/test_batch_c_trust_accounts.py`.
+
+- **Owner-journey review — fixes #1–#5:**
+  - **Sealed invitations:** on a sealed tender before its deadline, inviting a previous provider answers the same whether or not that provider has bid. A bidder is recorded as invited (a repeat is refused like any other) but isn't sent the notice. On an owner-visible tender the owner is still told the provider has already made an offer.
+  - **Job page during re-review:** a party whose documents are back under review (changes requested, pending review) keeps the page of the requirement and its transaction (`/owner/projects/{id}`, `/service-provider/projects/{id}/offer`), as the server already allowed (Batch A). A suspended owner keeps it read-only (7.14). Only a rejected account, or a suspended provider, is sent to the status page. The review form is replaced by a note until the account is approved again, since the server refuses reviews until then.
+  - **Start date passed during evaluation:**
+    - an offer whose proposed start date has passed can't be awarded as it stands;
+    - the owner can ask its provider to confirm it (`request-confirmation`), and the owner's offer list flags it (`start_passed`) with "Ask to confirm" instead of Approve;
+    - the provider confirms with a new start date, today or later (`POST /projects/{id}/offers/confirm` with `proposed_start_date`). The same span of work follows it; nothing else changes, and the earlier dates stay in the offer's history;
+    - while bidding is open, the start date is changed by revising the offer instead.
+  - **After termination:** an awarded requirement whose agreement was terminated can be started again as a new draft ("Start a new draft from this"). The award itself still can't be reopened (7.1).
+  - **Publishing moves the version on:** a page still showing the draft (a colleague's, another tab) can't save into the live requirement as if it were the draft. Its next save, or document upload (which now sends If-Match too), is refused and asks for a reload.
+  - **Tests:** `tests/test_owner_journey_fixes.py`.
 
 _Later Stage 9 steps are added as they are implemented._

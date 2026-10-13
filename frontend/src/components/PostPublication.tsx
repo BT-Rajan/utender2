@@ -5,7 +5,7 @@ import type { Clarification, Offer, ProjectAmendment, ProjectDetail, Requirement
 import { useConfirm } from "@/components/ConfirmDialog";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
-import { localInputToUtcIso, toLocalInputValue } from "@/lib/dates";
+import { kuwaitToday, localInputToUtcIso, toLocalInputValue } from "@/lib/dates";
 import { formatDeadline, fullDate } from "@/lib/format";
 
 // Stage 3.15: controlling a published requirement. Not a draft: the
@@ -354,11 +354,17 @@ export function OfferStandsNotice({ project, offer }: { project: ProjectDetail; 
     queryClient.setQueryData(["my-offer", project.id], data);
   };
   const fail = (err: unknown) => setError(err instanceof ApiError ? err.detail : t("postPub.error"));
-  const confirmOffer = useMutation({ mutationFn: () => apiFetch<Offer>(`/projects/${project.id}/offers/confirm`, { method: "POST" }), onSuccess: done, onError: fail });
+  const [newStart, setNewStart] = useState("");
+  const confirmOffer = useMutation({
+    mutationFn: () =>
+      apiFetch<Offer>(`/projects/${project.id}/offers/confirm`, { method: "POST", body: offer.start_passed ? { proposed_start_date: newStart } : undefined }),
+    onSuccess: done,
+    onError: fail,
+  });
   const withdrawOffer = useMutation({ mutationFn: () => apiFetch<Offer>(`/projects/${project.id}/offers/withdraw`, { method: "POST" }), onSuccess: done, onError: fail });
   if (offer.status !== "submitted" || (project.status !== "closed" && project.status !== "under_evaluation")) return null;
   const outdated = (offer.based_on_material_revision ?? 0) < (project.material_revision ?? 0);
-  if (!outdated && !offer.validity_lapsed) {
+  if (!outdated && !offer.validity_lapsed && !offer.start_passed) {
     return offer.valid_until ? (
       <p className="mt-3 font-mono text-xs text-steel" data-testid="offer-valid-until">
         {t("offerValidity.until").replace("{date}", fullDate(offer.valid_until, language))}
@@ -368,13 +374,21 @@ export function OfferStandsNotice({ project, offer }: { project: ProjectDetail; 
   return (
     <div className="mt-3 text-start border border-amber-dark/40 bg-amber/10 rounded px-4 py-3 text-sm" data-testid="offer-stands">
       <strong className="font-display text-navy block">{t("offerValidity.standsHeading")}</strong>
-      <p className="text-steel">{offer.validity_lapsed ? t("offerValidity.lapsedBody") : t("offerValidity.outdatedBody")}</p>
+      <p className="text-steel">
+        {offer.start_passed ? t("offerValidity.startPassedBody") : offer.validity_lapsed ? t("offerValidity.lapsedBody") : t("offerValidity.outdatedBody")}
+      </p>
       <ErrorBanner message={error} />
+      {offer.start_passed && (
+        <label className="grid gap-1 mt-2 max-w-xs text-navy">
+          {t("offerValidity.newStart")}
+          <input type="date" value={newStart} min={kuwaitToday()} onChange={(e) => setNewStart(e.target.value)} className="border border-border rounded px-3 py-2 text-sm" data-testid="offer-stands-new-start" />
+        </label>
+      )}
       <div className="flex flex-wrap gap-2 mt-2">
-        <button type="button" onClick={() => confirmOffer.mutate()} disabled={confirmOffer.isPending || withdrawOffer.isPending} className="bg-navy hover:bg-navy-deep disabled:opacity-60 text-white text-xs font-semibold rounded px-4 py-2" data-testid="offer-stands-confirm">
+        <button type="button" onClick={() => confirmOffer.mutate()} disabled={confirmOffer.isPending || withdrawOffer.isPending || (offer.start_passed && !newStart)} className="bg-navy hover:bg-navy-deep disabled:opacity-60 text-white text-xs font-semibold rounded px-4 py-2" data-testid="offer-stands-confirm">
           {t("offerValidity.confirm")}
         </button>
-        {offer.validity_lapsed && (
+        {(offer.validity_lapsed || offer.start_passed) && (
           <button type="button" onClick={() => withdrawOffer.mutate()} disabled={confirmOffer.isPending || withdrawOffer.isPending} className="border border-border text-steel hover:text-navy disabled:opacity-60 text-xs font-semibold rounded px-4 py-2" data-testid="offer-stands-withdraw">
             {t("offerValidity.withdraw")}
           </button>

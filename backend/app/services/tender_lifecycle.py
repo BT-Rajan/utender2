@@ -157,6 +157,11 @@ def publish(db: Session, project: Project, actor_id: str) -> None:
     requirement_quality.assert_publishable(db, project)  # Stage 3.12, authoritative
     project.status = ProjectStatus.open
     project.published_at = now.replace(microsecond=0)
+    # A page still showing the draft (a colleague's, another tab) must not
+    # save into the live requirement as if it were the draft: its version is
+    # now behind, so its next save is refused and it reloads.
+    project.version = (project.version or 0) + 1
+    project.updated_at = now.replace(microsecond=0)
     # log_action commits: the status, the timestamp and the audit entry land together.
     log_action(db, actor_id=actor_id, action="project.publish", target_type="project", target_id=project.id, previous_value="draft", new_value="open")
     _announce(db, project)

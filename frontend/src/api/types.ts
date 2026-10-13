@@ -318,6 +318,7 @@ export interface Offer {
   // Batch B: validity after the close, answers published since it was put forward, withdrawals left.
   valid_until?: string | null;
   validity_lapsed?: boolean;
+  start_passed?: boolean; // its proposed start date is behind us: confirmed with a new one before it can be awarded
   answers_since?: number;
   withdrawals_left?: number | null;
 }
