@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import logging
 import time
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -24,6 +25,8 @@ from app.services.notify import notify, notify_team
 from app.services.audit import log_action
 from app.services.team import acting_id, acting_profile, can_access, org_of, owns, side_users
 from app.services.tender_lifecycle import interested_providers, is_sealed_and_open
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects/{project_id}/clarifications", tags=["clarifications"])
 
@@ -207,6 +210,16 @@ def answer_clarification(
     clarification.answer = answer
     clarification.answered_at = datetime.utcnow()
     clarification.answered_by = user.id
+    # Files for an answer are uploaded just before it is sent, by whoever
+    # answers. A colleague's files left from an answer that never went in
+    # (they answered second, or gave up) aren't part of this one.
+    stray = db.query(ClarificationAttachment).filter(
+        ClarificationAttachment.clarification_id == clarification.id, ClarificationAttachment.part == "answer",
+        (ClarificationAttachment.uploaded_by != user.id) | ClarificationAttachment.uploaded_by.is_(None),
+    ).all()
+    stray_paths = [a.file_path for a in stray]
+    for a in stray:
+        db.delete(a)
     # Batch B: every answer is published for every provider (the asker stays
     # anonymous). A question asked privately before this rule keeps its flag:
     # its answer is published without its wording (list_clarifications).
@@ -217,6 +230,11 @@ def answer_clarification(
         previous_value="private" if asked_privately else "shared", new_value="answer published to all" + ("" if clarification.shared_with_all else " (question kept private)"),
     )
     db.refresh(clarification)
+    if stray_paths:
+        try:
+            get_storage().delete(CLARIFICATION_BUCKET, stray_paths)
+        except Exception:  # noqa: BLE001 -- the rows are gone; a leftover file is unreachable
+            logger.exception("Could not remove stray answer files for %s", clarification.id)
 
     service_provider_user = db.get(User, clarification.service_provider_id)
     if service_provider_user:
@@ -283,6 +301,9 @@ async def attach_files(
         profile = acting_profile(db, user)
         if not profile or not profile.is_verified_active:
             raise HTTPException(status_code=403, detail="not_approved")
+        # A published answer stays as it was published: its files go in with it.
+        if clarification.answer is not None:
+            raise HTTPException(status_code=400, detail="This question has already been answered.")
     elif user.role == UserRole.service_provider and can_access(db, user, clarification.organization_id, clarification.service_provider_id):
         part = "question"
         if clarification.answer is not None:

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError, draftVersion } from "@/api/client";
 import type { Clarification, Offer, ProjectAmendment, ProjectDetail, RequirementVersion } from "@/api/types";
@@ -94,51 +94,76 @@ export function PauseControl({ project }: { project: ProjectDetail }) {
 
 // Amend a published requirement: the fields that may change after
 // publication, with what each kind of change means for providers.
+const amendValues = (p: ProjectDetail) => ({
+  title: p.title,
+  description: p.description ?? "",
+  address: p.address ?? "",
+  area: p.area ?? "",
+  deadline: toLocalInputValue(p.bid_deadline),
+  start: p.expected_start_date ?? "",
+  completion: p.expected_completion_date ?? "",
+  reason: "",
+  clarification: "",
+});
+
 export function AmendPublishedForm({ project }: { project: ProjectDetail }) {
   const { t } = useI18n();
   const refresh = useRefresh(project.id);
-  const initial = () => ({
-    title: project.title,
-    description: project.description ?? "",
-    address: project.address ?? "",
-    area: project.area ?? "",
-    deadline: toLocalInputValue(project.bid_deadline),
-    start: project.expected_start_date ?? "",
-    completion: project.expected_completion_date ?? "",
-    reason: "",
-    clarification: "",
-  });
-  const [values, setValues] = useState(initial);
+  // The form works from the version it was filled from: it sends only what
+  // was changed from that, with that version as If-Match -- so a colleague's
+  // amendment made meanwhile is never silently undone (the save is refused
+  // and the form shows the latest). An untouched form follows newer versions.
+  const [base, setBase] = useState(() => ({ values: amendValues(project), version: project.version }));
+  const [values, setValues] = useState(base.values);
+  const untouched = JSON.stringify(values) === JSON.stringify(base.values);
+  const rebase = (p: ProjectDetail) => {
+    const next = { values: amendValues(p), version: p.version };
+    setBase(next);
+    setValues(next.values);
+  };
+  useEffect(() => {
+    if (project.version !== base.version && untouched) rebase(project);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.version]);
   // Stage 4.7: a change prompted by an answered question is tied to it.
   const { data: answered = [] } = useQuery({
     queryKey: ["clarifications", project.id],
     queryFn: () => apiFetch<Clarification[]>(`/projects/${project.id}/clarifications`),
-    select: (rows) => rows.filter((c) => c.answer),
+    select: (rows) => rows.filter((c) => c.answer && !c.amendment_number), // one already tied to a change stays with it
   });
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const set = (patch: Partial<typeof values>) => setValues((v) => ({ ...v, ...patch }));
   const save = useMutation({
     mutationFn: () => {
-      const base = initial();
+      const was = base.values;
       const body: Record<string, unknown> = { reason: values.reason || null };
       if (values.clarification) body.clarification_id = values.clarification;
-      if (values.title !== base.title) body.title = values.title;
-      if (values.description !== base.description) body.description = values.description;
-      if (values.address !== base.address) body.address = values.address;
-      if (values.area !== base.area) body.area = values.area || null;
-      if (values.deadline !== base.deadline) body.bid_deadline = localInputToUtcIso(values.deadline);
-      if (values.start !== base.start) body.expected_start_date = values.start || null;
-      if (values.completion !== base.completion) body.expected_completion_date = values.completion || null;
-      return apiFetch<ProjectDetail>(`/projects/${project.id}`, { method: "PATCH", body, headers: draftVersion(project) });
+      if (values.title !== was.title) body.title = values.title;
+      if (values.description !== was.description) body.description = values.description;
+      if (values.address !== was.address) body.address = values.address;
+      if (values.area !== was.area) body.area = values.area || null;
+      if (values.deadline !== was.deadline) body.bid_deadline = localInputToUtcIso(values.deadline);
+      if (values.start !== was.start) body.expected_start_date = values.start || null;
+      if (values.completion !== was.completion) body.expected_completion_date = values.completion || null;
+      return apiFetch<ProjectDetail>(`/projects/${project.id}`, { method: "PATCH", body, headers: draftVersion({ version: base.version }) });
     },
     onSuccess: (data) => {
       setError(null);
       setDone(t((data.material_revision ?? 0) > (project.material_revision ?? 0) ? "postPub.savedMaterial" : "postPub.savedMinor"));
+      rebase(data); // a fresh form: the reason and the question don't carry over to the next change
       refresh();
       queryClient.invalidateQueries({ queryKey: ["clarifications", project.id] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.detail : t("postPub.error")),
+    onError: (err) => {
+      setError(err instanceof ApiError ? err.detail : t("postPub.error"));
+      // Changed meanwhile (409): the form now shows the latest, to make the change again on top of it
+      // (keeping the stale fields would send them back and undo the colleague's change).
+      if (err instanceof ApiError && err.status === 409) {
+        rebase(project);
+        refresh();
+      }
+    },
   });
   const queryClient = useQueryClient();
   const field = "w-full border border-border rounded px-3 py-2 text-sm";

@@ -34,7 +34,7 @@ from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_re
 from app.services.email import notify_provider_requirement_ended, notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify, notify_team
-from app.services.team import acting_profile, mine, owns
+from app.services.team import acting_profile, mine, owns, side_users
 from app.services.eligibility import qualification_options
 from app.services.offer_clarifications import clarification_out, offer_clarifications
 from app.services.offer_clarifications import closed_reason as clarification_closed_reason
@@ -102,6 +102,15 @@ def dashboard(user: User = Depends(require_owner), db: Session = Depends(get_db)
         offer_count = db.query(Offer).filter(Offer.project_id == p.id, counted(), Offer.is_suspended.is_(False)).count()
         out.append(ProjectOut(**_project_fields(p), offer_count=offer_count))
     return out
+
+
+def _provider_side_active(db: Session, provider_user: User | None, organization_id: str | None) -> bool:
+    """Whether a provider can still act: an organisation while anyone acting
+    for it is active (its founding account may have been deactivated after
+    handing the representative role on); an individual while its account is."""
+    if organization_id:
+        return bool(side_users(db, organization_id, None))
+    return provider_user is not None and provider_user.deactivated_at is None
 
 
 def _owner_offer_out(db: Session, project: Project, o: Offer, cp: ServiceProviderProfile | None) -> OfferOut:
@@ -364,7 +373,7 @@ def invite_previous_provider(project_id: str, service_provider_id: str, user: Us
         raise HTTPException(status_code=404, detail="You can invite a provider you have completed work with.")
     profile = db.get(ServiceProviderProfile, service_provider_id)
     provider_user = db.get(User, service_provider_id)
-    if not profile or not provider_user or not profile.is_verified_active or provider_user.deactivated_at is not None or ineligibility_reasons(db, project, profile):
+    if not profile or not provider_user or not profile.is_verified_active or not _provider_side_active(db, provider_user, profile.organization_id) or ineligibility_reasons(db, project, profile):
         raise HTTPException(status_code=400, detail="This provider doesn't meet this requirement's conditions, so it can't be invited.")
     has_bid = db.query(Offer.id).filter(Offer.project_id == project_id, Offer.service_provider_id == service_provider_id, tendered()).first() is not None
     # On a sealed tender who has bid stays hidden until the deadline, so the
@@ -669,7 +678,7 @@ def approve_offer(
     winner_user = db.get(User, winning_offer.service_provider_id)
     if (
         not winner_profile or winner_profile.is_suspended or winner_profile.verification_status != VerificationStatus.approved
-        or (winner_user is not None and winner_user.deactivated_at is not None)
+        or not _provider_side_active(db, winner_user, winning_offer.organization_id or winner_profile.organization_id)
     ):
         raise HTTPException(
             status_code=409,

@@ -51,7 +51,7 @@ from app.services.notify import notify, notify_team
 from app.services.team import acting_id, acting_profile, can_access, mine, org_of, owns
 from app.services import requirement_quality
 from app.services.storage import drawing_url_expiry_seconds, get_storage
-from app.services.tender_lifecycle import interested_providers, is_sealed_and_open, lock_project, now_for, publish, sync_expired_projects, transaction_status
+from app.services.tender_lifecycle import interested_providers, is_sealed_and_open, lock_project, now_for, publish, set_bid_deadline, sync_expired_projects, transaction_status
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -501,6 +501,9 @@ def amend_project(
             raise HTTPException(status_code=400, detail="Choose an answered question on this requirement.")
         if project.status == ProjectStatus.draft:
             raise HTTPException(status_code=400, detail="Choose an answered question on this requirement.")
+        # A question is tied to the one change it brought about -- never moved to a later, unrelated one.
+        if clarification.amendment_id is not None:
+            raise HTTPException(status_code=400, detail="That question is already tied to an earlier change.")
 
     before = {f: getattr(project, f) for f in TRACKED_FIELDS}
     changed: list[str] = []
@@ -584,7 +587,7 @@ def amend_project(
             raise HTTPException(status_code=400, detail="The offer deadline must be after the question deadline.")
         deadline_extended = new_deadline > project.bid_deadline
         changed.append("bid_deadline")
-        project.bid_deadline = new_deadline
+        set_bid_deadline(project, new_deadline)
 
     for field in ("expected_start_date", "expected_completion_date", "expected_duration_days"):
         if field in payload.model_fields_set and getattr(payload, field) != getattr(project, field):

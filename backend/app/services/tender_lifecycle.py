@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -230,3 +230,16 @@ def transaction_status(db: Session, project: Project) -> str | None:
 
     row = db.query(Agreement.status).filter(Agreement.project_id == project.id).first()
     return row[0] if row else None
+
+
+# The owner side is reminded once, this long before offers close (cron).
+DEADLINE_REMINDER_WINDOW = timedelta(hours=24)
+
+
+def set_bid_deadline(project: Project, deadline: datetime) -> None:
+    """Moves the offer deadline. A reminder already sent for the old one is
+    sent again before the new one -- unless the new one is itself within the
+    reminder window, where the reminder just sent still holds."""
+    project.bid_deadline = deadline
+    if deadline - datetime.utcnow() > DEADLINE_REMINDER_WINDOW:
+        project.deadline_reminder_sent = False

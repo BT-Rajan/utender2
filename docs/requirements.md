@@ -1702,7 +1702,7 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
   - Migration 0067.
   - **Tests:** `tests/test_batch_c_trust_accounts.py`.
 
-- **Owner-journey review — fixes #1–#5:**
+- **Owner-journey review — fixes #1–#10:**
   - **Sealed invitations:** on a sealed tender before its deadline, inviting a previous provider answers the same whether or not that provider has bid. A bidder is recorded as invited (a repeat is refused like any other) but isn't sent the notice. On an owner-visible tender the owner is still told the provider has already made an offer.
   - **Job page during re-review:** a party whose documents are back under review (changes requested, pending review) keeps the page of the requirement and its transaction (`/owner/projects/{id}`, `/service-provider/projects/{id}/offer`), as the server already allowed (Batch A). A suspended owner keeps it read-only (7.14). Only a rejected account, or a suspended provider, is sent to the status page. The review form is replaced by a note until the account is approved again, since the server refuses reviews until then.
   - **Start date passed during evaluation:**
@@ -1712,6 +1712,11 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
     - while bidding is open, the start date is changed by revising the offer instead.
   - **After termination:** an awarded requirement whose agreement was terminated can be started again as a new draft ("Start a new draft from this"). The award itself still can't be reopened (7.1).
   - **Publishing moves the version on:** a page still showing the draft (a colleague's, another tab) can't save into the live requirement as if it were the draft. Its next save, or document upload (which now sends If-Match too), is refused and asks for a reload.
+  - **Amending against what the page showed:** the "Change the published requirement" form works from the version it was filled from. It sends only what was changed from that, with that version as If-Match. A colleague's amendment made meanwhile is never silently undone: the save is refused and the form shows the latest. An untouched form follows newer versions, and after a save it starts fresh (the reason and the question don't carry over).
+  - **Organisations whose founder left:** a provider organisation can be invited and awarded while anyone acting for it is active, even after its founding account was deactivated (once the representative role was handed on). An individual provider still needs an active account.
+  - **Answer files:** files on an answer go in with it. Once a question is answered, no files can be added to the answer. When someone answers, only their own files stay with it: a colleague's files from an answer that never went in are removed.
+  - **One change per question:** an answered question stays tied to the change it brought about. Tying it to a later change is refused, and the amend form only offers questions not yet tied to one.
+  - **Deadline reminder after an extension:** when the deadline moves more than a day away, the owner side is reminded again a day before the new deadline (`set_bid_deadline`, also used by admin edits). An extension that is still within the day doesn't repeat the reminder just sent.
   - **Tests:** `tests/test_owner_journey_fixes.py`.
 
 _Later Stage 9 steps are added as they are implemented._

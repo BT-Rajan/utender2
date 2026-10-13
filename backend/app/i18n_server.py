@@ -437,6 +437,7 @@ AR: dict[str, str] = {
     "This person set up the organization and its profile is tied to their account, so they can't be removed.": "أنشأ هذا الشخص المنظمة وملفها مرتبط بحسابه، لذا لا يمكن إزالته.",
     "This offer's proposed start date has already passed, so it can no longer be awarded as it stands.": "تاريخ البدء المقترح في هذا العرض قد مضى، لذا لا يمكن ترسيته كما هو.",
     "Give a new start date to confirm it.": "حدّد تاريخ بدء جديدًا لتأكيده.",
+    "That question is already tied to an earlier change.": "هذا السؤال مرتبط بالفعل بتعديل سابق.",
     "The new start date can't be in the past.": "لا يمكن أن يكون تاريخ البدء الجديد في الماضي.",
     "Your offer's start date hasn't passed; it is confirmed as it stands.": "لم يمضِ تاريخ البدء في عرضك؛ يُؤكَّد العرض كما هو.",
     "While bidding is open, change the start date by revising your offer.": "أثناء فتح تقديم العروض، غيّر تاريخ البدء بتعديل عرضك.",
