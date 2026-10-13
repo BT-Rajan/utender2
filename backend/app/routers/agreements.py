@@ -29,7 +29,7 @@ from app.models.user import User
 from app.routers.owner import _best_effort
 from app.schemas.agreement import AgreementDocumentOut, AgreementOut, CommercialTerms, PaymentStageTerm, AgreementTerminate, AgreementUpdate, ExecutionProgress, ExecutionUpdateOut, MilestoneOut, TimelineEntry, VariationOut, WorkStart
 from app.services.audit import log_action
-from app.services.transactions import ANSWER_DAYS, unanswered_delivery
+from app.services.transactions import ANSWER_DAYS, unanswered_delivery, waited_long_enough
 from app.services.notify import notify, notify_team
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name, sanitize_path_segment
 from app.services.offer_response import OPEN_LINK_SECONDS, _api
@@ -108,9 +108,10 @@ def require_in_force(agreement: Agreement) -> None:
 COMPLETION_REVIEW_DAYS = ANSWER_DAYS
 
 
-def _review_overdue(agreement: Agreement) -> bool:
-    """Batch D: submitted work has waited COMPLETION_REVIEW_DAYS for the owner's answer."""
-    return agreement.completion_submitted_at is not None and agreement.completion_submitted_at <= datetime.utcnow() - timedelta(days=COMPLETION_REVIEW_DAYS)
+def _review_overdue(db: Session, agreement: Agreement) -> bool:
+    """Batch D: submitted work has waited COMPLETION_REVIEW_DAYS for the owner's
+    answer -- not counting time an admin had the requirement suspended."""
+    return waited_long_enough(db, agreement.project_id, agreement.completion_submitted_at)
 
 
 def _clear_confirmation(agreement: Agreement) -> bool:
@@ -239,7 +240,7 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
         provider_name=provider_name,
         execution_status=_execution_status(agreement),
         completion_status=agreement.completion_status,
-        completion_review_overdue=agreement.completion_status == "submitted" and _review_overdue(agreement),
+        completion_review_overdue=agreement.completion_status == "submitted" and _review_overdue(db, agreement),
         delivery_review_overdue=agreement.status == "active" and unanswered_delivery(db, agreement),
         completed_at=agreement.completed_at,
         completion_submitted_at=agreement.completion_submitted_at,
@@ -548,7 +549,7 @@ def terminate_agreement(
     # owner who never answers can't hold the provider there forever -- after
     # COMPLETION_REVIEW_DAYS without an answer the provider may terminate. That
     # is the provider's remedy only: the owner side answers the submission.
-    if agreement.completion_status == "submitted" and (side == "owner" or not _review_overdue(agreement)):
+    if agreement.completion_status == "submitted" and (side == "owner" or not _review_overdue(db, agreement)):
         raise HTTPException(
             status_code=409,
             detail="The work was submitted as complete and is awaiting the owner's review. The owner accepts it or returns it for correction before either party can terminate (or, if there is no answer for 30 days, the service provider may terminate).",
@@ -706,6 +707,11 @@ async def attach_agreement_document(
         update = db.get(ExecutionUpdate, execution_update_id)
         if not update or update.agreement_id != agreement.id:
             raise HTTPException(status_code=404, detail="Progress update not found.")
+        # Spec 7.9: one of its progress updates -- the work started, progress, a
+        # hold or resumption, or the whole work's delivery -- not another entry
+        # of its history (in force, a paper, a change), where it would show nowhere.
+        if not (update.kind in ("started", "progress", "on_hold", "resumed") or (update.kind == "delivered" and update.milestone_id is None)):
+            raise HTTPException(status_code=400, detail="Evidence can be tied only to a progress update.")
     if (kind in EVIDENCE_KINDS or execution_update_id) and agreement.work_started_at is None:
         raise HTTPException(status_code=400, detail="Execution evidence can be added once the work has started.")
     storage = get_storage()

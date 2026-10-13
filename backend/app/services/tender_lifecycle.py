@@ -256,8 +256,21 @@ def interested_providers(db: Session, project: Project) -> list:
     bidders: set[str] = set()
     for provider_id, organization_id in db.query(Offer.service_provider_id, Offer.organization_id).filter(Offer.project_id == project.id, tendered()).distinct():
         bidders.update(u.id for u in side_users(db, organization_id, provider_id))
-    told = {n.user_id for n in db.query(Notification.user_id).filter(
-        Notification.type.in_((NotificationType.new_requirement, NotificationType.requirement_invitation)), Notification.link == link)}  # Batch C: invited too
+    # Batch C: invited too. Told as someone acting for a provider -- so it is
+    # the provider each person acts for now that is told again: everyone
+    # acting for it today (a colleague who joined since included), never a
+    # person removed from it since (who now acts only for an unverified
+    # account of their own), nor a deactivated account.
+    told: set[str] = set()
+    from app.services.team import acting_profile, org_of
+
+    for (user_id,) in db.query(Notification.user_id).filter(
+        Notification.type.in_((NotificationType.new_requirement, NotificationType.requirement_invitation)), Notification.link == link
+    ).distinct():
+        person = db.get(User, user_id)
+        profile = acting_profile(db, person) if person and person.deactivated_at is None else None
+        if profile is not None and profile.is_verified_active:
+            told.update(u.id for u in side_users(db, org_of(db, user_id), profile.user_id))
     for provider_id, organization_id in db.query(Clarification.service_provider_id, Clarification.organization_id).filter(Clarification.project_id == project.id).distinct():
         told.update(u.id for u in side_users(db, organization_id, provider_id))
     for provider_id, organization_id in db.query(Offer.service_provider_id, Offer.organization_id).filter(Offer.project_id == project.id, Offer.status == OfferStatus.draft).distinct():

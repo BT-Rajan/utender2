@@ -628,6 +628,9 @@ def grant_payment_override(
     cp = _get_active_service_provider_profile(db, service_provider_id)
 
     previous = cp.payment_override_active
+    # One override at a time: a second grant would outlive the revoke that ends the first.
+    if db.query(PaymentOverride.id).filter(PaymentOverride.service_provider_id == service_provider_id, PaymentOverride.revoked_at.is_(None)).first():
+        raise HTTPException(status_code=409, detail="This provider already has a payment override.")
     db.add(PaymentOverride(service_provider_id=service_provider_id, granted_by=admin.id, reason=reason))
     cp.payment_override_active = True
     db.commit()
@@ -664,15 +667,12 @@ def revoke_payment_override(
     cp = _get_active_service_provider_profile(db, service_provider_id)
 
     previous = cp.payment_override_active
-    active = (
-        db.query(PaymentOverride)
-        .filter(PaymentOverride.service_provider_id == service_provider_id, PaymentOverride.revoked_at.is_(None))
-        .order_by(PaymentOverride.created_at.desc())
-        .first()
-    )
-    if active:
-        active.revoked_by = admin.id
-        active.revoked_at = datetime.utcnow()
+    active = db.query(PaymentOverride).filter(PaymentOverride.service_provider_id == service_provider_id, PaymentOverride.revoked_at.is_(None)).all()
+    if not previous and not active:
+        raise HTTPException(status_code=409, detail="This provider has no payment override to revoke.")
+    for grant in active:  # every one still open (older records may hold more than one)
+        grant.revoked_by = admin.id
+        grant.revoked_at = datetime.utcnow()
     cp.payment_override_active = False
     db.commit()
     db.refresh(cp)

@@ -73,3 +73,6 @@ class OfferClarificationOut(BaseModel):
     answer: str | None
     answered_at: UTCDateTime | None
     answered_by_name: str | None = None
+    # Unanswered and still open to an answer (the offer is being evaluated,
+    # live and not suspended) -- so a page offers the answer form only then.
+    answerable: bool = False

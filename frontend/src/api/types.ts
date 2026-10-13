@@ -276,6 +276,7 @@ export interface OfferClarification {
   answer: string | null;
   answered_at: string | null;
   answered_by_name: string | null;
+  answerable?: boolean; // unanswered and still open to an answer
 }
 
 // Stage 6.6: chosen offers side by side, as stored, in the order chosen.
