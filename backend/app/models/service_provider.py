@@ -45,6 +45,9 @@ class ServiceProviderProfile(Base):
     review_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # The checkout this provider last started and that hasn't completed yet --
+    # expired before another is started, so two can't both create a subscription.
+    stripe_checkout_session_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     subscription_status: Mapped[SubscriptionStatus | None] = mapped_column(
         Enum(SubscriptionStatus, native_enum=True), nullable=True
     )

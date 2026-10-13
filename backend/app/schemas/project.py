@@ -39,7 +39,9 @@ class ProjectOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    owner_id: str
+    # Withheld from providers (None) until their side is awarded the work: whose
+    # requirement it is isn't theirs to know before then (Stage 7.2).
+    owner_id: str | None = None
     title: str
     # None in the service provider feed: the exact address is shown only on
     # the full requirement (see _can_view_project). Listings use governorate/area.

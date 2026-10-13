@@ -1,11 +1,35 @@
+import { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "@/api/client";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiFetch, ApiError } from "@/api/client";
 import type { ServiceProviderDocument, ServiceProviderProfile } from "@/api/types";
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
 import { VerificationStateBanner } from "@/components/VerificationChecklist";
 import { SupportContact } from "@/components/SupportContact";
+import { ErrorBanner } from "@/components/ErrorBanner";
+
+// A subscription stays manageable -- and cancellable -- whatever the account's
+// verification state: nobody is billed with no way to stop it.
+function ManageBilling({ profile }: { profile: ServiceProviderProfile }) {
+  const { t } = useI18n();
+  const [error, setError] = useState<string | null>(null);
+  const portal = useMutation({
+    mutationFn: () => apiFetch<{ url: string }>("/billing/portal-session", { method: "POST" }),
+    onSuccess: (data) => { window.location.href = data.url; },
+    onError: (err) => setError(err instanceof ApiError ? err.detail : t("service_provider.subscribe.portalError")),
+  });
+  if (!["active", "trialing", "past_due"].includes(profile.subscription_status ?? "")) return null;
+  return (
+    <div className="mt-3">
+      <ErrorBanner message={error} />
+      <button type="button" onClick={() => portal.mutate()} disabled={portal.isPending}
+        className="border border-navy text-navy hover:bg-navy hover:text-white disabled:opacity-60 text-xs font-semibold rounded px-4 py-2" data-testid="status-manage-billing">
+        {t("service_provider.subscribe.manageBilling")}
+      </button>
+    </div>
+  );
+}
 
 function statusBadge(status: string) {
   switch (status) {
@@ -46,6 +70,7 @@ export function ServiceProviderStatusPage() {
           <div className="font-display font-semibold text-navy">{t("service_provider.status.suspendedTitle")}</div>
           <p className="text-sm text-steel mt-1.5">{t("service_provider.status.suspendedBody")}</p>
           <SupportContact />
+          <ManageBilling profile={profile} />
         </div>
       </main>
     );
@@ -141,6 +166,7 @@ export function ServiceProviderStatusPage() {
       </div>
 
       <p className="text-xs text-steel-light mt-4">{t("service_provider.status.footerNote")}</p>
+      <ManageBilling profile={profile} />
     </main>
   );
 }

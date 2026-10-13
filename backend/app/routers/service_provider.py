@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import get_service_provider_profile, get_current_user, require_approved_service_provider, require_service_provider
+from app.deps import get_service_provider_profile, get_current_user, require_approved_service_provider, require_service_provider_in_standing, require_service_provider
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import DocumentRequirement
 from app.models.enums import DocumentStatus, OfferStatus, ProjectStatus, UserRole
@@ -231,7 +231,7 @@ def _cards(db: Session, page: list[Project], profile, my_offers: dict, full_acce
     return [
         ProjectOut(
             id=p.id,
-            owner_id=p.owner_id,
+            owner_id=None,  # whose requirement it is isn't a provider's to know before an award
             title=p.title,
             # Listing level: where (governorate/area) and what (title,
             # trade, the opening of the scope) only. The exact address and
@@ -620,14 +620,14 @@ def _winning_side(db: Session, user: User, project_id: str, *, lock: bool = Fals
 
 
 @router.get("/projects/{project_id}/review", response_model=ReviewOut | None)
-def my_review_of_the_owner(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+def my_review_of_the_owner(project_id: str, user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db)):
     """The provider side's own review of the owner, if it has written one."""
     _winning_side(db, user, project_id)
     return review_of(db, project_id, PROVIDER_TO_OWNER)
 
 
 @router.get("/projects/{project_id}/review/received", response_model=ReceivedReviewOut | None)
-def review_received_from_the_owner(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+def review_received_from_the_owner(project_id: str, user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db)):
     """Stage 8.6: the owner side's review of this winning provider side, once
     recorded -- to the winner's side only, as rating, comment and date. Other
     providers see only the aggregate rating owners already see on offers."""

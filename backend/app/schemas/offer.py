@@ -125,6 +125,9 @@ class OfferDocumentOut(BaseModel):
     url: str | None = None
     # Stage 5.6: the requirement version it was supplied against.
     material_revision: int = 0
+    # The stored file, for the side's own list: what the page shows is sent
+    # back on submit, so a file changed elsewhere meanwhile isn't sent unseen.
+    token: str | None = None
 
 
 class OfferOut(BaseModel):
