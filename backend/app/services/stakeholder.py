@@ -442,9 +442,11 @@ def hand_over(user: User, db: Session, member_id: str) -> None:
     representative does -- and stays on as a member. The organization's
     records, verification and history are unchanged: they belong to the
     organization, not to whoever set it up."""
-    _require_representative(user, db)
-    # Security: under the representative's own row lock, so two hand-overs at
-    # once can't leave the organization with two representatives.
+    current = _require_representative(user, db)
+    # Security: under the organization's row lock -- the one the admin routes
+    # and deactivation take -- so a hand-over can't interleave with an admin
+    # appointment (two representatives) or with the successor's deactivation.
+    _lock_organization(db, current.organization_id)
     membership = db.query(OrganizationMembership).filter(OrganizationMembership.user_id == user.id).populate_existing().with_for_update().first()
     if membership is None or membership.role != MembershipRole.admin:
         raise HTTPException(status_code=403, detail="Only the organization's authorized representative can manage its members.")
@@ -456,7 +458,7 @@ def hand_over(user: User, db: Session, member_id: str) -> None:
         .with_for_update()
         .first()
     )
-    successor = db.get(User, member_id) if target else None
+    successor = db.query(User).filter(User.id == member_id).populate_existing().with_for_update().first() if target else None
     if not target or successor is None or successor.deactivated_at is not None:
         raise HTTPException(status_code=404, detail="Not a member of this organization.")
     target.role, membership.role = MembershipRole.admin, MembershipRole.member
@@ -490,7 +492,11 @@ def deactivation_would_strand_organization(db: Session, target: User) -> bool:
     if membership is None:
         return False
     if membership.role == MembershipRole.admin:
-        return True
+        # The sole member strands nobody: there's no one left to manage.
+        others = db.query(OrganizationMembership.user_id).filter(
+            OrganizationMembership.organization_id == membership.organization_id, OrganizationMembership.user_id != target.id
+        )
+        return others.first() is not None
     rep = _representative_membership(db, membership.organization_id)
     rep_user = db.get(User, rep.user_id) if rep else None
     if rep_user is not None and rep_user.deactivated_at is None:
@@ -515,13 +521,27 @@ def _lock_organization(db: Session, organization_id: str) -> Organization:
     return org
 
 
+def lock_organization_of(db: Session, user_id: str) -> None:
+    """Takes the row lock of the organization this account belongs to, if
+    any. Callers take it before locking the account's own row: organization
+    first, then people -- the order hand_over and the admin routes use."""
+    organization_id = db.query(OrganizationMembership.organization_id).filter(OrganizationMembership.user_id == user_id).scalar()
+    if organization_id is not None:
+        _lock_organization(db, organization_id)
+
+
 def _make_representative(db: Session, organization_id: str, new_rep: OrganizationMembership) -> str | None:
     """Exactly one representative: the current one (if any) becomes an
     ordinary member. Returns the previous representative's user id."""
     previous = _representative_membership(db, organization_id)
     previous_id = previous.user_id if previous else None
-    if previous is not None and previous is not new_rep:
-        previous.role = MembershipRole.member
+    # Security: demote every other admin row, not just the first one read, so
+    # the result is one representative whatever state the rows were in.
+    db.query(OrganizationMembership).filter(
+        OrganizationMembership.organization_id == organization_id,
+        OrganizationMembership.role == MembershipRole.admin,
+        OrganizationMembership.user_id != new_rep.user_id,
+    ).update({OrganizationMembership.role: MembershipRole.member}, synchronize_session="fetch")
     new_rep.role = MembershipRole.admin
     db.flush()
     return previous_id

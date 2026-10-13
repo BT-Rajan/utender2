@@ -7,7 +7,7 @@ or award. Reviews are shown without the reviewer, the requirement or any
 other detail of the transaction they came from (8.6). Both parties are
 stakeholder profile ids -- the organisation's, which requirements, offers,
 awards and reviews are recorded under -- never an employee's."""
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models.agreement import Agreement
@@ -45,11 +45,16 @@ def provider_reputation(db: Session, service_provider_id: str) -> ProviderReputa
     # A termination counts on the provider only when a transaction really
     # happened -- the work had started. One ended while the agreement was
     # still being prepared, or in force with no work begun, says nothing
-    # about how the provider works.
+    # about how the provider works. Nor does one ended while its submitted
+    # work still awaited the owner's answer: that is the provider's remedy
+    # for an owner who never answered (agreements._review_overdue).
     terminated = (
         db.query(func.count(Agreement.id))
         .join(AwardRecord, AwardRecord.id == Agreement.award_id)
-        .filter(AwardRecord.service_provider_id == service_provider_id, Agreement.status == "terminated", Agreement.work_started_at.isnot(None))
+        .filter(
+            AwardRecord.service_provider_id == service_provider_id, Agreement.status == "terminated", Agreement.work_started_at.isnot(None),
+            or_(Agreement.completion_status.is_(None), Agreement.completion_status != "submitted"),
+        )
         .scalar()
     )
     count, average, recent = _reviews(db, Review.service_provider_id == service_provider_id, OWNER_TO_PROVIDER, True)

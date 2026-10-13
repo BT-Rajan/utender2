@@ -1,7 +1,7 @@
 from fastapi import Cookie, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.auth.security import decode_token_payload, token_matches_password
+from app.auth.security import decode_token_payload, token_is_current
 from app.db import get_db
 from app.models.service_provider import ServiceProviderProfile
 from app.services.team import acting_profile
@@ -34,8 +34,9 @@ def get_current_user(
     # logout closes the loop within one access-token lifetime at most.
 
     user = db.get(User, token.user_id)
-    # A token issued before the user's last password change/reset is dead.
-    if not user or not token_matches_password(token, user.password_hash):
+    # A token issued before the user's last password change/reset, or before
+    # their sessions were ended (session_version, e.g. an email change), is dead.
+    if not user or not token_is_current(token, user):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     # Stage 9.2: a deactivated account stops at once -- every live session
     # and token included, since this is read on each request.

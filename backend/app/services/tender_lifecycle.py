@@ -143,11 +143,13 @@ def sync_expired_projects(db: Session) -> None:
 
 def _tell_owner_deadline_reached(db: Session, project: Project) -> None:
     """After the change is committed: the owner side is told its offers
-    closed (and how many to evaluate), or that nobody made one. Best-effort."""
+    closed (and how many were made), or that nobody made one. Best-effort.
+    The count is the same live offers that closed it rather than expiring it
+    -- one an admin has suspended included: it is still an offer, held until
+    reactivated -- so a closed requirement is never reported with 0."""
     import logging
 
     from app.models.enums import NotificationType
-    from app.models.offer import counted
     from app.models.user import User
     from app.services.notify import notify_team
 
@@ -155,7 +157,7 @@ def _tell_owner_deadline_reached(db: Session, project: Project) -> None:
         owner = db.get(User, project.owner_id)
         link = f"/owner/projects/{project.id}"
         if project.status == ProjectStatus.closed:
-            count = db.query(Offer.id).filter(Offer.project_id == project.id, counted(), Offer.is_suspended.is_(False)).count()
+            count = db.query(Offer.id).filter(Offer.project_id == project.id, Offer.status == OfferStatus.submitted).count()
             notify_team(db, owner, NotificationType.evaluation_ready, link=link, organization_id=project.organization_id, project_title=project.title, count=count)
         else:
             notify_team(db, owner, NotificationType.requirement_expired, link=link, organization_id=project.organization_id, project_title=project.title)

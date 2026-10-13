@@ -30,7 +30,7 @@ def password_fingerprint(password_hash: str) -> str:
     return hmac.new(settings.jwt_secret.encode(), password_hash.encode(), hashlib.sha256).hexdigest()[:32]
 
 
-def _create_token(subject: str, ttl: timedelta, token_type: str, password_hash: str) -> str:
+def _create_token(subject: str, ttl: timedelta, token_type: str, password_hash: str, session_version: int) -> str:
     now = datetime.now(timezone.utc)
     payload = {
         "sub": subject,
@@ -39,16 +39,17 @@ def _create_token(subject: str, ttl: timedelta, token_type: str, password_hash: 
         "exp": now + ttl,
         "jti": str(uuid.uuid4()),
         "pwv": password_fingerprint(password_hash),
+        "sv": session_version,
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def create_access_token(user_id: str, password_hash: str) -> str:
-    return _create_token(user_id, timedelta(minutes=settings.jwt_access_ttl_minutes), "access", password_hash)
+def create_access_token(user_id: str, password_hash: str, session_version: int) -> str:
+    return _create_token(user_id, timedelta(minutes=settings.jwt_access_ttl_minutes), "access", password_hash, session_version)
 
 
-def create_refresh_token(user_id: str, password_hash: str) -> str:
-    return _create_token(user_id, timedelta(days=settings.jwt_refresh_ttl_days), "refresh", password_hash)
+def create_refresh_token(user_id: str, password_hash: str, session_version: int) -> str:
+    return _create_token(user_id, timedelta(days=settings.jwt_refresh_ttl_days), "refresh", password_hash, session_version)
 
 
 @dataclass
@@ -57,6 +58,7 @@ class TokenPayload:
     jti: str
     expires_at: datetime
     pwv: str | None = None
+    sv: int = 0
 
 
 def token_matches_password(payload: "TokenPayload", password_hash: str) -> bool:
@@ -64,6 +66,14 @@ def token_matches_password(payload: "TokenPayload", password_hash: str) -> bool:
     with no password claim at all (issued before this check existed), which
     simply means those sessions must log in again once."""
     return payload.pwv is not None and hmac.compare_digest(payload.pwv, password_fingerprint(password_hash))
+
+
+def token_is_current(payload: "TokenPayload", user) -> bool:
+    """The session is still the account's: issued under its current password
+    and its current session version (bumped e.g. when the sign-in email
+    changes). Tokens from before the version claim existed count as version 0,
+    so introducing it logged nobody out."""
+    return token_matches_password(payload, user.password_hash) and payload.sv == (user.session_version or 0)
 
 
 def decode_token_payload(token: str, expected_type: str) -> TokenPayload | None:
@@ -80,7 +90,8 @@ def decode_token_payload(token: str, expected_type: str) -> TokenPayload | None:
     if not sub or not jti or not exp:
         return None
     return TokenPayload(
-        user_id=sub, jti=jti, expires_at=datetime.fromtimestamp(exp, tz=timezone.utc), pwv=payload.get("pwv")
+        user_id=sub, jti=jti, expires_at=datetime.fromtimestamp(exp, tz=timezone.utc), pwv=payload.get("pwv"),
+        sv=payload.get("sv") or 0,
     )
 
 

@@ -40,6 +40,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import secrets
 import sys
 import time
 from datetime import date, datetime, timedelta, timezone
@@ -60,7 +61,10 @@ except ImportError:  # pragma: no cover
 # ----------------------------------------------------------------------------
 # The cast. Edit here (and only here) if you want different names/emails.
 # ----------------------------------------------------------------------------
-PASSWORD = "UTender#Test2026"
+# Never a fixed password in the repo: one is generated for each run (or taken
+# from SEED_PASSWORD), printed once at the end and kept only in the git-ignored
+# manifest -- so no working admin login is ever published with the code.
+PASSWORD = os.environ.get("SEED_PASSWORD") or "Ut-" + secrets.token_urlsafe(12)
 DOMAIN = "utender-test.example"  # reserved TLD: no real mailbox, nothing can be delivered by accident
 
 
@@ -72,22 +76,22 @@ ADMIN = {"email": em("admin"), "name": "Test Admin"}
 
 OWNERS = {
     "O1": {"email": em("owner.individual"), "name": "Fahad Al-Rashidi", "org": None},
-    "O2": {"email": em("owner.org"), "name": "Noura Al-Sabah", "org": "Gulf Holdings Real Estate W.L.L.", "position": "General Manager"},
+    "O2": {"email": em("owner.org"), "name": "Noura Al-Sabah", "org": "Gulf Holdings Real Estate W.L.L. (Test)", "position": "General Manager"},
 }
 
 # state: active = approved + payment override | unpaid = approved, no payment | pending = documents submitted, awaiting admin
 PROVIDERS = {
-    "P1": {"email": em("provider.diyar"), "name": "Ahmad Al-Fadhli", "org": "Al Diyar General Contracting Co. W.L.L.", "position": "Managing Partner",
+    "P1": {"email": em("provider.diyar"), "name": "Ahmad Al-Fadhli", "org": "Al Diyar General Contracting Co. W.L.L. (Test)", "position": "Managing Partner",
            "state": "active", "categories": ["General Contracting", "Finishing & Interior Fit-Out"], "governorates": ["hawalli", "capital"],
            "has_iso": True,
            "staff": [("diyar.staff1", "Mariam Al-Kandari", "Site Engineer"), ("diyar.staff2", "Yousef Al-Mutairi", "Estimator")]},
-    "P2": {"email": em("provider.gulfmep"), "name": "Bader Al-Enezi", "org": "Gulf Coast MEP Contracting Co.", "position": "Director",
+    "P2": {"email": em("provider.gulfmep"), "name": "Bader Al-Enezi", "org": "Gulf Coast MEP Contracting Co. (Test)", "position": "Director",
            "state": "unpaid", "categories": ["MEP Works"], "governorates": ["ahmadi", "hawalli"],
            "staff": [("gulfmep.staff1", "Dalal Al-Azmi", "MEP Coordinator")]},
     "P3": {"email": em("provider.freelance"), "name": "Talal Al-Shammari", "org": None,
            "state": "active", "categories": ["General Contracting", "Landscaping", "Civil Works"], "governorates": ["hawalli", "mubarak_al_kabeer", "capital"],
            "staff": []},
-    "P4": {"email": em("provider.bahar"), "name": "Khaled Al-Dosari", "org": "Al Bahar Interiors W.L.L.", "position": "Owner",
+    "P4": {"email": em("provider.bahar"), "name": "Khaled Al-Dosari", "org": "Al Bahar Interiors W.L.L. (Test)", "position": "Owner",
            "state": "pending", "categories": ["Finishing & Interior Fit-Out"], "governorates": ["capital"],
            # signed up + e-mail verified + INVITED, but has NOT accepted the invitation (so you can test accepting it)
            "staff": [("bahar.staff1", "Reem Al-Dosari", "Designer")], "leave_invited": True},
@@ -529,9 +533,9 @@ def self_check(admin: Client, cast: dict, tenders: dict) -> list[str]:
     from app.models.user import User
     problems: list[str] = []
     with db_session() as db:
-        n = db.query(User).count()
+        n = db.query(User).filter(User.email.like(f"%@{DOMAIN}")).count()  # the seeded accounts only
         if n != 11:
-            problems.append(f"expected 11 users, found {n}")
+            problems.append(f"expected 11 seeded users, found {n}")
         for code, want in EXPECTED_STATUS.items():
             got = db.get(Project, tenders[code]).status.value
             if got != want:
@@ -559,7 +563,7 @@ def self_check(admin: Client, cast: dict, tenders: dict) -> list[str]:
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--api-url", default="http://localhost:8000", help="where the backend API is reachable")
-    ap.add_argument("--yes", action="store_true", help="skip the confirmation prompt")
+    ap.add_argument("--confirm-db", metavar="NAME", help="the target database's name, instead of typing it at the prompt")
     args = ap.parse_args()
 
     from app.config import get_settings
@@ -567,9 +571,16 @@ def main():
     url = make_url(get_settings().database_url)
     shown = f"{url.drivername}://{url.username or ''}@{url.host or ''}/{url.database}" if url.host else str(url).split("///")[0] + "///" + (url.database or "")
     print(f"\nTarget API : {args.api_url}\nTarget DB  : {shown}\n")
+    # Never against production: deploy.sh writes ENVIRONMENT=production into the
+    # same backend/.env this script reads, and there is no way round this check.
+    if get_settings().environment.strip().lower() == "production":
+        sys.exit("Refusing to run: backend/.env says ENVIRONMENT=production. Run this only against a test or staging setup.")
     print("This ONE-TIME script will create 11 accounts and ~17 tenders (admin, 2 owners, 4 providers, 4 staff).")
-    if not args.yes and input("Run it against this database? Type 'yes' to continue: ").strip().lower() != "yes":
-        sys.exit("Aborted.")
+    # The database's own name must be given -- typed, or with --confirm-db -- so a
+    # copied command can't run it against whatever database happens to be configured.
+    typed = args.confirm_db if args.confirm_db is not None else input(f"Type the database name ({url.database}) to continue: ")
+    if typed.strip() != (url.database or ""):
+        sys.exit("Aborted: that isn't the target database's name.")
 
     try:
         requests.get(f"{args.api_url.rstrip('/')}/health", timeout=10).raise_for_status()

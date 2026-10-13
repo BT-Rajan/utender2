@@ -123,7 +123,8 @@ def test_answers_to_the_providers_own_private_questions_are_counted(db):
     row.shared_with_all = False
     db.commit()
     assert asker.get(f"/projects/{pid}/offers/mine").json()["answers_since"] == 1
-    assert sp.get(f"/projects/{pid}/offers/mine").json()["answers_since"] == 0  # not theirs to see
+    # Every answer is published to the field, a privately asked one's too (review fix).
+    assert sp.get(f"/projects/{pid}/offers/mine").json()["answers_since"] == 1
 
 
 def test_an_offer_whose_start_date_has_passed_cannot_be_confirmed_or_awarded(db):

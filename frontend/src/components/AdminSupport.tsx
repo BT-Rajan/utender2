@@ -22,7 +22,7 @@ async function lookup(email: string): Promise<Found | null> {
 // Correcting a person's details -- the way back in for someone who has lost
 // the mailbox their account was opened with. Only changed fields are sent; a
 // changed email becomes unverified and gets a verification link.
-function EditPerson({ user }: { user: Found["user"] }) {
+function EditPerson({ user, onEmailChanged }: { user: Found["user"]; onEmailChanged: (email: string) => void }) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -34,14 +34,18 @@ function EditPerson({ user }: { user: Found["user"] }) {
     const body: Record<string, string> = {};
     for (const [field, current] of [["full_name", user.full_name ?? ""], ["email", user.email], ["phone", user.phone ?? ""], ["language", user.language]] as const) {
       const value = String(form.get(field) ?? "").trim();
-      if (value !== current) body[field] = value;
+      // Emails are stored lowercased: a case-only edit isn't a change.
+      if (field === "email" ? value.toLowerCase() !== current.toLowerCase() : value !== current) body[field] = value;
     }
     const reason = String(form.get("reason") ?? "").trim();
     if (reason) body.reason = reason;
     setState({ pending: true, error: null, saved: false });
     try {
-      await apiFetch(`/admin/users/${user.id}`, { method: "PATCH", body });
+      const updated = await apiFetch<{ email: string }>(`/admin/users/${user.id}`, { method: "PATCH", body });
       setState({ pending: false, error: null, saved: true });
+      // Looked up by email: after an email change the old one finds nobody,
+      // so follow the person to their new address.
+      if (updated.email !== user.email) onEmailChanged(updated.email);
       await queryClient.invalidateQueries({ queryKey: ["admin-find"] });
     } catch (err) {
       setState({ pending: false, error: err instanceof ApiError ? err.message : t("support.failed"), saved: false });
@@ -103,7 +107,7 @@ export function FindPerson() {
           )}
         </dl>
       )}
-      {data && data.user.role !== "admin" && <EditPerson user={data.user} />}
+      {data && data.user.role !== "admin" && <EditPerson user={data.user} onEmailChanged={(next) => { setEmail(next); setQuery(next); }} />}
     </section>
   );
 }

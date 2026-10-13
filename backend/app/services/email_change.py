@@ -32,7 +32,7 @@ from app.models.email_change import EmailChangeRequest
 from app.models.enums import AuthTokenType
 from app.models.user import User
 from app.services.audit import log_action
-from app.services.auth_tokens import issue_token
+from app.services.auth_tokens import invalidate_tokens, issue_token
 from app.services.email import notify_email_change_code, notify_email_changed, notify_verify_email
 
 settings = get_settings()
@@ -112,6 +112,11 @@ def confirm_change(db: Session, user: User, code: str) -> User:
     except IntegrityError:  # someone took it between the check and now
         db.rollback()
         raise HTTPException(status_code=409, detail="That email address can't be used.")
+    # Security: links mailed to the old address die with it (a verify link
+    # would otherwise vouch for the new one), and every session ends -- the
+    # router re-issues this one.
+    invalidate_tokens(db, user.id)
+    user.session_version = (user.session_version or 0) + 1
     log_action(db, actor_id=user.id, action="account.email_changed", target_type="user", target_id=user.id, previous_value=old_email, new_value=user.email)
     db.refresh(user)
     notify_verify_email(user.email, issue_token(db, user.id, AuthTokenType.email_verify))

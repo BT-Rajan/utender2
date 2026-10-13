@@ -1,7 +1,7 @@
 # U-Tender stage test data: which data to use for which test
 
 One-time test data created by `seed_stage_test_data.py`. It is not part of application setup.
-Run it against a **test/staging database** (take a backup first, e.g. `backup.sh`).
+Run it against a **test/staging database** (take a backup first, e.g. `backup.sh`). It refuses to run when `backend/.env` says `ENVIRONMENT=production`, and asks you to type the target database's name (or pass `--confirm-db <name>`).
 
 ```
 cd backend
@@ -11,9 +11,11 @@ python ../stage-test-data/seed_stage_test_data.py --api-url http://localhost:800
 
 - Run it from a machine that has the backend's `.env` (it creates the admin and issues the e-mail verification token directly in the database; everything else goes through the API).
 - It refuses to run twice. If it fails midway, restore the backup and run again.
-- Every account uses the same password: **`UTender#Test2026`**
+- Every account uses the same password, generated for the run (or taken from `SEED_PASSWORD`). It is printed once at the end and saved in `last_run_manifest.json`; it is never in the repository.
 - E-mail addresses end in `@utender-test.example` (a reserved domain, nothing is delivered).
-- `last_run_manifest.json` (git-ignored) lists all tender ids and the pending invitation link.
+- `last_run_manifest.json` (git-ignored) lists all tender ids, the pending invitation link and the password.
+- The data is good for about **two weeks**: open tenders' deadlines are set relative to the day you seed, and once they pass, tenders move on (closed or expired) and no longer match this guide. Re-seed a fresh test database for a new round.
+- Organization names end in "(Test)" so they can't be mistaken for real Kuwaiti firms.
 
 ## 1. The 11 accounts
 
@@ -21,7 +23,7 @@ python ../stage-test-data/seed_stage_test_data.py --api-url http://localhost:800
 |---|---|---|---|---|
 | ADMIN | `admin` | admin | | `/admin/*` pages |
 | O1 | `owner.individual` | owner, individual | approved | owner side as a person |
-| O2 | `owner.org` | owner, organization (Gulf Holdings Real Estate W.L.L.) | approved, no staff | owner side as a company |
+| O2 | `owner.org` | owner, organization (Gulf Holdings Real Estate W.L.L. (Test)) | approved, no staff | owner side as a company |
 | P1 | `provider.diyar` | provider, organization (Al Diyar General Contracting) | **active** (approved + payment override) | the main bidder / winner |
 | P1 staff | `diyar.staff1`, `diyar.staff2` | members of P1 | joined | organization sharing (2 staff) |
 | P2 | `provider.gulfmep` | provider, organization (Gulf Coast MEP) | **approved, unpaid** | payment gate |
