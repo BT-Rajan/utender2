@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiFetch } from "@/api/client";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { ErrorBanner } from "@/components/ErrorBanner";
-import { ReceivedReview, ReviewResponse } from "@/components/ReceivedReview";
+import { ReceivedReview, ReviewResponse, useReceivedReview } from "@/components/ReceivedReview";
 import { RatingInput } from "@/components/RatingInput";
 import { useAccountApproved } from "@/auth/ProtectedRoute";
 import { useI18n } from "@/i18n/I18nContext";
@@ -49,6 +49,8 @@ export function OwnerReview({ projectId }: { projectId: string }) {
     onError: (e: Error) => { setError(e instanceof ApiError ? e.message : t("ownerReview.error")); queryClient.invalidateQueries({ queryKey: key }); },
   });
   const approved = useAccountApproved("service_provider");
+  // Batch C: the owner's review is already published (its sealed period ran out): the chance to review has passed.
+  const received = useReceivedReview(`/service-provider/projects/${projectId}/review/received`, completed);
   if (!completed) return null;
   const name = transaction?.owner_name ?? t("ownerReview.theOwner");
 
@@ -71,6 +73,8 @@ export function OwnerReview({ projectId }: { projectId: string }) {
           )}
           <ReviewResponse response={review.response} at={review.response_at} label={t("review.theirResponse")} reportBase={`/service-provider/projects/${projectId}`} />
         </div>
+      ) : received ? (
+        <p className="text-sm text-steel" data-testid="review-window-closed">{t("review.windowClosed")}</p>
       ) : approved === false ? (
         <p className="text-sm text-steel" data-testid="review-needs-approval">{t("review.needsApproval")}</p>
       ) : (

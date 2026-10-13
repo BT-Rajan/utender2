@@ -380,9 +380,14 @@ export function OfferStandsNotice({ project, offer }: { project: ProjectDetail; 
   };
   const fail = (err: unknown) => setError(err instanceof ApiError ? err.detail : t("postPub.error"));
   const [newStart, setNewStart] = useState("");
+  const byCompletion = !offer.proposed_start_date;
   const confirmOffer = useMutation({
     mutationFn: () =>
-      apiFetch<Offer>(`/projects/${project.id}/offers/confirm`, { method: "POST", body: offer.start_passed ? { proposed_start_date: newStart } : undefined }),
+      apiFetch<Offer>(`/projects/${project.id}/offers/confirm`, {
+        method: "POST",
+        // An offer that gave only a completion date restates that date instead.
+        body: offer.start_passed ? (byCompletion ? { proposed_completion_date: newStart } : { proposed_start_date: newStart }) : undefined,
+      }),
     onSuccess: done,
     onError: fail,
   });
@@ -400,12 +405,12 @@ export function OfferStandsNotice({ project, offer }: { project: ProjectDetail; 
     <div className="mt-3 text-start border border-amber-dark/40 bg-amber/10 rounded px-4 py-3 text-sm" data-testid="offer-stands">
       <strong className="font-display text-navy block">{t("offerValidity.standsHeading")}</strong>
       <p className="text-steel">
-        {offer.start_passed ? t("offerValidity.startPassedBody") : offer.validity_lapsed ? t("offerValidity.lapsedBody") : t("offerValidity.outdatedBody")}
+        {offer.start_passed ? t(byCompletion ? "offerValidity.completionPassedBody" : "offerValidity.startPassedBody") : offer.validity_lapsed ? t("offerValidity.lapsedBody") : t("offerValidity.outdatedBody")}
       </p>
       <ErrorBanner message={error} />
       {offer.start_passed && (
         <label className="grid gap-1 mt-2 max-w-xs text-navy">
-          {t("offerValidity.newStart")}
+          {t(byCompletion ? "offerValidity.newCompletion" : "offerValidity.newStart")}
           <input type="date" value={newStart} min={kuwaitToday()} onChange={(e) => setNewStart(e.target.value)} className="border border-border rounded px-3 py-2 text-sm" data-testid="offer-stands-new-start" />
         </label>
       )}

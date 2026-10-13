@@ -254,7 +254,7 @@ def _cards(db: Session, page: list[Project], profile, my_offers: dict, full_acce
             status=p.status,
             closure_reason=p.closure_reason,
             tender_type=p.tender_type,
-            tender_type_locked=p.tender_type_locked,
+            tender_type_locked=False,  # the owner's rule; to a provider it would say whether anyone has bid
             pricing_basis=p.pricing_basis.value,
             item_count=item_counts.get(p.id, 0),
             document_count=document_counts.get(p.id, 0),

@@ -299,6 +299,10 @@ def get_project(project_id: str, user: User = Depends(get_current_user), db: Ses
         detail.closure_note = project.closure_note  # Stage 3.16: the owner's private note, never a provider's to see
         detail.restarted_from_id = project.restarted_from_id
     elif user.role == UserRole.service_provider:
+        # The owner's own rule (the tender type can't change once an offer is
+        # in) -- to a provider it would say whether anyone has bid, which a
+        # sealed tender keeps from competitors.
+        detail.tender_type_locked = False
         if is_sealed_and_open(project):
             detail.offer_count = None  # a sealed tender doesn't tell competitors how many offers are in
         # Batch A/security: how the transaction stands is the parties' business --
