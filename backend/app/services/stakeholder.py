@@ -436,6 +436,10 @@ def accept_invitation(user: User, db: Session, token: str) -> None:
         raise HTTPException(status_code=403, detail="Verify your email address before accepting this invitation.")
     if user.role != invitation.role:
         raise HTTPException(status_code=400, detail="This invitation is for an account on the other side of the marketplace.")
+    # Security: the joining person's row too (organization, invitation, then
+    # person), so two joins at once -- another invitation, an admin adding
+    # them -- can't both pass the "not in an organization" check.
+    user = db.query(User).filter(User.id == user.id).populate_existing().with_for_update().one()
     _check_can_join(user, db)
     if not _has_active_representative(db, invitation.organization_id):
         raise HTTPException(
@@ -613,11 +617,14 @@ def revoke_invitations_on_deactivation(db: Session, actor: User, target: User) -
     )
     for invitation in pending:
         invitation.revoked_at = now
+    db.flush()
+    if pending:
+        # One audit entry, written last: log_action commits, and committing per
+        # invitation would release the organization's lock midway.
         log_action(
             db, actor_id=actor.id, action="organization.invitation_revoked_on_deactivation", target_type="organization",
-            target_id=membership.organization_id, previous_value=invitation.email, new_value=target.id,
+            target_id=membership.organization_id, previous_value=", ".join(i.email for i in pending), new_value=target.id,
         )
-    db.flush()
 
 
 def _lock_organization(db: Session, organization_id: str) -> Organization:
@@ -627,13 +634,19 @@ def _lock_organization(db: Session, organization_id: str) -> Organization:
     return org
 
 
-def lock_organization_of(db: Session, user_id: str) -> None:
+def lock_organization_of(db: Session, user_id: str) -> str | None:
     """Takes the row lock of the organization this account belongs to, if
-    any. Callers take it before locking the account's own row: organization
-    first, then people -- the order hand_over and the admin routes use."""
-    organization_id = db.query(OrganizationMembership.organization_id).filter(OrganizationMembership.user_id == user_id).scalar()
+    any, and returns its id. Callers take it before locking the account's own
+    row: organization first, then people -- the order hand_over and the admin
+    routes use -- and re-check the membership afterwards (organization_of)."""
+    organization_id = organization_of(db, user_id)
     if organization_id is not None:
         _lock_organization(db, organization_id)
+    return organization_id
+
+
+def organization_of(db: Session, user_id: str) -> str | None:
+    return db.query(OrganizationMembership.organization_id).filter(OrganizationMembership.user_id == user_id).scalar()
 
 
 def _make_representative(db: Session, organization_id: str, new_rep: OrganizationMembership) -> str | None:
@@ -694,7 +707,10 @@ def admin_add_member(db: Session, admin: User, organization_id: str, email: str,
     )
     # Security: read the person under a row lock (after the organization's) so
     # a concurrent deactivation can't land between these checks and the join.
-    person = db.query(User).filter(func.lower(User.email) == email.strip().lower()).populate_existing().with_for_update().first()
+    # Found by a plain read, then locked by its primary key: a FOR UPDATE on
+    # lower(email) can't use the index and would lock-scan every user.
+    person_id = db.query(User.id).filter(func.lower(User.email) == email.strip().lower()).scalar()
+    person = db.query(User).filter(User.id == person_id).populate_existing().with_for_update().first() if person_id else None
     if person is None:
         raise HTTPException(status_code=404, detail="No account with that email. They need to sign up first.")
     if side and person.role != side:

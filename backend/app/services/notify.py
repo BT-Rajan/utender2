@@ -244,6 +244,11 @@ _VARIANTS: dict[tuple[NotificationType, str], dict[Language, tuple[str, str]]] =
         Language.en: ("Offers closed on {project_title}", "Offers on {project_title} closed at the deadline. The offers received are under review by a site admin, so there are none to evaluate yet."),
         Language.ar: ("أُغلقت العروض على {project_title}", "أُغلق تقديم العروض على {project_title} عند الموعد النهائي. العروض المقدمة قيد المراجعة من قبل مسؤول الموقع، لذا لا توجد عروض لتقييمها بعد."),
     },
+    # It had offers, but after the close every one was withdrawn: not "no offers".
+    (NotificationType.requirement_expired, "withdrawn"): {
+        Language.en: ("Every offer withdrawn on {project_title}", "Every offer on {project_title} was withdrawn after offers closed, so it has expired. You can start a new draft from it."),
+        Language.ar: ("سُحبت كل العروض على {project_title}", "سُحبت كل العروض على {project_title} بعد إغلاق تقديم العروض، لذا انتهت صلاحيته. يمكنك بدء مسودة جديدة منه."),
+    },
 }
 
 

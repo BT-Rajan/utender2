@@ -60,6 +60,10 @@ def request_change(db: Session, user: User, new_email: str, current_password: st
     if new_email == user.email.strip().lower():
         raise HTTPException(status_code=400, detail="Your new email address must be different from the current one.")
 
+    # The account row first, as confirm_change and the admin email edit take it
+    # (the person, then their requests): the same order everywhere, so two of
+    # them at once queue instead of deadlocking.
+    db.query(User).filter(User.id == user.id).populate_existing().with_for_update().one()
     now = datetime.utcnow()
     recent = db.query(EmailChangeRequest).filter(EmailChangeRequest.user_id == user.id, EmailChangeRequest.created_at > now - timedelta(hours=1)).all()
     if len(recent) >= MAX_REQUESTS_PER_HOUR:
