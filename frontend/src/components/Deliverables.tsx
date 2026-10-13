@@ -138,7 +138,8 @@ export function Deliverables({
                       <button type="button" disabled={busy} onClick={() => setAction({ id: m.id, verb: "return", note: "" })} className="text-xs text-red underline" data-testid="deliverable-return">{t(`${d}.return`)}</button>
                     </>
                   )}
-                  {(owner || provider) && m.status !== "accepted" && !["terminated", "completed"].includes(a.status) && (
+                  {/* Evidence is added once the work has started (the server refuses it before). */}
+                  {(owner || provider) && m.status !== "accepted" && !["terminated", "completed"].includes(a.status) && a.work_started_at !== null && (
                     evidence?.id === m.id ? (
                       <form className="flex flex-wrap items-center gap-2" onSubmit={(ev) => { ev.preventDefault(); if (evidence.file) attach.mutate({ id: m.id, file: evidence.file }); }}>
                         <label className="text-xs text-steel" htmlFor={`deliverable-file-${m.id}`}>{t(`${d}.evidenceFile`)}</label>

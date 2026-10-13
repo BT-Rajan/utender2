@@ -22,7 +22,12 @@ of the owner's journey, now corrected:
     with a way forward;
 14. an agreed change can't move the completion date before open deliverables;
 15. the owner side is told when offers close, when nobody bid, and when a
-    provider confirms its offer."""
+    provider confirms its offer;
+16. a lapsed offer can't be withdrawn while the requirement is suspended;
+17. a suspended requirement can't be closed, evaluated, paused or resumed;
+18-22. (frontend) actions the server refuses aren't offered;
+23. the owner's review rests on the award record, not the offers list (an
+    admin-suspended winning offer is left out of it)."""
 from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
@@ -38,7 +43,9 @@ from app.models.service_provider import ServiceProviderProfile
 from app.services.tender_rules import kuwait_today
 from tests.test_batch_a_contract_logic import _v
 from tests.stage7_helpers import put_in_force
+from tests.test_batch_b_tender_fairness import _validity_tender
 from tests.test_batch_c_trust_accounts import _completed, _me
+from tests.stage7_helpers import complete_transaction
 from tests.test_stage4_9_participation import _account, _admin
 from tests.test_organization_sharing import _organization
 from tests.test_stage5_13_revise import DECL, _submitted, _tender, _when
@@ -349,3 +356,60 @@ def test_the_owner_is_told_when_a_provider_confirms_its_offer(db):
     assert sp.post(f"/projects/{pid}/offers/confirm", json={"proposed_start_date": (kuwait_today() + timedelta(days=3)).isoformat()}).status_code == 200
     told = _notices(db, owner, NotificationType.offer_confirmed)
     assert len(told) == 1 and told[0].link == f"/owner/projects/{pid}"
+
+
+def _suspend(db, pid):
+    db.get(Project, pid).is_suspended = True
+    db.commit()
+
+
+def test_a_lapsed_offer_isnt_withdrawn_while_the_requirement_is_suspended(db):
+    owner = _account(db, "owner", "o-susp-wd@example.com")
+    sp = _account(db, "service_provider", "s-susp-wd@example.com")
+    pid = _validity_tender(owner, days=5)
+    _submitted(sp, pid)
+    owner.post(f"/owner/projects/{pid}/close")
+    db.get(Project, pid).closed_at = datetime.utcnow() - timedelta(days=10)  # its validity has run out
+    db.commit()
+    _suspend(db, pid)
+    assert sp.post(f"/projects/{pid}/offers/withdraw").status_code == 400
+    assert sp.get(f"/projects/{pid}/offers/mine").json()["status"] == "submitted"
+
+
+def test_a_suspended_requirement_isnt_closed_evaluated_paused_or_resumed(db):
+    owner = _account(db, "owner", "o-susp-life@example.com")
+    sp = _account(db, "service_provider", "s-susp-life@example.com")
+    open_one, closed_one = _tender(owner, title="Open"), _tender(owner, title="Closed")
+    for pid in (open_one, closed_one):
+        _submitted(sp, pid)
+    owner.post(f"/owner/projects/{closed_one}/close")
+    _suspend(db, open_one)
+    _suspend(db, closed_one)
+    told = lambda: db.query(Notification).filter(Notification.type.in_([NotificationType.tender_closed, NotificationType.evaluation_started])).count()  # noqa: E731
+    before = told()
+    suspended = "suspended by an admin"
+    for r in (
+        owner.post(f"/owner/projects/{open_one}/close"),
+        owner.post(f"/owner/projects/{open_one}/pause", json={"reason": "Site access"}),
+        owner.post(f"/owner/projects/{open_one}/resume"),
+        owner.post(f"/owner/projects/{closed_one}/start-evaluation"),
+    ):
+        assert r.status_code == 400 and suspended in r.json()["detail"]
+    assert told() == before  # bidders aren't told about a requirement that is out of sight
+
+
+def test_the_award_record_still_names_the_winner_after_its_offer_is_suspended(db):
+    owner = _account(db, "owner", "o-susp-win@example.com")
+    sp = _account(db, "service_provider", "s-susp-win@example.com")
+    pid = _tender(owner)
+    _submitted(sp, pid)
+    owner.post(f"/owner/projects/{pid}/close")
+    oid = sp.get(f"/projects/{pid}/offers/mine").json()["id"]
+    owner.post(f"/owner/projects/{pid}/offers/{oid}/approve")
+    complete_transaction(owner, sp, pid)
+    assert _admin(db).post(f"/admin/offers/{oid}/suspend", json={"suspended": True}).status_code == 200
+    assert owner.get(f"/owner/projects/{pid}/offers").json() == []  # the inbox leaves it out
+    award = owner.get(f"/projects/{pid}/award").json()
+    assert award["service_provider_id"] == _me(sp)  # what the review section now rests on
+    r = owner.post("/owner/reviews", json={"project_id": pid, "service_provider_id": award["service_provider_id"], "rating": 5})
+    assert r.status_code == 200, r.text

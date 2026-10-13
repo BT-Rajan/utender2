@@ -48,6 +48,13 @@ export function Evidence({
     onError: onFailed,
   });
 
+  // A certificate or "other" paper counts as evidence only when it is tied to
+  // a progress update; on its own it would be filed with the agreement's papers.
+  const kinds = related ? EVIDENCE_KINDS : EVIDENCE_KINDS.filter((k) => k !== "certificate" && k !== "other");
+  const relate = (value: string) => {
+    setRelated(value);
+    if (!value && (kind === "certificate" || kind === "other")) setKind("progress_photo");
+  };
   const started = a.work_started_at !== null;
   const general = a.documents.filter((d) => d.evidence && !d.milestone_id && !d.execution_update_id);
   const canAdd = a.side !== "admin" && started && !["terminated", "completed"].includes(a.status);
@@ -66,13 +73,13 @@ export function Evidence({
           <label className="grid gap-0.5 text-xs text-steel" htmlFor="evidence-kind">
             {t(`${x}.kind`)}
             <select id="evidence-kind" value={kind} onChange={(ev) => setKind(ev.target.value)} className="border border-border rounded px-2 py-1 text-sm text-ink">
-              {EVIDENCE_KINDS.map((k) => <option key={k} value={k}>{t(`agreement.kind.${k}`)}</option>)}
+              {kinds.map((k) => <option key={k} value={k}>{t(`agreement.kind.${k}`)}</option>)}
             </select>
           </label>
           {updates.length > 0 && (
             <label className="grid gap-0.5 text-xs text-steel" htmlFor="evidence-related">
               {t(`${x}.relatesTo`)}
-              <select id="evidence-related" value={related} onChange={(ev) => setRelated(ev.target.value)} className="border border-border rounded px-2 py-1 text-sm text-ink max-w-[16rem]">
+              <select id="evidence-related" value={related} onChange={(ev) => relate(ev.target.value)} className="border border-border rounded px-2 py-1 text-sm text-ink max-w-[16rem]">
                 <option value="">{t(`${x}.wholeWork`)}</option>
                 {updates.map((h) => (
                   <option key={h.id} value={h.id}>

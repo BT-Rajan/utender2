@@ -1133,6 +1133,7 @@ export interface Dictionary {
     publishConfirm: string;
     publishNowConfirm: string;
     published: string;
+    expiredEarly: string;
   };
   verification: {
     scopeLabel: string;
@@ -2984,6 +2985,7 @@ export const en: Dictionary = {
     publishConfirm: "Publish \"{title}\" now?\n\nVerified providers who meet your \"who can respond\" rules will be able to find it, open it and send offers until {deadline}.\n\nOnce published, its rules and conditions can't be changed here.",
     publishNowConfirm: "Publish this requirement straight away, without saving it as a draft first?\n\nVerified providers will be able to find it and send offers until {deadline}. To review it as providers will see it first, save it as a draft and use Preview.",
     published: "Published {date} — open to offers until {deadline}.",
+    expiredEarly: "This requirement was closed on {date}, before its offer deadline, without any live offers. It is now read-only.",
   },
   verification: {
     scopeLabel: "Applies to",
@@ -4860,6 +4862,7 @@ export const ar: Dictionary = {
     publishConfirm: "هل تريد نشر \"{title}\" الآن؟\n\nسيتمكن مقدمو الخدمة الموثقون الذين يستوفون شروط \"من يمكنه تقديم عرض\" من العثور عليه وفتحه وتقديم العروض حتى {deadline}.\n\nبعد النشر لا يمكن تغيير قواعده وشروطه من هنا.",
     publishNowConfirm: "هل تريد نشر هذا الطلب فورًا دون حفظه كمسودة أولًا؟\n\nسيتمكن مقدمو الخدمة الموثقون من العثور عليه وتقديم العروض حتى {deadline}. لمراجعته كما سيراه مقدمو الخدمة أولًا، احفظه كمسودة واستخدم المعاينة.",
     published: "نُشر في {date} — مفتوح للعروض حتى {deadline}.",
+    expiredEarly: "أُغلق هذا الطلب في {date}، قبل موعد إغلاق العروض، دون أي عروض قائمة. أصبح الآن للقراءة فقط.",
   },
   verification: {
     scopeLabel: "ينطبق على",

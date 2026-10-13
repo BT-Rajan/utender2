@@ -52,6 +52,7 @@ interface Review {
 interface AwardRecordView {
   id: string | null;
   offer_id: string | null;
+  service_provider_id: string | null;
   amount: string | null;
   created_at: string;
   service_provider_company_name: string | null;
@@ -428,6 +429,16 @@ export function OwnerProjectDetailPage() {
   });
 
   const approvedOffer = offers?.find((o) => o.status === "approved");
+  // Who was awarded, from the permanent award record -- not the offers list,
+  // which leaves out an offer an admin has suspended since.
+  const { data: award } = useQuery({
+    queryKey: ["award", id],
+    queryFn: () => apiFetch<AwardRecordView>(`/projects/${id}/award`),
+    enabled: !!id && project?.status === "awarded",
+  });
+  const winner = award?.service_provider_id
+    ? { id: award.service_provider_id, name: award.service_provider_company_name ?? approvedOffer?.service_provider_company_name ?? null }
+    : null;
   // Stage 8.1: a review rests on completed work -- the transaction closed by the
   // owner side's acceptance -- never on the award alone. Same query as the agreement panel.
   const { data: transaction } = useQuery({
@@ -492,7 +503,7 @@ export function OwnerProjectDetailPage() {
     mutationFn: () =>
       apiFetch(`/owner/reviews`, {
         method: "POST",
-        body: { project_id: id, service_provider_id: approvedOffer?.service_provider_id, rating, comment: comment || null },
+        body: { project_id: id, service_provider_id: winner?.id, rating, comment: comment || null },
       }),
     onSuccess: () => {
       setError(null);
@@ -578,7 +589,9 @@ export function OwnerProjectDetailPage() {
       )}
       {project.status === "expired" && project.offer_count === 0 && (
         <div className="border border-border bg-border/30 rounded px-4 py-3 mb-6 text-sm text-steel max-w-2xl">
-          {t("draftDetails.expired").replace("{date}", formatDeadline(project.bid_deadline))}
+          {project.closed_at && new Date(project.closed_at) < new Date(project.bid_deadline)
+            ? t("draftDetails.expiredEarly").replace("{date}", formatDeadline(project.closed_at))
+            : t("draftDetails.expired").replace("{date}", formatDeadline(project.bid_deadline))}
         </div>
       )}
       {project.published_at && project.status === "open" && (
@@ -614,7 +627,7 @@ export function OwnerProjectDetailPage() {
       {editableDraft && <ProviderEligibilityEditor project={project} />}
 
       {/* Stage 3.15: controlling the published requirement. */}
-      {project.status === "open" && <PauseControl project={project} />}
+      {project.status === "open" && !project.is_suspended && <PauseControl project={project} />}
       {project.status === "open" && <AmendPublishedForm project={project} />}
       {project.status === "open" && !project.paused_at && <InvitePreviousProviders projectId={project.id} />}
       {/* Stage 7.1: the award, as recorded -- who, which offer, what value, when, on which version. */}
@@ -658,7 +671,8 @@ export function OwnerProjectDetailPage() {
               {t("owner.projectDetail.publish")}
             </button>
           )}
-          {project.status === "open" && (
+          {/* A sealed tender opens only at its deadline, and a suspended one waits: the server refuses closing either early. */}
+          {project.status === "open" && project.tender_type !== "sealed" && !project.is_suspended && (
             <button
               type="button"
               onClick={() =>
@@ -672,7 +686,7 @@ export function OwnerProjectDetailPage() {
               {t("owner.projectDetail.closeEarly")}
             </button>
           )}
-          {project.status === "closed" && (
+          {project.status === "closed" && !project.is_suspended && (
             <button
               type="button"
               onClick={() => lifecycleMutation.mutate("start-evaluation")}
@@ -1062,10 +1076,10 @@ export function OwnerProjectDetailPage() {
       {/* Stage 6.11: the owner side's own private notes on the requirement. */}
       {project.status !== "draft" && <EvaluationNotes projectId={project.id} />}
 
-      {approvedOffer && (existingReview || reviewable) && (
+      {winner && (existingReview || reviewable) && (
         <div className="mt-8 max-w-xl">
           <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-2">
-            {t("owner.projectDetail.rateServiceProvider")} {approvedOffer.service_provider_company_name ?? t("owner.projectDetail.theServiceProvider")}
+            {t("owner.projectDetail.rateServiceProvider")} {winner.name ?? t("owner.projectDetail.theServiceProvider")}
           </h3>
           {existingReview ? (
             <div className="bg-white border border-border rounded px-4.5 py-4">
@@ -1118,7 +1132,7 @@ export function OwnerProjectDetailPage() {
           {/* Stage 8.6: the winning provider's review of this owner side, once written. */}
           <ReceivedReview
             url={`/owner/projects/${project.id}/review/received`}
-            from={approvedOffer.service_provider_company_name ?? t("owner.projectDetail.theServiceProvider")}
+            from={winner.name ?? t("owner.projectDetail.theServiceProvider")}
           />
         </div>
       )}
