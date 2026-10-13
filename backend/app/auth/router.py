@@ -10,7 +10,7 @@ from app.auth.security import (
     create_refresh_token,
     decode_token_payload,
     hash_password,
-    token_matches_password,
+    token_is_current,
     verify_password,
 )
 from app.config import get_settings
@@ -37,7 +37,7 @@ from app.services.auth_tokens import consume_token, issue_token
 from app.services.documents import ensure_document_rows, ensure_owner_document_rows
 from app.services.audit import log_action
 from app.services.email import notify_password_reset, notify_verify_email
-from app.services.login_throttle import login_throttle
+from app.services.login_throttle import login_throttle, refresh_replays
 from app.services.token_cleanup import purge_expired_revoked_tokens
 from app.services import email_change as email_change_service
 
@@ -50,8 +50,8 @@ REFRESH_TTL_SECONDS = settings.jwt_refresh_ttl_days * 24 * 60 * 60
 
 
 def _set_auth_cookies(response: Response, user: User) -> None:
-    access_token = create_access_token(user.id, user.password_hash)
-    refresh_token = create_refresh_token(user.id, user.password_hash)
+    access_token = create_access_token(user.id, user.password_hash, user.session_version)
+    refresh_token = create_refresh_token(user.id, user.password_hash, user.session_version)
     # httpOnly so a browser-side XSS can't read the token; SameSite=lax is
     # enough since frontend and backend are same-site in production
     # deployments (reverse-proxied together) — see README for the local-dev
@@ -171,9 +171,13 @@ def login(payload: LoginRequest, request: Request, response: Response, db: Sessi
     user = db.query(User).filter(User.email == email).first()
     if not user or not verify_password(payload.password, user.password_hash):
         locked_now = login_throttle.record_failure(client_ip, email)
+        if locked_now == "ip":
+            # The address as a whole, not the account that happened to tip it
+            # (often one that doesn't exist): application log, not the trail.
+            logger.warning("login locked for client %s after too many failed attempts", client_ip)
         if user:
             _audit_session(db, request, user, "login.failed")
-            if locked_now:
+            if locked_now == "account":
                 _audit_session(db, request, user, "login.locked")
         else:
             # No account to attach a row to, and unauthenticated input
@@ -199,14 +203,16 @@ def refresh(request: Request, response: Response, refresh_token: str | None = Co
 
     payload = decode_token_payload(refresh_token, expected_type="refresh")
     user = db.get(User, payload.user_id) if payload else None
-    if not payload or not user or not token_matches_password(payload, user.password_hash):
+    if not payload or not user or not token_is_current(payload, user):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
     if db.get(RevokedToken, payload.jti):
         # A retired refresh token coming back is either a stale tab or a
         # stolen copy being replayed -- worth a line on the trail either way.
         # (Successful refreshes happen every access-token lifetime and are
-        # not audited, to keep the trail readable.)
-        _audit_session(db, request, user, "session.refresh_replayed")
+        # not audited, to keep the trail readable.) Once per token per window:
+        # a client retrying in a loop mustn't grow the table per request.
+        if refresh_replays.first(payload.jti):
+            _audit_session(db, request, user, "session.refresh_replayed")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
     if user.deactivated_at is not None:  # Stage 9.2
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
@@ -320,10 +326,14 @@ def request_email_change(payload: EmailChangeRequestIn, user: User = Depends(get
 
 
 @router.post("/email-change/confirm", response_model=UserOut)
-def confirm_email_change(payload: EmailChangeConfirmIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def confirm_email_change(payload: EmailChangeConfirmIn, response: Response, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Step 2: the code from the current address switches the account to the
     new one. The new address is then unverified until its link is used."""
-    return email_change_service.confirm_change(db, user, payload.code)
+    user = email_change_service.confirm_change(db, user, payload.code)
+    # The change ended every session (session_version); keep this tab, the
+    # one that just proved both the password and the old mailbox.
+    _set_auth_cookies(response, user)
+    return user
 
 
 @router.patch("/language", response_model=UserOut)

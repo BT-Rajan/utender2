@@ -1728,7 +1728,7 @@ def edit_account_details(user_id: str, payload: AccountDetailsPatch, admin: User
     from sqlalchemy import func
 
     from app.models.enums import AuthTokenType
-    from app.services.auth_tokens import issue_token
+    from app.services.auth_tokens import invalidate_tokens, issue_token
     from app.services.email import notify_email_changed, notify_verify_email
 
     target = _account_target(db, user_id, admin)
@@ -1765,6 +1765,11 @@ def edit_account_details(user_id: str, payload: AccountDetailsPatch, admin: User
     except IntegrityError:  # the same address was taken a moment ago
         db.rollback()
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
+    if "email" in changes:
+        # Security: the old mailbox may be in someone else's hands now -- its
+        # verify/reset links stop working and every session of the account ends.
+        invalidate_tokens(db, target.id)
+        target.session_version = (target.session_version or 0) + 1
     log_action(
         db, actor_id=admin.id, action="account.updated_by_admin", target_type="user", target_id=target.id,
         previous_value=json.dumps({f: c[0] for f, c in changes.items()}), new_value=json.dumps({f: c[1] for f, c in changes.items()}),
@@ -1814,6 +1819,9 @@ def deactivate_account(user_id: str, payload: AccountStatePatch | None = None, a
     request), and no sign-in -- without touching the organisation they act
     for, its other members, or anything recorded. Admin accounts aren't
     managed here. Repeating it changes nothing."""
+    # Security: the organisation first, so the strand check below can't race
+    # a hand-over or appointment that changes who its representative is.
+    stakeholder_service.lock_organization_of(db, user_id)
     target = _account_target(db, user_id, admin)
     if target.deactivated_at is None:
         if stakeholder_service.deactivation_would_strand_organization(db, target):

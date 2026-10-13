@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, String, func
+from sqlalchemy import Boolean, DateTime, Enum, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -27,6 +27,10 @@ class User(Base):
     # session, no request. Their memberships and everything recorded under
     # their organisation stay; reactivating restores exactly what they had.
     deactivated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Security: carried in every session token (security.py) and bumped to end
+    # all of the account's sessions at once -- e.g. when its sign-in email
+    # changes, since whoever held the old mailbox may hold a session too.
+    session_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     service_provider_profile = relationship(
         "ServiceProviderProfile", back_populates="user", uselist=False, cascade="all, delete-orphan"

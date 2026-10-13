@@ -18,6 +18,9 @@ class AuthToken(Base):
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
     type: Mapped[AuthTokenType] = mapped_column(Enum(AuthTokenType, native_enum=True), nullable=False)
+    # Security: the address the link was mailed to. A link proves control of
+    # that mailbox only, so it is refused once the account's email differs.
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
