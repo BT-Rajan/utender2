@@ -23,7 +23,6 @@ all built on what the platform already records:
 Nothing here names a specific licence, certificate or document. The same
 function decides both what a provider is told and what the server enforces.
 """
-from datetime import date
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -34,6 +33,7 @@ from app.models.project import Project
 from app.models.service_provider import ServiceProviderProfile
 from app.services.team import team_ids
 from app.schemas.project import EligibilityQualification, EligibilityReason, ProviderEligibilityIn, ProviderEligibilityOut
+from app.clock import kuwait_today
 
 
 def rules_for(project: Project) -> ProviderEligibilityIn:
@@ -104,7 +104,7 @@ def ineligibility_reasons(db: Session, project: Project, profile: ServiceProvide
             best = held.get(d.requirement_id)
             if best is None or (best.expires_on is not None and (d.expires_on is None or d.expires_on > best.expires_on)):
                 held[d.requirement_id] = d
-        today = date.today()
+        today = kuwait_today()
         for q in rules.qualifications:
             name = names.get(q, "a required qualification")
             doc = held.get(q)
@@ -165,7 +165,7 @@ def feed_condition(db: Session, profile: ServiceProviderProfile):
         conditions.append(Project.elig_org_only.is_(False))
     # Qualifications: every one the requirement lists must be held, approved
     # and in date, by someone in the provider's organization.
-    today = date.today()
+    today = kuwait_today()
     held = sorted({
         d.requirement_id
         for d in db.query(ServiceProviderDocument).filter(

@@ -15,10 +15,16 @@ settings = get_settings()
 # completed?" on state another request has since committed. READ COMMITTED
 # gives every statement the latest committed data, so a check made under the
 # lock sees what the lock holder wrote. (The MySQL tests already run this way.)
+#
+# Every MySQL connection also runs in UTC (app.clock): the app stamps
+# datetime.utcnow() and compares against it, so a server default (NOW(),
+# CURRENT_TIMESTAMP) must be UTC too, whatever time zone the server is set to
+# -- Kuwait servers run on Kuwait time, and nothing is configured per server.
 def engine_options(database_url: str) -> dict:
     options = {"pool_pre_ping": True}
     if database_url.startswith("mysql"):
         options["isolation_level"] = "READ COMMITTED"
+        options["connect_args"] = {"init_command": "SET time_zone = '+00:00'"}
     return options
 
 

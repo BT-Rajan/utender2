@@ -1736,4 +1736,10 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
   - **Reviews after an admin suspends the winning offer:** the owner's review section rests on the award record, not the offers list (which leaves a suspended offer out), so the owner still reviews and sees the review it received.
   - **Tests:** `tests/test_owner_journey_fixes.py`.
 
+- **One clock (`app/clock.py`):** time handling is decided in one place.
+  - Times are stored in UTC. Every MySQL connection runs in UTC (`SET time_zone = '+00:00'`, in `db.engine_options`, the test harness and Alembic), so database-stamped times (`NOW()` / `CURRENT_TIMESTAMP` defaults on 24 tables) agree with the app's `utcnow()` whatever time zone the server is set to. Kuwait servers run on Kuwait time, and nothing has to be configured per server.
+  - The calendar dates people work with are Kuwait dates. `kuwait_today()` and `kuwait_date()` replace two copies of the helper and three hand-written "+3 hours" conversions.
+  - Document-expiry checks in eligibility no longer use the server's own date.
+  - **Tests:** `tests/test_clock.py` (the MySQL check runs against a server set to Kuwait time).
+
 _Later Stage 9 steps are added as they are implemented._

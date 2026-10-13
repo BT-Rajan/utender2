@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 
 from app.models.project import Project
 from app.services.tender_lifecycle import bidding_is_open
+from app.clock import kuwait_today  # noqa: F401 -- re-exported for callers of tender_rules
 
 
 def questions_close_at(project: Project) -> datetime | None:
@@ -56,11 +57,6 @@ def offer_valid_until(project: Project, offer) -> datetime | None:
 def validity_lapsed(project: Project, offer) -> bool:
     until = offer_valid_until(project, offer)
     return until is not None and datetime.utcnow() > until
-
-
-def kuwait_today():
-    """Today's calendar date in Kuwait (UTC+3, no daylight saving)."""
-    return (datetime.utcnow() + timedelta(hours=3)).date()
 
 
 def start_date_passed(offer) -> bool:
