@@ -13,7 +13,7 @@ applied -- while each variation keeps what it changed from. The award, the
 requirement, the winning offer and the original agreement are never
 rewritten. Every action is under the requirement's lock with the variation's
 version; audit-logged; the other party is told."""
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -28,6 +28,7 @@ from app.routers.agreements import _best_effort, _check_version, _load, _out, _r
 from app.schemas.agreement import AgreementOut, MilestoneNote, VariationIn
 from app.services import audit
 from app.services import notify as notify_service
+from app.clock import kuwait_date
 
 router = APIRouter(prefix="/projects/{project_id}/agreement/variations", tags=["agreements"])
 
@@ -138,7 +139,7 @@ def propose_variation(
     # can't be in the past or before the work could start, and a deliverable
     # can't be rescheduled past the completion date in force (or this change's).
     today = kuwait_today()
-    earliest = max(d for d in (today, agreement.effective_date, (agreement.work_started_at + timedelta(hours=3)).date() if agreement.work_started_at else None) if d)
+    earliest = max(d for d in (today, agreement.effective_date, kuwait_date(agreement.work_started_at) if agreement.work_started_at else None) if d)
     if payload.completion_date and payload.completion_date < earliest:
         raise HTTPException(status_code=400, detail="A revised completion date can't be in the past or before the agreement takes effect and the work starts.")
     if payload.completion_date and _due_after(db, agreement, payload.completion_date, milestone.id if milestone else None):

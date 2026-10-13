@@ -55,6 +55,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 from sqlalchemy import create_engine, text
+
+from app.db import engine_options
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import close_all_sessions, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -106,7 +108,7 @@ def mysql_engine():
     # and later reads return stale rows (false failures in pass5/6/13/21).
     # Application request sessions are short-lived, so this only changes what
     # the tests' own sessions can see; no test assertion depends on it.
-    engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True, isolation_level="READ COMMITTED")
+    engine = create_engine(TEST_DATABASE_URL, **engine_options(TEST_DATABASE_URL))  # READ COMMITTED and UTC sessions, as the app
     with engine.begin() as conn:
         conn.execute(text("SET FOREIGN_KEY_CHECKS=0"))
         for name in _mysql_table_names(conn):

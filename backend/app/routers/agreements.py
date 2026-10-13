@@ -35,6 +35,7 @@ from app.services.offer_response import OPEN_LINK_SECONDS, _api
 from app.services.storage import get_storage
 from app.services.team import acting_profile, can_access, owns
 from app.services.tender_lifecycle import lock_project
+from app.clock import kuwait_date, kuwait_today  # noqa: F401 -- kuwait_today re-exported (tests, routers)
 
 AGREEMENT_BUCKET = "agreement-documents"
 
@@ -89,12 +90,6 @@ def _load(db: Session, project_id: str, user: User, *, lock: bool = False):
         if agreement.status == "completed":
             raise HTTPException(status_code=409, detail="This transaction is completed and closed; nothing more can be changed. This page now shows the latest.")
     return project, agreement, award, winner, side
-
-
-def kuwait_today():
-    """The calendar date in Kuwait (UTC+3, no daylight saving) -- the date the
-    parties' agreement dates are written in."""
-    return (datetime.utcnow() + timedelta(hours=3)).date()
 
 
 def require_in_force(agreement: Agreement) -> None:
@@ -285,7 +280,7 @@ def _commercial_terms(project: Project, agreement: Agreement, current_amount) ->
         for st in c.get("payment_stages") or []
     ]
     retention = Decimal(str(c["retention_percent"])) if c.get("retention_percent") is not None else None
-    done = (agreement.completed_at + timedelta(hours=3)).date() if agreement.completed_at else None
+    done = kuwait_date(agreement.completed_at) if agreement.completed_at else None
     return CommercialTerms(
         offer_validity_days=c.get("offer_validity_days"),
         payment_stages=stages,
@@ -432,7 +427,7 @@ def update_agreement(
     fields = payload.model_fields_set
     reference = (payload.reference or "").strip() or None if "reference" in fields else agreement.reference
     effective = payload.effective_date if "effective_date" in fields else agreement.effective_date
-    award_day = (award.created_at + timedelta(hours=3)).date()
+    award_day = kuwait_date(award.created_at)
     if effective is not None and effective < award_day:
         raise HTTPException(status_code=400, detail="The agreement can't take effect before the award.")
     if (reference, effective) != (agreement.reference, agreement.effective_date):

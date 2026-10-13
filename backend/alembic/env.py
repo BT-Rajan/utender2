@@ -4,7 +4,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from app.config import get_settings
-from app.db import Base
+from app.db import Base, engine_options
 from app.models import *  # noqa: F401,F403  (registers all models on Base.metadata)
 
 config = context.config
@@ -26,7 +26,10 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(config.get_section(config.config_ini_section, {}), prefix="sqlalchemy.", poolclass=pool.NullPool)
+    # Migrations run in a UTC session too (backfills that use NOW() agree with the app).
+    url = config.get_main_option("sqlalchemy.url")
+    connect_args = engine_options(url).get("connect_args", {})
+    connectable = engine_from_config(config.get_section(config.config_ini_section, {}), prefix="sqlalchemy.", poolclass=pool.NullPool, connect_args=connect_args)
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():

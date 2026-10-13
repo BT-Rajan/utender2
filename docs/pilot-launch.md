@@ -93,4 +93,4 @@ Tell customers about these limitations up front:
 - **Accepted file types.**
   - Requirement and offer files: PDF, DWG, XLSX, DOCX, JPG/PNG or ZIP.
   - Older `.xls` / `.dxf` files go inside a ZIP. Uploads are limited to 50 MB each (`MAX_UPLOAD_MB`).
-- **Times are Kuwait time.** Deadlines are entered and shown in Kuwait time (UTC+3), whatever the device's own timezone.
+- **Times are Kuwait time.** Deadlines are entered and shown in Kuwait time (UTC+3), whatever the device's own timezone. The servers may be set to Kuwait time; U-Tender stores times in UTC on every database connection by itself, so no time-zone setting is needed per server.
