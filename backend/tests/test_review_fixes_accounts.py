@@ -174,8 +174,8 @@ def test_making_a_representative_demotes_every_other_admin(db):
 
 def test_throttle_reports_which_limit_locked():
     t = LoginThrottle(max_per_account=3, max_per_ip=4)
-    assert [t.record_failure("1.1.1.1", "a@x") for _ in range(3)] == [None, None, "account"]
-    assert t.record_failure("1.1.1.1", "b@x") == "ip"
+    assert [t.record_failure("1.1.1.1", "a@x") for _ in range(3)] == [set(), set(), {"account"}]
+    assert t.record_failure("1.1.1.1", "b@x") == {"ip"}
 
 
 def test_ip_lockout_goes_to_the_log_not_the_tripping_account(db, caplog):

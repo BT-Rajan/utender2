@@ -252,4 +252,6 @@ def test_a_requirement_closed_on_a_suspended_offer_is_never_reported_with_none(d
     assert db.get(Project, pid).status == ProjectStatus.closed
     me = owner.get("/auth/me").json()["id"]
     ready = db.query(Notification).filter(Notification.user_id == me, Notification.type == NotificationType.evaluation_ready).all()
-    assert len(ready) == 1 and "0 offer" not in ready[0].body and "1 offer" in ready[0].body
+    # PR #22 review: the owner can't see a suspended offer, so it is neither
+    # counted nor reported as 0 -- the notice says the offers are under review.
+    assert len(ready) == 1 and "0 offer" not in ready[0].body and "1 offer" not in ready[0].body and "under review" in ready[0].body

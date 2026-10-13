@@ -252,6 +252,8 @@ export interface Dictionary {
     standsHeading: string; lapsedBody: string; outdatedBody: string; confirm: string; withdraw: string; lastWithdrawal: string; noMoreResubmission: string;
     startPassedBody: string;
     newStart: string;
+    offerSuspended: string;
+    requirementSuspended: string;
     completionPassedBody: string;
     newCompletion: string;
   };
@@ -2044,6 +2046,8 @@ export const en: Dictionary = {
     noMoreResubmission: "This offer was withdrawn twice, so it can't be put forward again on this requirement.",
     startPassedBody: "The start date you proposed has passed, so the owner can't award this offer as it stands. Give a new start date (today or later) to confirm it: the same span of work follows it, and nothing else in your offer changes. You may withdraw it instead.",
     newStart: "New start date",
+    offerSuspended: "Your offer has been suspended by a site admin. You can confirm or withdraw it once it is reactivated.",
+    requirementSuspended: "This requirement has been suspended by a site admin. You can confirm or withdraw your offer once it is reactivated.",
     completionPassedBody: "The completion date you proposed has passed, so the owner can't award this offer as it stands. Give a new completion date (today or later) to confirm it: nothing else in your offer changes. You may withdraw it instead.",
     newCompletion: "New completion date",
   },
@@ -3925,6 +3929,8 @@ export const ar: Dictionary = {
     noMoreResubmission: "سُحب هذا العرض مرتين، لذا لا يمكن تقديمه مجددًا على هذا الطلب.",
     startPassedBody: "مضى تاريخ البدء الذي اقترحته، لذا لا يستطيع المالك ترسية هذا العرض كما هو. حدّد تاريخ بدء جديدًا (اليوم أو بعده) لتأكيده: تتبعه مدة العمل نفسها، ولا يتغير شيء آخر في عرضك. يمكنك سحبه بدلًا من ذلك.",
     newStart: "تاريخ البدء الجديد",
+    offerSuspended: "قام مسؤول الموقع بتعليق عرضك. يمكنك تأكيده أو سحبه بعد إعادة تفعيله.",
+    requirementSuspended: "قام مسؤول الموقع بتعليق هذا الطلب. يمكنك تأكيد عرضك أو سحبه بعد إعادة تفعيله.",
     completionPassedBody: "مضى تاريخ الإنجاز الذي اقترحته، لذا لا يستطيع المالك ترسية هذا العرض كما هو. حدّد تاريخ إنجاز جديدًا (اليوم أو بعده) لتأكيده: لا يتغير شيء آخر في عرضك. يمكنك سحبه بدلًا من ذلك.",
     newCompletion: "تاريخ الإنجاز الجديد",
   },

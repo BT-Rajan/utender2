@@ -8,6 +8,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.i18n_server import translate
 from app.deps import get_service_provider_profile, require_approved_service_provider, require_service_provider_in_standing, require_marketplace_active_service_provider, require_service_provider
+from app.models.audit_log import AuditLog
 from app.models.clarification import Clarification
 from app.models.enums import NotificationType, OfferStatus, ProjectStatus, TenderType
 from app.models.offer import Offer, OfferDocument, OfferRevision
@@ -916,7 +917,17 @@ def withdraw_offer(project_id: str, user: User = Depends(require_approved_servic
     offer.withdrawal_count = (offer.withdrawal_count or 0) + 1
     offer.status = OfferStatus.withdrawn
     offer.updated_at, offer.updated_by = datetime.utcnow(), user.id
-    # Stage 9.7: withdrawn, by whom, in the same commit.
+    # After the close, the last live offer withdrawn leaves nothing to
+    # evaluate: the requirement expires, as it would have at the close with
+    # no offer (sync_expired_projects / close_project). closed_at stays.
+    expired_from = None
+    if lapsed_after_close and not db.query(Offer.id).filter(
+        Offer.project_id == project.id, Offer.id != offer.id, Offer.status == OfferStatus.submitted
+    ).first():
+        expired_from, project.status = project.status.value, ProjectStatus.expired
+        db.add(AuditLog(actor_id=user.id, action="project.expire", target_type="project", target_id=project.id,
+                        previous_value=expired_from, new_value="expired", reason="The last live offer was withdrawn."))
+    # Stage 9.7: withdrawn, by whom, in the same commit (with the expiry, if any).
     log_action(db, actor_id=user.id, action="offer.withdraw", target_type="offer", target_id=offer.id,
                previous_value="submitted", new_value=f"withdrawn ({project.id})")
     db.refresh(offer)
@@ -930,4 +941,7 @@ def withdraw_offer(project_id: str, user: User = Depends(require_approved_servic
             db, owner, NotificationType.bid_withdrawn, organization_id=project.organization_id, link=f"/owner/projects/{project.id}",
             project_title=project.title, service_provider_name="A service provider" if sealed or not profile else profile.company_name,
         )
+        if expired_from:  # and that nothing is left to evaluate (the deadline notice's wording)
+            notify_team(db, owner, NotificationType.requirement_expired, link=f"/owner/projects/{project.id}",
+                        organization_id=project.organization_id, project_title=project.title)
     return _with_documents(db, offer)  # Stage 5.14: the same shape as every other offer response
