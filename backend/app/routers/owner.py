@@ -34,7 +34,7 @@ from app.services.reviews import OWNER_TO_PROVIDER, PROVIDER_TO_OWNER, record_re
 from app.services.email import notify_provider_requirement_ended, notify_service_provider_offer_decision
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.notify import notify, notify_team
-from app.services.team import acting_profile, mine, owns
+from app.services.team import acting_profile, mine, owns, side_users
 from app.services.eligibility import qualification_options
 from app.services.offer_clarifications import clarification_out, offer_clarifications
 from app.services.offer_clarifications import closed_reason as clarification_closed_reason
@@ -104,6 +104,15 @@ def dashboard(user: User = Depends(require_owner), db: Session = Depends(get_db)
     return out
 
 
+def _provider_side_active(db: Session, provider_user: User | None, organization_id: str | None) -> bool:
+    """Whether a provider can still act: an organisation while anyone acting
+    for it is active (its founding account may have been deactivated after
+    handing the representative role on); an individual while its account is."""
+    if organization_id:
+        return bool(side_users(db, organization_id, None))
+    return provider_user is not None and provider_user.deactivated_at is None
+
+
 def _owner_offer_out(db: Session, project: Project, o: Offer, cp: ServiceProviderProfile | None) -> OfferOut:
     """A live (not withdrawn) offer, in full, as the owner receives it once unsealed."""
     return OfferOut(
@@ -135,6 +144,7 @@ def _owner_offer_out(db: Session, project: Project, o: Offer, cp: ServiceProvide
         # Batch B: whether it still holds its price, and answers published since it was put forward.
         valid_until=offer_valid_until(project, o) if o.status == OfferStatus.submitted else None,
         validity_lapsed=o.status == OfferStatus.submitted and validity_lapsed(project, o),
+        start_passed=o.status == OfferStatus.submitted and start_date_passed(o),
         answers_since=answers_since(db, project, o) if o.status == OfferStatus.submitted else 0,
     )
 
@@ -363,9 +373,14 @@ def invite_previous_provider(project_id: str, service_provider_id: str, user: Us
         raise HTTPException(status_code=404, detail="You can invite a provider you have completed work with.")
     profile = db.get(ServiceProviderProfile, service_provider_id)
     provider_user = db.get(User, service_provider_id)
-    if not profile or not provider_user or not profile.is_verified_active or provider_user.deactivated_at is not None or ineligibility_reasons(db, project, profile):
+    if not profile or not provider_user or not profile.is_verified_active or not _provider_side_active(db, provider_user, profile.organization_id) or ineligibility_reasons(db, project, profile):
         raise HTTPException(status_code=400, detail="This provider doesn't meet this requirement's conditions, so it can't be invited.")
-    if db.query(Offer.id).filter(Offer.project_id == project_id, Offer.service_provider_id == service_provider_id, tendered()).first():
+    has_bid = db.query(Offer.id).filter(Offer.project_id == project_id, Offer.service_provider_id == service_provider_id, tendered()).first() is not None
+    # On a sealed tender who has bid stays hidden until the deadline, so the
+    # answer must not depend on it: a bidder is "invited" like anyone else
+    # (recorded, so a repeat is refused the same way), just not told again.
+    sealed = is_sealed_and_open(project)
+    if has_bid and not sealed:
         raise HTTPException(status_code=409, detail="This provider has already made an offer on this requirement.")
     # Security: one invitation per provider per requirement -- an invitation
     # can't be repeated to flood a provider's notices.
@@ -379,6 +394,8 @@ def invite_previous_provider(project_id: str, service_provider_id: str, user: Us
                     organization_id=profile.organization_id, project_title=project.title,
                     deadline=project.bid_deadline.strftime("%d %b %Y %H:%M UTC"))
 
+    if has_bid:
+        return
     _best_effort(db, tell, f"invitation to {service_provider_id} for {project_id}")
 
 
@@ -661,7 +678,7 @@ def approve_offer(
     winner_user = db.get(User, winning_offer.service_provider_id)
     if (
         not winner_profile or winner_profile.is_suspended or winner_profile.verification_status != VerificationStatus.approved
-        or (winner_user is not None and winner_user.deactivated_at is not None)
+        or not _provider_side_active(db, winner_user, winning_offer.organization_id or winner_profile.organization_id)
     ):
         raise HTTPException(
             status_code=409,
@@ -768,7 +785,7 @@ def request_offer_confirmation(project_id: str, offer_id: str, user: User = Depe
         raise HTTPException(status_code=404, detail="Offer not found.")
     if offer.status != OfferStatus.submitted:
         raise HTTPException(status_code=400, detail="Only a live bid can be awarded.")
-    if offer.based_on_material_revision >= project.material_revision and not validity_lapsed(project, offer):
+    if offer.based_on_material_revision >= project.material_revision and not validity_lapsed(project, offer) and not start_date_passed(offer):
         raise HTTPException(status_code=400, detail="This offer is on the current version and within its validity period; it can be awarded as it is.")
     log_action(db, actor_id=user.id, action="offer.confirmation_requested", target_type="offer", target_id=offer.id)
 
@@ -804,8 +821,13 @@ def publish_project(project_id: str, user: User = Depends(require_owner), db: Se
 def close_project(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     """Manually stop accepting bids before the deadline — e.g. the owner is
     satisfied with what's in hand and wants to move straight to evaluation."""
+    # The deadline may have passed without anything reading the requirement
+    # since: it closed then, by itself -- not now, and not early.
+    sync_expired_projects(db)
     project = _get_owned_project(project_id, user, db, lock=True)
     if project.status != ProjectStatus.open:
+        if project.status in (ProjectStatus.closed, ProjectStatus.expired) and project.closed_at == project.bid_deadline:
+            raise HTTPException(status_code=400, detail="Offers already closed at the deadline.")
         raise HTTPException(status_code=400, detail="Only an open project can be closed.")
     # Closing lifts the seal (is_sealed_and_open turns false), so an owner who
     # could close early could read every sealed bid before the deadline.
@@ -1073,9 +1095,14 @@ def restart_project(project_id: str, payload: RestartRequest | None = None, user
     source = _get_owned_project(project_id, user, db, lock=True)
     # Stage 8.11: also a completed transaction (Stage 7's authoritative
     # completion) -- the same need again, as a new, independent requirement.
-    # Never one still open, awarded but unfinished, or a draft.
+    # Likewise a terminated one: the award can't be reopened (Stage 7.1), so
+    # the need, still unmet, comes back as a new requirement.
+    # Never one still open, awarded and still in progress, or a draft.
     ended = source.status in (ProjectStatus.canceled, ProjectStatus.no_award, ProjectStatus.expired)
-    if not ended and not (source.status == ProjectStatus.awarded and completed_transaction(db, source.id) is not None):
+    finished = source.status == ProjectStatus.awarded and (
+        completed_transaction(db, source.id) is not None or transaction_status(db, source) == "terminated"
+    )
+    if not ended and not finished:
         raise HTTPException(status_code=400, detail="Only a completed or ended requirement can be used to start a new one.")
     # Stage 8.11: content an admin has suspended isn't copied into a new requirement.
     if source.is_suspended:

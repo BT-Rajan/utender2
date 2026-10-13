@@ -58,12 +58,17 @@ def validity_lapsed(project: Project, offer) -> bool:
     return until is not None and datetime.utcnow() > until
 
 
+def kuwait_today():
+    """Today's calendar date in Kuwait (UTC+3, no daylight saving)."""
+    return (datetime.utcnow() + timedelta(hours=3)).date()
+
+
 def start_date_passed(offer) -> bool:
     """Batch D: the start date the provider proposed is already behind us
     (Kuwait's calendar day, UTC+3), so the offer commits to work that can no
     longer begin as it says -- it can't be confirmed or awarded as it stands."""
     start = getattr(offer, "proposed_start_date", None)
-    return start is not None and start < (datetime.utcnow() + timedelta(hours=3)).date()
+    return start is not None and start < kuwait_today()
 
 
 START_PASSED_DETAIL = "This offer's proposed start date has already passed, so it can no longer be awarded as it stands."

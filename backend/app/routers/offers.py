@@ -1,4 +1,5 @@
 from datetime import datetime
+import logging
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from sqlalchemy.orm import Session
@@ -12,7 +13,7 @@ from app.models.enums import NotificationType, OfferStatus, ProjectStatus, Tende
 from app.models.offer import Offer, OfferDocument, OfferRevision
 from app.models.project import Project
 from app.models.user import User
-from app.schemas.offer import OfferAssumptionsDraft, OfferCommercialDraft, OfferDeclarationsDraft, OfferDraftSave, OfferPreviewOut, OfferReadiness, PreviewRequirement, OfferCreate, OfferTechnicalDraft, OfferTimingDraft, OfferDocumentOut, OfferOut, OfferRevisionOut
+from app.schemas.offer import OfferAssumptionsDraft, OfferConfirm, OfferCommercialDraft, OfferDeclarationsDraft, OfferDraftSave, OfferPreviewOut, OfferReadiness, PreviewRequirement, OfferCreate, OfferTechnicalDraft, OfferTimingDraft, OfferDocumentOut, OfferOut, OfferRevisionOut
 from app.schemas.clarification import OfferClarificationAnswer, OfferClarificationOut
 from app.services.audit import log_action
 from app.services.offer_clarifications import clarification_out, offer_clarifications
@@ -28,7 +29,9 @@ from app.services.offer_response import (
 )
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import bidding_is_open, lock_project, sync_expired_projects
-from app.services.tender_rules import START_PASSED_DETAIL, answers_since, offer_valid_until, start_date_passed, validity_lapsed
+from app.services.tender_rules import START_PASSED_DETAIL, answers_since, kuwait_today, offer_valid_until, start_date_passed, validity_lapsed
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects/{project_id}/offers", tags=["offers"])
 
@@ -62,6 +65,7 @@ def _validity(db: Session, project: Project, offer: Offer, out: OfferOut) -> Off
     if offer.status == OfferStatus.submitted:
         out.valid_until = offer_valid_until(project, offer)
         out.validity_lapsed = validity_lapsed(project, offer)
+        out.start_passed = start_date_passed(offer)
         out.answers_since = answers_since(db, project, offer)
     return out
 
@@ -735,7 +739,9 @@ def submit_draft(
 
 
 @router.post("/confirm", response_model=OfferOut)
-def confirm_offer(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+def confirm_offer(
+    project_id: str, payload: OfferConfirm | None = None, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)
+):
     """Stage 3.15: after a material change to the requirement, the provider
     confirms their offer still stands as submitted -- its price and content
     unchanged -- against the requirement as it now is. (To change anything,
@@ -749,7 +755,9 @@ def confirm_offer(project_id: str, user: User = Depends(require_approved_service
     if not project or not offer or offer.status != OfferStatus.submitted:
         raise HTTPException(status_code=404, detail="No offer to confirm.")
     if project.status in (ProjectStatus.closed, ProjectStatus.under_evaluation) and not project.is_suspended:
-        return _confirm_after_close(db, user, project, offer)
+        return _confirm_after_close(db, user, project, offer, payload.proposed_start_date if payload else None)
+    if payload and payload.proposed_start_date:
+        raise HTTPException(status_code=400, detail="While bidding is open, change the start date by revising your offer.")
     if not bidding_is_open(project):
         raise HTTPException(status_code=400, detail="Bidding on this project is closed.")
     profile = acting_profile(db, user)
@@ -777,28 +785,56 @@ def confirm_offer(project_id: str, user: User = Depends(require_approved_service
     return _with_documents(db, offer)
 
 
-def _confirm_after_close(db: Session, user: User, project: Project, offer: Offer) -> OfferOut:
+def _confirm_after_close(db: Session, user: User, project: Project, offer: Offer, new_start=None) -> OfferOut:
     """Batch B: once offers have closed, the owner can award only an offer its
     provider stands by -- made against the requirement as it now is, and
     within its validity period. Confirming re-states it, unchanged, against
     the current version and restarts its validity from now. Only the
-    provider confirms; the owner can ask (request-confirmation)."""
-    if start_date_passed(offer):  # Batch D: confirming would re-open an offer the owner can't award
-        raise HTTPException(status_code=400, detail=START_PASSED_DETAIL)
-    if offer.based_on_material_revision >= project.material_revision and not validity_lapsed(project, offer) and offer_valid_until(project, offer) is None:
+    provider confirms; the owner can ask (request-confirmation).
+
+    Batch D: an offer whose proposed start date passed while it was being
+    evaluated can't be awarded as it stands -- its provider confirms it with
+    a new start date (today or later), the same span of work following it,
+    and nothing else changes. The earlier dates stay in its history."""
+    passed = start_date_passed(offer)
+    if new_start is not None and not passed:
+        raise HTTPException(status_code=400, detail="Your offer's start date hasn't passed; it is confirmed as it stands.")
+    if passed:
+        if new_start is None:
+            raise HTTPException(status_code=400, detail=f"{START_PASSED_DETAIL} Give a new start date to confirm it.")
+        if new_start < kuwait_today():
+            raise HTTPException(status_code=400, detail="The new start date can't be in the past.")
+    elif offer.based_on_material_revision >= project.material_revision and not validity_lapsed(project, offer) and offer_valid_until(project, offer) is None:
         raise HTTPException(status_code=400, detail="Your offer is already up to date with the requirement.")
     previous = offer.based_on_material_revision
-    if previous < project.material_revision:
+    previous_start = offer.proposed_start_date
+    if previous < project.material_revision or passed:
         _snapshot_revision(db, offer)
         offer.based_on_material_revision = project.material_revision
+    if passed:
+        if offer.proposed_completion_date:
+            offer.proposed_completion_date += new_start - offer.proposed_start_date
+        offer.proposed_start_date = new_start
     now = datetime.utcnow().replace(microsecond=0)
     offer.validity_confirmed_at = now
     offer.updated_at, offer.updated_by = now, user.id
     log_action(
         db, actor_id=user.id, action="offer.confirmed", target_type="offer", target_id=offer.id,
-        previous_value=f"material revision {previous}", new_value=f"material revision {project.material_revision}; stands from {now.isoformat()}Z",
+        previous_value=f"material revision {previous}" + (f"; start {previous_start}" if passed else ""),
+        new_value=f"material revision {project.material_revision}; stands from {now.isoformat()}Z" + (f"; start {offer.proposed_start_date}" if passed else ""),
     )
     db.refresh(offer)
+    # The owner side is waiting on it to award: tell them. (A sealed tender is
+    # open by now -- offers have closed -- so naming the provider is fine.)
+    try:
+        profile = acting_profile(db, user)
+        notify_team(db, db.get(User, project.owner_id), NotificationType.offer_confirmed, link=f"/owner/projects/{project.id}",
+                    organization_id=project.organization_id, project_title=project.title,
+                    provider=(profile.company_name if profile and profile.company_name else "A provider"))
+        db.commit()
+    except Exception:  # noqa: BLE001 -- a notice never undoes the confirmation
+        db.rollback()
+        logger.exception("Could not tell the owner side offer %s was confirmed", offer.id)
     return _with_documents(db, offer)
 
 

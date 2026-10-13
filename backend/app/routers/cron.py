@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ from app.models.project import Project
 from app.models.user import User
 from app.services.email import notify_owner_deadline_approaching
 from app.services.notify import notify, notify_team
+from app.services.tender_lifecycle import DEADLINE_REMINDER_WINDOW
 from app.services.token_cleanup import purge_expired_revoked_tokens
 
 router = APIRouter(tags=["cron"])
@@ -28,7 +29,7 @@ def deadline_reminders(authorization: str | None = Header(default=None), db: Ses
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     now = datetime.utcnow()
-    in_24h = now + timedelta(hours=24)
+    in_24h = now + DEADLINE_REMINDER_WINDOW
 
     projects = (
         db.query(Project)

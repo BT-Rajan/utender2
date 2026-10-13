@@ -82,6 +82,16 @@ export function App() {
           <Route index element={<OwnerStatusPage />} />
         </Route>
         <Route
+          path="/owner/projects/:id"
+          element={
+            <ProtectedRoute role="owner" gate="job">
+              <OwnerLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<OwnerProjectDetailPage />} />
+        </Route>
+        <Route
           path="/owner"
           element={
             <ProtectedRoute role="owner" gate>
@@ -91,7 +101,6 @@ export function App() {
         >
           <Route path="dashboard" element={<OwnerDashboardPage />} />
           <Route path="projects/new" element={<OwnerProjectNewPage />} />
-          <Route path="projects/:id" element={<OwnerProjectDetailPage />} />
           <Route path="projects/:id/preview" element={<OwnerProjectPreviewPage />} />
           <Route path="projects/:id/offers/:offerId" element={<OwnerOfferDetailPage />} />
           <Route path="projects/:id/compare" element={<OwnerCompareOffersPage />} />
@@ -128,6 +137,16 @@ export function App() {
           <Route index element={<ServiceProviderStatusPage />} />
         </Route>
         <Route
+          path="/service-provider/projects/:id/offer"
+          element={
+            <ProtectedRoute role="service_provider" gate="job">
+              <ServiceProviderLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<ServiceProviderOfferPage />} />
+        </Route>
+        <Route
           path="/service-provider"
           element={
             <ProtectedRoute role="service_provider" gate>
@@ -138,7 +157,6 @@ export function App() {
           <Route path="feed" element={<ServiceProviderFeedPage />} />
           <Route path="saved" element={<ServiceProviderSavedPage />} />
           <Route path="subscribe" element={<ServiceProviderSubscribePage />} />
-          <Route path="projects/:id/offer" element={<ServiceProviderOfferPage />} />
         </Route>
 
         <Route

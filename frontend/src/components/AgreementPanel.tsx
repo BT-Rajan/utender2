@@ -1,5 +1,6 @@
 import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { kuwaitToday } from "@/lib/dates";
 import { ApiError, apiFetch } from "@/api/client";
 import { Completion } from "@/components/Completion";
 import { Deliverables } from "@/components/Deliverables";
@@ -53,10 +54,6 @@ export interface TimelineEntry {
 }
 
 // Stage 7.13: what each history entry says.
-// Batch A: today's date in Kuwait (UTC+3, no daylight saving), as YYYY-MM-DD.
-function kuwaitToday(): string {
-  return new Date(Date.now() + 3 * 3600 * 1000).toISOString().slice(0, 10);
-}
 
 // Batch A: the requirement's commercial conditions as they apply to this agreement.
 function CommercialTermsBlock({ terms, currency }: { terms: CommercialTerms; currency: string }) {

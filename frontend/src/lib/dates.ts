@@ -33,3 +33,8 @@ export function formatWorkTiming(t: (key: string) => string, p: Pick<Project, "e
   ].filter(Boolean);
   return parts.length ? `${t("dates.work")}: ${parts.join(" · ")}` : null;
 }
+
+// Today's date in Kuwait (UTC+3, no daylight saving), as YYYY-MM-DD.
+export function kuwaitToday(): string {
+  return new Date(Date.now() + KUWAIT_OFFSET_MS).toISOString().slice(0, 10);
+}

@@ -1165,7 +1165,7 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
     - **Completed requirements:** restart refused them; it accepted only cancelled, no-award or expired requirements.
     - **Suspended requirements:** restart didn't refuse a requirement an admin had suspended, so its content could be copied into a new requirement.
   - **Fixed:**
-    - **Completed transactions:** restart also accepts an awarded requirement whose transaction is completed (`completed_transaction`, Stage 7). Open, awarded-but-unfinished and draft requirements are still refused.
+    - **Completed transactions:** restart also accepts an awarded requirement whose transaction is completed (`completed_transaction`, Stage 7), or terminated (owner-journey review, below). Open, awarded-and-still-in-progress and draft requirements are still refused.
     - **Suspension:** a suspended requirement is refused.
     - **UI:** "Create similar requirement" (the existing `StartAgain` button, with its own confirmation wording) on a completed requirement's page. It leads into the normal draft flow.
   - **Tests:** `tests/test_stage8_11_similar_requirement.py`.
@@ -1701,5 +1701,31 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
   - **Owner dashboard:** no stray "0" when there are no requirements.
   - Migration 0067.
   - **Tests:** `tests/test_batch_c_trust_accounts.py`.
+
+- **Owner-journey review — fixes #1–#15:**
+  - **Sealed invitations:** on a sealed tender before its deadline, inviting a previous provider answers the same whether or not that provider has bid. A bidder is recorded as invited (a repeat is refused like any other) but isn't sent the notice. On an owner-visible tender the owner is still told the provider has already made an offer.
+  - **Job page during re-review:** a party whose documents are back under review (changes requested, pending review) keeps the page of the requirement and its transaction (`/owner/projects/{id}`, `/service-provider/projects/{id}/offer`), as the server already allowed (Batch A). A suspended owner keeps it read-only (7.14). Only a rejected account, or a suspended provider, is sent to the status page. The review form is replaced by a note until the account is approved again, since the server refuses reviews until then.
+  - **Start date passed during evaluation:**
+    - an offer whose proposed start date has passed can't be awarded as it stands;
+    - the owner can ask its provider to confirm it (`request-confirmation`), and the owner's offer list flags it (`start_passed`) with "Ask to confirm" instead of Approve;
+    - the provider confirms with a new start date, today or later (`POST /projects/{id}/offers/confirm` with `proposed_start_date`). The same span of work follows it; nothing else changes, and the earlier dates stay in the offer's history;
+    - while bidding is open, the start date is changed by revising the offer instead.
+  - **After termination:** an awarded requirement whose agreement was terminated can be started again as a new draft ("Start a new draft from this"). The award itself still can't be reopened (7.1).
+  - **Publishing moves the version on:** a page still showing the draft (a colleague's, another tab) can't save into the live requirement as if it were the draft. Its next save, or document upload (which now sends If-Match too), is refused and asks for a reload.
+  - **Amending against what the page showed:** the "Change the published requirement" form works from the version it was filled from. It sends only what was changed from that, with that version as If-Match. A colleague's amendment made meanwhile is never silently undone: the save is refused and the form shows the latest. An untouched form follows newer versions, and after a save it starts fresh (the reason and the question don't carry over).
+  - **Organisations whose founder left:** a provider organisation can be invited and awarded while anyone acting for it is active, even after its founding account was deactivated (once the representative role was handed on). An individual provider still needs an active account.
+  - **Answer files:** files on an answer go in with it. Once a question is answered, no files can be added to the answer. When someone answers, only their own files stay with it: a colleague's files from an answer that never went in are removed.
+  - **One change per question:** an answered question stays tied to the change it brought about. Tying it to a later change is refused, and the amend form only offers questions not yet tied to one.
+  - **Deadline reminder after an extension:** when the deadline moves more than a day away, the owner side is reminded again a day before the new deadline (`set_bid_deadline`, also used by admin edits). An extension that is still within the day doesn't repeat the reminder just sent.
+  - **Close after the deadline:** "close early" clicked after the deadline (before anything read the requirement) is no longer recorded as an early close. The requirement closed at its deadline, by itself; the owner is told "Offers already closed at the deadline", and nothing tells providers it ended early.
+  - **Answers need an active owner:** a suspended (or no longer approved) owner can't publish an answer, as for its files and every other change.
+  - **Expired drafts:** a draft whose offer deadline passed before it was published is refused the same way by every editor and by publish: "it has expired … Start a new draft from it" (`EXPIRED_DRAFT`), whether or not a read has marked it expired yet. A page open on it reloads when the deadline passes and shows "Start a new draft from this".
+  - **Completion date and open deliverables:** a change can't move the completion date before a deliverable that isn't accepted yet, unless the same change reschedules that deliverable. It is checked when proposed and again when agreed.
+  - **Owner notices:**
+    - offers closed at the deadline: `evaluation_ready`, with the number of offers to evaluate;
+    - the deadline passed with no offer: `requirement_expired`;
+    - a provider confirmed its offer still stands: `offer_confirmed`.
+    - Sent once, after the change is committed, to everyone acting for the owner. Migration 0070.
+  - **Tests:** `tests/test_owner_journey_fixes.py`.
 
 _Later Stage 9 steps are added as they are implemented._

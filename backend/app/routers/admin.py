@@ -43,7 +43,7 @@ from app.services.verification import assert_ready_to_approve, checklist, docume
 from app.services.notify import notify, notify_team
 from app.services.team import stakeholder_rows
 from app.services.storage import get_storage
-from app.services.tender_lifecycle import is_sealed_and_open, lock_project, sync_expired_projects
+from app.services.tender_lifecycle import is_sealed_and_open, lock_project, set_bid_deadline, sync_expired_projects
 from app.models.category import ServiceCategory
 from app.schemas.category import CategoryCreate, CategoryOut, CategoryPatch
 from app.services.categories import rename_category, resolve_trade
@@ -1306,7 +1306,7 @@ def admin_edit_project(
             raise HTTPException(status_code=400, detail="The offer deadline must be after the question deadline.")
         deadline_extended = deadline > project.bid_deadline
         changed.append("bid_deadline")
-        project.bid_deadline = deadline
+        set_bid_deadline(project, deadline)
 
     if not changed:
         raise HTTPException(status_code=400, detail="No changes were provided.")

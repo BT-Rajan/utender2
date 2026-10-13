@@ -87,6 +87,19 @@ def _other(side: str) -> str:
     return "provider" if side == "owner" else "owner"
 
 
+def _due_after(db: Session, agreement, completion, rescheduled_id=None) -> bool:
+    """Whether a deliverable not yet accepted is due after `completion` --
+    other than the one this change reschedules (its new date is checked
+    against the completion on its own)."""
+    for m in db.query(Milestone).filter(Milestone.agreement_id == agreement.id, Milestone.status != "accepted"):
+        if m.id != rescheduled_id and m.due_date and m.due_date > completion:
+            return True
+    return False
+
+
+EARLY_COMPLETION = "A deliverable that isn't accepted yet is due after this completion date. Reschedule it in the same change, or choose a later date."
+
+
 @router.post("", response_model=AgreementOut)
 def propose_variation(
     project_id: str, payload: VariationIn, if_match: str | None = Header(None, alias="If-Match"),
@@ -128,6 +141,8 @@ def propose_variation(
     earliest = max(d for d in (today, agreement.effective_date, (agreement.work_started_at + timedelta(hours=3)).date() if agreement.work_started_at else None) if d)
     if payload.completion_date and payload.completion_date < earliest:
         raise HTTPException(status_code=400, detail="A revised completion date can't be in the past or before the agreement takes effect and the work starts.")
+    if payload.completion_date and _due_after(db, agreement, payload.completion_date, milestone.id if milestone else None):
+        raise HTTPException(status_code=400, detail=EARLY_COMPLETION)
     if milestone and payload.milestone_due_date:
         if payload.milestone_due_date < today:
             raise HTTPException(status_code=400, detail="A revised due date can't be in the past.")
@@ -177,6 +192,9 @@ def agree_variation(
     milestone = db.get(Milestone, v.milestone_id) if v.milestone_id else None
     if v.milestone_id and (not milestone or milestone.status == "accepted"):
         raise HTTPException(status_code=409, detail=f"The deliverable this change reschedules was accepted meanwhile. Reject this change and propose a new one if needed. {LATEST}")
+    # The schedule may have moved since it was proposed: still coherent?
+    if v.completion_date and _due_after(db, agreement, v.completion_date, v.milestone_id):
+        raise HTTPException(status_code=409, detail=f"{EARLY_COMPLETION} {LATEST}")
     now = datetime.utcnow().replace(microsecond=0)
     v.status, v.decided_party, v.decided_by, v.decided_at = "agreed", side, user.id, now
     v.decision_note = (payload.note or "").strip() or None

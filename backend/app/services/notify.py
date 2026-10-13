@@ -100,6 +100,19 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
         Language.en: ("Invitation: {project_title}", "An owner you completed work for invites you to make an offer on {project_title}, open until {deadline}. The usual rules apply: it is weighed like every other offer."),
         Language.ar: ("دعوة: {project_title}", "يدعوك مالك سبق أن أنجزت له عملًا لتقديم عرض على {project_title}، والعروض مفتوحة حتى {deadline}. تسري القواعد المعتادة: يُقيَّم كأي عرض آخر."),
     },
+    # Owner-journey review: the owner side is told where its requirement stands.
+    NotificationType.evaluation_ready: {
+        Language.en: ("Offers closed on {project_title}", "Offers on {project_title} closed at the deadline. {count} offer(s) are ready for you to evaluate."),
+        Language.ar: ("أُغلقت العروض على {project_title}", "أُغلق تقديم العروض على {project_title} عند الموعد النهائي. {count} عرض/عروض جاهزة لتقييمك."),
+    },
+    NotificationType.requirement_expired: {
+        Language.en: ("No offers on {project_title}", "{project_title} reached its deadline without an offer, so it has expired. You can start a new draft from it."),
+        Language.ar: ("لا عروض على {project_title}", "بلغ {project_title} موعده النهائي دون أي عرض، لذا انتهت صلاحيته. يمكنك بدء مسودة جديدة منه."),
+    },
+    NotificationType.offer_confirmed: {
+        Language.en: ("Offer confirmed on {project_title}", "{provider} confirmed its offer on {project_title} still stands. It can now be considered for award."),
+        Language.ar: ("تأكيد عرض على {project_title}", "أكّد {provider} أن عرضه على {project_title} ما زال قائمًا. يمكن الآن النظر فيه للترسية."),
+    },
     NotificationType.evaluation_started: {
         Language.en: ("{project_title} is being evaluated", "The owner has started evaluating the offers on {project_title}. You'll be told the outcome."),
         Language.ar: ("بدأ تقييم {project_title}", "بدأ المالك تقييم العروض المقدمة على {project_title}. سيتم إبلاغك بالنتيجة."),

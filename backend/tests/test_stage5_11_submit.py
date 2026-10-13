@@ -135,7 +135,7 @@ def test_lifecycle_and_amendment_block_submission(db):
     assert rival.post(SUBMIT.format(closed)).status_code == 200
     db.get(Project, closed).bid_deadline = datetime.utcnow() - timedelta(minutes=1)
     db.commit()
-    assert owner.post(f"/owner/projects/{closed}/close").json()["status"] == "closed"  # 4. closed by the owner
+    assert owner.get(f"/projects/{closed}").json()["status"] == "closed"  # 4. closed (at its deadline, with an offer in)
     admin.post(f"/admin/projects/{suspended}/suspend", json={"suspended": True})  # 5
     db.get(Project, expired).bid_deadline = datetime.utcnow() - timedelta(minutes=1)  # 6/7. deadline passed (server clock)
     # Exactly at the deadline: too late. Whole seconds, as the column stores them

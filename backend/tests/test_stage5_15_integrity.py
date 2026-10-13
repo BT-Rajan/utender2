@@ -113,7 +113,7 @@ def test_every_lifecycle_state_blocks_every_change(db):
                 _submitted(rival, pid)
                 db.get(Project, pid).bid_deadline = datetime.utcnow() - timedelta(minutes=1)
                 db.commit()
-                assert owner.post(f"/owner/projects/{pid}/close").json()["status"] == "closed"
+                assert owner.get(f"/projects/{pid}").json()["status"] == "closed"
         for name, method, url, kw in _draft_changes(drafting) + _offer_changes(offered):
             assert getattr(sp, method)(url, **kw).status_code == 400, (state, name)
     # Batch B: cancelling sets the live offer to "closed"; nothing else changed.
