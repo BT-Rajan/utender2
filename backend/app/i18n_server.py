@@ -461,6 +461,7 @@ AR: dict[str, str] = {
     "The work can be recorded as started from that date.": "يمكن تسجيل بدء العمل اعتبارًا من ذلك التاريخ.",
     "The organization's representative can't be removed.": "لا يمكن إزالة ممثل المؤسسة.",
     "This organization has no active representative right now, so the invitation can't be accepted.": "ليس لهذه المؤسسة ممثل نشط حاليًا، لذا لا يمكن قبول الدعوة.",
+    "This person's organization changed just now. Try again.": "تغيّرت مؤسسة هذا الشخص للتو. حاول مرة أخرى.",
     # Batch C: trust and accounts.
     "Providers can be invited only while the requirement is open for offers.": "لا يمكن دعوة مقدمي الخدمة إلا أثناء فتح الطلب لتلقي العروض.",
     "This provider doesn't meet this requirement's conditions, so it can't be invited.": "مقدم الخدمة هذا لا يستوفي شروط هذا الطلب، لذا لا يمكن دعوته.",

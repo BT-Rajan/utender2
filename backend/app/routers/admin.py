@@ -1841,8 +1841,12 @@ def deactivate_account(user_id: str, payload: AccountStatePatch | None = None, a
     managed here. Repeating it changes nothing."""
     # Security: the organisation first, so the strand check below can't race
     # a hand-over or appointment that changes who its representative is.
-    stakeholder_service.lock_organization_of(db, user_id)
+    locked = stakeholder_service.lock_organization_of(db, user_id)
     target = _account_target(db, user_id, admin)
+    # They may have joined (or moved) between that read and their row lock:
+    # then the organization checked below isn't the one locked -- try again.
+    if stakeholder_service.organization_of(db, user_id) != locked:
+        raise HTTPException(status_code=409, detail="This person's organization changed just now. Try again.")
     if target.deactivated_at is None:
         if stakeholder_service.deactivation_would_strand_organization(db, target):
             raise HTTPException(

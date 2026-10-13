@@ -1805,4 +1805,16 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
     - The password is saved before seeding starts.
   - **Tests:** `tests/test_pr22_review_fixes_accounts.py`, `tests/test_pr22_review_fixes_transactions.py`.
 
+- **Review of PR #26:**
+  - **Lock order (no deadlocks):**
+    - Requesting an email change locks the account row first, the same order as confirming it and as the admin email edit.
+    - Accepting an invitation locks the joining person, so one person can't join two organisations at once.
+    - The admin "add a member" locks the person by primary key instead of scanning every user.
+    - Deactivation retries if the person's organisation changed between the reads.
+    - Withdrawn invitations are audited in one entry, written last.
+  - **Withdrawn offers:** when the last live offer is withdrawn after the close, the expired requirement records `closure_reason` `offers_withdrawn`. The notice and both pages then say every offer was withdrawn, not that none was made.
+  - **Reactivated offers:** reactivating an offer after the close tells the owner what it can now evaluate.
+  - **Provider page:** it refreshes after a withdrawal.
+  - **Tests:** `tests/test_pr22_review_fixes_accounts.py`, `tests/test_pr22_review_fixes_transactions.py` (extended).
+
 _Later Stage 9 steps are added as they are implemented._
