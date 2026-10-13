@@ -20,7 +20,7 @@ from app.deps import get_current_user
 from app.models.agreement import AGREEMENT_DOCUMENT_KINDS, EVIDENCE_KINDS, TRANSACTION_EVENT_KINDS, Agreement, AgreementDocument, ExecutionUpdate, Milestone, Variation
 from app.models.award_record import AwardRecord
 from app.models.common import gen_uuid
-from app.models.enums import NotificationType, ProjectStatus, UserRole
+from app.models.enums import Language, NotificationType, ProjectStatus, UserRole
 from app.models.offer import Offer
 from app.models.organization import Organization
 from app.models.project import Project, ProjectItem
@@ -29,11 +29,11 @@ from app.models.user import User
 from app.routers.owner import _best_effort
 from app.schemas.agreement import AgreementDocumentOut, AgreementOut, CommercialTerms, PaymentStageTerm, AgreementTerminate, AgreementUpdate, ExecutionProgress, ExecutionUpdateOut, MilestoneOut, TimelineEntry, VariationOut, WorkStart
 from app.services.audit import log_action
-from app.services.notify import notify_team
+from app.services.notify import notify, notify_team
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name, sanitize_path_segment
 from app.services.offer_response import OPEN_LINK_SECONDS, _api
 from app.services.storage import get_storage
-from app.services.team import acting_profile, can_access, owns
+from app.services.team import acting_profile, can_access, owns, side_users
 from app.services.tender_lifecycle import lock_project
 from app.clock import kuwait_date, kuwait_today  # noqa: F401 -- kuwait_today re-exported (tests, routers)
 
@@ -112,20 +112,47 @@ def _review_overdue(agreement: Agreement) -> bool:
     return agreement.completion_submitted_at is not None and agreement.completion_submitted_at <= datetime.utcnow() - timedelta(days=COMPLETION_REVIEW_DAYS)
 
 
-def _clear_confirmation(agreement: Agreement) -> None:
+def _clear_confirmation(agreement: Agreement) -> bool:
     """Batch A: the provider confirmed the terms as they were; any change by the
-    owner side means they must confirm again before the agreement can take force."""
+    owner side means they must confirm again before the agreement can take force.
+    True when a confirmation was cleared (the provider is then told)."""
+    cleared = agreement.provider_confirmed_at is not None
     agreement.provider_confirmed_at = agreement.provider_confirmed_by = None
+    return cleared
 
 
-def _reconfirm_after_paper_change(agreement: Agreement, side: str, user: User) -> None:
+def _reconfirm_after_paper_change(agreement: Agreement, side: str, user: User) -> bool:
     """Batch D: the signed papers are part of the terms the provider confirmed.
     When the owner side adds or removes one while the agreement is still being
     prepared, the provider must confirm again -- otherwise the owner could put
-    the agreement in force on different paperwork than was confirmed."""
-    if side == "owner" and agreement.status == "preparing" and agreement.provider_confirmed_at is not None:
+    the agreement in force on different paperwork than was confirmed. Any paper
+    change while preparing is a new version of the terms, so a page still
+    showing the old papers can't confirm them (If-Match). True when the
+    provider's confirmation was cleared."""
+    if agreement.status != "preparing":
+        return False
+    cleared = side == "owner" and agreement.provider_confirmed_at is not None
+    if cleared:
         _clear_confirmation(agreement)
-        _touch(agreement, user)
+    _touch(agreement, user)
+    return cleared
+
+
+_RECONFIRM_SUMMARY = {
+    Language.en: "The owner changed the agreement after you confirmed its terms. Check it and confirm the terms again before the agreement can be put in force.",
+    Language.ar: "غيّر المالك الاتفاقية بعد أن أكّدت شروطها. راجعها وأكّد الشروط مجددًا قبل أن يمكن جعل الاتفاقية سارية.",
+}
+
+
+def _tell_provider_to_reconfirm(db: Session, project: Project, winner: Offer) -> None:
+    """The provider's confirmation was cleared: its side is told to confirm again
+    (in each member's language; no notification type of its own)."""
+    def send():
+        for member in side_users(db, winner.organization_id, winner.service_provider_id):
+            notify(db, member, NotificationType.tender_amendment, link=f"/service-provider/projects/{project.id}/offer",
+                   project_title=project.title, summary=_RECONFIRM_SUMMARY.get(member.language, _RECONFIRM_SUMMARY[Language.en]))
+
+    _best_effort(db, send, f"agreement reconfirmation notice for {project.id}")
 
 
 def _tell_other(db: Session, project: Project, winner: Offer, side: str, kind: NotificationType, **params) -> None:
@@ -430,12 +457,13 @@ def update_agreement(
     award_day = kuwait_date(award.created_at)
     if effective is not None and effective < award_day:
         raise HTTPException(status_code=400, detail="The agreement can't take effect before the award.")
-    if (reference, effective) != (agreement.reference, agreement.effective_date):
-        _clear_confirmation(agreement)
+    reconfirm = (reference, effective) != (agreement.reference, agreement.effective_date) and _clear_confirmation(agreement)
     agreement.reference, agreement.effective_date = reference, effective
     _touch(agreement, user)
     log_action(db, actor_id=user.id, action="agreement.update", target_type="agreement", target_id=agreement.id,
                previous_value=before, new_value=f"reference:{agreement.reference} effective:{agreement.effective_date}")
+    if reconfirm:  # after the commit, like the papers' notice
+        _tell_provider_to_reconfirm(db, project, winner)
     return _out(db, project, agreement, award, winner, side)
 
 
@@ -503,8 +531,10 @@ def terminate_agreement(
     user: User = Depends(get_current_user), db: Session = Depends(get_db),
 ):
     """The agreement ended before the work was completed. Either party may
-    terminate it, with a reason (Batch A). The award stays on record exactly
-    as it was made: the requirement remains awarded."""
+    terminate it, with a reason (Batch A) -- while submitted work awaits the
+    owner's answer, only the provider, once the review is overdue (Batch D).
+    The award stays on record exactly as it was made: the requirement
+    remains awarded."""
     project, agreement, award, winner, side = _load(db, project_id, user, lock=True)
     if side not in ("owner", "provider"):
         raise HTTPException(status_code=403, detail="Only the parties to the agreement can terminate it.")
@@ -514,11 +544,12 @@ def terminate_agreement(
         raise HTTPException(status_code=409, detail="The work was already accepted as complete, so the agreement can't be terminated. This page now shows the latest.")
     # Batch A: submitted work is answered, not walked away from. Batch D: but an
     # owner who never answers can't hold the provider there forever -- after
-    # COMPLETION_REVIEW_DAYS without an answer either party may terminate.
-    if agreement.completion_status == "submitted" and not _review_overdue(agreement):
+    # COMPLETION_REVIEW_DAYS without an answer the provider may terminate. That
+    # is the provider's remedy only: the owner side answers the submission.
+    if agreement.completion_status == "submitted" and (side == "owner" or not _review_overdue(agreement)):
         raise HTTPException(
             status_code=409,
-            detail="The work was submitted as complete and is awaiting the owner's review. The owner accepts it or returns it for correction before either party can terminate (or, if there is no answer for 30 days, after that).",
+            detail="The work was submitted as complete and is awaiting the owner's review. The owner accepts it or returns it for correction before either party can terminate (or, if there is no answer for 30 days, the service provider may terminate).",
         )
     _check_version(agreement, if_match)
     reason = payload.reason.strip()
@@ -682,6 +713,7 @@ async def attach_agreement_document(
     doc_id = gen_uuid()
     path = f"{project_id}/{agreement.id}/{doc_id}/{sanitize_path_segment(file.filename)}"
     storage.save(AGREEMENT_BUCKET, path, content, file.content_type or "application/octet-stream")
+    reconfirm = False
     doc = AgreementDocument(id=doc_id, agreement_id=agreement.id, kind=kind, party=side, file_path=path, file_name=safe_relative_name(file.filename), uploaded_by=user.id, milestone_id=milestone_id, variation_id=variation_id, execution_update_id=execution_update_id)
     db.add(doc)
     try:
@@ -689,7 +721,7 @@ async def attach_agreement_document(
         if not (milestone_id or variation_id or execution_update_id) and kind not in EVIDENCE_KINDS:
             # Stage 7.13: the agreement's own papers are part of its history.
             _record(db, agreement, "document", side, user, doc.file_name, doc.uploaded_at or datetime.utcnow().replace(microsecond=0), document_id=doc.id)
-            _reconfirm_after_paper_change(agreement, side, user)
+            reconfirm = _reconfirm_after_paper_change(agreement, side, user)
         # log_action commits: the document and its audit entry land together.
         log_action(db, actor_id=user.id, action="agreement.document_add", target_type="agreement", target_id=agreement.id, new_value=f"{doc.id}:{kind}")
     except Exception:  # never leave a stored file no record points to
@@ -699,6 +731,8 @@ async def attach_agreement_document(
         except Exception:
             pass
         raise
+    if reconfirm:
+        _tell_provider_to_reconfirm(db, project, winner)
     return _out(db, project, agreement, award, winner, side)
 
 
@@ -714,11 +748,13 @@ def remove_agreement_document(project_id: str, document_id: str, user: User = De
         raise HTTPException(status_code=403, detail="Only the side that attached a document can remove it.")
     if agreement.status != "preparing":
         raise HTTPException(status_code=400, detail="Documents of an agreement in force or terminated stay on record.")
-    path = doc.file_path
+    path, reconfirm = doc.file_path, False
     if not (doc.milestone_id or doc.variation_id or doc.execution_update_id) and doc.kind not in EVIDENCE_KINDS:
-        _reconfirm_after_paper_change(agreement, side, user)
+        reconfirm = _reconfirm_after_paper_change(agreement, side, user)
     db.delete(doc)
     log_action(db, actor_id=user.id, action="agreement.document_remove", target_type="agreement", target_id=agreement.id, previous_value=f"{document_id}:{doc.kind}")
+    if reconfirm:
+        _tell_provider_to_reconfirm(db, project, winner)
     try:
         get_storage().delete(AGREEMENT_BUCKET, [path])
     except Exception:

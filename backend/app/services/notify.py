@@ -102,8 +102,8 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
     },
     # Owner-journey review: the owner side is told where its requirement stands.
     NotificationType.evaluation_ready: {
-        Language.en: ("Offers closed on {project_title}", "Offers on {project_title} closed at the deadline. {count} offer(s) are ready for you to evaluate."),
-        Language.ar: ("أُغلقت العروض على {project_title}", "أُغلق تقديم العروض على {project_title} عند الموعد النهائي. {count} عرض/عروض جاهزة لتقييمك."),
+        Language.en: ("Offers closed on {project_title}", "Offers on {project_title} closed at the deadline with {count} offer(s) made. Open it to evaluate them."),
+        Language.ar: ("أُغلقت العروض على {project_title}", "أُغلق تقديم العروض على {project_title} عند الموعد النهائي وقد قُدّم {count} عرض/عروض. افتحه لتقييمها."),
     },
     NotificationType.requirement_expired: {
         Language.en: ("No offers on {project_title}", "{project_title} reached its deadline without an offer, so it has expired. You can start a new draft from it."),

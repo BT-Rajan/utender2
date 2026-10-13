@@ -51,6 +51,7 @@ from app.services.notify import notify, notify_team
 from app.services.team import acting_id, acting_profile, can_access, mine, org_of, owns
 from app.services import requirement_quality
 from app.services.storage import drawing_url_expiry_seconds, get_storage
+from app.clock import kuwait_date
 from app.services.tender_lifecycle import EXPIRED_DRAFT, interested_providers, is_expired_draft, is_sealed_and_open, lock_project, now_for, publish, set_bid_deadline, sync_expired_projects, transaction_status
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -131,7 +132,7 @@ def _check_execution_timing(deadline: datetime, start: date | None, completion: 
         raise HTTPException(status_code=400, detail=f"Duration must be between 1 and {MAX_DURATION_DAYS} days.")
     if start and completion and completion < start:
         raise HTTPException(status_code=400, detail="The expected completion date can't be before the expected start date.")
-    response_closes = deadline.date()
+    response_closes = kuwait_date(deadline)
     if start and start < response_closes:
         raise HTTPException(status_code=400, detail="Work can't be expected to start before the response deadline.")
     if completion and completion < response_closes:

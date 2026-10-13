@@ -18,6 +18,7 @@ from app.models.project import Project
 from app.schemas.offer import OfferCreate, OfferDocumentOut
 from app.schemas.project import ResponseRequirements
 from app.services.storage import get_storage
+from app.clock import kuwait_date
 
 OFFER_DOCUMENTS_BUCKET = "offer-documents"
 _FILS = Decimal("0.001")
@@ -107,7 +108,7 @@ def check_commitment(project: Project, start: date | None, completion: date | No
         raise HTTPException(status_code=400, detail=f"Duration must be between 1 and {MAX_DURATION_DAYS} days.")
     if start and completion and completion < start:
         raise HTTPException(status_code=400, detail="The completion date can't be before the start date.")
-    response_closes = project.bid_deadline.date()
+    response_closes = kuwait_date(project.bid_deadline)
     if start and start < response_closes:
         raise HTTPException(status_code=400, detail="Work can't start before the response deadline.")
     if completion and completion < response_closes:
@@ -141,7 +142,7 @@ def timing_conflicts(project: Project, offer) -> list[str]:
         conflicts.append("finishes_later")
     if theirs[2] and (s := span(*mine)) is not None and s > theirs[2]:
         conflicts.append("takes_longer")
-    closes = project.bid_deadline.date()
+    closes = kuwait_date(project.bid_deadline)
     if (mine[0] and mine[0] < closes) or (mine[1] and mine[1] < closes):
         conflicts.append("before_close")
     return conflicts

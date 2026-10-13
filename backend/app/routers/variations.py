@@ -123,7 +123,7 @@ def propose_variation(
         amount, _ = current_terms(award, None, variations)
         if amount + payload.value_change <= 0:
             raise HTTPException(status_code=400, detail="The agreed value can't fall to zero or below.")
-    awarded_on = award.created_at.date()
+    awarded_on = kuwait_date(award.created_at)
     if payload.completion_date and payload.completion_date < awarded_on:
         raise HTTPException(status_code=400, detail="A revised date can't be before the award.")
     milestone = None

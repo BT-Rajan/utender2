@@ -1742,4 +1742,27 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
   - Document-expiry checks in eligibility no longer use the server's own date.
   - **Tests:** `tests/test_clock.py` (the MySQL check runs against a server set to Kuwait time).
 
+- **Review of PRs #14–#20 (18 fixes):**
+  - **Accounts (security):**
+    - Verify and reset links are bound to the address they were mailed to and retired on any email change, so an old link can't verify someone else's address and accept their invitation.
+    - An email change ends the account's other sessions (`users.session_version`, migration 0071).
+    - A sole-member organisation can be deactivated.
+    - Representative changes and deactivation take the organisation lock and leave exactly one representative.
+    - The IP lockout is no longer audited against an innocent account, and refresh replays are audited at most once per token per 10 minutes.
+  - **Seed script:**
+    - It refuses `ENVIRONMENT=production` and needs the target database's name.
+    - No password is committed; one is generated per run.
+    - Company names are marked "(Test)".
+  - **Agreements:**
+    - Any paper change while preparing outdates pages holding the old version.
+    - The provider is told whenever an owner change (papers, date, reference or deliverables) clears its confirmation.
+    - The 30-day overdue rule is the provider's remedy only, and such terminations don't count against the provider.
+  - **Offers:**
+    - A suspended offer can't be confirmed.
+    - After the close, a provider may withdraw an offer whose validity has lapsed or whose start date has passed.
+    - "Answers since your offer" counts every published answer.
+    - The deadline notice counts the same offers that decided closed or expired.
+  - **Dates:** award days and offer-deadline days are Kuwait dates (`app/clock.py`).
+  - **Tests:** `tests/test_review_fixes_accounts.py`, `tests/test_review_fixes_transactions.py`.
+
 _Later Stage 9 steps are added as they are implemented._

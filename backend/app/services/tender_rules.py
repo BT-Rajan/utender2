@@ -72,20 +72,18 @@ START_PASSED_DETAIL = "This offer's proposed start date has already passed, so i
 
 def answers_since(db, project: Project, offer) -> int:
     """Batch B: answers published to every provider after this offer was last
-    put forward or confirmed -- they may change how it should be read. Batch D:
-    also the answers to this provider's own private questions, which only
-    they were sent."""
-    from sqlalchemy import or_
-
+    put forward or confirmed -- they may change how it should be read. Every
+    answer is published to the field (clarifications.list_clarifications),
+    including one to a question asked privately before that rule, so each
+    counts for every provider."""
     from app.models.clarification import Clarification
 
     if offer.updated_at is None:
         return 0
-    own_private = (Clarification.shared_with_all.is_(False)) & (Clarification.service_provider_id == offer.service_provider_id)
     return (
         db.query(Clarification)
         .filter(
-            Clarification.project_id == project.id, Clarification.offer_id.is_(None), or_(Clarification.shared_with_all.is_(True), own_private),
+            Clarification.project_id == project.id, Clarification.offer_id.is_(None),
             Clarification.answered_at.isnot(None), Clarification.answered_at >= offer.updated_at,  # same second counts (MySQL keeps whole seconds)
         )
         .count()

@@ -754,6 +754,10 @@ def confirm_offer(
     offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
     if not project or not offer or offer.status != OfferStatus.submitted:
         raise HTTPException(status_code=404, detail="No offer to confirm.")
+    # Stage 3.18: every provider action waits while an admin has the offer suspended
+    # (it can't be withdrawn or awarded either) -- confirming it must not restart its validity.
+    if offer.is_suspended:
+        raise HTTPException(status_code=400, detail="This offer has been suspended by an admin and cannot be confirmed.")
     if project.status in (ProjectStatus.closed, ProjectStatus.under_evaluation) and not project.is_suspended:
         return _confirm_after_close(db, user, project, offer, payload.proposed_start_date if payload else None)
     if payload and payload.proposed_start_date:
@@ -855,11 +859,13 @@ def withdraw_offer(project_id: str, user: User = Depends(require_approved_servic
         raise HTTPException(status_code=400, detail="This offer has already been decided, so it can no longer be withdrawn.")
     # Batch B: after the close an offer is held only for its validity period;
     # once that has run out (and the provider hasn't confirmed it since), the
-    # provider is free to withdraw it.
+    # provider is free to withdraw it. Batch D: likewise once its proposed start
+    # date has passed -- it can't stand as made, so the provider may confirm it
+    # with a new start date or withdraw it.
     # Not while the requirement or the offer is suspended by an admin: every provider action waits (Stage 3.18).
     lapsed_after_close = (
         project.status in (ProjectStatus.closed, ProjectStatus.under_evaluation) and not project.is_suspended and not offer.is_suspended
-        and validity_lapsed(project, offer)
+        and (validity_lapsed(project, offer) or start_date_passed(offer))
     )
     if not bidding_is_open(project) and not lapsed_after_close:
         raise HTTPException(
