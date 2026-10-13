@@ -1765,4 +1765,12 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
   - **Dates:** award days and offer-deadline days are Kuwait dates (`app/clock.py`).
   - **Tests:** `tests/test_review_fixes_accounts.py`, `tests/test_review_fixes_transactions.py`.
 
+- **Provider-journey review — fixes #1–#5:**
+  - **Job page during re-review:** a provider whose documents are back under review (changes requested, pending review) keeps sight of its own offer, its history, documents and clarifications, and its reviews (`require_service_provider_in_standing`), so the job page shows its offer and agreement. It can answer the owner's clarification of its offer. Submitting, withdrawing, confirming and reviewing still need an approved account. Only a rejected or suspended account loses sight of it. On a requirement still open for offers, such an account is sent to its verification status page.
+  - **One subscription at a time:** checkout locks the provider's profile and expires a checkout it started earlier that hasn't completed (`stripe_checkout_session_id`, migration 0072), so two checkouts (two colleagues, two tabs) can't both create a subscription. One that already completed refuses a new checkout until it shows. A second completed subscription never replaces a live one held, and a subscription event about a subscription other than the one held doesn't change the provider's access.
+  - **Billing always reachable:** the billing portal opens for every provider account, suspended, rejected or sent back included, and the verification status page links to it while a subscription is live, so nobody is billed with no way to cancel.
+  - **Documents as seen:** each of the side's offer documents carries a token for its stored file. Submitting a draft or revising an offer sends the tokens the page showed (`X-Offer-Documents`). A file added, replaced or removed elsewhere since is refused rather than submitted unseen, and the page shows the documents as they now are.
+  - **Whose requirement it is:** a provider learns the owner only with the award. Feed cards and requirement pages carry no `owner_id` for providers until their side is awarded, and amendments don't name the owner-side member who made them.
+  - **Tests:** `tests/test_provider_journey_fixes.py`.
+
 _Later Stage 9 steps are added as they are implemented._

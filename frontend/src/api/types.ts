@@ -189,6 +189,7 @@ export interface OfferDocument {
   file_name: string;
   uploaded_at: string;
   url: string;
+  token?: string | null; // the stored file; sent back on submit (X-Offer-Documents)
 }
 
 // Stage 5.16: one earlier version of the provider's own offer, as submitted.

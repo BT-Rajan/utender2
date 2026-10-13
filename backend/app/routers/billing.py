@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_db
-from app.deps import get_service_provider_profile, require_approved_service_provider
+from app.deps import get_service_provider_profile, require_approved_service_provider, require_service_provider
 from app.models.service_provider import ServiceProviderProfile
 from app.models.enums import SubscriptionStatus
 from app.models.user import User
@@ -30,6 +30,10 @@ def create_checkout_session(
         raise HTTPException(status_code=400, detail="Billing isn't configured yet — a Stripe price ID is missing.")
 
     cp = get_service_provider_profile(user, db)
+    # Two checkouts at once (two colleagues, two tabs) would each create a
+    # subscription. The profile row is locked, and a checkout started earlier
+    # that hasn't completed is expired before a new one starts.
+    cp = db.query(ServiceProviderProfile).filter(ServiceProviderProfile.user_id == cp.user_id).populate_existing().with_for_update().one()
     # Stage 9.13: a subscription that is still live -- including one whose
     # payment failed and that Stripe is still retrying -- is fixed in the
     # billing portal. A second checkout would start a second subscription
@@ -39,6 +43,20 @@ def create_checkout_session(
             status_code=409,
             detail="You already have a subscription. Use Manage billing to update your payment method or plan.",
         )
+
+    if cp.stripe_checkout_session_id:
+        try:
+            stripe.checkout.Session.expire(cp.stripe_checkout_session_id)
+        except stripe.error.StripeError:
+            # Can't be expired: it completed (the webhook may not be in yet), or it already expired.
+            try:
+                previous = stripe.checkout.Session.retrieve(cp.stripe_checkout_session_id)
+            except stripe.error.StripeError:
+                logger.exception("stripe checkout session lookup failed for %s", cp.user_id)
+                raise HTTPException(status_code=502, detail="Could not start checkout. Try again.")
+            if previous.get("status") == "complete":
+                raise HTTPException(status_code=409, detail="A subscription was just set up for your account. It shows here within a minute.")
+        cp.stripe_checkout_session_id = None
 
     try:
         session = stripe.checkout.Session.create(
@@ -65,11 +83,16 @@ def create_checkout_session(
         raise HTTPException(status_code=502, detail="Could not start checkout. Try again.")
     if not session.url:
         raise HTTPException(status_code=502, detail="Could not start checkout. Try again.")
+    cp.stripe_checkout_session_id = getattr(session, "id", None)
+    db.commit()
     return {"url": session.url}
 
 
 @router.post("/billing/portal-session")
-def create_billing_portal_session(user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+def create_billing_portal_session(user: User = Depends(require_service_provider), db: Session = Depends(get_db)):
+    """Managing or cancelling the subscription stays open to every provider
+    account -- a suspended, rejected or sent-back one included -- so nobody is
+    billed with no way to stop it."""
     cp = get_service_provider_profile(user, db)
     if not cp.stripe_customer_id:
         raise HTTPException(status_code=400, detail="No billing account yet — subscribe first.")
@@ -109,7 +132,15 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                 subscription = stripe.Subscription.retrieve(data["subscription"])  # its current state, not the event's
                 cp = _billed_profile(db, subscription_id=subscription["id"],
                                      reference=(data.get("metadata") or {}).get("service_provider_id") or data.get("client_reference_id"))
-                if cp:
+                if cp and cp.stripe_checkout_session_id == data.get("id"):
+                    cp.stripe_checkout_session_id = None
+                if cp and cp.stripe_subscription_id not in (None, subscription["id"]) and cp.subscription_status in LIVE_SUBSCRIPTION:
+                    # A second subscription while one is live: keep the one held, never swap it out
+                    # unseen. (Checkout refuses this; it can only come from outside the app.)
+                    logger.error("second live stripe subscription %s for %s (holds %s); not applied",
+                                 subscription["id"], cp.user_id, cp.stripe_subscription_id)
+                    db.commit()
+                elif cp:
                     cp.stripe_customer_id = data["customer"]
                     cp.stripe_subscription_id = subscription["id"]
                     _apply(db, cp, subscription, event_at, event.get("id"))
@@ -120,7 +151,11 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         # going forward.
         elif event_type in ("customer.subscription.updated", "customer.subscription.deleted"):
             cp = _billed_profile(db, subscription_id=data["id"], reference=(data.get("metadata") or {}).get("service_provider_id"))
-            if cp:
+            if cp and cp.stripe_subscription_id not in (None, data["id"]):
+                # About a subscription other than the one this provider holds (one it replaced, or a
+                # duplicate): it says nothing about the access the held one pays for.
+                logger.info("ignoring stripe event %s for subscription %s; %s holds %s", event.get("id"), data["id"], cp.user_id, cp.stripe_subscription_id)
+            elif cp:
                 if cp.subscription_event_at and event_at and event_at < cp.subscription_event_at:
                     # Stage 9.6: a delayed, older event -- the state already reflects something newer.
                     logger.info("ignoring stale stripe event %s for %s", event.get("id"), cp.user_id)

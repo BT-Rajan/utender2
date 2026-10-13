@@ -307,6 +307,10 @@ def get_project(project_id: str, user: User = Depends(get_current_user), db: Ses
             Offer.project_id == project.id, mine(db, user, Offer, Offer.service_provider_id), Offer.status == OfferStatus.approved
         ).first():
             detail.transaction_status = None
+        # Whose requirement it is: only to the provider awarded the work (Stage 7.2) -- a
+        # stable id would otherwise let providers follow one owner across requirements.
+        if detail.transaction_status is None:
+            detail.owner_id = None
         # Stage 4.4: whether this provider may respond, and if not why -- the
         # same check the offer endpoints enforce. (Only ever their own.)
         profile = acting_profile(db, user)
@@ -807,12 +811,15 @@ def list_amendments(project_id: str, user: User = Depends(get_current_user), db:
     project = db.get(Project, project_id)
     if not project or not _can_view_project(user, project, db):
         raise HTTPException(status_code=404, detail="Project not found.")
-    return (
+    rows = (
         db.query(ProjectAmendment)
         .filter(ProjectAmendment.project_id == project_id)
         .order_by(ProjectAmendment.amendment_number.asc())
         .all()
     )
+    if user.role == UserRole.service_provider:  # the owner side's members aren't named to providers
+        return [ProjectAmendmentOut.model_validate(a).model_copy(update={"created_by": None}) for a in rows]
+    return rows
 
 
 @router.get("/{project_id}/versions/{number}", response_model=RequirementVersionOut)

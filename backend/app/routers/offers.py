@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.i18n_server import translate
-from app.deps import get_service_provider_profile, require_approved_service_provider, require_marketplace_active_service_provider, require_service_provider
+from app.deps import get_service_provider_profile, require_approved_service_provider, require_service_provider_in_standing, require_marketplace_active_service_provider, require_service_provider
 from app.models.clarification import Clarification
 from app.models.enums import NotificationType, OfferStatus, ProjectStatus, TenderType
 from app.models.offer import Offer, OfferDocument, OfferRevision
@@ -37,7 +37,7 @@ router = APIRouter(prefix="/projects/{project_id}/offers", tags=["offers"])
 
 
 @router.get("/mine", response_model=OfferOut | None)
-def my_offer(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+def my_offer(project_id: str, user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db)):
     """This provider's side's one offer on the requirement, in whatever state --
     including the draft Participate started (Stage 5.2). Found by who is
     asking (their stakeholder), never by an id from the request."""
@@ -54,6 +54,19 @@ def _with_documents(db: Session, offer: Offer) -> OfferOut:
         _validity(db, project, offer, out)
     out.withdrawals_left = max(0, MAX_WITHDRAWALS - (offer.withdrawal_count or 0))
     return out
+
+
+DOCUMENTS_CHANGED = "Your offer's documents were changed somewhere else (another tab, device or team member) since you opened it. Reload to see them, then submit again."
+
+
+def _documents_as_seen(db: Session, offer: Offer, seen: str | None) -> None:
+    """Stage 5.11: the documents that go with an offer are the ones the page
+    showed (X-Offer-Documents: the tokens it listed). A file added, replaced
+    or removed elsewhere since is never submitted unseen."""
+    from app.services.offer_response import documents_fingerprint
+
+    if seen is not None and seen != documents_fingerprint(db, offer.project_id, offer.organization_id, offer.service_provider_id):
+        raise HTTPException(status_code=409, detail=DOCUMENTS_CHANGED)
 
 
 # Batch B: withdrawing and putting an offer forward again is allowed, but not
@@ -320,7 +333,7 @@ def save_timing_draft(
 
 
 @router.get("/documents", response_model=list[OfferDocumentOut])
-def my_offer_documents(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+def my_offer_documents(project_id: str, user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db)):
     """The provider's own response attachments (there may be some before the
     offer itself is first submitted)."""
     return documents_out(db, project_id, org_of(db, user.id), acting_id(db, user))
@@ -430,7 +443,7 @@ def remove_offer_document(
 
 
 @router.get("/mine/history", response_model=list[OfferRevisionOut])
-def my_offer_history(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+def my_offer_history(project_id: str, user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db)):
     offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
     if not offer:
         return []
@@ -439,7 +452,7 @@ def my_offer_history(project_id: str, user: User = Depends(require_approved_serv
 
 @router.get("/mine/documents/file")
 def open_my_offer_document(
-    project_id: str, label: str, revision: int | None = None, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)
+    project_id: str, label: str, revision: int | None = None, user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db)
 ):
     """Stage 6.2: opens a document of the side's own offer as submitted (or
     as in an earlier version) -- authorised on every click, then a one-minute link."""
@@ -451,7 +464,7 @@ def open_my_offer_document(
 
 
 @router.get("/mine/clarifications", response_model=list[OfferClarificationOut])
-def my_offer_clarifications(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+def my_offer_clarifications(project_id: str, user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db)):
     """Stage 6.10: what the owner has asked about this side's own offer (found
     by who is asking, never an id from the request), with any answers."""
     offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
@@ -461,7 +474,7 @@ def my_offer_clarifications(project_id: str, user: User = Depends(require_approv
 @router.post("/mine/clarifications/{clarification_id}/answer", response_model=OfferClarificationOut)
 def answer_offer_clarification(
     project_id: str, clarification_id: str, payload: OfferClarificationAnswer,
-    user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db),
+    user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db),
 ):
     """Stage 6.10: answer the owner's clarification of this side's own offer,
     during evaluation. Text beside the offer: the price, response, timing,
@@ -495,7 +508,7 @@ def answer_offer_clarification(
 
 
 @router.get("/documents/{document_id}/file")
-def open_my_document(project_id: str, document_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+def open_my_document(project_id: str, document_id: str, user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db)):
     """Stage 6.2: opens one of the side's current attachments -- found among
     the caller's own side's documents only, authorised on every click."""
     d = _side_documents(db, project_id, org_of(db, user.id), acting_id(db, user)).filter(OfferDocument.id == document_id).first()
@@ -540,6 +553,7 @@ def submit_offer(
     project_id: str,
     payload: OfferCreate,
     if_match: str | None = Header(None, alias="If-Match"),
+    documents_seen: str | None = Header(None, alias="X-Offer-Documents"),
     user: User = Depends(require_marketplace_active_service_provider),
     db: Session = Depends(get_db),
 ):
@@ -598,6 +612,8 @@ def submit_offer(
             status_code=409,
             detail="Your offer was changed somewhere else (another tab, device or team member) since you opened it. Reload to see the latest, then make your change again.",
         )
+    if offer:
+        _documents_as_seen(db, offer, documents_seen)
     if offer:
         # upsert on the (project_id, service_provider_id) unique constraint — a
         # service provider revising their bid before the deadline updates the
@@ -704,6 +720,7 @@ def _put_forward(db: Session, user: User, project: Project, offer: Offer, profil
 def submit_draft(
     project_id: str,
     if_match: str | None = Header(None, alias="If-Match"),
+    documents_seen: str | None = Header(None, alias="X-Offer-Documents"),
     user: User = Depends(require_marketplace_active_service_provider),
     db: Session = Depends(get_db),
 ):
@@ -735,6 +752,7 @@ def submit_draft(
             status_code=409,
             detail="Your offer draft was changed somewhere else (another tab, device or team member) since you opened it. Reload to see the latest, then make your change again.",
         )
+    _documents_as_seen(db, offer, documents_seen)
     return _put_forward(db, user, project, offer, profile, first=True)
 
 
