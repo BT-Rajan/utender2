@@ -377,6 +377,8 @@ export function OfferStandsNotice({ project, offer }: { project: ProjectDetail; 
   const done = (data: Offer) => {
     setError(null);
     queryClient.setQueryData(["my-offer", project.id], data);
+    // A withdrawal can end the requirement (its last live offer): show it as it now stands.
+    queryClient.invalidateQueries({ queryKey: ["project", project.id] });
   };
   const fail = (err: unknown) => setError(err instanceof ApiError ? err.detail : t("postPub.error"));
   const [newStart, setNewStart] = useState("");
@@ -408,10 +410,11 @@ export function OfferStandsNotice({ project, offer }: { project: ProjectDetail; 
         {offer.start_passed ? t(byCompletion ? "offerValidity.completionPassedBody" : "offerValidity.startPassedBody") : offer.validity_lapsed ? t("offerValidity.lapsedBody") : t("offerValidity.outdatedBody")}
       </p>
       <ErrorBanner message={error} />
-      {/* The server refuses every provider action while either is suspended by an admin. */}
-      {offer.is_suspended || project.is_suspended ? (
+      {/* The server refuses every provider action while the offer is suspended by an
+          admin. (A suspended requirement isn't shown to providers at all.) */}
+      {offer.is_suspended ? (
         <p className="mt-2 text-navy" data-testid="offer-stands-suspended">
-          {t(offer.is_suspended ? "offerValidity.offerSuspended" : "offerValidity.requirementSuspended")}
+          {t("offerValidity.offerSuspended")}
         </p>
       ) : (
         <>

@@ -96,8 +96,8 @@ class SeenRecently:
 
     def first(self, key: str) -> bool:
         """True the first time a key is seen in the window (and records it)."""
-        now = time.monotonic()
         with self._lock:
+            now = time.monotonic()  # read under the lock, so times only grow
             # Times only grow, so the expired keys are all at the front:
             # O(1) per call, amortised.
             while self._seen and next(iter(self._seen.values())) <= now - self.window:

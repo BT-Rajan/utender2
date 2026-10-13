@@ -591,7 +591,10 @@ export function OwnerProjectDetailPage() {
       )}
       {project.status === "expired" && project.offer_count === 0 && (
         <div className="border border-border bg-border/30 rounded px-4 py-3 mb-6 text-sm text-steel max-w-2xl">
-          {project.closed_at && new Date(project.closed_at) < new Date(project.bid_deadline)
+          {/* It had offers, every one withdrawn after the close: not "without any offers". */}
+          {project.closure_reason === "offers_withdrawn"
+            ? t("closure.textAllWithdrawn")
+            : project.closed_at && new Date(project.closed_at) < new Date(project.bid_deadline)
             ? t("draftDetails.expiredEarly").replace("{date}", formatDeadline(project.closed_at))
             : t("draftDetails.expired").replace("{date}", formatDeadline(project.bid_deadline))}
         </div>

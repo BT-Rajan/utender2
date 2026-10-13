@@ -1560,6 +1560,14 @@ def suspend_offer(
             link=f"/service-provider/projects/{project.id}/offer",
             project_title=project.title,
         )
+    # An offer back in sight after offers closed: the owner side, which may have
+    # been told the offers were under review with none to evaluate, is told
+    # what it can now evaluate.
+    if previous and not payload.suspended and offer.status == OfferStatus.submitted and project \
+            and project.status in (ProjectStatus.closed, ProjectStatus.under_evaluation):
+        visible = db.query(Offer.id).filter(Offer.project_id == project.id, Offer.status == OfferStatus.submitted, Offer.is_suspended.is_(False)).count()
+        notify_team(db, db.get(User, project.owner_id), NotificationType.evaluation_ready, link=f"/owner/projects/{project.id}",
+                    organization_id=project.organization_id, project_title=project.title, count=visible)
     cp = db.get(ServiceProviderProfile, offer.service_provider_id)
     return _offer_admin_fields(offer, project, cp)
 
@@ -1833,8 +1841,12 @@ def deactivate_account(user_id: str, payload: AccountStatePatch | None = None, a
     managed here. Repeating it changes nothing."""
     # Security: the organisation first, so the strand check below can't race
     # a hand-over or appointment that changes who its representative is.
-    stakeholder_service.lock_organization_of(db, user_id)
+    locked = stakeholder_service.lock_organization_of(db, user_id)
     target = _account_target(db, user_id, admin)
+    # They may have joined (or moved) between that read and their row lock:
+    # then the organization checked below isn't the one locked -- try again.
+    if stakeholder_service.organization_of(db, user_id) != locked:
+        raise HTTPException(status_code=409, detail="This person's organization changed just now. Try again.")
     if target.deactivated_at is None:
         if stakeholder_service.deactivation_would_strand_organization(db, target):
             raise HTTPException(
