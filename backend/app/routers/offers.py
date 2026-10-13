@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.i18n_server import translate
-from app.deps import get_service_provider_profile, require_approved_service_provider, require_marketplace_active_service_provider, require_service_provider
+from app.deps import get_service_provider_profile, require_approved_service_provider, require_service_provider_in_standing, require_marketplace_active_service_provider, require_service_provider
 from app.models.audit_log import AuditLog
 from app.models.clarification import Clarification
 from app.models.enums import NotificationType, OfferStatus, ProjectStatus, TenderType
@@ -26,11 +26,11 @@ from app.services.notify import notify, notify_team
 from app.services.team import acting_id, acting_profile, can_access, mine, org_of
 from app.services.offer_response import (
     AMOUNT_LIMIT, OFFER_DOCUMENTS_BUCKET, _side_documents, offer_file, open_file, check_commitment, history_out, check_complete, documents_out, draft_pricing, priced_total, readiness, requirements_for,
-    timing_conflicts,
+    submitted_documents_out, timing_conflicts,
 )
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import bidding_is_open, lock_project, sync_expired_projects
-from app.services.tender_rules import START_PASSED_DETAIL, answers_since, kuwait_today, offer_valid_until, start_date_passed, validity_lapsed
+from app.services.tender_rules import answers_since, date_passed_detail, kuwait_today, offer_valid_until, start_date_passed, validity_lapsed
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ router = APIRouter(prefix="/projects/{project_id}/offers", tags=["offers"])
 
 
 @router.get("/mine", response_model=OfferOut | None)
-def my_offer(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+def my_offer(project_id: str, user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db)):
     """This provider's side's one offer on the requirement, in whatever state --
     including the draft Participate started (Stage 5.2). Found by who is
     asking (their stakeholder), never by an id from the request."""
@@ -48,13 +48,32 @@ def my_offer(project_id: str, user: User = Depends(require_approved_service_prov
 
 def _with_documents(db: Session, offer: Offer) -> OfferOut:
     out = OfferOut.model_validate(offer)
-    out.documents = documents_out(db, offer.project_id, offer.organization_id, offer.service_provider_id)
     project = db.get(Project, offer.project_id)
+    if offer.status != OfferStatus.draft and project is not None and not bidding_is_open(project):
+        # Once offers have closed nothing more can go with it: the provider's
+        # own view is the documents the owner received with its submitted
+        # version, not files attached since that never went (Stage 5.16).
+        out.documents = submitted_documents_out(db, offer, viewer="provider")
+    else:
+        out.documents = documents_out(db, offer.project_id, offer.organization_id, offer.service_provider_id)
     out.timing_conflicts = timing_conflicts(project, offer) if project else []  # Stage 5.5
     if project:
         _validity(db, project, offer, out)
     out.withdrawals_left = max(0, MAX_WITHDRAWALS - (offer.withdrawal_count or 0))
     return out
+
+
+DOCUMENTS_CHANGED = "Your offer's documents were changed somewhere else (another tab, device or team member) since you opened it. Reload to see them, then submit again."
+
+
+def _documents_as_seen(db: Session, offer: Offer, seen: str | None) -> None:
+    """Stage 5.11: the documents that go with an offer are the ones the page
+    showed (X-Offer-Documents: the tokens it listed). A file added, replaced
+    or removed elsewhere since is never submitted unseen."""
+    from app.services.offer_response import documents_fingerprint
+
+    if seen is not None and seen != documents_fingerprint(db, offer.project_id, offer.organization_id, offer.service_provider_id):
+        raise HTTPException(status_code=409, detail=DOCUMENTS_CHANGED)
 
 
 # Batch B: withdrawing and putting an offer forward again is allowed, but not
@@ -321,7 +340,7 @@ def save_timing_draft(
 
 
 @router.get("/documents", response_model=list[OfferDocumentOut])
-def my_offer_documents(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+def my_offer_documents(project_id: str, user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db)):
     """The provider's own response attachments (there may be some before the
     offer itself is first submitted)."""
     return documents_out(db, project_id, org_of(db, user.id), acting_id(db, user))
@@ -431,7 +450,7 @@ def remove_offer_document(
 
 
 @router.get("/mine/history", response_model=list[OfferRevisionOut])
-def my_offer_history(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+def my_offer_history(project_id: str, user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db)):
     offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
     if not offer:
         return []
@@ -440,7 +459,7 @@ def my_offer_history(project_id: str, user: User = Depends(require_approved_serv
 
 @router.get("/mine/documents/file")
 def open_my_offer_document(
-    project_id: str, label: str, revision: int | None = None, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)
+    project_id: str, label: str, revision: int | None = None, user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db)
 ):
     """Stage 6.2: opens a document of the side's own offer as submitted (or
     as in an earlier version) -- authorised on every click, then a one-minute link."""
@@ -452,7 +471,7 @@ def open_my_offer_document(
 
 
 @router.get("/mine/clarifications", response_model=list[OfferClarificationOut])
-def my_offer_clarifications(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+def my_offer_clarifications(project_id: str, user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db)):
     """Stage 6.10: what the owner has asked about this side's own offer (found
     by who is asking, never an id from the request), with any answers."""
     offer = db.query(Offer).filter(Offer.project_id == project_id, mine(db, user, Offer, Offer.service_provider_id)).first()
@@ -462,7 +481,7 @@ def my_offer_clarifications(project_id: str, user: User = Depends(require_approv
 @router.post("/mine/clarifications/{clarification_id}/answer", response_model=OfferClarificationOut)
 def answer_offer_clarification(
     project_id: str, clarification_id: str, payload: OfferClarificationAnswer,
-    user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db),
+    user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db),
 ):
     """Stage 6.10: answer the owner's clarification of this side's own offer,
     during evaluation. Text beside the offer: the price, response, timing,
@@ -496,7 +515,7 @@ def answer_offer_clarification(
 
 
 @router.get("/documents/{document_id}/file")
-def open_my_document(project_id: str, document_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+def open_my_document(project_id: str, document_id: str, user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db)):
     """Stage 6.2: opens one of the side's current attachments -- found among
     the caller's own side's documents only, authorised on every click."""
     d = _side_documents(db, project_id, org_of(db, user.id), acting_id(db, user)).filter(OfferDocument.id == document_id).first()
@@ -541,6 +560,7 @@ def submit_offer(
     project_id: str,
     payload: OfferCreate,
     if_match: str | None = Header(None, alias="If-Match"),
+    documents_seen: str | None = Header(None, alias="X-Offer-Documents"),
     user: User = Depends(require_marketplace_active_service_provider),
     db: Session = Depends(get_db),
 ):
@@ -591,6 +611,8 @@ def submit_offer(
     if offer and offer.status == OfferStatus.withdrawn and (offer.withdrawal_count or 0) >= MAX_WITHDRAWALS:
         raise HTTPException(status_code=400, detail="This offer has been withdrawn twice, so it can't be put forward again on this requirement.")
     first = offer is None or offer.status == OfferStatus.draft  # Stage 5.11: put forward for the first time
+    if offer is not None and offer.is_suspended:  # Stage 3.18: it waits while an admin has it suspended
+        raise HTTPException(status_code=400, detail="This offer has been suspended by an admin and cannot be changed.")
     # Stage 5.13: revising a submitted (or withdrawn) offer from a page showing
     # an earlier revision -- another tab, a colleague, a retried request -- is
     # refused rather than overwriting the newer one (If-Match: revision).
@@ -599,6 +621,8 @@ def submit_offer(
             status_code=409,
             detail="Your offer was changed somewhere else (another tab, device or team member) since you opened it. Reload to see the latest, then make your change again.",
         )
+    if offer:
+        _documents_as_seen(db, offer, documents_seen)
     if offer:
         # upsert on the (project_id, service_provider_id) unique constraint — a
         # service provider revising their bid before the deadline updates the
@@ -705,6 +729,7 @@ def _put_forward(db: Session, user: User, project: Project, offer: Offer, profil
 def submit_draft(
     project_id: str,
     if_match: str | None = Header(None, alias="If-Match"),
+    documents_seen: str | None = Header(None, alias="X-Offer-Documents"),
     user: User = Depends(require_marketplace_active_service_provider),
     db: Session = Depends(get_db),
 ):
@@ -736,6 +761,7 @@ def submit_draft(
             status_code=409,
             detail="Your offer draft was changed somewhere else (another tab, device or team member) since you opened it. Reload to see the latest, then make your change again.",
         )
+    _documents_as_seen(db, offer, documents_seen)
     return _put_forward(db, user, project, offer, profile, first=True)
 
 
@@ -760,8 +786,9 @@ def confirm_offer(
     if offer.is_suspended:
         raise HTTPException(status_code=400, detail="This offer has been suspended by an admin and cannot be confirmed.")
     if project.status in (ProjectStatus.closed, ProjectStatus.under_evaluation) and not project.is_suspended:
-        return _confirm_after_close(db, user, project, offer, payload.proposed_start_date if payload else None)
-    if payload and payload.proposed_start_date:
+        return _confirm_after_close(db, user, project, offer, payload.proposed_start_date if payload else None,
+                                    payload.proposed_completion_date if payload else None)
+    if payload and (payload.proposed_start_date or payload.proposed_completion_date):
         raise HTTPException(status_code=400, detail="While bidding is open, change the start date by revising your offer.")
     if not bidding_is_open(project):
         raise HTTPException(status_code=400, detail="Bidding on this project is closed.")
@@ -790,7 +817,7 @@ def confirm_offer(
     return _with_documents(db, offer)
 
 
-def _confirm_after_close(db: Session, user: User, project: Project, offer: Offer, new_start=None) -> OfferOut:
+def _confirm_after_close(db: Session, user: User, project: Project, offer: Offer, new_start=None, new_completion=None) -> OfferOut:
     """Batch B: once offers have closed, the owner can award only an offer its
     provider stands by -- made against the requirement as it now is, and
     within its validity period. Confirming re-states it, unchanged, against
@@ -800,23 +827,33 @@ def _confirm_after_close(db: Session, user: User, project: Project, offer: Offer
     Batch D: an offer whose proposed start date passed while it was being
     evaluated can't be awarded as it stands -- its provider confirms it with
     a new start date (today or later), the same span of work following it,
-    and nothing else changes. The earlier dates stay in its history."""
+    and nothing else changes. An offer that gave only a completion date,
+    once that date has passed, is confirmed with a new completion date. The
+    earlier dates stay in its history."""
     passed = start_date_passed(offer)
-    if new_start is not None and not passed:
-        raise HTTPException(status_code=400, detail="Your offer's start date hasn't passed; it is confirmed as it stands.")
-    if passed:
+    by_completion = offer.proposed_start_date is None  # the offer committed a completion date only
+    if (new_start is not None or new_completion is not None) and not passed:
+        raise HTTPException(status_code=400, detail="Your offer's dates haven't passed; it is confirmed as it stands.")
+    if passed and by_completion:
+        if new_completion is None:
+            raise HTTPException(status_code=400, detail=f"{date_passed_detail(offer)} Give a new completion date to confirm it.")
+        if new_completion < kuwait_today():
+            raise HTTPException(status_code=400, detail="The new completion date can't be in the past.")
+    elif passed:
         if new_start is None:
-            raise HTTPException(status_code=400, detail=f"{START_PASSED_DETAIL} Give a new start date to confirm it.")
+            raise HTTPException(status_code=400, detail=f"{date_passed_detail(offer)} Give a new start date to confirm it.")
         if new_start < kuwait_today():
             raise HTTPException(status_code=400, detail="The new start date can't be in the past.")
     elif offer.based_on_material_revision >= project.material_revision and not validity_lapsed(project, offer) and offer_valid_until(project, offer) is None:
         raise HTTPException(status_code=400, detail="Your offer is already up to date with the requirement.")
     previous = offer.based_on_material_revision
-    previous_start = offer.proposed_start_date
+    previous_start = offer.proposed_start_date or offer.proposed_completion_date
     if previous < project.material_revision or passed:
         _snapshot_revision(db, offer)
         offer.based_on_material_revision = project.material_revision
-    if passed:
+    if passed and by_completion:
+        offer.proposed_completion_date = new_completion
+    elif passed:
         if offer.proposed_completion_date:
             offer.proposed_completion_date += new_start - offer.proposed_start_date
         offer.proposed_start_date = new_start
@@ -825,8 +862,9 @@ def _confirm_after_close(db: Session, user: User, project: Project, offer: Offer
     offer.updated_at, offer.updated_by = now, user.id
     log_action(
         db, actor_id=user.id, action="offer.confirmed", target_type="offer", target_id=offer.id,
-        previous_value=f"material revision {previous}" + (f"; start {previous_start}" if passed else ""),
-        new_value=f"material revision {project.material_revision}; stands from {now.isoformat()}Z" + (f"; start {offer.proposed_start_date}" if passed else ""),
+        previous_value=f"material revision {previous}" + (f"; {'completion' if by_completion else 'start'} {previous_start}" if passed else ""),
+        new_value=f"material revision {project.material_revision}; stands from {now.isoformat()}Z"
+        + (f"; {'completion' if by_completion else 'start'} {offer.proposed_completion_date if by_completion else offer.proposed_start_date}" if passed else ""),
     )
     db.refresh(offer)
     # The owner side is waiting on it to award: tell them. (A sealed tender is
@@ -858,6 +896,9 @@ def withdraw_offer(project_id: str, user: User = Depends(require_approved_servic
         raise HTTPException(status_code=400, detail="This offer has already been withdrawn.")
     if offer.status != OfferStatus.submitted:
         raise HTTPException(status_code=400, detail="This offer has already been decided, so it can no longer be withdrawn.")
+    # Stage 3.18: every provider action waits while an admin has the offer suspended.
+    if offer.is_suspended:
+        raise HTTPException(status_code=400, detail="This offer has been suspended by an admin and cannot be withdrawn.")
     # Batch B: after the close an offer is held only for its validity period;
     # once that has run out (and the provider hasn't confirmed it since), the
     # provider is free to withdraw it. Batch D: likewise once its proposed start

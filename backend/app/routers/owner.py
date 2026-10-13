@@ -50,7 +50,7 @@ from app.services.verification import (
     profile_state_fields,
 )
 from app.services.storage import get_storage
-from app.services.tender_rules import START_PASSED_DETAIL, answers_since, offer_valid_until, start_date_passed, validity_lapsed
+from app.services.tender_rules import answers_since, date_passed_detail, offer_valid_until, start_date_passed, validity_lapsed
 from app.services.tender_lifecycle import bidding_is_open, interested_providers, is_sealed_and_open, lock_project, publish, sync_expired_projects, transaction_status
 
 logger = logging.getLogger(__name__)
@@ -699,7 +699,7 @@ def approve_offer(
             detail="This offer's validity period has ended. Ask the provider to confirm it still stands before awarding it.",
         )
     if start_date_passed(winning_offer):  # Batch D
-        raise HTTPException(status_code=409, detail=START_PASSED_DETAIL)
+        raise HTTPException(status_code=409, detail=date_passed_detail(winning_offer))
 
     # Only other LIVE bids get marked rejected — a bid the service provider
     # already withdrew stays withdrawn, not overwritten into a status that

@@ -254,6 +254,8 @@ export interface Dictionary {
     newStart: string;
     offerSuspended: string;
     requirementSuspended: string;
+    completionPassedBody: string;
+    newCompletion: string;
   };
   award: {
     confirmTitle: string;
@@ -287,6 +289,7 @@ export interface Dictionary {
     ownerResponse: string;
     providerResponse: string;
     needsApproval: string;
+    windowClosed: string;
   };
   reputation: {
     heading: string;
@@ -674,6 +677,7 @@ export interface Dictionary {
     file: string;
     attach: string;
     remove: string;
+    deliveryOverdue: string;
   };
   awardHandover: {
     heading: string;
@@ -2044,6 +2048,8 @@ export const en: Dictionary = {
     newStart: "New start date",
     offerSuspended: "Your offer has been suspended by a site admin. You can confirm or withdraw it once it is reactivated.",
     requirementSuspended: "This requirement has been suspended by a site admin. You can confirm or withdraw your offer once it is reactivated.",
+    completionPassedBody: "The completion date you proposed has passed, so the owner can't award this offer as it stands. Give a new completion date (today or later) to confirm it: nothing else in your offer changes. You may withdraw it instead.",
+    newCompletion: "New completion date",
   },
   award: {
     confirmTitle: "Award this requirement to {provider}?",
@@ -2077,6 +2083,7 @@ export const en: Dictionary = {
     ownerResponse: "The owner's response",
     providerResponse: "The provider's response",
     needsApproval: "Reviews can be written once your account verification is approved again. See your verification status for what is needed.",
+    windowClosed: "The other side's review was published when its sealed period ended, so this transaction can no longer be reviewed from your side.",
   },
   reputation: {
     heading: "U-Tender track record",
@@ -2528,6 +2535,7 @@ export const en: Dictionary = {
     file: "File",
     attach: "Attach",
     remove: "Remove",
+    deliveryOverdue: "A delivered deliverable has waited more than 30 days for the owner's answer. If you end the agreement now, it won't count against your track record.",
   },
   awardHandover: {
     heading: "Awarded",
@@ -3923,6 +3931,8 @@ export const ar: Dictionary = {
     newStart: "تاريخ البدء الجديد",
     offerSuspended: "قام مسؤول الموقع بتعليق عرضك. يمكنك تأكيده أو سحبه بعد إعادة تفعيله.",
     requirementSuspended: "قام مسؤول الموقع بتعليق هذا الطلب. يمكنك تأكيد عرضك أو سحبه بعد إعادة تفعيله.",
+    completionPassedBody: "مضى تاريخ الإنجاز الذي اقترحته، لذا لا يستطيع المالك ترسية هذا العرض كما هو. حدّد تاريخ إنجاز جديدًا (اليوم أو بعده) لتأكيده: لا يتغير شيء آخر في عرضك. يمكنك سحبه بدلًا من ذلك.",
+    newCompletion: "تاريخ الإنجاز الجديد",
   },
   award: {
     confirmTitle: "ترسية هذا المتطلب على {provider}؟",
@@ -3956,6 +3966,7 @@ export const ar: Dictionary = {
     ownerResponse: "رد المالك",
     providerResponse: "رد مقدم الخدمة",
     needsApproval: "يمكن كتابة التقييم بعد الموافقة على توثيق حسابك مرة أخرى. راجع حالة التوثيق لمعرفة المطلوب.",
+    windowClosed: "نُشر تقييم الطرف الآخر عند انتهاء فترة الإخفاء، لذا لم يعد بإمكانك تقييم هذه المعاملة.",
   },
   reputation: {
     heading: "السجل على U-Tender",
@@ -4407,6 +4418,7 @@ export const ar: Dictionary = {
     file: "الملف",
     attach: "إرفاق",
     remove: "حذف",
+    deliveryOverdue: "انتظر أحد التسليمات المسلَّمة أكثر من 30 يومًا رد المالك. إذا أنهيت الاتفاقية الآن، فلن يُحتسب ذلك في سجلك.",
   },
   awardHandover: {
     heading: "تمت الترسية",

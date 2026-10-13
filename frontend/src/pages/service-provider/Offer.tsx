@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { useAccountApproved } from "@/auth/ProtectedRoute";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError, serverNow } from "@/api/client";
 import type { EligibilityCheck, Offer, OpportunityListing, ProjectDetail } from "@/api/types";
@@ -83,10 +84,16 @@ export function ServiceProviderOfferPage() {
   // instead of spinning forever.
   // Stage 3.9: the full requirement is refused to a provider who isn't
   // eligible for it; ask why before falling back to the generic notice.
+  // The page is open to an account whose documents are back under review, for
+  // a job it is part of; anything else it can't open needs an approved account.
+  const accountApproved = useAccountApproved("service_provider");
+  useEffect(() => {
+    if (projectError && accountApproved === false) navigate("/service-provider/status", { replace: true });
+  }, [projectError, accountApproved, navigate]);
   const { data: eligibility, isError: eligibilityError } = useQuery({
     queryKey: ["eligibility", id],
     queryFn: () => apiFetch<EligibilityCheck>(`/projects/${id}/eligibility`),
-    enabled: !!id && projectError,
+    enabled: !!id && projectError && accountApproved !== false,
     retry: false,
   });
   // Stage 4.5: when the requirement itself can't be opened, the server's

@@ -78,6 +78,18 @@ def require_approved_service_provider(user: User = Depends(require_service_provi
     return user
 
 
+def require_service_provider_in_standing(user: User = Depends(require_service_provider), db: Session = Depends(get_db)) -> User:
+    """Batch A: a provider that has taken part keeps sight of its own offer and
+    job -- and can answer for it -- while its documents are re-reviewed
+    (changes requested, pending review). A rejected or suspended account loses
+    it, as on the requirement page and the agreement; one never verified as
+    anyone has nothing to see."""
+    profile = acting_profile(db, user)
+    if not profile or profile.verification_status.value not in ("approved", "changes_requested", "pending_review") or profile.is_suspended:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="not_approved")
+    return user
+
+
 # THE P0 gate (spec checklist "docs approved but payment absent" /
 # decision D-002/D-003): full marketplace participation — viewing a
 # project's drawings, downloading them, and submitting or revising a bid —

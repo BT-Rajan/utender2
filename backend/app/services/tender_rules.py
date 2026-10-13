@@ -60,14 +60,24 @@ def validity_lapsed(project: Project, offer) -> bool:
 
 
 def start_date_passed(offer) -> bool:
-    """Batch D: the start date the provider proposed is already behind us
-    (Kuwait's calendar day, UTC+3), so the offer commits to work that can no
-    longer begin as it says -- it can't be confirmed or awarded as it stands."""
+    """Batch D: the date the offer's commitment runs from is already behind us
+    (Kuwait's calendar day) -- its proposed start, or, for an offer that gave
+    only a completion date, that completion date -- so the offer commits to
+    work that can no longer be done as it says: it can't be confirmed or
+    awarded as it stands."""
     start = getattr(offer, "proposed_start_date", None)
-    return start is not None and start < kuwait_today()
+    if start is not None:
+        return start < kuwait_today()
+    completion = getattr(offer, "proposed_completion_date", None)
+    return completion is not None and completion < kuwait_today()
 
 
 START_PASSED_DETAIL = "This offer's proposed start date has already passed, so it can no longer be awarded as it stands."
+COMPLETION_PASSED_DETAIL = "This offer's proposed completion date has already passed, so it can no longer be awarded as it stands."
+
+
+def date_passed_detail(offer) -> str:
+    return START_PASSED_DETAIL if getattr(offer, "proposed_start_date", None) is not None else COMPLETION_PASSED_DETAIL
 
 
 def answers_since(db, project: Project, offer) -> int:

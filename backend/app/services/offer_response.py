@@ -2,6 +2,7 @@
 requirement's response rules (Project.response_requirements) and its pricing
 basis (Stage 3.4). Used by the existing offer submission -- there is one offer
 system; this only decides whether a submission is complete."""
+import hashlib
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -317,6 +318,19 @@ def open_file(file_path: str, file_name: str) -> RedirectResponse:
     return RedirectResponse(url, status_code=303, headers={"Cache-Control": "no-store"})
 
 
+def document_token(d: OfferDocument) -> str:
+    """Names one stored file of an offer's documents: a replacement under the
+    same label is a new file, so a new token."""
+    return hashlib.sha256(d.file_path.encode()).hexdigest()[:16]
+
+
+def documents_fingerprint(db: Session, project_id: str, organization_id: str | None, provider_id: str) -> str:
+    """The side's current documents as one value, the same way the page builds
+    it from the tokens it shows -- to tell whether the documents someone
+    reviewed are still the ones that would go."""
+    return ",".join(sorted(document_token(d) for d in _side_documents(db, project_id, organization_id, provider_id)))
+
+
 def documents_out(db: Session, project_id: str, organization_id: str | None, provider_id: str) -> list[OfferDocumentOut]:
     """The side's current attachments, for the side itself."""
     rows = _side_documents(db, project_id, organization_id, provider_id).order_by(OfferDocument.label.asc()).all()
@@ -328,15 +342,17 @@ def documents_out(db: Session, project_id: str, organization_id: str | None, pro
             uploaded_at=d.uploaded_at,
             url=_api(f"/projects/{project_id}/offers/documents/{d.id}/file"),
             material_revision=d.material_revision,
+            token=document_token(d),
         )
         for d in rows
     ]
 
 
-def submitted_documents_out(db: Session, offer) -> list[OfferDocumentOut]:
+def submitted_documents_out(db: Session, offer, viewer: str = "owner") -> list[OfferDocumentOut]:
     """Stage 5.13: the documents that went with the offer's current
-    submitted version -- what the owner receives. An offer submitted before
-    these were recorded falls back to its current documents."""
+    submitted version -- what the owner receives (each opened through
+    `viewer`'s own download route). An offer submitted before these were
+    recorded falls back to its current documents."""
     if offer.submitted_documents is None:
         rows = _side_documents(db, offer.project_id, offer.organization_id, offer.service_provider_id).order_by(OfferDocument.label.asc()).all()
         docs = [(d.label, d.file_name, d.uploaded_at, d.material_revision) for d in rows]
@@ -345,7 +361,7 @@ def submitted_documents_out(db: Session, offer) -> list[OfferDocumentOut]:
     return [
         OfferDocumentOut(
             id=f"{offer.id}:{label}", label=label, file_name=file_name, uploaded_at=uploaded_at,
-            url=offer_file_link("owner", offer.project_id, offer.id, label), material_revision=material_revision,
+            url=offer_file_link(viewer, offer.project_id, offer.id, label), material_revision=material_revision,
         )
         for label, file_name, uploaded_at, material_revision in docs
     ]

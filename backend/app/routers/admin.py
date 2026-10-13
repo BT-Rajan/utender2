@@ -250,6 +250,13 @@ def _decide_document(db: Session, admin: User, profile, requirement_id: str, dec
     doc.reviewed_by = admin.id
     doc.reviewed_at = datetime.utcnow()
     doc.expires_on = expires_on if decision == DocumentStatus.approved else None
+    renewal = getattr(doc, "previous_file_path", None) is not None
+    if renewal and decision == DocumentStatus.rejected:
+        # A refused renewal: the approval it would have renewed stands, as it was
+        # (the note says why the renewal wasn't accepted).
+        doc.status, doc.file_path, doc.expires_on = DocumentStatus.approved, doc.previous_file_path, doc.previous_expires_on
+    if renewal:
+        doc.previous_file_path = doc.previous_expires_on = None
     if decision == DocumentStatus.rejected and not is_added_qualification(profile, req):
         # A correction sends the whole application back to the account holder
         # -- except for an optional qualification a verified account added

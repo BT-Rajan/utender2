@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import get_service_provider_profile, get_current_user, require_approved_service_provider, require_service_provider
+from app.deps import get_service_provider_profile, get_current_user, require_approved_service_provider, require_service_provider_in_standing, require_service_provider
 from app.models.service_provider import ServiceProviderProfile
 from app.models.document import DocumentRequirement
 from app.models.enums import DocumentStatus, OfferStatus, ProjectStatus, UserRole
@@ -27,7 +27,7 @@ from app.services.categories import clean_services
 from app.services.eligibility import availability, feed_condition, ineligibility_reasons, rules_out
 from app.services.search_text import arabic_root, expand, normalize, search_words
 from app.models.category import ServiceCategory
-from app.services.team import acting_id, acting_profile, mine, org_of, team_ids
+from app.services.team import acting_id, acting_profile, mine, org_of
 from app.services.file_security import ALLOWED_DOCUMENT_EXTENSIONS, assert_allowed_extension, sanitize_path_segment
 from app.services.locations import clean_governorate
 from app.services.stakeholder import require_established
@@ -38,10 +38,12 @@ from app.services.verification import (
     assert_ready_to_submit,
     checklist,
     document_out_fields,
+    is_added_qualification,
     mark_submitted,
     profile_state_fields,
 )
 from app.services.storage import get_storage
+from app.clock import kuwait_today
 from app.services.tender_lifecycle import is_sealed_and_open, sync_expired_projects, transaction_status
 
 router = APIRouter(prefix="/service-provider", tags=["service_provider"])
@@ -118,8 +120,8 @@ def feed(
     if governorate and governorate.strip():
         query = query.filter(Project.governorate == clean_governorate(governorate))
     if my_services or my_areas:
-        # What the provider (an organization: any of its members) declared.
-        team = db.query(ServiceProviderProfile).filter(ServiceProviderProfile.user_id.in_(team_ids(db, user.id))).all()
+        # What the provider declared: its (organization's) own profile -- never a member's own row.
+        team = [acting_profile(db, user)]
         if my_services:
             offered = sorted({c for p in team for c in (p.service_categories or [])})
             # Filed under one of those types of work -- or, filed with a
@@ -231,7 +233,7 @@ def _cards(db: Session, page: list[Project], profile, my_offers: dict, full_acce
     return [
         ProjectOut(
             id=p.id,
-            owner_id=p.owner_id,
+            owner_id=None,  # whose requirement it is isn't a provider's to know before an award
             title=p.title,
             # Listing level: where (governorate/area) and what (title,
             # trade, the opening of the scope) only. The exact address and
@@ -254,7 +256,7 @@ def _cards(db: Session, page: list[Project], profile, my_offers: dict, full_acce
             status=p.status,
             closure_reason=p.closure_reason,
             tender_type=p.tender_type,
-            tender_type_locked=p.tender_type_locked,
+            tender_type_locked=False,  # the owner's rule; to a provider it would say whether anyone has bid
             pricing_basis=p.pricing_basis.value,
             item_count=item_counts.get(p.id, 0),
             document_count=document_counts.get(p.id, 0),
@@ -529,6 +531,14 @@ async def upload_document(
     path = f"{user.id}/{requirement_id}/{int(datetime.utcnow().timestamp() * 1000)}-{safe_name}"
     get_storage().save("service-provider-documents", path, content, file.content_type or "application/octet-stream")
 
+    # A renewal of an optional qualification whose approval is still in date:
+    # that approval keeps counting until the renewal is decided.
+    today = kuwait_today()
+    if doc.status == DocumentStatus.approved and doc.file_path and is_added_qualification(cp, requirement) \
+            and (doc.expires_on is None or doc.expires_on >= today):
+        doc.previous_file_path, doc.previous_expires_on = doc.file_path, doc.expires_on
+    elif doc.status != DocumentStatus.pending:
+        doc.previous_file_path = doc.previous_expires_on = None
     doc.file_path = path
     doc.status = DocumentStatus.pending
     doc.submitted_at = datetime.utcnow()
@@ -620,14 +630,14 @@ def _winning_side(db: Session, user: User, project_id: str, *, lock: bool = Fals
 
 
 @router.get("/projects/{project_id}/review", response_model=ReviewOut | None)
-def my_review_of_the_owner(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+def my_review_of_the_owner(project_id: str, user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db)):
     """The provider side's own review of the owner, if it has written one."""
     _winning_side(db, user, project_id)
     return review_of(db, project_id, PROVIDER_TO_OWNER)
 
 
 @router.get("/projects/{project_id}/review/received", response_model=ReceivedReviewOut | None)
-def review_received_from_the_owner(project_id: str, user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+def review_received_from_the_owner(project_id: str, user: User = Depends(require_service_provider_in_standing), db: Session = Depends(get_db)):
     """Stage 8.6: the owner side's review of this winning provider side, once
     recorded -- to the winner's side only, as rating, comment and date. Other
     providers see only the aggregate rating owners already see on offers."""

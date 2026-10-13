@@ -106,13 +106,17 @@ export function OfferForm({
   }, [existingOffer]);
 
   // Stage 3.8: attachments the requirement asks for, one per requested label.
-  const { data: myDocuments = [] } = useQuery({
+  const { data: myDocuments = [], isSuccess: documentsLoaded } = useQuery({
     queryKey: ["my-offer-documents", project.id],
     queryFn: () => apiFetch<OfferDocument[]>(`/projects/${project.id}/offers/documents`),
     enabled: !preview,
     // Stage 5.6: links last an hour; fetch fresh ones before they lapse.
     refetchInterval: 20 * 60 * 1000,
   });
+  // Stage 5.11: the documents shown here are the ones that go -- one changed
+  // elsewhere meanwhile (another tab, a colleague) is refused, never sent unseen.
+  const documentsSeen = (): Record<string, string> =>
+    documentsLoaded ? { "X-Offer-Documents": myDocuments.map((d) => d.token ?? "").filter(Boolean).sort().join(",") } : {};
   const uploadMutation = useMutation({
     mutationFn: ({ label, file }: { label: string; file: File }) => {
       const formData = new FormData();
@@ -149,7 +153,7 @@ export function OfferForm({
     mutationFn: () =>
       apiFetch(`/projects/${project.id}/offers`, {
         method: "POST",
-        headers: existingOffer ? { "If-Match": String(existingOffer.revision) } : undefined,
+        headers: { ...(existingOffer ? { "If-Match": String(existingOffer.revision) } : {}), ...documentsSeen() },
         body: {
           amount: perItem ? null : clean(amount),
           item_prices: perItem ? project.items.map((item) => ({ item_id: item.id, rate: clean(rates[item.id] ?? "") })) : null,
@@ -170,7 +174,10 @@ export function OfferForm({
     // Stage 5.15: a refusal (deadline passed, closed, suspended...) shows the
     // requirement as the server now has it. The offer itself isn't re-read
     // here, so a stale-page refusal never overwrites what was typed.
-    onError: () => queryClient.invalidateQueries({ queryKey: ["project", project.id] }),
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["project", project.id] });
+      queryClient.invalidateQueries({ queryKey: ["my-offer-documents", project.id] }); // e.g. changed elsewhere: show them
+    },
   });
 
   // Stage 5.3/5.4: save the price, then the technical response, on the
@@ -243,7 +250,7 @@ export function OfferForm({
       const saved = await saveDraftMutation.mutateAsync(currentSnapshot);
       return apiFetch<Offer>(`/projects/${project.id}/offers/draft/submit`, {
         method: "POST",
-        headers: { "If-Match": String(saved.draft_version ?? 0) },
+        headers: { "If-Match": String(saved.draft_version ?? 0), ...documentsSeen() },
       });
     },
     onSuccess: (submitted) => {
@@ -259,6 +266,7 @@ export function OfferForm({
     onError: () => {
       queryClient.invalidateQueries({ queryKey: ["my-offer", project.id] });
       queryClient.invalidateQueries({ queryKey: ["project", project.id] });
+      queryClient.invalidateQueries({ queryKey: ["my-offer-documents", project.id] });
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["offer-check", project.id] }),
   });

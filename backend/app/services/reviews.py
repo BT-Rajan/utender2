@@ -28,6 +28,9 @@ OWNER_TO_PROVIDER = "owner_to_provider"
 PROVIDER_TO_OWNER = "provider_to_owner"
 
 
+REVIEW_WINDOW_CLOSED = "The other side's review was published when its sealed period ended, so this transaction can no longer be reviewed from your side."
+
+
 # Stage 8.15: why a party may report a review or response -- policy, not disagreement.
 REPORT_REASONS = ("abusive", "private_information", "not_about_this_transaction", "other")
 
@@ -44,11 +47,18 @@ def is_revealed(review: Review) -> bool:
     return review.is_revealed_now
 
 
-def one_per_reviewer(reviews: list[Review], key) -> list[Review]:
-    """Batch C: the latest review from each counterparty only -- repeated
-    transactions between the same two parties can't stack up a rating."""
+def one_per_reviewer(db: Session, reviews: list[Review], key) -> list[Review]:
+    """Batch C: one review from each counterparty only -- repeated
+    transactions between the same two parties can't stack up a rating. It is
+    the review of their most recently completed transaction, not the one
+    written last: reviewing an older job later can't replace how the latest
+    one went. Newest first, by when each was written."""
+    from app.models.agreement import Agreement
+
+    completed = dict(db.query(Agreement.project_id, Agreement.completed_at).filter(
+        Agreement.project_id.in_({r.project_id for r in reviews}), Agreement.completed_at.isnot(None)).all()) if reviews else {}
     latest: dict[str, Review] = {}
-    for r in sorted(reviews, key=lambda r: (r.created_at or datetime.min, r.id)):
+    for r in sorted(reviews, key=lambda r: (completed.get(r.project_id) or r.created_at or datetime.min, r.id)):
         latest[key(r)] = r
     return sorted(latest.values(), key=lambda r: (r.created_at or datetime.min, r.id), reverse=True)
 
@@ -72,7 +82,7 @@ def _recount_provider(db: Session, profile: ServiceProviderProfile | None, servi
         return
     shown = db.query(Review).filter(
         Review.service_provider_id == service_provider_id, Review.direction == OWNER_TO_PROVIDER, Review.hidden_at.is_(None), revealed()).all()
-    ratings = [r.rating for r in one_per_reviewer(shown, lambda r: r.owner_id)]
+    ratings = [r.rating for r in one_per_reviewer(db, shown, lambda r: r.owner_id)]
     profile.review_count = len(ratings)
     profile.avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else 0
 
@@ -94,6 +104,12 @@ def record_review(db: Session, project: Project, direction: str, reviewer: User,
         raise HTTPException(status_code=400, detail="You can review the owner once the work has been accepted and the transaction is completed.")
     if review_of(db, project.id, direction):
         raise HTTPException(status_code=409, detail="This transaction has already been reviewed (by a colleague or from another tab). This page now shows the latest.")
+    # Batch C: double-blind. Once the other side's review was published because
+    # its sealed period ran out, a review written now could answer it -- the
+    # chance to review this transaction has passed.
+    other_side = review_of(db, project.id, PROVIDER_TO_OWNER if direction == OWNER_TO_PROVIDER else OWNER_TO_PROVIDER)
+    if other_side is not None and other_side.revealed_at is None and other_side.is_revealed_now:
+        raise HTTPException(status_code=409, detail=REVIEW_WINDOW_CLOSED)
     # The parties come from the transaction's own records, never the request:
     # the requirement's owner stakeholder and the award's provider (the PASS 17
     # IDOR fix, now for both directions).

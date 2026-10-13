@@ -125,6 +125,9 @@ class OfferDocumentOut(BaseModel):
     url: str | None = None
     # Stage 5.6: the requirement version it was supplied against.
     material_revision: int = 0
+    # The stored file, for the side's own list: what the page shows is sent
+    # back on submit, so a file changed elsewhere meanwhile isn't sent unseen.
+    token: str | None = None
 
 
 class OfferOut(BaseModel):
@@ -326,5 +329,7 @@ class ShortlistOut(BaseModel):
 
 class OfferConfirm(BaseModel):
     """Confirming an offer after the close. When its proposed start date has
-    passed, the provider gives a new one (the same span of work follows it)."""
+    passed, the provider gives a new one (the same span of work follows it);
+    for an offer that gave only a completion date, a new completion date."""
     proposed_start_date: date | None = None
+    proposed_completion_date: date | None = None
