@@ -509,7 +509,8 @@ export function OfferForm({
               </fieldset>
             )}
             <div className="flex items-center gap-3">
-              <button
+              {/* Two withdrawals are final: the offer can't be put forward again. */}
+              {!(existingOffer?.status === "withdrawn" && existingOffer.withdrawals_left === 0) && <button
                 type="submit"
                 disabled={submitMutation.isPending || submitDraftMutation.isPending}
                 className="bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 w-fit"
@@ -519,7 +520,7 @@ export function OfferForm({
                   : existingOffer
                     ? t("service_provider.offer.updateOffer")
                     : t("service_provider.offer.submitOffer")}
-              </button>
+              </button>}
               {draft && !existingOffer && !preview && (
                 <button
                   type="button"

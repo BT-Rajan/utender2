@@ -30,7 +30,19 @@ review of the service provider's journey, now corrected:
 14. a missing or expired qualification is offered as one to put right only
     when the provider can upload it;
 15. after the representative role is handed over, the new representative
-    can correct the organisation's identity (and only it is offered to)."""
+    can correct the organisation's identity (and only it is offered to);
+16. a provider that was verified (or has offered) can't change who it is when
+    sent back for a correction -- only correct its details;
+17. a person removed from an organisation stops getting its requirement
+    notices; colleagues who joined since get them;
+18. an owner paper tied to a deliverable, added after the provider confirmed
+    the terms, clears that confirmation like any other paper;
+19. evidence is tied only to a progress update, where it shows;
+20. one payment override at a time, and revoking ends it;
+21. the provider is offered an answer to the owner's question only while it
+    can still be answered;
+22. the owner's 30 days to answer don't run while an admin has the
+    requirement suspended."""
 import time
 from datetime import datetime, timedelta
 
@@ -43,7 +55,12 @@ from app.models.enums import DocumentStatus, StakeholderType, UserRole
 from app.models.enums import VerificationStatus
 from app.models.agreement import Agreement, Milestone
 from app.models.offer import Offer
+from app.models.audit_log import AuditLog
+from app.models.enums import NotificationType
+from app.models.notification import Notification
 from app.models.review import Review
+from app.services.tender_lifecycle import interested_providers
+from app.models.project import Project
 from app.services.reputation import provider_reputation
 from app.services.tender_rules import kuwait_today
 from tests.stage7_helpers import put_in_force
@@ -462,3 +479,110 @@ def test_the_new_representative_can_correct_the_organisations_identity(db):
     assert colleague.get("/account/identity").json()["stakeholder"]["organization"]["legal_name"] == "X Contracting"
     # A member can't turn the organisation into an individual.
     assert colleague.put("/account/stakeholder", json={"type": "individual"}).status_code == 409
+
+
+def test_a_verified_provider_sent_back_cant_change_who_it_is(db):
+    owner = _account(db, "owner", "o-who-is@example.com")
+    sp = _account(db, "service_provider", "s-who-is@example.com", organization="Solo W.L.L.")
+    pid = _tender(owner)
+    _submitted(sp, pid)
+    _standing(db, sp, VerificationStatus.changes_requested)  # a document sent back for correction
+    r = sp.put("/account/stakeholder", json={"type": "individual"})
+    assert r.status_code == 409
+    assert sp.get("/account/identity").json()["stakeholder"]["type"] == "organization"
+    # Its details can still be corrected.
+    assert sp.put("/account/stakeholder", json={"type": "organization", "legal_name": "Solo Contracting W.L.L.", "authorized": True}).status_code == 200
+
+
+def test_a_removed_member_stops_getting_the_organisations_requirement_notices(db):
+    owner = _account(db, "owner", "o-removed@example.com")
+    rep, member, org_id, member_id = _organization(db, "service_provider", "Co W.L.L.", "rep@removed.example", "member@removed.example")
+    profile = db.get(ServiceProviderProfile, org_id)
+    profile.payment_override_active, profile.company_name = True, "Co"
+    db.commit()
+    pid = _tender(owner)
+    link = f"/service-provider/projects/{pid}/offer"
+    db.add_all([Notification(user_id=uid, type=NotificationType.new_requirement, title="New", body="New", link=link) for uid in (org_id, member_id)])
+    db.commit()
+    assert {u.id for u in interested_providers(db, db.get(Project, pid))} == {org_id, member_id}
+    assert rep.delete(f"/account/organization/members/{member_id}").status_code == 200
+    assert {u.id for u in interested_providers(db, db.get(Project, pid))} == {org_id}
+
+
+def test_a_deliverable_paper_after_confirmation_needs_confirming_again(db):
+    owner = _account(db, "owner", "o-paper@example.com")
+    sp = _account(db, "service_provider", "s-paper@example.com")
+    pid = _awarded_to(db, owner, sp)
+    base = f"/projects/{pid}/agreement"
+    mid = owner.post(f"{base}/milestones", json={"title": "Panels"}, headers=_v(owner, pid)).json()["milestones"][0]["id"]
+    owner.patch(base, json={"effective_date": kuwait_today().isoformat()}, headers=_v(owner, pid))
+    assert sp.post(f"{base}/confirm", headers=_v(sp, pid)).json()["provider_confirmed_at"] is not None
+    r = owner.post(f"{base}/documents", data={"kind": "agreed_scope", "milestone_id": mid}, files={"file": ("scope.pdf", b"%PDF", "application/pdf")})
+    assert r.status_code == 200, r.text
+    assert r.json()["provider_confirmed_at"] is None
+    assert owner.post(f"{base}/activate", headers=_v(owner, pid)).status_code != 200
+
+
+def test_evidence_is_tied_only_to_a_progress_update(db):
+    owner = _account(db, "owner", "o-evidence@example.com")
+    sp = _account(db, "service_provider", "s-evidence@example.com")
+    pid = _awarded_to(db, owner, sp)
+    base = f"/projects/{pid}/agreement"
+    put_in_force(owner, sp, pid)
+    sp.post(f"{base}/start-work", json={}, headers=_v(sp, pid))
+    from app.models.agreement import ExecutionUpdate
+
+    in_force = {"id": db.query(ExecutionUpdate.id).filter(ExecutionUpdate.kind == "in_force").scalar()}  # a history entry, not progress
+    started = next(h for h in sp.get(base).json()["execution_history"] if h["kind"] == "started")
+    upload = lambda update: sp.post(f"{base}/documents", data={"kind": "progress_photo", "execution_update_id": update},  # noqa: E731
+                                     files={"file": ("p.jpg", b"\xff\xd8x", "image/jpeg")})
+    r = upload(in_force["id"])
+    assert r.status_code == 400 and "progress update" in r.json()["detail"]
+    assert upload(started["id"]).status_code == 200
+
+
+def test_one_payment_override_at_a_time(db):
+    sp = _account(db, "service_provider", "s-override@example.com", paid=False)
+    admin = _admin(db)
+    url = f"/admin/service-providers/{_me(sp)}/payment-override"
+    assert admin.post(url, json={"reason": "Pilot"}).status_code == 200
+    assert admin.post(url, json={"reason": "Again"}).status_code == 409
+    assert admin.post(f"{url}/revoke", json={"reason": "Ended"}).status_code == 200
+    assert all(o["revoked_at"] for o in admin.get(f"/admin/service-providers/{_me(sp)}/payment-overrides").json())
+    assert admin.post(f"{url}/revoke", json={}).status_code == 409
+
+
+def test_the_answer_form_only_while_the_question_can_be_answered(db):
+    owner = _account(db, "owner", "o-answerable@example.com")
+    sp = _account(db, "service_provider", "s-answerable@example.com")
+    pid = _tender(owner)
+    _submitted(sp, pid)
+    owner.post(f"/owner/projects/{pid}/close")
+    oid = sp.get(f"/projects/{pid}/offers/mine").json()["id"]
+    owner.post(f"/owner/projects/{pid}/offers/{oid}/clarifications", json={"question": "Which brand?"})
+    assert [q["answerable"] for q in sp.get(f"/projects/{pid}/offers/mine/clarifications").json()] == [True]
+    owner.post(f"/owner/projects/{pid}/no-award", json={})
+    assert [q["answerable"] for q in sp.get(f"/projects/{pid}/offers/mine/clarifications").json()] == [False]
+
+
+def test_the_owners_30_days_dont_run_while_the_requirement_is_suspended(db):
+    owner = _account(db, "owner", "o-paused-clock@example.com")
+    sp = _account(db, "service_provider", "s-paused-clock@example.com")
+    pid = _awarded_to(db, owner, sp)
+    base = f"/projects/{pid}/agreement"
+    put_in_force(owner, sp, pid)
+    sp.post(f"{base}/start-work", json={}, headers=_v(sp, pid))
+    assert sp.post(f"{base}/completion/submit", json={}, headers=_v(sp, pid)).status_code == 200
+    now = datetime.utcnow()
+    db.query(Agreement).filter(Agreement.project_id == pid).update({Agreement.completion_submitted_at: now - timedelta(days=31)})
+    # Suspended by an admin for 20 of those days (now lifted): the owner could answer for only 11.
+    db.add_all([
+        AuditLog(action="project.suspend", target_type="project", target_id=pid, created_at=now - timedelta(days=28)),
+        AuditLog(action="project.reactivate", target_type="project", target_id=pid, created_at=now - timedelta(days=8)),
+    ])
+    db.commit()
+    assert sp.get(base).json()["completion_review_overdue"] is False
+    assert sp.post(f"{base}/terminate", json={"reason": "No answer"}, headers=_v(sp, pid)).status_code == 409
+    db.query(Agreement).filter(Agreement.project_id == pid).update({Agreement.completion_submitted_at: now - timedelta(days=51)})
+    db.commit()
+    assert sp.get(base).json()["completion_review_overdue"] is True

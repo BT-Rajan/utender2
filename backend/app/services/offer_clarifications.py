@@ -44,4 +44,11 @@ def clarification_out(db: Session, c: Clarification, owner_side: bool) -> OfferC
 
 def offer_clarifications(db: Session, offer: Offer, owner_side: bool) -> list[OfferClarificationOut]:
     rows = db.query(Clarification).filter(Clarification.offer_id == offer.id).order_by(Clarification.created_at.asc(), Clarification.id)
-    return [clarification_out(db, c, owner_side) for c in rows]
+    project = db.get(Project, offer.project_id)
+    open_now = project is not None and closed_reason(project, offer) is None
+    out = []
+    for c in rows:
+        row = clarification_out(db, c, owner_side)
+        row.answerable = open_now and c.answer is None
+        out.append(row)
+    return out

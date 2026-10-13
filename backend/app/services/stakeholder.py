@@ -137,6 +137,24 @@ def identity(user: User, db: Session) -> dict:
     return {"person": person, "role": user.role.value, "stakeholder": stakeholder, "acting_as": acting_as}
 
 
+def _was_verified(db: Session, profile) -> bool:
+    """Whether the stakeholder was ever verified (an admin approved it -- the
+    audit log records every decision), or has already taken part (offers put
+    forward, requirements published) as what it is."""
+    from app.models.audit_log import AuditLog
+    from app.models.offer import Offer, tendered
+    from app.models.project import Project
+
+    if db.query(AuditLog.id).filter(
+        AuditLog.action.in_(("verification_status.set", "owner_verification_status.set")),
+        AuditLog.target_id == profile.user_id, AuditLog.new_value.like("approved%"),
+    ).first():
+        return True
+    if isinstance(profile, ServiceProviderProfile):
+        return db.query(Offer.id).filter(Offer.service_provider_id == profile.user_id, tendered()).first() is not None
+    return db.query(Project.id).filter(Project.owner_id == profile.user_id, Project.published_at.isnot(None)).first() is not None
+
+
 def establish(
     user: User,
     db: Session,
@@ -158,6 +176,14 @@ def establish(
 
         profile = acting_profile(db, user)
     if profile.verification_status not in EDITABLE_STATUSES or profile.is_suspended:
+        raise HTTPException(
+            status_code=409,
+            detail="Who this account represents can't be changed while it is under review or after it has been verified.",
+        )
+    if profile.stakeholder_type is not None and stakeholder_type != profile.stakeholder_type and _was_verified(db, profile):
+        # Sent back for a correction after it was verified: the identity it was
+        # verified as -- and that its offers and requirements were made under --
+        # stays. Only its details (the legal name) can be corrected.
         raise HTTPException(
             status_code=409,
             detail="Who this account represents can't be changed while it is under review or after it has been verified.",

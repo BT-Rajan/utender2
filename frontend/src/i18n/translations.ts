@@ -225,6 +225,7 @@ export interface Dictionary {
     sendAnswer: string;
     ask: string;
     askPlaceholder: string;
+    closed: string;
   };
   evaluationNotes: {
     offerHeading: string;
@@ -2007,6 +2008,7 @@ export const en: Dictionary = {
     sendAnswer: "Send answer",
     ask: "Ask for clarification",
     askPlaceholder: "What would you like this provider to clarify?",
+    closed: "This question can no longer be answered.",
   },
   evaluationNotes: {
     offerHeading: "Your evaluation notes on this offer",
@@ -3890,6 +3892,7 @@ export const ar: Dictionary = {
     sendAnswer: "أرسل الإجابة",
     ask: "اطلب توضيحًا",
     askPlaceholder: "ما الذي تريد من هذا المزوّد توضيحه؟",
+    closed: "لم يعد بالإمكان الإجابة عن هذا السؤال.",
   },
   evaluationNotes: {
     offerHeading: "ملاحظات التقييم الخاصة بك على هذا العرض",

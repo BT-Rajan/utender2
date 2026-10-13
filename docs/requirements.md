@@ -1765,7 +1765,7 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
   - **Dates:** award days and offer-deadline days are Kuwait dates (`app/clock.py`).
   - **Tests:** `tests/test_review_fixes_accounts.py`, `tests/test_review_fixes_transactions.py`.
 
-- **Provider-journey review — fixes #1–#15:**
+- **Provider-journey review — fixes #1–#22:**
   - **Job page during re-review:** a provider whose documents are back under review (changes requested, pending review) keeps sight of its own offer, its history, documents and clarifications, and its reviews (`require_service_provider_in_standing`), so the job page shows its offer and agreement. It can answer the owner's clarification of its offer. Submitting, withdrawing, confirming and reviewing still need an approved account. Only a rejected or suspended account loses sight of it. On a requirement still open for offers, such an account is sent to its verification status page.
   - **One subscription at a time:** checkout locks the provider's profile and expires a checkout it started earlier that hasn't completed (`stripe_checkout_session_id`, migration 0072), so two checkouts (two colleagues, two tabs) can't both create a subscription. One that already completed refuses a new checkout until it shows. A second completed subscription never replaces a live one held, and a subscription event about a subscription other than the one held doesn't change the provider's access.
   - **Billing always reachable:** the billing portal opens for every provider account, suspended, rejected or sent back included, and the verification status page links to it while a subscription is live, so nobody is billed with no way to cancel.
@@ -1781,6 +1781,13 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
   - **An organisation's own services and areas:** eligibility, the opportunities feed, new-requirement notices and the "my services/areas" filters use the organisation's own declared services and governorates, which any member edits. A colleague's personal ones from before joining don't count.
   - **Only what can be put right:** a missing or expired qualification is offered as one the provider can put right only when it can upload it now, not when it is a required document of a verified account, applies only to the other kind of account, or has been retired.
   - **After a hand-over:** the organisation's current representative can correct its identity (legal name) when the application is sent back. The "Change" option is offered to the representative only, not to the founder once a member, nor to other members.
+  - **Who it is, after verification:** a provider or owner that was ever verified (an admin approved it), or has already offered or published as what it is, can't change who it represents when sent back for a correction. It can only correct its details, such as the legal name.
+  - **Notices follow current membership:** the people told about a requirement's changes (amended, ended, answers published) are those acting today for the providers that were told about it. A person removed from an organisation, or deactivated, stops getting them; a colleague who joined since gets them.
+  - **Deliverable papers are terms too:** while the agreement is being prepared, an owner-side paper tied to a deliverable (its agreed scope, say), added or removed after the provider confirmed the terms, clears that confirmation like any other paper.
+  - **Evidence where it shows:** execution evidence can be tied only to a progress update (work started, progress, on hold, resumed, the whole work's delivery), not to other entries of the agreement's history.
+  - **One payment override at a time:** a second grant while one is active is refused; revoking ends every open grant; revoking with none active is refused rather than announced.
+  - **Answering the owner's questions:** each offer clarification says whether it can still be answered (`answerable`), and the provider is offered the answer form only then. "Submit again" isn't offered after an offer's final withdrawal.
+  - **The 30 days pause during a suspension:** the owner side's 30 days to answer submitted work or a delivered deliverable don't run while an admin has the requirement suspended (measured from the audit log's suspend and reactivate entries).
   - **Tests:** `tests/test_provider_journey_fixes.py`.
 - **Review of PR #22:**
   - **Organisations:**

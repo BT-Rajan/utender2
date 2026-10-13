@@ -63,6 +63,8 @@ export function OfferClarifications({
                 </div>
                 <p dir="auto" className="whitespace-pre-wrap break-words">{q.answer}</p>
               </div>
+            ) : role === "provider" && !q.answerable ? (
+              <p className="text-xs text-steel-light mt-1">{t(`${c}.closed`)}</p>
             ) : role === "provider" ? (
               <form
                 className="mt-1 grid gap-1"
