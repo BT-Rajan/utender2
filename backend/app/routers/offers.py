@@ -1,4 +1,5 @@
 from datetime import datetime
+import logging
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from sqlalchemy.orm import Session
@@ -29,6 +30,8 @@ from app.services.offer_response import (
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import bidding_is_open, lock_project, sync_expired_projects
 from app.services.tender_rules import START_PASSED_DETAIL, answers_since, kuwait_today, offer_valid_until, start_date_passed, validity_lapsed
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects/{project_id}/offers", tags=["offers"])
 
@@ -821,6 +824,17 @@ def _confirm_after_close(db: Session, user: User, project: Project, offer: Offer
         new_value=f"material revision {project.material_revision}; stands from {now.isoformat()}Z" + (f"; start {offer.proposed_start_date}" if passed else ""),
     )
     db.refresh(offer)
+    # The owner side is waiting on it to award: tell them. (A sealed tender is
+    # open by now -- offers have closed -- so naming the provider is fine.)
+    try:
+        profile = acting_profile(db, user)
+        notify_team(db, db.get(User, project.owner_id), NotificationType.offer_confirmed, link=f"/owner/projects/{project.id}",
+                    organization_id=project.organization_id, project_title=project.title,
+                    provider=(profile.company_name if profile and profile.company_name else "A provider"))
+        db.commit()
+    except Exception:  # noqa: BLE001 -- a notice never undoes the confirmation
+        db.rollback()
+        logger.exception("Could not tell the owner side offer %s was confirmed", offer.id)
     return _with_documents(db, offer)
 
 

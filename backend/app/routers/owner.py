@@ -821,8 +821,13 @@ def publish_project(project_id: str, user: User = Depends(require_owner), db: Se
 def close_project(project_id: str, user: User = Depends(require_owner), db: Session = Depends(get_db)):
     """Manually stop accepting bids before the deadline — e.g. the owner is
     satisfied with what's in hand and wants to move straight to evaluation."""
+    # The deadline may have passed without anything reading the requirement
+    # since: it closed then, by itself -- not now, and not early.
+    sync_expired_projects(db)
     project = _get_owned_project(project_id, user, db, lock=True)
     if project.status != ProjectStatus.open:
+        if project.status in (ProjectStatus.closed, ProjectStatus.expired) and project.closed_at == project.bid_deadline:
+            raise HTTPException(status_code=400, detail="Offers already closed at the deadline.")
         raise HTTPException(status_code=400, detail="Only an open project can be closed.")
     # Closing lifts the seal (is_sealed_and_open turns false), so an owner who
     # could close early could read every sealed bid before the deadline.

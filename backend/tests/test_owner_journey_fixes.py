@@ -15,7 +15,14 @@ of the owner's journey, now corrected:
 8. a published answer's files can't be added to afterwards, and a
    colleague's files from an answer that never went in aren't part of it;
 9. an answered question stays tied to the change it brought about;
-10. the deadline reminder is sent again before an extended deadline."""
+10. the deadline reminder is sent again before an extended deadline;
+11. "close early" after the deadline is the deadline's own close, not an early one;
+12. a suspended owner can't publish answers;
+13. a draft whose deadline passed is refused the same way by every editor,
+    with a way forward;
+14. an agreed change can't move the completion date before open deliverables;
+15. the owner side is told when offers close, when nobody bid, and when a
+    provider confirms its offer."""
 from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
@@ -23,11 +30,14 @@ from fastapi.testclient import TestClient
 from app.models.enums import NotificationType
 from app.models.notification import Notification
 from app.main import app
+from app.models.audit_log import AuditLog
 from app.models.offer import Offer, OfferRevision
+from app.models.owner import OwnerProfile
 from app.models.project import Project
 from app.models.service_provider import ServiceProviderProfile
 from app.services.tender_rules import kuwait_today
 from tests.test_batch_a_contract_logic import _v
+from tests.stage7_helpers import put_in_force
 from tests.test_batch_c_trust_accounts import _completed, _me
 from tests.test_stage4_9_participation import _account, _admin
 from tests.test_organization_sharing import _organization
@@ -234,3 +244,108 @@ def test_the_deadline_reminder_is_sent_again_before_an_extended_deadline(db, mon
     project.bid_deadline = datetime.utcnow() + timedelta(hours=10)  # time passes
     db.commit()
     assert remind() == 1
+
+
+def _deadline_passes(db, pid, minutes=30):
+    project = db.get(Project, pid)
+    project.bid_deadline = datetime.utcnow() - timedelta(minutes=minutes)
+    db.commit()
+
+
+def test_close_early_after_the_deadline_is_the_deadlines_own_close(db):
+    owner = _account(db, "owner", "o-late-close@example.com")
+    sp = _account(db, "service_provider", "s-late-close@example.com")
+    pid = _tender(owner)
+    _submitted(sp, pid)
+    _deadline_passes(db, pid)  # nothing has read it since
+    r = owner.post(f"/owner/projects/{pid}/close")
+    assert r.status_code == 400 and "already closed at the deadline" in r.json()["detail"]
+    db.expire_all()
+    project = db.get(Project, pid)
+    assert project.status.value == "closed" and project.closed_at == project.bid_deadline
+    assert db.query(AuditLog).filter(AuditLog.action == "project.close", AuditLog.target_id == pid).count() == 0
+
+
+def test_a_suspended_owner_cant_publish_an_answer(db):
+    owner = _account(db, "owner", "o-susp-qa@example.com")
+    sp = _account(db, "service_provider", "s-susp-qa@example.com")
+    pid = _tender(owner)
+    q = sp.post(f"/projects/{pid}/clarifications", json={"question": "Gate width?"}).json()["id"]
+    db.get(OwnerProfile, _me(owner)).is_suspended = True
+    db.commit()
+    r = owner.post(f"/projects/{pid}/clarifications/{q}/answer", json={"answer": "4 m."})
+    assert r.status_code == 403
+    assert all(c["answer"] is None for c in sp.get(f"/projects/{pid}/clarifications").json())
+
+
+def test_an_expired_draft_is_refused_the_same_way_everywhere_and_can_start_again(db):
+    owner = _account(db, "owner", "o-exp-draft@example.com")
+    pid = owner.post("/projects", data={"title": "Boundary wall", "address": "Kaifan", "description": "A wall.", "bid_deadline": _when(10)}).json()["id"]
+    v = owner.get(f"/projects/{pid}").json()["version"]
+    _deadline_passes(db, pid)  # while its page was open
+    expired = "it has expired"
+    r = owner.put(f"/projects/{pid}/tender-rules", json={"tender_type": "owner_visible", "questions_allowed": True, "commercial_conditions": {}}, headers={"If-Match": str(v)})
+    assert r.status_code == 400 and expired in r.json()["detail"]
+    r = owner.post(f"/owner/projects/{pid}/publish")
+    assert r.status_code == 400 and expired in r.json()["detail"]
+    r = owner.patch(f"/projects/{pid}", json={"bid_deadline": _when(7)}, headers={"If-Match": str(v)})
+    assert r.status_code == 400 and expired in r.json()["detail"]
+    assert owner.get(f"/projects/{pid}").json()["status"] == "expired"
+    assert owner.post(f"/owner/projects/{pid}/restart", json={}).status_code == 201
+
+
+def test_a_change_cant_move_completion_before_an_open_deliverable(db):
+    owner = _account(db, "owner", "o-early-done@example.com")
+    sp = _account(db, "service_provider", "s-early-done@example.com")
+    pid = _tender(owner)
+    _submitted(sp, pid)
+    owner.post(f"/owner/projects/{pid}/close")
+    owner.post(f"/owner/projects/{pid}/offers/{sp.get(f'/projects/{pid}/offers/mine').json()['id']}/approve")
+    due = kuwait_today() + timedelta(days=25)
+    r = owner.post(f"/projects/{pid}/agreement/milestones", json={"title": "Phase 2", "due_date": due.isoformat()}, headers=_v(owner, pid))
+    assert r.status_code == 200, r.text
+    put_in_force(owner, sp, pid)
+    early = (kuwait_today() + timedelta(days=5)).isoformat()
+    r = sp.post(f"/projects/{pid}/agreement/variations", json={"description": "Finish early", "completion_date": early}, headers=_v(sp, pid))
+    assert r.status_code == 400 and "due after this completion date" in r.json()["detail"]
+    # Rescheduling the deliverable in the same change keeps the schedule coherent.
+    mid = sp.get(f"/projects/{pid}/agreement").json()["milestones"][0]["id"]
+    r = sp.post(f"/projects/{pid}/agreement/variations", json={"description": "Finish early", "completion_date": early,
+                                                               "milestone_id": mid, "milestone_due_date": early}, headers=_v(sp, pid))
+    assert r.status_code == 200, r.text
+
+
+def _notices(db, client, kind):
+    return db.query(Notification).filter(Notification.user_id == _me(client), Notification.type == kind).all()
+
+
+def test_the_owner_is_told_when_offers_close_or_nobody_bid(db):
+    owner = _account(db, "owner", "o-told@example.com")
+    sp = _account(db, "service_provider", "s-told@example.com")
+    with_offer, without = _tender(owner, title="Wall"), _tender(owner, title="Gate")
+    _submitted(sp, with_offer)
+    _deadline_passes(db, with_offer)
+    _deadline_passes(db, without)
+    owner.get("/owner/projects")  # any read moves them on
+    ready = _notices(db, owner, NotificationType.evaluation_ready)
+    assert len(ready) == 1 and ready[0].link == f"/owner/projects/{with_offer}" and "1 offer" in ready[0].body
+    nobody = _notices(db, owner, NotificationType.requirement_expired)
+    assert len(nobody) == 1 and nobody[0].link == f"/owner/projects/{without}"
+    owner.get("/owner/projects")
+    assert len(_notices(db, owner, NotificationType.evaluation_ready)) == 1  # once
+
+
+def test_the_owner_is_told_when_a_provider_confirms_its_offer(db):
+    owner = _account(db, "owner", "o-confirmed@example.com")
+    sp = _account(db, "service_provider", "s-confirmed@example.com")
+    pid = _tender(owner)
+    _submitted(sp, pid)
+    owner.post(f"/owner/projects/{pid}/close")
+    oid = sp.get(f"/projects/{pid}/offers/mine").json()["id"]
+    offer = db.get(Offer, oid)
+    offer.proposed_start_date = kuwait_today() - timedelta(days=1)
+    db.commit()
+    owner.post(f"/owner/projects/{pid}/offers/{oid}/request-confirmation")
+    assert sp.post(f"/projects/{pid}/offers/confirm", json={"proposed_start_date": (kuwait_today() + timedelta(days=3)).isoformat()}).status_code == 200
+    told = _notices(db, owner, NotificationType.offer_confirmed)
+    assert len(told) == 1 and told[0].link == f"/owner/projects/{pid}"

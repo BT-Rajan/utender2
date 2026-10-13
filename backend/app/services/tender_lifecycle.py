@@ -113,6 +113,7 @@ def sync_expired_projects(db: Session) -> None:
         # externally, at once). Callers run this first, with nothing pending.
         db.commit()
         return
+    reached = []  # published requirements whose offers closed now
     for project in stale:
         if project.status == ProjectStatus.draft:
             # Stage 3.11: a draft whose offer deadline passed before it was
@@ -134,7 +135,47 @@ def sync_expired_projects(db: Session) -> None:
         # Offers stopped at the deadline (Stage 3.15), paused or not.
         project.closed_at = project.bid_deadline
         project.paused_at = None
+        reached.append(project)
     db.commit()
+    for project in reached:
+        _tell_owner_deadline_reached(db, project)
+
+
+def _tell_owner_deadline_reached(db: Session, project: Project) -> None:
+    """After the change is committed: the owner side is told its offers
+    closed (and how many to evaluate), or that nobody made one. Best-effort."""
+    import logging
+
+    from app.models.enums import NotificationType
+    from app.models.offer import counted
+    from app.models.user import User
+    from app.services.notify import notify_team
+
+    try:
+        owner = db.get(User, project.owner_id)
+        link = f"/owner/projects/{project.id}"
+        if project.status == ProjectStatus.closed:
+            count = db.query(Offer.id).filter(Offer.project_id == project.id, counted(), Offer.is_suspended.is_(False)).count()
+            notify_team(db, owner, NotificationType.evaluation_ready, link=link, organization_id=project.organization_id, project_title=project.title, count=count)
+        else:
+            notify_team(db, owner, NotificationType.requirement_expired, link=link, organization_id=project.organization_id, project_title=project.title)
+        db.commit()
+    except Exception:  # noqa: BLE001 -- a notice never undoes the close
+        db.rollback()
+        logging.getLogger(__name__).exception("Could not tell the owner side %s reached its deadline", project.id)
+
+
+EXPIRED_DRAFT = "This draft's offer deadline passed before it was published, so it has expired and can't be changed or published. Start a new draft from it."
+
+
+def is_expired_draft(project: Project) -> bool:
+    """Stage 3.11: a draft whose offer deadline passed before it was published
+    -- expired, whether or not a read has marked it so yet."""
+    if project.published_at is not None or project.discarded_at is not None:
+        return False
+    return project.status == ProjectStatus.expired or (
+        project.status == ProjectStatus.draft and project.bid_deadline is not None and project.bid_deadline <= datetime.utcnow()
+    )
 
 
 def publish(db: Session, project: Project, actor_id: str) -> None:
@@ -149,11 +190,13 @@ def publish(db: Session, project: Project, actor_id: str) -> None:
     from app.services import requirement_quality
     from app.services.audit import log_action
 
+    if is_expired_draft(project):
+        raise HTTPException(status_code=400, detail=EXPIRED_DRAFT)
     if project.status != ProjectStatus.draft or project.discarded_at is not None:
         raise HTTPException(status_code=400, detail="Only a draft project can be published.")
     now = db_now(db)
     if project.bid_deadline is None or project.bid_deadline <= now:
-        raise HTTPException(status_code=400, detail="Set a bid deadline in the future before publishing.")
+        raise HTTPException(status_code=400, detail=EXPIRED_DRAFT)
     requirement_quality.assert_publishable(db, project)  # Stage 3.12, authoritative
     project.status = ProjectStatus.open
     project.published_at = now.replace(microsecond=0)

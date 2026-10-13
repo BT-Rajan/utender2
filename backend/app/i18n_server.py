@@ -165,7 +165,6 @@ AR: dict[str, str] = {
     "Choose again under Who can respond.": "اختر مجددًا في من يمكنه تقديم عرض.",
     "The requirement depends on its documents, but none are uploaded.": "يعتمد الطلب على مستنداته، لكن لم يُرفع أي منها.",
     "Upload them, or untick that providers need them to price.": "ارفعها، أو ألغِ تحديد أن مقدمي الخدمة يحتاجونها للتسعير.",
-    "Set a bid deadline in the future before publishing.": "حدد موعدًا مستقبليًا لإغلاق العروض قبل النشر.",
     "Only a draft project can be published.": "يمكن نشر مسودة المشروع فقط.",
     # --- lifecycle ---
     "Only an open project can be closed.": "يمكن إغلاق المشروع المفتوح فقط.",
@@ -437,6 +436,10 @@ AR: dict[str, str] = {
     "This person set up the organization and its profile is tied to their account, so they can't be removed.": "أنشأ هذا الشخص المنظمة وملفها مرتبط بحسابه، لذا لا يمكن إزالته.",
     "This offer's proposed start date has already passed, so it can no longer be awarded as it stands.": "تاريخ البدء المقترح في هذا العرض قد مضى، لذا لا يمكن ترسيته كما هو.",
     "Give a new start date to confirm it.": "حدّد تاريخ بدء جديدًا لتأكيده.",
+    "A deliverable that isn't accepted yet is due after this completion date.": "أحد التسليمات غير المقبولة بعد مستحق بعد تاريخ الإنجاز هذا.",
+    "Reschedule it in the same change, or choose a later date.": "أعد جدولته في التعديل نفسه، أو اختر تاريخًا لاحقًا.",
+    "This draft's offer deadline passed before it was published, so it has expired and can't be changed or published. Start a new draft from it.": "مضى الموعد النهائي لتقديم العروض في هذه المسودة قبل نشرها، لذا انتهت صلاحيتها ولا يمكن تعديلها أو نشرها. ابدأ مسودة جديدة منها.",
+    "Offers already closed at the deadline.": "أُغلق تقديم العروض بالفعل عند الموعد النهائي.",
     "That question is already tied to an earlier change.": "هذا السؤال مرتبط بالفعل بتعديل سابق.",
     "The new start date can't be in the past.": "لا يمكن أن يكون تاريخ البدء الجديد في الماضي.",
     "Your offer's start date hasn't passed; it is confirmed as it stands.": "لم يمضِ تاريخ البدء في عرضك؛ يُؤكَّد العرض كما هو.",

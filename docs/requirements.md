@@ -1702,7 +1702,7 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
   - Migration 0067.
   - **Tests:** `tests/test_batch_c_trust_accounts.py`.
 
-- **Owner-journey review — fixes #1–#10:**
+- **Owner-journey review — fixes #1–#15:**
   - **Sealed invitations:** on a sealed tender before its deadline, inviting a previous provider answers the same whether or not that provider has bid. A bidder is recorded as invited (a repeat is refused like any other) but isn't sent the notice. On an owner-visible tender the owner is still told the provider has already made an offer.
   - **Job page during re-review:** a party whose documents are back under review (changes requested, pending review) keeps the page of the requirement and its transaction (`/owner/projects/{id}`, `/service-provider/projects/{id}/offer`), as the server already allowed (Batch A). A suspended owner keeps it read-only (7.14). Only a rejected account, or a suspended provider, is sent to the status page. The review form is replaced by a note until the account is approved again, since the server refuses reviews until then.
   - **Start date passed during evaluation:**
@@ -1717,6 +1717,15 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
   - **Answer files:** files on an answer go in with it. Once a question is answered, no files can be added to the answer. When someone answers, only their own files stay with it: a colleague's files from an answer that never went in are removed.
   - **One change per question:** an answered question stays tied to the change it brought about. Tying it to a later change is refused, and the amend form only offers questions not yet tied to one.
   - **Deadline reminder after an extension:** when the deadline moves more than a day away, the owner side is reminded again a day before the new deadline (`set_bid_deadline`, also used by admin edits). An extension that is still within the day doesn't repeat the reminder just sent.
+  - **Close after the deadline:** "close early" clicked after the deadline (before anything read the requirement) is no longer recorded as an early close. The requirement closed at its deadline, by itself; the owner is told "Offers already closed at the deadline", and nothing tells providers it ended early.
+  - **Answers need an active owner:** a suspended (or no longer approved) owner can't publish an answer, as for its files and every other change.
+  - **Expired drafts:** a draft whose offer deadline passed before it was published is refused the same way by every editor and by publish: "it has expired … Start a new draft from it" (`EXPIRED_DRAFT`), whether or not a read has marked it expired yet. A page open on it reloads when the deadline passes and shows "Start a new draft from this".
+  - **Completion date and open deliverables:** a change can't move the completion date before a deliverable that isn't accepted yet, unless the same change reschedules that deliverable. It is checked when proposed and again when agreed.
+  - **Owner notices:**
+    - offers closed at the deadline: `evaluation_ready`, with the number of offers to evaluate;
+    - the deadline passed with no offer: `requirement_expired`;
+    - a provider confirmed its offer still stands: `offer_confirmed`.
+    - Sent once, after the change is committed, to everyone acting for the owner. Migration 0070.
   - **Tests:** `tests/test_owner_journey_fixes.py`.
 
 _Later Stage 9 steps are added as they are implemented._

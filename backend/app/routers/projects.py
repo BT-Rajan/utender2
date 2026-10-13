@@ -51,7 +51,7 @@ from app.services.notify import notify, notify_team
 from app.services.team import acting_id, acting_profile, can_access, mine, org_of, owns
 from app.services import requirement_quality
 from app.services.storage import drawing_url_expiry_seconds, get_storage
-from app.services.tender_lifecycle import interested_providers, is_sealed_and_open, lock_project, now_for, publish, set_bid_deadline, sync_expired_projects, transaction_status
+from app.services.tender_lifecycle import EXPIRED_DRAFT, interested_providers, is_expired_draft, is_sealed_and_open, lock_project, now_for, publish, set_bid_deadline, sync_expired_projects, transaction_status
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -345,6 +345,9 @@ def _guard_draft_write(project: Project, if_match: str | None) -> None:
     the version the page last saw."""
     if project.discarded_at is not None:
         raise HTTPException(status_code=409, detail="This draft was discarded and can no longer be changed.")
+    # Every draft editor refuses an expired draft the same way, marked so or not yet.
+    if is_expired_draft(project):
+        raise HTTPException(status_code=400, detail=EXPIRED_DRAFT)
     if if_match and if_match.strip('"') != str(project.version):
         raise HTTPException(
             status_code=409,

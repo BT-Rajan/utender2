@@ -532,6 +532,18 @@ export function OwnerProjectDetailPage() {
     enabled: !!project && project.status === "draft" && !project.discarded_at,
   });
 
+  // Stage 3.11: a draft expires when its offer deadline passes unpublished. If
+  // that happens while it is open here, show it as it now is (expired, with
+  // "Start a new draft from this") rather than an editor nothing can be saved from.
+  const draftDeadline = project?.status === "draft" ? project.bid_deadline : null;
+  useEffect(() => {
+    if (!draftDeadline) return;
+    const ms = new Date(draftDeadline).getTime() - Date.now();
+    if (ms > 2 ** 31 - 1) return; // beyond what a timer holds; the page is reloaded long before
+    const timer = setTimeout(() => queryClient.invalidateQueries({ queryKey: ["project", id] }), Math.max(ms, 0) + 1000);
+    return () => clearTimeout(timer);
+  }, [draftDeadline, id, queryClient]);
+
   if (!project) return <PageLoading />;
   // Stage 3.11: a discarded draft stays readable to its owner but is closed to changes.
   const editableDraft = project.status === "draft" && !project.discarded_at;

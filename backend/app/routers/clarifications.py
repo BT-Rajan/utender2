@@ -189,6 +189,11 @@ def answer_clarification(
     project = db.get(Project, project_id)
     if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
+    # A suspended (or no longer approved) owner keeps read access but publishes
+    # nothing -- the same rule as for the answer's files and every other change.
+    profile = acting_profile(db, user)
+    if not profile or not profile.is_verified_active:
+        raise HTTPException(status_code=403, detail="not_approved")
 
     # Locked: two people on the owner's side answering at once -- one answer
     # is recorded, the other is told it was already answered.
