@@ -11,7 +11,8 @@ import { StakeholderSummary, type Stakeholder } from "@/components/Stakeholder";
 import { useI18n } from "@/i18n/I18nContext";
 import { PageLoading } from "@/components/PageLoading";
 
-const STATUS_OPTIONS = ["incomplete", "pending_review", "changes_requested", "approved", "rejected"] as const;
+// The decisions an admin can set by hand; the other states follow from the applicant's own uploads and submission.
+const STATUS_OPTIONS = ["changes_requested", "approved", "rejected"] as const;
 
 const MARKETPLACE_STATUS_LABEL: Record<string, string> = {
   documents_incomplete: "Documents incomplete",
@@ -194,6 +195,7 @@ export function AdminServiceProviderDetailPage() {
   const [primaryTrade, setPrimaryTrade] = useState("");
   const [serviceArea, setServiceArea] = useState("");
   const [statusValue, setStatusValue] = useState<string>("");
+  const [statusNote, setStatusNote] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -202,7 +204,7 @@ export function AdminServiceProviderDetailPage() {
     setLicenseNumber(service_provider.license_number ?? "");
     setPrimaryTrade(service_provider.primary_trade ?? "");
     setServiceArea(service_provider.service_area ?? "");
-    setStatusValue(service_provider.verification_status);
+    setStatusValue((STATUS_OPTIONS as readonly string[]).includes(service_provider.verification_status) ? service_provider.verification_status : "");
   }, [service_provider?.user_id]);
 
   const invalidate = () => {
@@ -224,8 +226,11 @@ export function AdminServiceProviderDetailPage() {
   });
 
   const statusMutation = useMutation({
-    mutationFn: () => apiFetch(`/admin/service-providers/${id}/verification-status`, { method: "POST", body: { status: statusValue } }),
-    onSuccess: invalidate,
+    mutationFn: () => apiFetch(`/admin/service-providers/${id}/verification-status`, { method: "POST", body: { status: statusValue, note: statusNote.trim() || null } }),
+    onSuccess: () => {
+      setStatusNote("");
+      invalidate();
+    },
     onError: (err) => onMutationError(err, "Could not update verification status."),
   });
 
@@ -296,6 +301,9 @@ export function AdminServiceProviderDetailPage() {
             <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-3">Verification status</h3>
             <div className="flex items-center gap-2">
               <select value={statusValue} onChange={(e) => setStatusValue(e.target.value)} className="border border-border rounded px-2.5 py-2 text-sm flex-1">
+                <option value="" disabled>
+                  choose a decision
+                </option>
                 {STATUS_OPTIONS.map((s) => (
                   <option key={s} value={s}>
                     {s.replace("_", " ")}
@@ -305,12 +313,21 @@ export function AdminServiceProviderDetailPage() {
               <button
                 type="button"
                 onClick={() => statusMutation.mutate()}
+                disabled={!statusValue || statusMutation.isPending}
                 className="border border-navy text-navy hover:bg-navy hover:text-white text-xs font-semibold rounded px-3 py-2"
               >
                 Update
               </button>
             </div>
-            <p className="text-[11px] text-steel-light mt-2">Admin override — bypasses the per-document review flow. Use with care.</p>
+            <input
+              value={statusNote}
+              onChange={(e) => setStatusNote(e.target.value)}
+              placeholder="Reason (required to send back or reject)"
+              className="mt-2 w-full border border-border rounded px-2.5 py-2 text-sm"
+            />
+            <p className="text-[11px] text-steel-light mt-2">
+              Same rules as the review buttons: approving needs every required document approved, and the provider is notified.
+            </p>
           </div>
 
           <MarketplaceAccessPanel serviceProviderId={service_provider.user_id} service_provider={service_provider} />

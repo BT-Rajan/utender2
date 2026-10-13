@@ -1,3 +1,4 @@
+import logging
 import json
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -238,6 +239,13 @@ def _decide_document(db: Session, admin: User, profile, requirement_id: str, dec
     req, doc = entry
     if doc.status == DocumentStatus.not_submitted:
         raise HTTPException(status_code=400, detail="This document hasn't been uploaded yet.")
+    if profile.verification_status == VerificationStatus.rejected:
+        # A rejection is final until an admin reopens it; a document decision
+        # must not quietly turn it back into "changes requested".
+        raise HTTPException(
+            status_code=409,
+            detail="This application was rejected. Reopen it by requesting changes before deciding its documents.",
+        )
     note = (note or "").strip() or None
     if decision == DocumentStatus.rejected and not note:
         raise HTTPException(status_code=400, detail="Say what needs to be corrected, so the account holder knows what to fix.")
@@ -257,10 +265,14 @@ def _decide_document(db: Session, admin: User, profile, requirement_id: str, dec
         doc.status, doc.file_path, doc.expires_on = DocumentStatus.approved, doc.previous_file_path, doc.previous_expires_on
     if renewal:
         doc.previous_file_path = doc.previous_expires_on = None
-    if decision == DocumentStatus.rejected and not is_added_qualification(profile, req):
-        # A correction sends the whole application back to the account holder
-        # -- except for an optional qualification a verified account added
-        # later, which is decided on its own (their access is untouched).
+    # An optional qualification a verified account added later is decided on
+    # its own -- also while the account is suspended: a suspension cuts
+    # access, it doesn't undo the verification.
+    added_later = not req.is_required and profile.verification_status == VerificationStatus.approved
+    sent_back = decision == DocumentStatus.rejected and not added_later and profile.verification_status != VerificationStatus.changes_requested
+    previous_status = profile.verification_status.value
+    if decision == DocumentStatus.rejected and not added_later:
+        # A correction sends the whole application back to the account holder.
         profile.verification_status = VerificationStatus.changes_requested
     db.commit()
 
@@ -275,6 +287,10 @@ def _decide_document(db: Session, admin: User, profile, requirement_id: str, dec
         new_value=f"{req.name}: {decision.value}" + (f" ({note})" if note else ""),
     )
     is_owner = isinstance(profile, OwnerProfile)
+    if sent_back:  # the application's own status changed with it -- on its trail too
+        log_action(db, actor_id=admin.id, action="owner_verification_status.set" if is_owner else "verification_status.set",
+                   target_type=target_type, target_id=profile.user_id, previous_value=previous_status,
+                   new_value=f"{VerificationStatus.changes_requested.value} ({req.name})")
     if decision == DocumentStatus.approved:
         kind = NotificationType.owner_document_approved if is_owner else NotificationType.document_approved
     else:
@@ -542,6 +558,25 @@ def update_service_provider(service_provider_id: str, payload: ServiceProviderPr
 
 class VerificationStatusPatch(BaseModel):
     status: VerificationStatus
+    note: str | None = None
+
+
+_OVERRIDABLE = (VerificationStatus.approved, VerificationStatus.changes_requested, VerificationStatus.rejected)
+
+
+def _override_application(db: Session, admin: User, profile, payload: VerificationStatusPatch) -> None:
+    """The manual verification-status control: the same decision as the
+    review buttons, under the same rules -- approval needs every required
+    document approved, a send-back or rejection says why, and the account
+    holder is told. "incomplete" and "pending_review" follow from the
+    applicant's own uploads and submission, so they aren't set by hand; a
+    rejected application is reopened by requesting changes."""
+    if payload.status not in _OVERRIDABLE:
+        raise HTTPException(
+            status_code=400,
+            detail="Set an application to approved, changes requested or rejected. To reopen a rejected application, request changes.",
+        )
+    _decide_application(db, admin, profile, payload.status, payload.note)
 
 
 @router.post("/service-providers/{service_provider_id}/verification-status", response_model=ServiceProviderProfileOut)
@@ -552,20 +587,8 @@ def set_verification_status(
     db: Session = Depends(get_db),
 ):
     cp = _get_active_service_provider_profile(db, service_provider_id)
-    previous = cp.verification_status.value
-    cp.verification_status = payload.status
-    db.commit()
-    db.refresh(cp)
-    log_action(
-        db,
-        actor_id=admin.id,
-        action="verification_status.set",
-        target_type="service_provider_profile",
-        target_id=service_provider_id,
-        previous_value=previous,
-        new_value=payload.status.value,
-    )
-    return cp
+    _override_application(db, admin, cp, payload)
+    return ServiceProviderProfileOut(**_profile_fields(cp), email=cp.user.email)
 
 
 class SuspendPatch(BaseModel):
@@ -835,19 +858,15 @@ def delete_service_provider(service_provider_id: str, admin: User = Depends(requ
             detail="This service provider has been awarded a requirement and its award record is on file. Suspend the account instead of deleting it.",
         )
 
-    docs_with_files = (
-        db.query(ServiceProviderDocument.file_path)
-        .filter(ServiceProviderDocument.service_provider_id == service_provider_id, ServiceProviderDocument.file_path.isnot(None))
-        .all()
-    )
-    paths = [p[0] for p in docs_with_files if p[0]]
-    if paths:
-        get_storage().delete("service-provider-documents", paths)
-
     user = db.get(User, service_provider_id)
     if not user:
         raise HTTPException(status_code=404, detail="Service provider not found.")
     _no_recorded_history(db, service_provider_id)  # after the more specific guards above
+    # Every check passes before anything is removed: a refused delete changes nothing.
+    paths = [p for (p,) in db.query(ServiceProviderDocument.file_path).filter(
+        ServiceProviderDocument.service_provider_id == service_provider_id, ServiceProviderDocument.file_path.isnot(None)) if p]
+    paths += [p for (p,) in db.query(ServiceProviderDocument.previous_file_path).filter(
+        ServiceProviderDocument.service_provider_id == service_provider_id, ServiceProviderDocument.previous_file_path.isnot(None)) if p]
     from app.models.saved_opportunity import SavedOpportunity
 
     db.query(SavedOpportunity).filter(SavedOpportunity.service_provider_id == service_provider_id).delete(synchronize_session=False)  # Stage 4.8
@@ -855,7 +874,20 @@ def delete_service_provider(service_provider_id: str, admin: User = Depends(requ
     db.delete(user)  # cascades to service_provider_profiles -> service_provider_documents/offers
     # Stage 9.4: removing an account is on the audit trail, with who it was (log_action commits the deletion with it).
     log_action(db, actor_id=admin.id, action="service_provider.delete", target_type="user", target_id=service_provider_id, previous_value=snapshot)
+    _remove_files("service-provider-documents", paths)  # only once the deletion is committed
     return None
+
+
+def _remove_files(bucket: str, paths: list[str]) -> None:
+    """Stored files of a deleted account, removed after the deletion is
+    committed. Best-effort: a leftover file is unreachable, a missing one
+    behind a live record is not."""
+    if not paths:
+        return
+    try:
+        get_storage().delete(bucket, paths)
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).exception("Could not remove the files of a deleted account")
 
 
 # ---------- owner management (mirrors the service provider management section
@@ -976,20 +1008,9 @@ def set_owner_verification_status(
     owner_id: str, payload: VerificationStatusPatch, admin: User = Depends(require_admin), db: Session = Depends(get_db)
 ):
     """Manual override, mirroring the service provider one -- e.g. to reopen a
-    rejected application."""
+    rejected application (request changes)."""
     op = _get_active_owner_profile(db, owner_id)
-    previous = op.verification_status.value
-    op.verification_status = payload.status
-    db.commit()
-    log_action(
-        db,
-        actor_id=admin.id,
-        action="owner_verification_status.set",
-        target_type="owner_profile",
-        target_id=owner_id,
-        previous_value=previous,
-        new_value=payload.status.value,
-    )
+    _override_application(db, admin, op, payload)
     return OwnerProfileOut(**_owner_fields(op, op.user))
 
 
@@ -1049,22 +1070,15 @@ def delete_owner(owner_id: str, admin: User = Depends(require_admin), db: Sessio
         )
     _no_recorded_history(db, owner_id)  # after the more specific guards above
 
-    docs_with_files = (
-        db.query(OwnerDocument.file_path)
-        .filter(OwnerDocument.owner_id == owner_id, OwnerDocument.file_path.isnot(None))
-        .all()
-    )
-    paths = [p[0] for p in docs_with_files if p[0]]
-    if paths:
-        get_storage().delete("owner-documents", paths)
-
     user = db.get(User, owner_id)
     if not user:
         raise HTTPException(status_code=404, detail="Owner not found.")
+    paths = [p for (p,) in db.query(OwnerDocument.file_path).filter(OwnerDocument.owner_id == owner_id, OwnerDocument.file_path.isnot(None)) if p]
     snapshot = json.dumps({"email": user.email, "full_name": user.full_name})
     db.delete(user)  # cascades to owner_profiles -> owner_documents
     # Stage 9.4: removing an account is on the audit trail (log_action commits the deletion with it).
     log_action(db, actor_id=admin.id, action="owner.delete", target_type="user", target_id=owner_id, previous_value=snapshot)
+    _remove_files("owner-documents", paths)  # only once the deletion is committed
     return None
 
 

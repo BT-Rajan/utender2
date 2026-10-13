@@ -1811,5 +1811,12 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
     - `SEED_PASSWORD` must fit the app's 8–72 rule.
     - The password is saved before seeding starts.
   - **Tests:** `tests/test_pr22_review_fixes_accounts.py`, `tests/test_pr22_review_fixes_transactions.py`.
+- **Admin-journey review — fixes #1–#5:**
+  - **A refused deletion changes nothing:** deleting a provider or owner account checks every rule (reviews, awards, recorded history) before anything is removed. The account's stored files, including a renewal's previous file, are removed only after the deletion is committed (best-effort: a leftover file is unreachable, a missing one behind a live record is not).
+  - **The 30 days pause while the owner can't act:** the owner side's 30 days to answer submitted work or a delivered deliverable also don't run while an admin has the owner account suspended or its login deactivated (`owner.suspend`/`owner.reactivate`, `account.deactivate`/`account.reactivate` in the audit log). Overlapping pauses count once.
+  - **The manual verification control follows the review rules:** setting a provider's or owner's verification status by hand is the same decision as the review buttons. Approving needs every required document approved; a send-back or a rejection gives its reason (`note`); the account holder's side is told. "Incomplete" and "pending review" follow from the applicant's own uploads and submission and aren't set by hand. A rejected application is reopened by requesting changes.
+  - **A suspension doesn't undo a verification:** sending back an optional qualification that a verified provider added decides that document only, also while the account is suspended. When a document decision does send the whole application back, that status change is on the account's trail (`verification_status.set` / `owner_verification_status.set`).
+  - **A rejection stays a rejection:** a rejected application's documents can't be decided until an admin reopens it by requesting changes, so a document decision can't quietly turn it back into "changes requested".
+  - **Tests:** `tests/test_admin_journey_fixes.py`.
 
 _Later Stage 9 steps are added as they are implemented._

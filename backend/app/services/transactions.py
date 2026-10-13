@@ -10,25 +10,53 @@ from app.models.agreement import Agreement, Milestone
 ANSWER_DAYS = 30
 
 
-def suspended_for(db: Session, project_id: str, since: datetime, until: datetime | None = None) -> timedelta:
-    """How long, between `since` and `until` (now), an admin had the
-    requirement suspended -- from the audit log's suspend/reactivate entries.
-    Nobody can act on a suspended requirement, so that time doesn't count
-    towards how long work has waited for the owner side's answer."""
+# Audit actions that stop the owner side from answering, and the ones that
+# end that stop: an admin suspending the requirement, suspending the owner
+# account, or deactivating the owner's login.
+_PAUSES = {
+    "project": ("project.suspend", "project.reactivate"),
+    "owner": ("owner.suspend", "owner.reactivate"),
+    "account": ("account.deactivate", "account.reactivate"),
+}
+
+
+def _intervals(db: Session, target_id: str, start_action: str, end_action: str, until: datetime) -> list[tuple[datetime, datetime]]:
     from app.models.audit_log import AuditLog
 
-    until = until or datetime.utcnow()
-    total, started = timedelta(0), None
+    out, started = [], None
     for action, at in db.query(AuditLog.action, AuditLog.created_at).filter(
-        AuditLog.target_id == project_id, AuditLog.action.in_(("project.suspend", "project.reactivate")), AuditLog.created_at <= until,
+        AuditLog.target_id == target_id, AuditLog.action.in_((start_action, end_action)), AuditLog.created_at <= until,
     ).order_by(AuditLog.created_at.asc(), AuditLog.id.asc()):
-        if action == "project.suspend" and started is None:
+        if action == start_action and started is None:
             started = at
-        elif action == "project.reactivate" and started is not None:
-            total += max(timedelta(0), min(at, until) - max(started, since))
+        elif action == end_action and started is not None:
+            out.append((started, at))
             started = None
-    if started is not None:  # still suspended
-        total += max(timedelta(0), until - max(started, since))
+    if started is not None:  # still stopped
+        out.append((started, until))
+    return out
+
+
+def suspended_for(db: Session, project_id: str, since: datetime, until: datetime | None = None) -> timedelta:
+    """How long, between `since` and `until` (now), the owner side could not
+    answer because an admin had the requirement suspended, or the owner
+    account suspended or deactivated -- from the audit log. That time doesn't
+    count towards how long work has waited for the owner side's answer.
+    Overlapping stops count once."""
+    from app.models.project import Project
+
+    until = until or datetime.utcnow()
+    owner_id = db.query(Project.owner_id).filter(Project.id == project_id).scalar()
+    spans = _intervals(db, project_id, *_PAUSES["project"], until)
+    if owner_id:
+        spans += _intervals(db, owner_id, *_PAUSES["owner"], until)
+        spans += _intervals(db, owner_id, *_PAUSES["account"], until)
+    total, edge = timedelta(0), since
+    for start, end in sorted(spans):
+        start, end = max(start, edge), min(end, until)
+        if end > start:
+            total += end - start
+            edge = end
     return total
 
 
