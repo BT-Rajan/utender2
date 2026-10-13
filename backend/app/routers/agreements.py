@@ -29,6 +29,7 @@ from app.models.user import User
 from app.routers.owner import _best_effort
 from app.schemas.agreement import AgreementDocumentOut, AgreementOut, CommercialTerms, PaymentStageTerm, AgreementTerminate, AgreementUpdate, ExecutionProgress, ExecutionUpdateOut, MilestoneOut, TimelineEntry, VariationOut, WorkStart
 from app.services.audit import log_action
+from app.services.transactions import ANSWER_DAYS, unanswered_delivery
 from app.services.notify import notify, notify_team
 from app.services.file_security import ALLOWED_DRAWING_EXTENSIONS, assert_allowed_extension, safe_relative_name, sanitize_path_segment
 from app.services.offer_response import OPEN_LINK_SECONDS, _api
@@ -104,7 +105,7 @@ def require_in_force(agreement: Agreement) -> None:
         )
 
 
-COMPLETION_REVIEW_DAYS = 30
+COMPLETION_REVIEW_DAYS = ANSWER_DAYS
 
 
 def _review_overdue(agreement: Agreement) -> bool:
@@ -239,6 +240,7 @@ def _out(db: Session, project: Project, agreement: Agreement, award: AwardRecord
         execution_status=_execution_status(agreement),
         completion_status=agreement.completion_status,
         completion_review_overdue=agreement.completion_status == "submitted" and _review_overdue(agreement),
+        delivery_review_overdue=agreement.status == "active" and unanswered_delivery(db, agreement),
         completed_at=agreement.completed_at,
         completion_submitted_at=agreement.completion_submitted_at,
         completion_note=agreement.completion_note,

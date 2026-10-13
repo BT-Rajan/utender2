@@ -29,7 +29,7 @@ from app.services.offer_response import (
 )
 from app.services.storage import get_storage
 from app.services.tender_lifecycle import bidding_is_open, lock_project, sync_expired_projects
-from app.services.tender_rules import START_PASSED_DETAIL, answers_since, kuwait_today, offer_valid_until, start_date_passed, validity_lapsed
+from app.services.tender_rules import answers_since, date_passed_detail, kuwait_today, offer_valid_until, start_date_passed, validity_lapsed
 
 logger = logging.getLogger(__name__)
 
@@ -604,6 +604,8 @@ def submit_offer(
     if offer and offer.status == OfferStatus.withdrawn and (offer.withdrawal_count or 0) >= MAX_WITHDRAWALS:
         raise HTTPException(status_code=400, detail="This offer has been withdrawn twice, so it can't be put forward again on this requirement.")
     first = offer is None or offer.status == OfferStatus.draft  # Stage 5.11: put forward for the first time
+    if offer is not None and offer.is_suspended:  # Stage 3.18: it waits while an admin has it suspended
+        raise HTTPException(status_code=400, detail="This offer has been suspended by an admin and cannot be changed.")
     # Stage 5.13: revising a submitted (or withdrawn) offer from a page showing
     # an earlier revision -- another tab, a colleague, a retried request -- is
     # refused rather than overwriting the newer one (If-Match: revision).
@@ -777,8 +779,9 @@ def confirm_offer(
     if offer.is_suspended:
         raise HTTPException(status_code=400, detail="This offer has been suspended by an admin and cannot be confirmed.")
     if project.status in (ProjectStatus.closed, ProjectStatus.under_evaluation) and not project.is_suspended:
-        return _confirm_after_close(db, user, project, offer, payload.proposed_start_date if payload else None)
-    if payload and payload.proposed_start_date:
+        return _confirm_after_close(db, user, project, offer, payload.proposed_start_date if payload else None,
+                                    payload.proposed_completion_date if payload else None)
+    if payload and (payload.proposed_start_date or payload.proposed_completion_date):
         raise HTTPException(status_code=400, detail="While bidding is open, change the start date by revising your offer.")
     if not bidding_is_open(project):
         raise HTTPException(status_code=400, detail="Bidding on this project is closed.")
@@ -807,7 +810,7 @@ def confirm_offer(
     return _with_documents(db, offer)
 
 
-def _confirm_after_close(db: Session, user: User, project: Project, offer: Offer, new_start=None) -> OfferOut:
+def _confirm_after_close(db: Session, user: User, project: Project, offer: Offer, new_start=None, new_completion=None) -> OfferOut:
     """Batch B: once offers have closed, the owner can award only an offer its
     provider stands by -- made against the requirement as it now is, and
     within its validity period. Confirming re-states it, unchanged, against
@@ -817,23 +820,33 @@ def _confirm_after_close(db: Session, user: User, project: Project, offer: Offer
     Batch D: an offer whose proposed start date passed while it was being
     evaluated can't be awarded as it stands -- its provider confirms it with
     a new start date (today or later), the same span of work following it,
-    and nothing else changes. The earlier dates stay in its history."""
+    and nothing else changes. An offer that gave only a completion date,
+    once that date has passed, is confirmed with a new completion date. The
+    earlier dates stay in its history."""
     passed = start_date_passed(offer)
-    if new_start is not None and not passed:
-        raise HTTPException(status_code=400, detail="Your offer's start date hasn't passed; it is confirmed as it stands.")
-    if passed:
+    by_completion = offer.proposed_start_date is None  # the offer committed a completion date only
+    if (new_start is not None or new_completion is not None) and not passed:
+        raise HTTPException(status_code=400, detail="Your offer's dates haven't passed; it is confirmed as it stands.")
+    if passed and by_completion:
+        if new_completion is None:
+            raise HTTPException(status_code=400, detail=f"{date_passed_detail(offer)} Give a new completion date to confirm it.")
+        if new_completion < kuwait_today():
+            raise HTTPException(status_code=400, detail="The new completion date can't be in the past.")
+    elif passed:
         if new_start is None:
-            raise HTTPException(status_code=400, detail=f"{START_PASSED_DETAIL} Give a new start date to confirm it.")
+            raise HTTPException(status_code=400, detail=f"{date_passed_detail(offer)} Give a new start date to confirm it.")
         if new_start < kuwait_today():
             raise HTTPException(status_code=400, detail="The new start date can't be in the past.")
     elif offer.based_on_material_revision >= project.material_revision and not validity_lapsed(project, offer) and offer_valid_until(project, offer) is None:
         raise HTTPException(status_code=400, detail="Your offer is already up to date with the requirement.")
     previous = offer.based_on_material_revision
-    previous_start = offer.proposed_start_date
+    previous_start = offer.proposed_start_date or offer.proposed_completion_date
     if previous < project.material_revision or passed:
         _snapshot_revision(db, offer)
         offer.based_on_material_revision = project.material_revision
-    if passed:
+    if passed and by_completion:
+        offer.proposed_completion_date = new_completion
+    elif passed:
         if offer.proposed_completion_date:
             offer.proposed_completion_date += new_start - offer.proposed_start_date
         offer.proposed_start_date = new_start
@@ -842,8 +855,9 @@ def _confirm_after_close(db: Session, user: User, project: Project, offer: Offer
     offer.updated_at, offer.updated_by = now, user.id
     log_action(
         db, actor_id=user.id, action="offer.confirmed", target_type="offer", target_id=offer.id,
-        previous_value=f"material revision {previous}" + (f"; start {previous_start}" if passed else ""),
-        new_value=f"material revision {project.material_revision}; stands from {now.isoformat()}Z" + (f"; start {offer.proposed_start_date}" if passed else ""),
+        previous_value=f"material revision {previous}" + (f"; {'completion' if by_completion else 'start'} {previous_start}" if passed else ""),
+        new_value=f"material revision {project.material_revision}; stands from {now.isoformat()}Z"
+        + (f"; {'completion' if by_completion else 'start'} {offer.proposed_completion_date if by_completion else offer.proposed_start_date}" if passed else ""),
     )
     db.refresh(offer)
     # The owner side is waiting on it to award: tell them. (A sealed tender is
@@ -875,6 +889,9 @@ def withdraw_offer(project_id: str, user: User = Depends(require_approved_servic
         raise HTTPException(status_code=400, detail="This offer has already been withdrawn.")
     if offer.status != OfferStatus.submitted:
         raise HTTPException(status_code=400, detail="This offer has already been decided, so it can no longer be withdrawn.")
+    # Stage 3.18: every provider action waits while an admin has the offer suspended.
+    if offer.is_suspended:
+        raise HTTPException(status_code=400, detail="This offer has been suspended by an admin and cannot be withdrawn.")
     # Batch B: after the close an offer is held only for its validity period;
     # once that has run out (and the provider hasn't confirmed it since), the
     # provider is free to withdraw it. Batch D: likewise once its proposed start

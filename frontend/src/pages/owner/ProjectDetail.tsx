@@ -22,7 +22,7 @@ import { QualityCheck, type QualityReport } from "@/components/QualityCheck";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useAccountApproved } from "@/auth/ProtectedRoute";
 import { AgreementPanel } from "@/components/AgreementPanel";
-import { ReceivedReview, ReviewResponse } from "@/components/ReceivedReview";
+import { ReceivedReview, ReviewResponse, useReceivedReview } from "@/components/ReceivedReview";
 import { TrackRecord } from "@/components/TrackRecord";
 import { ClosureOutcome, EndRequirement, StartAgain, outcomeLabel } from "@/components/ClosureOutcome";
 import { AmendPublishedForm, AmendmentsList, PauseControl } from "@/components/PostPublication";
@@ -411,6 +411,8 @@ export function OwnerProjectDetailPage() {
     // Stage 6.3: back on the page, the requirement's state as it is now.
     refetchOnWindowFocus: (q) => !!q.state.data && q.state.data.status !== "draft",
   });
+  // Batch C: the provider's review is already published (its sealed period ran out): the chance to review has passed.
+  const receivedReview = useReceivedReview(`/owner/projects/${id}/review/received`, project?.status === "awarded");
 
   const { data: offers, isPending: offersLoading, isError: offersError } = useQuery({
     queryKey: ["owner-offers", id],
@@ -1096,6 +1098,8 @@ export function OwnerProjectDetailPage() {
               )}
               <ReviewResponse response={existingReview.response} at={existingReview.response_at} label={t("review.theirResponse")} reportBase={`/owner/projects/${project.id}`} />
             </div>
+          ) : receivedReview ? (
+            <p className="text-sm text-steel" data-testid="review-window-closed">{t("review.windowClosed")}</p>
           ) : accountApproved === false ? (
             <p className="text-sm text-steel" data-testid="review-needs-approval">{t("review.needsApproval")}</p>
           ) : (

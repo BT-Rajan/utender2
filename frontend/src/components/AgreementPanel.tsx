@@ -190,6 +190,7 @@ export interface Agreement {
   execution_status: "not_started" | "in_progress" | "on_hold" | "completed" | "terminated";
   completion_status: "submitted" | "accepted" | "returned" | null;
   completion_review_overdue?: boolean; // Batch D: unanswered for 30 days, so the provider may terminate
+  delivery_review_overdue?: boolean; // a delivered deliverable unanswered for 30 days: walking away won't count against the provider
   completed_at: string | null; // Stage 7.11: when the transaction closed
   completion_submitted_at: string | null;
   completion_note: string | null;
@@ -440,6 +441,9 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
           </button>
         </div>
       ))}
+      {a.side === "provider" && a.delivery_review_overdue && a.status === "active" && (
+        <p className="text-xs text-amber-dark mt-2" data-testid="delivery-overdue">{t("agreement.deliveryOverdue")}</p>
+      )}
       {a.side !== "admin" && !["terminated", "completed"].includes(a.status) && a.completion_status === "submitted" && !(a.completion_review_overdue && a.side === "provider") && (
         <p className="text-xs text-steel mt-2">{t(`${c}.submittedBlocksTermination`)}</p>
       )}

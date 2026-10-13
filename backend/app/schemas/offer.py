@@ -329,5 +329,7 @@ class ShortlistOut(BaseModel):
 
 class OfferConfirm(BaseModel):
     """Confirming an offer after the close. When its proposed start date has
-    passed, the provider gives a new one (the same span of work follows it)."""
+    passed, the provider gives a new one (the same span of work follows it);
+    for an offer that gave only a completion date, a new completion date."""
     proposed_start_date: date | None = None
+    proposed_completion_date: date | None = None

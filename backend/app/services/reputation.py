@@ -26,7 +26,7 @@ def _reviews(db: Session, party_filter, direction: str, recent: bool):
     Stage 8.15: hidden reviews don't count. Batch C: nor sealed ones (not yet
     revealed), and only the latest from each counterparty counts."""
     shown = db.query(Review).filter(party_filter, Review.direction == direction, Review.hidden_at.is_(None), revealed()).all()
-    counted = one_per_reviewer(shown, (lambda r: r.owner_id) if direction == OWNER_TO_PROVIDER else (lambda r: r.service_provider_id))
+    counted = one_per_reviewer(db, shown, (lambda r: r.owner_id) if direction == OWNER_TO_PROVIDER else (lambda r: r.service_provider_id))
     count = len(counted)
     average = sum(r.rating for r in counted) / count if count else None
     latest = counted[:RECENT_REVIEWS] if recent else []
@@ -48,15 +48,20 @@ def provider_reputation(db: Session, service_provider_id: str) -> ProviderReputa
     # about how the provider works. Nor does one ended while its submitted
     # work still awaited the owner's answer: that is the provider's remedy
     # for an owner who never answered (agreements._review_overdue).
-    terminated = (
-        db.query(func.count(Agreement.id))
+    # Likewise a provider that walked away from a deliverable the owner side
+    # left unanswered for ANSWER_DAYS (services.transactions).
+    from app.services.transactions import unanswered_delivery
+
+    ended = (
+        db.query(Agreement)
         .join(AwardRecord, AwardRecord.id == Agreement.award_id)
         .filter(
             AwardRecord.service_provider_id == service_provider_id, Agreement.status == "terminated", Agreement.work_started_at.isnot(None),
             or_(Agreement.completion_status.is_(None), Agreement.completion_status != "submitted"),
         )
-        .scalar()
+        .all()
     )
+    terminated = sum(1 for a in ended if not (a.terminated_party == "provider" and unanswered_delivery(db, a, a.terminated_at)))
     count, average, recent = _reviews(db, Review.service_provider_id == service_provider_id, OWNER_TO_PROVIDER, True)
     return ProviderReputationOut(
         company_name=profile.company_name if profile else None,

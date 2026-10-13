@@ -252,6 +252,8 @@ export interface Dictionary {
     standsHeading: string; lapsedBody: string; outdatedBody: string; confirm: string; withdraw: string; lastWithdrawal: string; noMoreResubmission: string;
     startPassedBody: string;
     newStart: string;
+    completionPassedBody: string;
+    newCompletion: string;
   };
   award: {
     confirmTitle: string;
@@ -285,6 +287,7 @@ export interface Dictionary {
     ownerResponse: string;
     providerResponse: string;
     needsApproval: string;
+    windowClosed: string;
   };
   reputation: {
     heading: string;
@@ -672,6 +675,7 @@ export interface Dictionary {
     file: string;
     attach: string;
     remove: string;
+    deliveryOverdue: string;
   };
   awardHandover: {
     heading: string;
@@ -2040,6 +2044,8 @@ export const en: Dictionary = {
     noMoreResubmission: "This offer was withdrawn twice, so it can't be put forward again on this requirement.",
     startPassedBody: "The start date you proposed has passed, so the owner can't award this offer as it stands. Give a new start date (today or later) to confirm it: the same span of work follows it, and nothing else in your offer changes. You may withdraw it instead.",
     newStart: "New start date",
+    completionPassedBody: "The completion date you proposed has passed, so the owner can't award this offer as it stands. Give a new completion date (today or later) to confirm it: nothing else in your offer changes. You may withdraw it instead.",
+    newCompletion: "New completion date",
   },
   award: {
     confirmTitle: "Award this requirement to {provider}?",
@@ -2073,6 +2079,7 @@ export const en: Dictionary = {
     ownerResponse: "The owner's response",
     providerResponse: "The provider's response",
     needsApproval: "Reviews can be written once your account verification is approved again. See your verification status for what is needed.",
+    windowClosed: "The other side's review was published when its sealed period ended, so this transaction can no longer be reviewed from your side.",
   },
   reputation: {
     heading: "U-Tender track record",
@@ -2524,6 +2531,7 @@ export const en: Dictionary = {
     file: "File",
     attach: "Attach",
     remove: "Remove",
+    deliveryOverdue: "A delivered deliverable has waited more than 30 days for the owner's answer. If you end the agreement now, it won't count against your track record.",
   },
   awardHandover: {
     heading: "Awarded",
@@ -3917,6 +3925,8 @@ export const ar: Dictionary = {
     noMoreResubmission: "سُحب هذا العرض مرتين، لذا لا يمكن تقديمه مجددًا على هذا الطلب.",
     startPassedBody: "مضى تاريخ البدء الذي اقترحته، لذا لا يستطيع المالك ترسية هذا العرض كما هو. حدّد تاريخ بدء جديدًا (اليوم أو بعده) لتأكيده: تتبعه مدة العمل نفسها، ولا يتغير شيء آخر في عرضك. يمكنك سحبه بدلًا من ذلك.",
     newStart: "تاريخ البدء الجديد",
+    completionPassedBody: "مضى تاريخ الإنجاز الذي اقترحته، لذا لا يستطيع المالك ترسية هذا العرض كما هو. حدّد تاريخ إنجاز جديدًا (اليوم أو بعده) لتأكيده: لا يتغير شيء آخر في عرضك. يمكنك سحبه بدلًا من ذلك.",
+    newCompletion: "تاريخ الإنجاز الجديد",
   },
   award: {
     confirmTitle: "ترسية هذا المتطلب على {provider}؟",
@@ -3950,6 +3960,7 @@ export const ar: Dictionary = {
     ownerResponse: "رد المالك",
     providerResponse: "رد مقدم الخدمة",
     needsApproval: "يمكن كتابة التقييم بعد الموافقة على توثيق حسابك مرة أخرى. راجع حالة التوثيق لمعرفة المطلوب.",
+    windowClosed: "نُشر تقييم الطرف الآخر عند انتهاء فترة الإخفاء، لذا لم يعد بإمكانك تقييم هذه المعاملة.",
   },
   reputation: {
     heading: "السجل على U-Tender",
@@ -4401,6 +4412,7 @@ export const ar: Dictionary = {
     file: "الملف",
     attach: "إرفاق",
     remove: "حذف",
+    deliveryOverdue: "انتظر أحد التسليمات المسلَّمة أكثر من 30 يومًا رد المالك. إذا أنهيت الاتفاقية الآن، فلن يُحتسب ذلك في سجلك.",
   },
   awardHandover: {
     heading: "تمت الترسية",

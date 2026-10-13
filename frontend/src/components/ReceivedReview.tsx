@@ -32,6 +32,12 @@ export function ReviewResponse({ response, at, label, reportBase }: { response: 
 // Stage 8.6: the review this side received on a completed transaction -- the
 // rating, comment and date only, from the side's own "received" endpoint.
 // Stage 8.9: with this side's one, final response, or the form to give it.
+// The review this side received, once the other side may see it (revealed) --
+// the same query the component below uses.
+export function useReceivedReview(url: string, enabled = true) {
+  return useQuery({ queryKey: ["received-review", url], queryFn: () => apiFetch<Received | null>(url), enabled }).data;
+}
+
 export function ReceivedReview({ url, from }: { url: string; from: string }) {
   const { t, language } = useI18n();
   const confirm = useConfirm();
