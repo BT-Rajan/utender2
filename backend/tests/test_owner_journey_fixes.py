@@ -27,7 +27,9 @@ of the owner's journey, now corrected:
 17. a suspended requirement can't be closed, evaluated, paused or resumed;
 18-22. (frontend) actions the server refuses aren't offered;
 23. the owner's review rests on the award record, not the offers list (an
-    admin-suspended winning offer is left out of it)."""
+    admin-suspended winning offer is left out of it);
+24. a termination counts on the provider's track record only when the work
+    had started -- a transaction that really happened."""
 from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
@@ -413,3 +415,32 @@ def test_the_award_record_still_names_the_winner_after_its_offer_is_suspended(db
     assert award["service_provider_id"] == _me(sp)  # what the review section now rests on
     r = owner.post("/owner/reviews", json={"project_id": pid, "service_provider_id": award["service_provider_id"], "rating": 5})
     assert r.status_code == 200, r.text
+
+
+def test_a_termination_counts_on_the_provider_only_once_the_work_had_started(db):
+    owner = _account(db, "owner", "o-term-count@example.com")
+    sp = _account(db, "service_provider", "s-term-count@example.com")
+    count = lambda: sp.get("/service-provider/reputation").json()["terminated_transactions"]  # noqa: E731
+
+    def awarded(title):
+        pid = _tender(owner, title=title)
+        _submitted(sp, pid)
+        owner.post(f"/owner/projects/{pid}/close")
+        owner.post(f"/owner/projects/{pid}/offers/{sp.get(f'/projects/{pid}/offers/mine').json()['id']}/approve")
+        return pid
+
+    # Ended while the agreement was being prepared, and in force with no work begun: not counted.
+    preparing = awarded("Preparing")
+    assert owner.post(f"/projects/{preparing}/agreement/terminate", json={"reason": "Budget withdrawn"}, headers=_v(owner, preparing)).status_code == 200
+    in_force = awarded("In force")
+    put_in_force(owner, sp, in_force)
+    assert sp.post(f"/projects/{in_force}/agreement/terminate", json={"reason": "Can't mobilise"}, headers=_v(sp, in_force)).status_code == 200
+    assert count() == 0
+    # Ended after the work had started: counted.
+    working = awarded("Working")
+    put_in_force(owner, sp, working)
+    assert sp.post(f"/projects/{working}/agreement/start-work", json={}, headers=_v(sp, working)).status_code == 200
+    assert owner.post(f"/projects/{working}/agreement/terminate", json={"reason": "Stopped"}, headers=_v(owner, working)).status_code == 200
+    assert count() == 1
+    # The owner's own record is unchanged by this rule.
+    assert owner.get("/owner/reputation").json()["terminated_transactions"] == 3

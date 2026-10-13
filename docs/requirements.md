@@ -1647,7 +1647,7 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
     - either party may terminate, with a reason (`terminated_party`);
     - not while submitted work awaits the owner's answer;
     - the other party is told;
-    - terminations count on both sides' track records (`terminated_transactions`).
+    - terminations count on both sides' track records (`terminated_transactions`). On the provider's, only once the work had started: one ended while the agreement was being prepared, or in force with no work begun, isn't counted (owner-journey review, #24).
   - **Notifications:** `agreement_terms_confirmed`, `agreement_in_force` and `agreement_terminated` (migration 0065).
   - **Award and access:**
     - no award to a suspended, unverified or closed provider account;
