@@ -403,22 +403,31 @@ export function OfferStandsNotice({ project, offer }: { project: ProjectDetail; 
         {offer.start_passed ? t("offerValidity.startPassedBody") : offer.validity_lapsed ? t("offerValidity.lapsedBody") : t("offerValidity.outdatedBody")}
       </p>
       <ErrorBanner message={error} />
-      {offer.start_passed && (
-        <label className="grid gap-1 mt-2 max-w-xs text-navy">
-          {t("offerValidity.newStart")}
-          <input type="date" value={newStart} min={kuwaitToday()} onChange={(e) => setNewStart(e.target.value)} className="border border-border rounded px-3 py-2 text-sm" data-testid="offer-stands-new-start" />
-        </label>
+      {/* The server refuses every provider action while either is suspended by an admin. */}
+      {offer.is_suspended || project.is_suspended ? (
+        <p className="mt-2 text-navy" data-testid="offer-stands-suspended">
+          {t(offer.is_suspended ? "offerValidity.offerSuspended" : "offerValidity.requirementSuspended")}
+        </p>
+      ) : (
+        <>
+          {offer.start_passed && (
+            <label className="grid gap-1 mt-2 max-w-xs text-navy">
+              {t("offerValidity.newStart")}
+              <input type="date" value={newStart} min={kuwaitToday()} onChange={(e) => setNewStart(e.target.value)} className="border border-border rounded px-3 py-2 text-sm" data-testid="offer-stands-new-start" />
+            </label>
+          )}
+          <div className="flex flex-wrap gap-2 mt-2">
+            <button type="button" onClick={() => confirmOffer.mutate()} disabled={confirmOffer.isPending || withdrawOffer.isPending || (offer.start_passed && !newStart)} className="bg-navy hover:bg-navy-deep disabled:opacity-60 text-white text-xs font-semibold rounded px-4 py-2" data-testid="offer-stands-confirm">
+              {t("offerValidity.confirm")}
+            </button>
+            {(offer.validity_lapsed || offer.start_passed) && (
+              <button type="button" onClick={() => withdrawOffer.mutate()} disabled={confirmOffer.isPending || withdrawOffer.isPending} className="border border-border text-steel hover:text-navy disabled:opacity-60 text-xs font-semibold rounded px-4 py-2" data-testid="offer-stands-withdraw">
+                {t("offerValidity.withdraw")}
+              </button>
+            )}
+          </div>
+        </>
       )}
-      <div className="flex flex-wrap gap-2 mt-2">
-        <button type="button" onClick={() => confirmOffer.mutate()} disabled={confirmOffer.isPending || withdrawOffer.isPending || (offer.start_passed && !newStart)} className="bg-navy hover:bg-navy-deep disabled:opacity-60 text-white text-xs font-semibold rounded px-4 py-2" data-testid="offer-stands-confirm">
-          {t("offerValidity.confirm")}
-        </button>
-        {(offer.validity_lapsed || offer.start_passed) && (
-          <button type="button" onClick={() => withdrawOffer.mutate()} disabled={confirmOffer.isPending || withdrawOffer.isPending} className="border border-border text-steel hover:text-navy disabled:opacity-60 text-xs font-semibold rounded px-4 py-2" data-testid="offer-stands-withdraw">
-            {t("offerValidity.withdraw")}
-          </button>
-        )}
-      </div>
     </div>
   );
 }

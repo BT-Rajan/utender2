@@ -236,6 +236,16 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
     },
 }
 
+# A notice worded differently for one case of its event (notify(variant=...)).
+_VARIANTS: dict[tuple[NotificationType, str], dict[Language, tuple[str, str]]] = {
+    # Offers closed, but every offer made is suspended by an admin: the owner
+    # can't see them, so it isn't told how many or asked to evaluate them.
+    (NotificationType.evaluation_ready, "under_review"): {
+        Language.en: ("Offers closed on {project_title}", "Offers on {project_title} closed at the deadline. The offers received are under review by a site admin, so there are none to evaluate yet."),
+        Language.ar: ("أُغلقت العروض على {project_title}", "أُغلق تقديم العروض على {project_title} عند الموعد النهائي. العروض المقدمة قيد المراجعة من قبل مسؤول الموقع، لذا لا توجد عروض لتقييمها بعد."),
+    },
+}
+
 
 # Dedup policy (spec §2.10 "deduplicated"): if the recipient already has an
 # UNREAD notification of the same type pointing at the same link that says
@@ -245,8 +255,8 @@ _TEMPLATES: dict[NotificationType, dict[Language, tuple[str, str]]] = {
 # Batch B/C: a notice that says something different is its own row, never
 # written over an unread one -- "deliverable A returned for correction" must
 # not be replaced by "deliverable B accepted" before anyone reads it.
-def notify(db: Session, user: User, notification_type: NotificationType, link: str | None = None, **kwargs) -> Notification | None:
-    template = _TEMPLATES.get(notification_type)
+def notify(db: Session, user: User, notification_type: NotificationType, link: str | None = None, *, variant: str | None = None, **kwargs) -> Notification | None:
+    template = _VARIANTS.get((notification_type, variant)) if variant else _TEMPLATES.get(notification_type)
     if not template or user.deactivated_at is not None:  # Stage 9.2/9.5: a deactivated account is told nothing
         return None
     # Stage 9.8: when the business change is already committed (nothing is

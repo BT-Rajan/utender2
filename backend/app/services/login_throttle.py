@@ -1,6 +1,6 @@
 import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
 
 # Failed-login throttle. Process-local and in-memory by design: it needs no
 # schema or new dependency, and still stops online password guessing against
@@ -48,14 +48,14 @@ class LoginThrottle:
                     wait = max(wait, int(hits[0] + self.window - now) + 1)
         return wait
 
-    def record_failure(self, ip: str, email: str) -> str | None:
-        """Records a failed attempt. Returns which lockout this very failure
-        starts -- "account" (this ip + account) or "ip" (the address as a
-        whole) -- or None, so the caller can report the lockout once instead
-        of on every refused retry, and against the right thing: an address
-        lockout is not about whichever account happened to tip it."""
+    def record_failure(self, ip: str, email: str) -> frozenset[str]:
+        """Records a failed attempt. Returns the lockouts this very failure
+        starts -- "account" (this ip + account) and/or "ip" (the address as a
+        whole); empty if none -- so the caller can report each lockout once
+        instead of on every refused retry, and against the right thing: an
+        address lockout is not about whichever account happened to tip it."""
         now = time.monotonic()
-        locked_now = None
+        locked_now = set()
         with self._lock:
             if len(self._failures) > 10_000:  # opportunistic sweep so keys can't pile up forever
                 for key in list(self._failures):
@@ -65,8 +65,8 @@ class LoginThrottle:
                 hits = self._failures.setdefault(key, deque())
                 hits.append(now)
                 if len(hits) == limit:
-                    locked_now = which  # "account" wins if both tip at once
-        return locked_now
+                    locked_now.add(which)  # both may tip at once
+        return frozenset(locked_now)
 
     def record_success(self, ip: str, email: str) -> None:
         with self._lock:
@@ -89,17 +89,23 @@ class SeenRecently:
         self.window = window_seconds
         self.max_keys = max_keys
         self._lock = threading.Lock()
-        self._seen: dict[str, float] = {}
+        # In the order recorded (a key is only re-recorded after it expired and
+        # was dropped), so expired keys and, at max_keys, the oldest one drop
+        # off the front.
+        self._seen: OrderedDict[str, float] = OrderedDict()
 
     def first(self, key: str) -> bool:
         """True the first time a key is seen in the window (and records it)."""
         now = time.monotonic()
         with self._lock:
-            if len(self._seen) > self.max_keys:
-                self._seen = {k: t for k, t in self._seen.items() if t > now - self.window}
-            seen_at = self._seen.get(key)
-            if seen_at is not None and seen_at > now - self.window:
+            # Times only grow, so the expired keys are all at the front:
+            # O(1) per call, amortised.
+            while self._seen and next(iter(self._seen.values())) <= now - self.window:
+                self._seen.popitem(last=False)
+            if key in self._seen:
                 return False
+            if len(self._seen) >= self.max_keys:
+                self._seen.popitem(last=False)  # hard cap: forget the oldest
             self._seen[key] = now
             return True
 
