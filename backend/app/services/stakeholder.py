@@ -325,6 +325,12 @@ def invite_member(user: User, db: Session, email: str, position: str | None) -> 
     its one-time token (the link is emailed; the representative may also
     share it directly)."""
     membership = _require_representative(user, db)
+    # A rejected or suspended organization can't bid, so it has nobody to bring in.
+    from app.services.team import acting_profile
+
+    profile = acting_profile(db, user)
+    if profile is not None and (profile.is_suspended or profile.verification_status == VerificationStatus.rejected):
+        raise HTTPException(status_code=409, detail="Colleagues can't be invited while this account is rejected or suspended.")
     email = email.strip().lower()
     existing = db.query(User).filter(func.lower(User.email) == email).first()
     if existing:

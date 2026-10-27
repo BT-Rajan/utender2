@@ -40,6 +40,7 @@ import { AdminOffersPage } from "@/pages/admin/Offers";
 import { AdminProjectsPage } from "@/pages/admin/Projects";
 import { AdminProjectDetailPage } from "@/pages/admin/ProjectDetail";
 import { AdminCmsPage } from "@/pages/admin/Cms";
+import { NotFoundPage } from "@/components/NotFound";
 
 export function App() {
   return (
@@ -190,6 +191,8 @@ export function App() {
           <Route path="projects/:id" element={<AdminProjectDetailPage />} />
           <Route path="cms" element={<AdminCmsPage />} />
         </Route>
+        {/* Any other address: say so, with a way back -- never a blank page. */}
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   );

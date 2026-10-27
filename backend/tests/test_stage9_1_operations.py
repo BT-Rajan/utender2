@@ -30,6 +30,8 @@ def _kinds(admin):
 def test_the_overview_follows_the_marketplace(db, monkeypatch):
     admin = _admin(db)
     # A. Empty: every section available, all zero, nothing to attend to, the job's health not yet knowable.
+    # Dead-ends fix: a site with no support contact is itself flagged; this one has one.
+    admin.put("/admin/cms/support_contact/en", json={"value": "support@example.com"})
     body = admin.get("/admin/overview").json()
     assert all(body[s]["available"] for s in ("accounts", "requirements", "offers", "transactions", "attention", "background"))
     assert body["requirements"]["data"]["by_status"]["open"] == 0 and body["attention"]["data"] == []

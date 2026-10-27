@@ -1,5 +1,5 @@
 export interface Dictionary {
-  common: { loading: string; save: string; cancel: string; back: string; loadFailed: string; retry: string; notifications: string; markAllRead: string; noNotifications: string; supportContact: string };
+  common: { loading: string; save: string; cancel: string; back: string; loadFailed: string; retry: string; notifications: string; markAllRead: string; noNotifications: string; supportContact: string; notFoundTitle: string; notFoundBody: string; toDashboard: string; toHome: string };
   brand: { tagline: string };
   home: {
     login: string;
@@ -397,7 +397,7 @@ export interface Dictionary {
     completed: string;
     terminated: string;
     awardedLast7: string;
-    kinds: { open_without_offers_closing_24h: string; open_without_offers: string; awaiting_owner_decision: string; completion_awaiting_owner: string; transactions_on_hold: string; agreements_not_in_force: string; providers_awaiting_review: string; owners_awaiting_review: string; provider_payment_failed: string; open_review_reports: string; deliverables_awaiting_owner: string; changes_awaiting_answer: string; email_failures: string; access_requested: string };
+    kinds: { open_without_offers_closing_24h: string; open_without_offers: string; awaiting_owner_decision: string; completion_awaiting_owner: string; transactions_on_hold: string; agreements_not_in_force: string; providers_awaiting_review: string; owners_awaiting_review: string; provider_payment_failed: string; open_review_reports: string; deliverables_awaiting_owner: string; changes_awaiting_answer: string; email_failures: string; access_requested: string; support_contact_missing: string };
   };
   members: {
     heading: string;
@@ -1348,6 +1348,9 @@ export interface Dictionary {
         paymentRestrictedTitle: string;
         paymentRestrictedBody: string;
         paymentRestrictedCta: string;
+        rejectedTitle: string;
+        rejectedBody: string;
+        rejectedCta: string;
         suspendedTitle: string;
         suspendedBody: string;
       };
@@ -1797,6 +1800,10 @@ export const en: Dictionary = {
     markAllRead: "Mark all read",
     noNotifications: "No notifications yet.",
     supportContact: "Contact the U-Tender team:",
+    notFoundTitle: "This page isn't here",
+    notFoundBody: "The link may be mistyped, or what it pointed to was removed or isn't shared with you.",
+    toDashboard: "Go to your dashboard",
+    toHome: "Go to the home page",
   },
   brand: {
     tagline: "Drawings in. Offers out.",
@@ -2218,6 +2225,7 @@ export const en: Dictionary = {
       agreements_not_in_force: "Agreements not yet in force",
       providers_awaiting_review: "Service providers awaiting verification",
       access_requested: "Providers asking to have their access activated",
+      support_contact_missing: "No support contact set: people told to contact support see no way to reach you (Website content)",
       owners_awaiting_review: "Owners awaiting verification",
       provider_payment_failed: "Verified providers whose payment failed",
       open_review_reports: "Reported reviews to decide",
@@ -3242,6 +3250,9 @@ export const en: Dictionary = {
         paymentRestrictedTitle: "Payment issue on your account",
         paymentRestrictedBody: "Your subscription payment failed or is past due. Update billing to keep bidding.",
         paymentRestrictedCta: "Manage billing",
+        rejectedTitle: "Verification rejected",
+        rejectedBody: "Your application wasn't approved, so you can't bid. The reviewer's reason is on your application status.",
+        rejectedCta: "See the reason",
         suspendedTitle: "Account suspended",
         suspendedBody: "Your account has been suspended by a site admin. Contact support if you believe this is a mistake.",
       },
@@ -3699,6 +3710,10 @@ export const ar: Dictionary = {
     markAllRead: "تعليم الكل كمقروء",
     noNotifications: "لا توجد إشعارات بعد.",
     supportContact: "تواصل مع فريق U-Tender:",
+    notFoundTitle: "هذه الصفحة غير موجودة",
+    notFoundBody: "ربما كُتب الرابط بشكل خاطئ، أو أُزيل ما يشير إليه أو لم يعد متاحًا لك.",
+    toDashboard: "اذهب إلى لوحتك",
+    toHome: "اذهب إلى الصفحة الرئيسية",
   },
   brand: {
     tagline: "المخططات تدخل، والعروض تخرج.",
@@ -4120,6 +4135,7 @@ export const ar: Dictionary = {
       agreements_not_in_force: "اتفاقيات لم تدخل حيز التنفيذ بعد",
       providers_awaiting_review: "مقدمو خدمة بانتظار التوثيق",
       access_requested: "مقدمو خدمة يطلبون تفعيل وصولهم",
+      support_contact_missing: "لم تُحدَّد جهة اتصال للدعم: من يُطلب منهم التواصل مع الدعم لا يجدون وسيلة للوصول إليكم (محتوى الموقع)",
       owners_awaiting_review: "ملاك بانتظار التوثيق",
       provider_payment_failed: "مقدمو خدمة موثَّقون فشل دفعهم",
       open_review_reports: "تقييمات مبلغ عنها بانتظار القرار",
@@ -5144,6 +5160,9 @@ export const ar: Dictionary = {
         paymentRestrictedTitle: "مشكلة في الدفع على حسابك",
         paymentRestrictedBody: "فشلت عملية دفع اشتراكك أو أنها متأخرة. حدّث بيانات الفوترة لمواصلة تقديم العروض.",
         paymentRestrictedCta: "إدارة الفوترة",
+        rejectedTitle: "رُفض التوثيق",
+        rejectedBody: "لم يُوافَق على طلبك، لذا لا يمكنك تقديم العروض. سبب المراجع موجود في حالة طلبك.",
+        rejectedCta: "اطّلع على السبب",
         suspendedTitle: "الحساب موقوف",
         suspendedBody: "تم إيقاف حسابك من قبل مسؤول الموقع. تواصل مع الدعم إذا كنت تعتقد أن هذا خطأ.",
       },

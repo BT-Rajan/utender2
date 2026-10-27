@@ -10,6 +10,7 @@ import { StakeholderSummary, type Stakeholder } from "@/components/Stakeholder";
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
 import { useState } from "react";
+import { RecordPending } from "@/components/NotFound";
 
 function statusBadge(status: string) {
   switch (status) {
@@ -31,7 +32,7 @@ export function AdminOwnerDetailPage() {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
 
-  const { data: detail } = useQuery({
+  const { data: detail, error: detailError, refetch: refetchDetail } = useQuery({
     queryKey: ["admin-owner", id],
     queryFn: () => apiFetch<{ owner: OwnerProfile; stakeholder: Stakeholder; members: Member[]; organization_id?: string | null; documents: OwnerDocument[] }>(`/admin/owners/${id}`),
     enabled: !!id,
@@ -85,7 +86,7 @@ export function AdminOwnerDetailPage() {
     onError: (err) => onMutationError(err, t("admin.ownerDetail.deleteError")),
   });
 
-  if (!detail) return <PageLoading />;
+  if (!detail) return <RecordPending error={detailError} onRetry={() => void refetchDetail()} />;
   const { owner, documents } = detail;
 
   return (

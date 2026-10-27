@@ -5,6 +5,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ApiError } from "@/api/client";
 import { safeNext } from "@/lib/next";
+import { SupportContact } from "@/components/SupportContact";
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -52,6 +53,8 @@ export function LoginPage() {
         </p>
       )}
       {error && <p className="text-xs bg-red-tint text-red border border-red rounded px-3 py-2.5 mb-4">{error}</p>}
+      {/* Can't get in (deactivated, locked out...): who to reach, when the site has set it. */}
+      {error && <div className="mb-4"><SupportContact /></div>}
 
       <form onSubmit={handleSubmit} className="grid gap-4">
         <div>

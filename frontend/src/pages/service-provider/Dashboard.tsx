@@ -10,6 +10,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { money } from "@/lib/money";
 import { timeLeft, fullDate } from "@/lib/format";
 import { offerStatusLabel, outcomeLabel } from "@/components/ClosureOutcome";
+import { SupportContact } from "@/components/SupportContact";
 
 interface Preparing {
   project_id: string;
@@ -73,6 +74,12 @@ function statusBanner(
       title: t(`${b}.paymentRestrictedTitle`),
       body: t(`${b}.paymentRestrictedBody`),
       cta: { label: t(`${b}.paymentRestrictedCta`), href: "/service-provider/subscribe" },
+    },
+    rejected: {
+      tone: "red",
+      title: t(`${b}.rejectedTitle`),
+      body: t(`${b}.rejectedBody`),
+      cta: { label: t(`${b}.rejectedCta`), href: "/service-provider/status" },
     },
     suspended: {
       tone: "red",
@@ -162,6 +169,8 @@ export function ServiceProviderDashboardPage() {
           <div>
             <div className="font-display font-semibold text-sm">{banner.title}</div>
             <p className="text-[13px] mt-1 opacity-90">{banner.body}</p>
+            {/* Nothing left to do here but reach the team: who to reach. */}
+            {(profile.marketplace_status === "suspended" || profile.marketplace_status === "rejected") && <SupportContact />}
           </div>
           {banner.cta && (
             <Link

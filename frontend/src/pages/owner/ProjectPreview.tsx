@@ -8,6 +8,7 @@ import { ProviderRequirementView } from "@/components/ProviderRequirementView";
 import { QualityCheck, type QualityReport } from "@/components/QualityCheck";
 import { OfferForm } from "@/components/OfferForm";
 import { useI18n } from "@/i18n/I18nContext";
+import { RecordPending } from "@/components/NotFound";
 
 // Stage 3.13: the owner sees the requirement as a provider who may respond
 // will receive it -- first as it appears in the list of opportunities, then
@@ -48,7 +49,7 @@ function AudienceSummary({ audience }: { audience: Audience }) {
 export function OwnerProjectPreviewPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useI18n();
-  const { data: project } = useQuery({
+  const { data: project, error: projectError, refetch: refetchProject } = useQuery({
     queryKey: ["project", id],
     queryFn: () => apiFetch<ProjectDetail>(`/projects/${id}`),
     enabled: !!id,
@@ -63,7 +64,7 @@ export function OwnerProjectPreviewPage() {
     queryFn: () => apiFetch<Audience>(`/projects/${id}/audience`),
     enabled: !!project,
   });
-  if (!project) return <PageLoading />;
+  if (!project) return <RecordPending error={projectError} onRetry={() => void refetchProject()} />;
 
   const back = `/owner/projects/${project.id}`;
   return (

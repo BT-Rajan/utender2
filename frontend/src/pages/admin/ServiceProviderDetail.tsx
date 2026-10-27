@@ -11,6 +11,7 @@ import { AdminOrganizationMembers, type Member } from "@/components/AdminOrganiz
 import { StakeholderSummary, type Stakeholder } from "@/components/Stakeholder";
 import { useI18n } from "@/i18n/I18nContext";
 import { PageLoading } from "@/components/PageLoading";
+import { RecordPending } from "@/components/NotFound";
 
 const STATUS_OPTIONS = ["incomplete", "pending_review", "changes_requested", "approved", "rejected"] as const;
 
@@ -185,7 +186,7 @@ export function AdminServiceProviderDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data: detail } = useQuery({
+  const { data: detail, error: detailError, refetch: refetchDetail } = useQuery({
     queryKey: ["admin-service-provider", id],
     queryFn: () => apiFetch<{ service_provider: ServiceProviderProfile; stakeholder: Stakeholder; members: Member[]; organization_id?: string | null }>(`/admin/service-providers/${id}`),
     enabled: !!id,
@@ -238,7 +239,7 @@ export function AdminServiceProviderDetailPage() {
     onError: (err) => onMutationError(err, "Could not update account access."),
   });
 
-  if (!service_provider) return <PageLoading />;
+  if (!service_provider) return <RecordPending error={detailError} onRetry={() => void refetchDetail()} />;
 
   return (
     <main className="max-w-3xl mx-auto px-5 py-8">

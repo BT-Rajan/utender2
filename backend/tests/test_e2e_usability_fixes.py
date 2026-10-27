@@ -130,3 +130,26 @@ def test_a_clarification_notice_opens_at_the_question(db):
     assert owner.post(f"/owner/projects/{pid}/offers/{offer_id}/clarifications", json={"question": "Which membrane brand?"}).status_code in (200, 201)
     notice = db.query(Notification).filter(Notification.user_id == _me(sp), Notification.type == NotificationType.offer_clarification_requested).one()
     assert notice.link == f"/service-provider/projects/{pid}/offer#offer-clarifications"
+
+
+def test_the_overview_says_when_no_support_contact_is_set(db):
+    """Dead ends: every "contact support" message shows the support contact;
+    until an admin sets it, the overview says so."""
+    admin = _admin(db)
+
+    def flagged():
+        return "support_contact_missing" in {a["kind"] for a in admin.get("/admin/overview").json()["attention"]["data"]}
+
+    assert flagged()
+    assert admin.put("/admin/cms/support_contact/en", json={"value": "support@u-tender.example · +965 2222 0000"}).status_code == 200
+    assert not flagged()
+
+
+def test_a_rejected_organization_cannot_invite_colleagues(db):
+    sp = _account(db, "service_provider", "rejected-rep@sp.example", organization="Rejected Co")
+    from app.models.service_provider import ServiceProviderProfile
+
+    db.get(ServiceProviderProfile, _me(sp)).verification_status = VerificationStatus.rejected
+    db.commit()
+    r = sp.post("/account/organization/invitations", json={"email": "colleague@rejected.example"})
+    assert r.status_code == 409 and "rejected or suspended" in r.json()["detail"]
