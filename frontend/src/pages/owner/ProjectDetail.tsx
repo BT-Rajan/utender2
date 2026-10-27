@@ -30,6 +30,8 @@ import { InvitePreviousProviders } from "@/components/PreviousProviders";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
 import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
 import { UnsavedSectionsProvider, useReportUnsaved, useUnsavedSections } from "@/lib/unsavedSections";
+import { RecordPending } from "@/components/NotFound";
+import { SupportContact } from "@/components/SupportContact";
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.detail : fallback;
@@ -413,7 +415,7 @@ function OwnerProjectDetail() {
   const [showHistory, setShowHistory] = useState(false);
   const drawingsFormRef = useRef<HTMLFormElement>(null);
 
-  const { data: project } = useQuery({
+  const { data: project, error: projectError, refetch: refetchProject } = useQuery({
     queryKey: ["project", id],
     queryFn: () => apiFetch<ProjectDetail>(`/projects/${id}`),
     enabled: !!id,
@@ -569,7 +571,7 @@ function OwnerProjectDetail() {
     return () => clearTimeout(timer);
   }, [draftDeadline, id, queryClient]);
 
-  if (!project) return <PageLoading />;
+  if (!project) return <RecordPending error={projectError} onRetry={() => void refetchProject()} />;
   // Stage 3.11: a discarded draft stays readable to its owner but is closed to changes.
   const editableDraft = project.status === "draft" && !project.discarded_at;
 
@@ -625,6 +627,7 @@ function OwnerProjectDetail() {
       {project.is_suspended && (
         <div className="border border-red bg-red-tint rounded px-4 py-3 mb-6 text-sm text-red max-w-2xl" data-testid="admin-suspended">
           {t("closure.adminSuspended")}
+          <SupportContact />
         </div>
       )}
       {project.restarted_from_id && (

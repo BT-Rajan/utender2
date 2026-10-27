@@ -11,6 +11,7 @@ import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
 import { money } from "@/lib/money";
 import { localInputToUtcIso, toLocalInputValue } from "@/lib/dates";
+import { RecordPending } from "@/components/NotFound";
 
 const OFFER_STATUS_BADGE: Record<string, string> = {
   submitted: "bg-blue-tint text-blue",
@@ -196,7 +197,7 @@ export function AdminProjectDetailPage() {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
 
-  const { data: detail } = useQuery({
+  const { data: detail, error: detailError, refetch: refetchDetail } = useQuery({
     queryKey: ["admin-project", id],
     queryFn: () => apiFetch<AdminProjectDetail>(`/admin/projects/${id}`),
     enabled: !!id,
@@ -254,7 +255,7 @@ export function AdminProjectDetailPage() {
     onError: (err) => onMutationError(err, t("admin.projectDetail.deleteError")),
   });
 
-  if (!detail || !project) return <PageLoading />;
+  if (!detail || !project) return <RecordPending error={detailError} onRetry={() => void refetchDetail()} />;
   const { offers } = detail;
 
   return (

@@ -1847,4 +1847,11 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
   - **Wording:** the publish preview's exclusion counts read correctly for any number; rating stars have labels in the page's language.
   - **Tests:** `tests/test_e2e_usability_fixes.py` (clarification link).
 
+- **No dead ends:**
+  - **Unknown address:** shows "This page isn't here" with a way back (the person's dashboard, or the home page), not a blank page.
+  - **Missing record:** a requirement or admin record that doesn't exist or isn't shared says so with a way back, instead of loading forever; a failed request offers a retry.
+  - **Someone to contact:** every "contact support" message shows the support contact: rejection, suspension, a deactivated account at login (and any login error), lost access to the email address, a requirement suspended by an admin. While no contact is set (Website content), the admin overview says so under "Needs attention".
+  - **Rejected provider:** the dashboard says the application wasn't approved and links to the reason. A rejected or suspended organization can't invite colleagues.
+  - **Tests:** `tests/test_e2e_usability_fixes.py`.
+
 _Later Stage 9 steps are added as they are implemented._

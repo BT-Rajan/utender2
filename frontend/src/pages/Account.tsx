@@ -5,6 +5,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { StakeholderSummary, useIdentity } from "@/components/Stakeholder";
 import { AppHeader } from "@/components/AppHeader";
 import { OrganizationMembers } from "@/components/OrganizationMembers";
+import { SupportContact } from "@/components/SupportContact";
 
 const ROLE_HOME: Record<string, { label: string; href: string }> = {
   owner: { label: "Owner", href: "/owner/dashboard" },
@@ -187,6 +188,7 @@ function ChangeEmailForm() {
             <button type="submit" disabled={pending} className={button}>{pending ? t("auth.changeEmail.sending") : t("auth.changeEmail.sendCode")}</button>
           </form>
           <p className="text-[12px] text-steel mt-4">{t("auth.changeEmail.lostAccess")}</p>
+          <SupportContact />
         </>
       )}
       {step === "confirm" && (

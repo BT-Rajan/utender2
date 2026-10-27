@@ -187,6 +187,12 @@ def _attention(db: Session, now: datetime) -> list[dict]:
     if asked:
         out.append({"kind": "access_requested", "count": len(asked), "link": "/admin/service-providers/",
                     "items": _items(asked[:LIST_LIMIT])})
+    # Every "contact support" message (rejection, suspension, deactivation, lost
+    # email) shows this contact; until it is set they offer no way to reach anyone.
+    from app.models.cms_content import CmsContent
+
+    if not db.query(CmsContent.id).filter(CmsContent.key == "support_contact", func.trim(CmsContent.value) != "").first():
+        out.append({"kind": "support_contact_missing", "count": 1, "link": "/admin/cms", "items": [{"id": None, "title": None, "since": None}]})
     # Stage 9.10: emails that couldn't be sent in the last day -- what and when (the business
     # action they were about is unaffected; 9.5). No link: there is nothing to retry from here.
     from app.models.email_failure import EmailFailure

@@ -35,6 +35,8 @@ def test_the_dashboard_points_at_what_needs_attention(db):
     w_id = waiting.get("/auth/me").json()["id"]
 
     # A. Morning check on a quiet platform: information, nothing to attend to, no false "healthy".
+    # Dead-ends fix: a site with no support contact is itself flagged; this one has one.
+    admin.put("/admin/cms/support_contact/en", json={"value": "support@example.com"})
     body = admin.get("/admin/overview").json()
     assert body["attention"]["data"] == []
     bg = body["background"]["data"]
