@@ -42,7 +42,7 @@ export function OfferClarifications({
   if (!items?.length && !canAsk) return null;
   const c = "offerClarification";
   return (
-    <section className="border border-border rounded px-4 py-3 mt-4 text-sm" data-testid="offer-clarifications">
+    <section className="border border-border rounded px-4 py-3 mt-4 text-sm scroll-mt-4" data-testid="offer-clarifications" id="offer-clarifications">
       <div className="font-mono text-[11px] uppercase tracking-wide text-navy mb-1">{t(`${c}.heading`)}</div>
       <p className="text-xs text-steel mb-2">{t(role === "owner" ? `${c}.ownerNote` : `${c}.providerNote`)}</p>
       {error && <ErrorBanner message={error} />}
@@ -78,6 +78,7 @@ export function OfferClarifications({
                   dir="auto"
                   className="border border-border rounded px-2 py-1 text-sm"
                   aria-label={t(`${c}.answer`)}
+                  placeholder={t(`${c}.answer`)}
                 />
                 <button type="submit" disabled={answer.isPending || !(answers[q.id] ?? "").trim()} className="justify-self-start bg-navy text-white text-xs font-semibold rounded px-3 py-1.5 disabled:opacity-60">
                   {t(`${c}.sendAnswer`)}

@@ -1146,6 +1146,7 @@ export interface Dictionary {
     lastSavedShort: string;
     expired: string;
     publishConfirm: string;
+    unsavedBeforePublish: string;
     publishNowConfirm: string;
     published: string;
     expiredEarly: string;
@@ -1838,7 +1839,7 @@ export const en: Dictionary = {
     questions: "Questions from providers",
     questionsAllowed: "Providers may ask questions",
     questionsUntil: "Questions close at (optional)",
-    questionsUntilHint: "Leave blank to take questions until offers close. At the cut-off, questions and answers both close. In your local time.",
+    questionsUntilHint: "Leave blank to take questions until offers close. At the cut-off, questions and answers both close. Kuwait time.",
     commercialTerms: "Commercial conditions",
     commercialTermsHint: "Only what applies, e.g. payment stages, retention, warranty, how long prices must stay valid.",
     instructions: "Instructions for providers",
@@ -1962,11 +1963,11 @@ export const en: Dictionary = {
     open: "Preview as a provider",
     audienceHeading: "Who this reaches",
     audienceCount: "{eligible} of the {total} verified providers on U-Tender meet your \"who can respond\" rules today.",
-    excluded_organization_only: "{count} are registered as individuals (you asked for organizations only)",
-    excluded_qualification_missing: "{count} don't hold a required qualification",
-    excluded_qualification_expired: "{count} hold a required qualification that has expired",
-    excluded_category_not_offered: "{count} don't list this type of work among their services",
-    excluded_governorate_not_served: "{count} don't serve this governorate",
+    excluded_organization_only: "Registered as individuals (you asked for organizations only): {count}",
+    excluded_qualification_missing: "Without a required qualification: {count}",
+    excluded_qualification_expired: "With a required qualification that has expired: {count}",
+    excluded_category_not_offered: "Not offering this type of work: {count}",
+    excluded_governorate_not_served: "Not serving this governorate: {count}",
     audienceNone: "No provider meets these rules right now. Consider relaxing them under Who can respond.",
     audienceNote: "Counts only; providers who qualify later will be able to respond too.",
   },
@@ -2915,7 +2916,7 @@ export const en: Dictionary = {
   dates: {
     heading: "Dates",
     responseHeading: "Offer deadline",
-    responseHint: "When service providers must have submitted their offers. Offers are refused after this moment. In your local time.",
+    responseHint: "When service providers must have submitted their offers. Offers are refused after this moment. Kuwait time.",
     workHeading: "Expected work timing",
     workHint: "When you expect the work itself to happen, so providers can check their availability. Optional; leave blank if it doesn't apply.",
     start: "Expected start",
@@ -3022,6 +3023,7 @@ export const en: Dictionary = {
     lastSavedShort: "last saved {date}",
     expired: "This requirement expired at its offer deadline ({date}) without any offers. It is now read-only.",
     publishConfirm: "Publish \"{title}\" now?\n\nVerified providers who meet your \"who can respond\" rules will be able to find it, open it and send offers until {deadline}.\n\nOnce published, its rules and conditions can't be changed here.",
+    unsavedBeforePublish: "Unsaved changes in: {sections}. Publishing now leaves them out, and the rules can't be changed afterwards. Cancel and save them first.",
     publishNowConfirm: "Publish this requirement straight away, without saving it as a draft first?\n\nVerified providers will be able to find it and send offers until {deadline}. To review it as providers will see it first, save it as a draft and use Preview.",
     published: "Published {date} — open to offers until {deadline}.",
     expiredEarly: "This requirement was closed on {date}, before its offer deadline, without any live offers. It is now read-only.",
@@ -3739,7 +3741,7 @@ export const ar: Dictionary = {
     questions: "أسئلة مقدمي الخدمة",
     questionsAllowed: "يمكن لمقدمي الخدمة طرح الأسئلة",
     questionsUntil: "موعد إغلاق الأسئلة (اختياري)",
-    questionsUntilHint: "اتركه فارغًا لاستقبال الأسئلة حتى إغلاق العروض. عند هذا الموعد تُغلق الأسئلة والأجوبة معًا. بتوقيتك المحلي.",
+    questionsUntilHint: "اتركه فارغًا لاستقبال الأسئلة حتى إغلاق العروض. عند هذا الموعد تُغلق الأسئلة والأجوبة معًا. بتوقيت الكويت.",
     commercialTerms: "الشروط التجارية",
     commercialTermsHint: "ما ينطبق فقط، مثل: مراحل الدفع، المحتجزات، الضمان، مدة صلاحية الأسعار.",
     instructions: "تعليمات لمقدمي الخدمة",
@@ -3863,11 +3865,11 @@ export const ar: Dictionary = {
     open: "معاينة كمقدم خدمة",
     audienceHeading: "من سيصله الطلب",
     audienceCount: "{eligible} من أصل {total} من مقدمي الخدمة الموثقين على U-Tender يستوفون شروط \"من يمكنه تقديم عرض\" اليوم.",
-    excluded_organization_only: "{count} مسجلون كأفراد (طلبت الجهات فقط)",
-    excluded_qualification_missing: "{count} لا يحملون مؤهلًا مطلوبًا",
-    excluded_qualification_expired: "{count} يحملون مؤهلًا مطلوبًا منتهي الصلاحية",
-    excluded_category_not_offered: "{count} لا يدرجون هذا النوع من العمل ضمن خدماتهم",
-    excluded_governorate_not_served: "{count} لا يخدمون هذه المحافظة",
+    excluded_organization_only: "مسجلون كأفراد (طلبت الجهات فقط): {count}",
+    excluded_qualification_missing: "دون مؤهل مطلوب: {count}",
+    excluded_qualification_expired: "بمؤهل مطلوب منتهي الصلاحية: {count}",
+    excluded_category_not_offered: "لا يقدمون هذا النوع من العمل: {count}",
+    excluded_governorate_not_served: "لا يخدمون هذه المحافظة: {count}",
     audienceNone: "لا يستوفي أي مقدم خدمة هذه الشروط حاليًا. فكر في تخفيفها في من يمكنه تقديم عرض.",
     audienceNote: "أعداد فقط؛ من يستوفي الشروط لاحقًا سيتمكن من تقديم عرض أيضًا.",
   },
@@ -4816,7 +4818,7 @@ export const ar: Dictionary = {
   dates: {
     heading: "التواريخ",
     responseHeading: "الموعد النهائي لتقديم العروض",
-    responseHint: "الوقت الذي يجب أن يقدّم فيه مزوّدو الخدمات عروضهم. تُرفض العروض بعد هذه اللحظة. بتوقيتك المحلي.",
+    responseHint: "الوقت الذي يجب أن يقدّم فيه مزوّدو الخدمات عروضهم. تُرفض العروض بعد هذه اللحظة. بتوقيت الكويت.",
     workHeading: "التوقيت المتوقع للعمل",
     workHint: "متى تتوقع تنفيذ العمل نفسه، ليتمكن مزوّدو الخدمات من التحقق من توفرهم. اختياري؛ اتركه فارغًا إن لم ينطبق.",
     start: "البدء المتوقع",
@@ -4923,6 +4925,7 @@ export const ar: Dictionary = {
     lastSavedShort: "آخر حفظ {date}",
     expired: "انتهت صلاحية هذا الطلب عند موعد إغلاق العروض ({date}) دون أي عروض. أصبح الآن للقراءة فقط.",
     publishConfirm: "هل تريد نشر \"{title}\" الآن؟\n\nسيتمكن مقدمو الخدمة الموثقون الذين يستوفون شروط \"من يمكنه تقديم عرض\" من العثور عليه وفتحه وتقديم العروض حتى {deadline}.\n\nبعد النشر لا يمكن تغيير قواعده وشروطه من هنا.",
+    unsavedBeforePublish: "تغييرات غير محفوظة في: {sections}. النشر الآن يستبعدها، ولا يمكن تغيير القواعد بعد ذلك. ألغِ واحفظها أولًا.",
     publishNowConfirm: "هل تريد نشر هذا الطلب فورًا دون حفظه كمسودة أولًا؟\n\nسيتمكن مقدمو الخدمة الموثقون من العثور عليه وتقديم العروض حتى {deadline}. لمراجعته كما سيراه مقدمو الخدمة أولًا، احفظه كمسودة واستخدم المعاينة.",
     published: "نُشر في {date} — مفتوح للعروض حتى {deadline}.",
     expiredEarly: "أُغلق هذا الطلب في {date}، قبل موعد إغلاق العروض، دون أي عروض قائمة. أصبح الآن للقراءة فقط.",

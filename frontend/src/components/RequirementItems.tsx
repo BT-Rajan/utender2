@@ -4,6 +4,7 @@ import { apiFetch, ApiError, draftVersion } from "@/api/client";
 import type { PricingBasis, ProjectDetail, RequirementItem } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
+import { useReportUnsaved } from "@/lib/unsavedSections";
 
 // Stage 3.4: the requirement's measurable pricing basis. Items are optional;
 // the pricing basis says whether providers price the whole requirement or
@@ -89,6 +90,17 @@ export function RequirementItemsEditor({ project }: { project: ProjectDetail }) 
     setBasis(project.pricing_basis);
     setRows(toRows(project.items));
   }, [project.pricing_basis, project.items]);
+
+  // Unsaved: the basis or any row differs from what is saved (row keys are only for React).
+  // Blank rows aren't saved, so they don't count as a change.
+  const strip = (list: Omit<Row, "key">[]) =>
+    JSON.stringify(list.filter((r) => r.description.trim() || r.quantity || r.unit.trim() || r.specification.trim())
+      .map((r) => [r.description, r.quantity, r.unit, r.specification]));
+  const savedRows = project.items.map((i) => ({
+    description: i.description, quantity: i.quantity === null ? "" : String(Number(i.quantity)), unit: i.unit ?? "", specification: i.specification ?? "",
+  }));
+  const dirty = basis !== project.pricing_basis || strip(rows) !== strip(savedRows);
+  useReportUnsaved(t("requirementItems.heading"), dirty);
 
   const update = (key: number, patch: Partial<Row>) => {
     setSaved(false);

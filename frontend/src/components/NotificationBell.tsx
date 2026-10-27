@@ -51,7 +51,22 @@ export function NotificationBell() {
   function handleClick(n: NotificationItem) {
     if (!n.is_read) markReadMutation.mutate(n.id);
     setOpen(false);
-    if (n.link) navigate(n.link);
+    if (n.link) {
+      navigate(n.link);
+      // A link to one part of a long page ("...#offer-clarifications"): scroll
+      // there once that part has loaded, so the notice lands on what it is about.
+      const target = n.link.split("#")[1];
+      if (target) {
+        let tries = 0;
+        const timer = window.setInterval(() => {
+          const el = document.getElementById(target);
+          if (el || ++tries > 40) {
+            window.clearInterval(timer);
+            el?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }, 100);
+      }
+    }
   }
 
   const count = unread?.count ?? 0;

@@ -7,6 +7,16 @@ export function useCategories() {
   return useQuery({ queryKey: ["categories"], queryFn: () => apiFetch<ServiceCategory[]>("/categories"), staleTime: 60_000 });
 }
 
+// What a provider does, as admins read it: the types of work it chose on its
+// profile, else the older free-text trade.
+export function useWorkLabel(): (p: { service_categories?: string[]; primary_trade?: string | null }) => string {
+  const { data } = useCategories();
+  return (p) => {
+    const names = (p.service_categories ?? []).map((id) => data?.find((c) => c.id === id)?.name).filter(Boolean);
+    return names.length ? names.join(", ") : p.primary_trade || "Types of work not chosen yet";
+  };
+}
+
 // The type of work: one of the platform's service categories (admin-managed),
 // or free text while the platform has none. A chosen name links the category
 // server-side (services.categories.resolve_trade).

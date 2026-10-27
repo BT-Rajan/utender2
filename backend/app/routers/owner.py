@@ -448,7 +448,8 @@ def ask_offer_clarification(
     if provider:
         notify_team(
             db, provider, NotificationType.offer_clarification_requested, organization_id=offer.organization_id,
-            link=f"/service-provider/projects/{project_id}/offer", project_title=project.title,
+            # Straight to the question: it sits low on a long page.
+            link=f"/service-provider/projects/{project_id}/offer#offer-clarifications", project_title=project.title,
         )
     return clarification_out(db, clarification, owner_side=True)
 

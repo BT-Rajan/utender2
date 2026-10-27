@@ -6,6 +6,7 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
 import { localInputToUtcIso, toLocalInputValue } from "@/lib/dates";
 import { formatDeadline, fullDate } from "@/lib/format";
+import { useReportUnsaved } from "@/lib/unsavedSections";
 
 // Stage 3.10: the rules of participation, kept apart from the requirement
 // itself. The offer deadline stays with the dates (Stage 3.7) and the
@@ -41,6 +42,7 @@ export function TenderRulesEditor({ project }: { project: ProjectDetail }) {
 
   const strip = (v: typeof values) => ({ ...v, stages: v.stages.map(({ milestone, percent }) => ({ milestone, percent })) });
   const dirty = JSON.stringify(strip(values)) !== JSON.stringify(strip(initial()));
+  useReportUnsaved(t("tenderRules.heading"), dirty);
   const stagesTotal = values.stages.reduce((sum, s) => sum + (Number(s.percent) || 0), 0);
   const num = (v: string) => (v.trim() ? Number(v) : null);
   const set = (patch: Partial<typeof values>) => {

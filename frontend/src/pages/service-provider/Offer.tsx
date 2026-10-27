@@ -322,6 +322,8 @@ function ParticipateStep({ projectId }: { projectId: string }) {
     onSuccess: () => {
       setError(null);
       queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      // Participating starts the draft: load it, so the form saves to it from the first keystroke.
+      queryClient.invalidateQueries({ queryKey: ["my-offer", projectId] });
     },
     // A refusal says why (closed, paused, eligibility...); the page then shows the current state.
     onError: (err) => {
