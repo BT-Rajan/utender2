@@ -95,12 +95,14 @@ export function DocumentDecisionControls({
 
 export function ApplicationDecisionControls({
   canApprove,
+  blockedReason,
   pending,
   onApprove,
   onRequestChanges,
   onReject,
 }: {
   canApprove: boolean;
+  blockedReason?: string; // why approving isn't possible yet, shown under a disabled button
   pending: boolean;
   onApprove: () => void;
   onRequestChanges: (note: string) => void;
@@ -160,6 +162,7 @@ export function ApplicationDecisionControls({
       <button type="button" onClick={() => setMode("reject")} disabled={pending} className="bg-red-tint text-red text-sm font-semibold rounded px-4 py-2">
         Reject application
       </button>
+      {!canApprove && blockedReason && <p className="basis-full text-xs text-steel" data-testid="approve-blocked">{blockedReason}</p>}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/api/client";
 import { useI18n } from "@/i18n/I18nContext";
 import { fullDate } from "@/lib/format";
+import { auditLabel } from "@/lib/auditLabels";
 
 interface Entry {
   id: string;
@@ -29,7 +30,7 @@ export function AdminAuditTrail({ url }: { url: string }) {
           {data.map((e) => (
             <li key={e.id} className="border-b border-border pb-1">
               <span className="font-mono text-steel">{fullDate(e.at, language)}</span>{" "}
-              <span className="font-semibold">{e.action}</span>{" "}
+              <span className="font-semibold" title={e.action}>{auditLabel(e.action)}</span>{" "}
               <span className="text-steel">({e.target_type})</span>{" "}
               <span dir="auto">{e.actor ? `${e.actor.name ?? e.actor.email} · ${e.actor.role}` : t("audit.system")}</span>
               {(e.previous_value || e.new_value) && (

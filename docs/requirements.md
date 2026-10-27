@@ -1824,4 +1824,18 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
   - **Provider page:** it refreshes after a withdrawal.
   - **Tests:** `tests/test_pr22_review_fixes_accounts.py`, `tests/test_pr22_review_fixes_transactions.py` (extended).
 
+- **End-to-end usability run (browser walk-through of every role):**
+  - **Agreement next step:** until the owner enters the effective date, the owner is told the next step is theirs and the provider that it waits on the owner (it no longer tells each side to wait for the other).
+  - **Admin review panel:** a provider application shows who it is (legal identity, representative and email) and its licence number, with a link to the full record. "Approve application" says why it is disabled.
+  - **Access without online payment:** when no online plan is set up, the subscribe page no longer offers a checkout. A verified provider asks the U-Tender team to activate its access (`/billing/access-request`, recorded in the audit log). The request is listed under "Needs attention" on the admin overview until access is granted.
+  - **Drafts while under review:** an owner whose verification is submitted (pending review or changes requested) can create, edit and discard drafts. Publishing still needs an approved account, and the pages say so instead of offering Publish.
+  - **After submitting for verification:** the page goes to the application status (it used to bounce back to the form). The status page links to drafting; the verify page links to the status while under review.
+  - **Company trading name:** once an account is set up as a company, the trading name follows the organisation's legal name unless the provider has edited it.
+  - **Offer timing:** the free-text timing field sits inside the start/completion section as "Timing notes".
+  - **Early close:** questions close when offers close early (`questions_close_at`), and the owner's deadline box says when it closed early and what the deadline was.
+  - **Award:** the button says "Award", and the confirmation mentions answers published after the offer.
+  - **Agreement history:** when the owner changes terms the provider had confirmed, the history records it (`terms_changed`).
+  - **Wording and display:** counts read correctly for any number; "Your offer for" once submitted; the owner page heading follows the requirement's state; version 0 reads as the original requirement; award and agreement references show a short code (full id on hover); admin history shows actions in words; one date format; the overview's period is labelled Kuwait time; the overview's owner and provider counts exclude admins; the identity form's labels are linked to their fields; a link to the review form where the work is accepted; the page header refreshes when the agreement's status changes.
+  - **Tests:** `tests/test_e2e_usability_fixes.py`.
+
 _Later Stage 9 steps are added as they are implemented._

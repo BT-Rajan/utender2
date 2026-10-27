@@ -9,9 +9,11 @@ import { KUWAIT_GOVERNORATES } from "@/lib/location";
 import { CategoryField } from "@/components/CategoryField";
 import { formatDeadline } from "@/lib/format";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { useAccountApproved } from "@/auth/ProtectedRoute";
 
 export function OwnerProjectNewPage() {
   const { t } = useI18n();
+  const accountApproved = useAccountApproved("owner"); // drafts while under review; publishing waits for approval
   const navigate = useNavigate();
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -182,8 +184,9 @@ export function OwnerProjectNewPage() {
             />
             <p className="text-xs text-steel-light mt-1.5">{t("owner.projectNew.deadlineNote")}</p>
           </div>
+          {accountApproved === false && <p className="text-xs text-amber-dark" data-testid="publish-after-approval">{t("owner.projectNew.publishAfterApproval")}</p>}
           <div className="flex items-center gap-3 mt-1">
-            <button
+            {accountApproved !== false && <button
               type="button"
               disabled={pending}
               onClick={() => {
@@ -199,7 +202,7 @@ export function OwnerProjectNewPage() {
               className="bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 w-fit"
             >
               {pending ? t("owner.projectNew.posting") : t("owner.projectNew.postProject")}
-            </button>
+            </button>}
             <button
               type="submit"
               disabled={pending}

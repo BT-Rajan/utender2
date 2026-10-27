@@ -94,7 +94,7 @@ export function App() {
         <Route
           path="/owner"
           element={
-            <ProtectedRoute role="owner" gate>
+            <ProtectedRoute role="owner" gate="draft">
               <OwnerLayout />
             </ProtectedRoute>
           }
@@ -102,6 +102,15 @@ export function App() {
           <Route path="dashboard" element={<OwnerDashboardPage />} />
           <Route path="projects/new" element={<OwnerProjectNewPage />} />
           <Route path="projects/:id/preview" element={<OwnerProjectPreviewPage />} />
+        </Route>
+        <Route
+          path="/owner"
+          element={
+            <ProtectedRoute role="owner" gate>
+              <OwnerLayout />
+            </ProtectedRoute>
+          }
+        >
           <Route path="projects/:id/offers/:offerId" element={<OwnerOfferDetailPage />} />
           <Route path="projects/:id/compare" element={<OwnerCompareOffersPage />} />
         </Route>

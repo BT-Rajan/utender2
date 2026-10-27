@@ -9,7 +9,7 @@ import { Evidence, EvidenceList } from "@/components/Evidence";
 import { Variations } from "@/components/Variations";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useI18n } from "@/i18n/I18nContext";
-import { fullDate } from "@/lib/format";
+import { fullDate, shortRef } from "@/lib/format";
 import { money } from "@/lib/money";
 
 export interface AgreementDocument {
@@ -246,7 +246,12 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
   const [kind, setKind] = useState<string>("signed_agreement");
   const [file, setFile] = useState<File | null>(null);
   const [fileKey, setFileKey] = useState(0);
-  const done = (next: Agreement) => { setError(null); setNotice(null); queryClient.setQueryData(key, next); };
+  const done = (next: Agreement) => {
+    setError(null); setNotice(null);
+    // The page header shows where the transaction stands (in force, completed, terminated): refresh it when that moves.
+    if (queryClient.getQueryData<Agreement>(key)?.status !== next.status) queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+    queryClient.setQueryData(key, next);
+  };
   const failed = (e: Error) => {
     const refused = e instanceof ApiError && (e.status === 400 || e.status === 409);
     setError(refused ? null : e.message);
@@ -366,7 +371,7 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
         <dt className="text-steel">{t(`${c}.reference`)}</dt>
         <dd dir="auto">{a.reference ?? "—"}</dd>
         <dt className="text-steel">{t(`${c}.id`)}</dt>
-        <dd className="font-mono text-xs break-all">{a.id}</dd>
+        <dd className="font-mono text-xs" title={a.id}>{shortRef(a.id)}</dd>
         {a.completed_at && (
           <>
             <dt className="text-steel">{t(`${c}.completedOn`)}</dt>
@@ -396,7 +401,7 @@ export function AgreementPanel({ projectId }: { projectId: string }) {
         <p className={`text-xs mt-3 ${a.provider_confirmed_at ? "text-green" : "text-amber-dark"}`} data-testid="agreement-confirmation">
           {a.provider_confirmed_at
             ? `✓ ${t(`${c}.termsConfirmed`)} · ${fullDate(a.provider_confirmed_at, language)}`
-            : owner ? t(`${c}.awaitingConfirmation`) : a.effective_date ? t(`${c}.confirmTermsHelp`) : t(`${c}.needsDate`)}
+            : owner ? t(a.effective_date ? `${c}.awaitingConfirmation` : `${c}.ownerNeedsDate`) : t(a.effective_date ? `${c}.confirmTermsHelp` : `${c}.awaitingDate`)}
         </p>
       )}
       {a.side === "provider" && a.status === "preparing" && a.effective_date && !a.provider_confirmed_at && (

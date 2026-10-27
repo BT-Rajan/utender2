@@ -114,7 +114,7 @@ def add_milestone(
     last = db.query(Milestone.position).filter(Milestone.agreement_id == agreement.id).order_by(Milestone.position.desc()).first()
     m = Milestone(agreement_id=agreement.id, position=(last[0] if last else 0) + 1, created_by=user.id, **fields)
     db.add(m)
-    reconfirm = _clear_confirmation(agreement)
+    reconfirm = _clear_confirmation(db, agreement, user)
     _touch(agreement, user)
     db.flush()
     audit.log_action(db, actor_id=user.id, action="milestone.create", target_type="agreement", target_id=agreement.id, new_value=f"{m.id}:{m.title}")
@@ -141,7 +141,7 @@ def edit_milestone(
     for k, v in fields.items():
         setattr(m, k, v)
     _bump(m)
-    reconfirm = _clear_confirmation(agreement)
+    reconfirm = _clear_confirmation(db, agreement, user)
     _touch(agreement, user)
     audit.log_action(db, actor_id=user.id, action="milestone.update", target_type="agreement", target_id=agreement.id,
                      previous_value=f"{m.id}:{before}", new_value=f"{m.id}:{m.title} due:{m.due_date}")
@@ -165,7 +165,7 @@ def remove_milestone(
         raise HTTPException(status_code=400, detail="A deliverable that was delivered or has evidence stays on record.")
     title = m.title
     db.delete(m)
-    reconfirm = _clear_confirmation(agreement)
+    reconfirm = _clear_confirmation(db, agreement, user)
     _touch(agreement, user)
     audit.log_action(db, actor_id=user.id, action="milestone.remove", target_type="agreement", target_id=agreement.id, previous_value=f"{milestone_id}:{title}")
     if reconfirm:

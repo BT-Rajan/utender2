@@ -40,7 +40,7 @@ class TimelineEntry(BaseModel):
 
     at: UTCDateTime
     kind: Literal[
-        "awarded", "terms_confirmed", "in_force", "document", "started", "progress", "on_hold", "resumed",
+        "awarded", "terms_confirmed", "terms_changed", "in_force", "document", "started", "progress", "on_hold", "resumed",
         "delivered", "accepted", "returned", "change_proposed", "change_agreed", "change_rejected",
         "change_withdrawn", "change_lapsed", "terminated", "completed",
     ]

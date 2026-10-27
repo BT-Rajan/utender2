@@ -4,6 +4,7 @@ import { apiFetch } from "@/api/client";
 import type { OwnerDocument, OwnerProfile } from "@/api/types";
 import { PageLoading } from "@/components/PageLoading";
 import { useI18n } from "@/i18n/I18nContext";
+import { fullDate } from "@/lib/format";
 import { VerificationStateBanner } from "@/components/VerificationChecklist";
 import { SupportContact } from "@/components/SupportContact";
 
@@ -21,7 +22,7 @@ function statusBadge(status: string) {
 }
 
 export function OwnerStatusPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { data: profile } = useQuery({
     queryKey: ["owner-profile"],
     queryFn: () => apiFetch<OwnerProfile>("/owner/profile"),
@@ -93,7 +94,7 @@ export function OwnerStatusPage() {
         <div>
           <div className="font-display font-semibold text-navy text-sm">{bannerTitle}</div>
           <div className="font-mono text-[11px] text-steel mt-1">
-            {t("owner.status.submittedOn")} {new Date(profile.created_at).toLocaleDateString()}
+            {t("owner.status.submittedOn")} {fullDate(profile.verification_submitted_at ?? profile.created_at, language, false)}
           </div>
         </div>
         <span className={`font-mono text-[10px] uppercase px-2.5 py-1 rounded-full ${statusBadge(profile.verification_status === "pending_review" ? "pending" : "rejected")}`}>
@@ -141,6 +142,10 @@ export function OwnerStatusPage() {
       </div>
 
       <p className="text-xs text-steel-light mt-4">{t("owner.status.footerNote")}</p>
+      {/* Drafts can be prepared while the review runs (ProtectedRoute gate="draft"). */}
+      <Link to="/owner/dashboard" className="inline-block mt-3 bg-navy hover:bg-navy-deep text-white text-xs font-semibold rounded px-4 py-2" data-testid="start-draft">
+        {t("owner.status.startDraft")}
+      </Link>
     </main>
   );
 }

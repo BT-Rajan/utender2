@@ -368,20 +368,6 @@ export function OfferForm({
                 />
               </div>
             )}
-            <div>
-              <label htmlFor="offer-timeline" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">
-                {t("response.completionPeriod")}
-                {rules.completion_period === "required" && requiredMark}
-              </label>
-              <input
-                id="offer-timeline"
-                value={timeline}
-                onChange={(e) => setTimeline(e.target.value)}
-                required={rules.completion_period === "required" && !completionDate && !durationDays}
-                placeholder={t("service_provider.offer.timelinePlaceholder")}
-                className="w-full border border-border rounded px-3 py-2.5 text-sm"
-              />
-            </div>
             {/* Stage 5.5: when the provider commits to start and finish, beside what the owner expects (Stage 3.7). */}
             <fieldset className="grid gap-2" data-testid="timing-commitment" id="offer-section-timing">
               <legend className="font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">{t("timing.heading")}</legend>
@@ -408,6 +394,20 @@ export function OfferForm({
                 </label>
               </div>
               <p className="text-xs text-steel-light">{t("timing.hint")}</p>
+              <div>
+                <label htmlFor="offer-timeline" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1.5">
+                  {t("timing.notes")}
+                  {rules.completion_period === "required" && requiredMark}
+                </label>
+                <input
+                  id="offer-timeline"
+                  value={timeline}
+                  onChange={(e) => setTimeline(e.target.value)}
+                  required={rules.completion_period === "required" && !completionDate && !durationDays}
+                  placeholder={t("service_provider.offer.timelinePlaceholder")}
+                  className="w-full border border-border rounded px-3 py-2.5 text-sm"
+                />
+              </div>
               {(draft ?? existingOffer)?.timing_conflicts?.map((code) => (
                 <p key={code} className="text-xs text-amber-dark" data-testid="timing-conflict">⚠ {t(`timing.conflict_${code}`)}</p>
               ))}

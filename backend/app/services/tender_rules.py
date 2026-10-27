@@ -23,9 +23,13 @@ def questions_close_at(project: Project) -> datetime | None:
     """When questions stop being accepted; None if they aren't accepted at all."""
     if not project.questions_allowed:
         return None
-    if project.questions_deadline and project.questions_deadline < project.bid_deadline:
-        return project.questions_deadline
-    return project.bid_deadline
+    close_at = project.bid_deadline
+    if project.questions_deadline and project.questions_deadline < close_at:
+        close_at = project.questions_deadline
+    # Offers closed early: questions closed with them, then -- not at the old deadline.
+    if project.closed_at and project.closed_at < close_at:
+        close_at = project.closed_at
+    return close_at
 
 
 def questions_open(project: Project) -> bool:

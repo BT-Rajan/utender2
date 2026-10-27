@@ -162,6 +162,7 @@ export function AdminOwnerDetailPage() {
           {owner.verification_note && <p className="text-[12px] text-navy mb-3">{owner.verification_note}</p>}
           <ApplicationDecisionControls
             canApprove={owner.verification_status !== "approved" && documents.every((d) => !d.requirement_is_required || d.status === "approved")}
+            blockedReason={owner.verification_status === "approved" ? "This application is already approved." : "Approve each required document above first."}
             pending={approveMutation.isPending || applicationMutation.isPending}
             onApprove={() => approveMutation.mutate()}
             onRequestChanges={(note) => applicationMutation.mutate({ action: "request-changes", note })}

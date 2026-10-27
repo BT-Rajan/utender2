@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import StreamingResponse
 
 from app.db import get_db
-from app.deps import get_current_user, require_approved_service_provider, require_service_provider, require_verified_owner
+from app.deps import get_current_user, may_prepare_drafts, require_approved_service_provider, require_owner_who_may_draft, require_service_provider
 from app.models.award_record import AwardRecord
 from app.models.service_provider import ServiceProviderProfile
 from app.models.enums import NotificationType, OfferStatus, PricingBasis, ProjectStatus, TenderType, UserRole, VerificationStatus
@@ -176,7 +176,7 @@ async def create_project(
     # to publish; a client that omits status must never publish by accident.
     status: str = Form(ProjectStatus.draft.value),
     drawings: list[UploadFile] = File(default=[]),
-    user: User = Depends(require_verified_owner),
+    user: User = Depends(require_owner_who_may_draft),
     db: Session = Depends(get_db),
 ):
     # Stage 3.11: the same start sent again (double click, retry after a lost
@@ -195,6 +195,11 @@ async def create_project(
     if status not in (ProjectStatus.draft.value, ProjectStatus.open.value):
         raise HTTPException(status_code=400, detail="A new project must start as draft or open.")
     status_value = ProjectStatus(status)
+    # A draft can be prepared while verification is under review; publishing needs an approved account.
+    if status_value == ProjectStatus.open:
+        profile = acting_profile(db, user)
+        if not profile or not profile.is_verified_active:
+            raise HTTPException(status_code=403, detail="not_approved")
 
     _check_scope_length(description)
     category_value, trade = resolve_trade(db, category_id, trade)
@@ -334,12 +339,15 @@ def get_project(project_id: str, user: User = Depends(get_current_user), db: Ses
 # permanent numbered record, never a silent edit. changed_fields only
 # lists what actually differs from before, so a no-op PATCH (same values
 # resubmitted) creates no amendment row and bumps nothing.
-def _require_active_owner(user: User, db: Session) -> None:
+def _require_active_owner(user: User, db: Session, project: Project) -> None:
     """A suspended (or unapproved) owner can still see their tender but can't
     change it. Same rule and same "not_approved" code as
     deps.require_verified_owner, applied *after* the ownership lookup so
-    everyone else keeps getting the 404 they always did."""
+    everyone else keeps getting the 404 they always did. A draft is the
+    exception: it can be prepared while verification is under review."""
     profile = acting_profile(db, user)
+    if project.status == ProjectStatus.draft and may_prepare_drafts(profile):
+        return
     if not profile or not profile.is_verified_active:
         raise HTTPException(status_code=403, detail="not_approved")
 
@@ -498,7 +506,7 @@ def amend_project(
     project = lock_project(db, project_id)
     if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
-    _require_active_owner(user, db)
+    _require_active_owner(user, db, project)
     _guard_draft_write(project, if_match)
     # Stage 3.15: once offers have closed, the requirement they were made
     # against is the record the owner evaluates -- it is no longer changed.
@@ -643,7 +651,7 @@ def set_project_items(
     project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
     if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
-    _require_active_owner(user, db)
+    _require_active_owner(user, db, project)
     _guard_draft_write(project, if_match)
     if project.status != ProjectStatus.draft:
         raise HTTPException(status_code=409, detail="Items and the pricing basis can only be changed while the requirement is a draft.")
@@ -682,7 +690,7 @@ def set_response_requirements(
     project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
     if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
-    _require_active_owner(user, db)
+    _require_active_owner(user, db, project)
     _guard_draft_write(project, if_match)
     if project.status != ProjectStatus.draft:
         raise HTTPException(status_code=409, detail="Response requirements can only be changed while the requirement is a draft.")
@@ -737,7 +745,7 @@ def set_tender_rules(
     project = lock_project(db, project_id)
     if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
-    _require_active_owner(user, db)
+    _require_active_owner(user, db, project)
     _guard_draft_write(project, if_match)
     if project.status != ProjectStatus.draft:
         raise HTTPException(status_code=409, detail="Tender rules can only be changed while the requirement is a draft.")
@@ -774,7 +782,7 @@ def set_provider_eligibility(
     project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
     if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
-    _require_active_owner(user, db)
+    _require_active_owner(user, db, project)
     _guard_draft_write(project, if_match)
     if project.status != ProjectStatus.draft:
         raise HTTPException(status_code=409, detail="Eligibility can only be changed while the requirement is a draft.")
@@ -1071,7 +1079,7 @@ async def add_drawings(
     project = lock_project(db, project_id)  # saves are serialized; the version check runs under the lock
     if not project or not owns(db, user, project):
         raise HTTPException(status_code=404, detail="Project not found.")
-    _require_active_owner(user, db)
+    _require_active_owner(user, db, project)
     _guard_draft_write(project, if_match)
     if category not in DOCUMENT_CATEGORIES:
         raise HTTPException(status_code=400, detail="Unknown document type.")
@@ -1115,7 +1123,7 @@ def _owned_draft_document(project_id: str, drawing_id: str, user: User, db: Sess
     drawing = db.get(ProjectDrawing, drawing_id)
     if not project or not owns(db, user, project) or not drawing or drawing.project_id != project_id:
         raise HTTPException(status_code=404, detail="Document not found.")
-    _require_active_owner(user, db)
+    _require_active_owner(user, db, project)
     _guard_draft_write(project, None)
     if project.status != ProjectStatus.draft:
         # Once published, providers may already be pricing against a file;

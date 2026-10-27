@@ -185,7 +185,7 @@ export function OwnerDashboardPage() {
                 </div>
               </div>
               <p className="font-mono text-xs text-blue">
-                {p.offer_count} {t("owner.dashboard.offersReceived")}
+                {t("owner.dashboard.offersReceived").replace("{n}", String(p.offer_count))}
                 {p.status === "closed" && <span className="text-amber-dark"> · {t("owner.dashboard.readyToReview")}</span>}
                 {p.status === "draft" && p.updated_at && (
                   <span className="text-steel-light"> · {t("draftDetails.lastSavedShort").replace("{date}", formatDeadline(p.updated_at))}</span>

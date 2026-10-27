@@ -11,6 +11,8 @@ from app.deps import get_service_provider_profile, require_approved_service_prov
 from app.models.service_provider import ServiceProviderProfile
 from app.models.enums import SubscriptionStatus
 from app.models.user import User
+from app.services.access_requests import ACTION as ACCESS_REQUESTED, open_request_at
+from app.services.audit import log_action
 from app.services.stripe_service import map_stripe_status
 
 router = APIRouter(tags=["billing"])
@@ -105,6 +107,28 @@ def create_billing_portal_session(user: User = Depends(require_service_provider)
         logger.exception("stripe billing portal session failed for %s", cp.user_id)
         raise HTTPException(status_code=502, detail="Could not open billing. Try again.")
     return {"url": session.url}
+
+
+@router.get("/billing/access-request")
+def get_access_request(user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """The provider's request to have its access activated, while it still waits."""
+    return {"requested_at": open_request_at(db, get_service_provider_profile(user, db))}
+
+
+@router.post("/billing/access-request")
+def request_access(user: User = Depends(require_approved_service_provider), db: Session = Depends(get_db)):
+    """A verified provider without access asks the U-Tender team to activate it
+    -- the way in when online subscription isn't available. Asking again while
+    a request waits changes nothing (one entry on the admin overview)."""
+    cp = get_service_provider_profile(user, db)
+    if cp.is_verified_active:
+        raise HTTPException(status_code=409, detail="Your marketplace access is already active.")
+    waiting = open_request_at(db, cp)
+    if waiting is None:
+        # log_action commits.
+        log_action(db, actor_id=user.id, action=ACCESS_REQUESTED, target_type="service_provider", target_id=cp.user_id)
+        waiting = open_request_at(db, cp)
+    return {"requested_at": waiting}
 
 
 # Webhooks arrive with no user session — authenticated by the signature

@@ -187,6 +187,7 @@ export interface Dictionary {
     preparingHeading: string;
     changedShort: string;
     preparingFor: string;
+    yourOfferFor: string;
     reviewFirst: string;
     draftStatus: string;
     draftStarted: string;
@@ -396,7 +397,7 @@ export interface Dictionary {
     completed: string;
     terminated: string;
     awardedLast7: string;
-    kinds: { open_without_offers_closing_24h: string; open_without_offers: string; awaiting_owner_decision: string; completion_awaiting_owner: string; transactions_on_hold: string; agreements_not_in_force: string; providers_awaiting_review: string; owners_awaiting_review: string; provider_payment_failed: string; open_review_reports: string; deliverables_awaiting_owner: string; changes_awaiting_answer: string; email_failures: string };
+    kinds: { open_without_offers_closing_24h: string; open_without_offers: string; awaiting_owner_decision: string; completion_awaiting_owner: string; transactions_on_hold: string; agreements_not_in_force: string; providers_awaiting_review: string; owners_awaiting_review: string; provider_payment_failed: string; open_review_reports: string; deliverables_awaiting_owner: string; changes_awaiting_answer: string; email_failures: string; access_requested: string };
   };
   members: {
     heading: string;
@@ -511,6 +512,7 @@ export interface Dictionary {
     heading: string;
     awarded: string;
     terms_confirmed: string;
+    terms_changed: string;
     in_force: string;
     document: string;
     change_proposed: string;
@@ -535,6 +537,7 @@ export interface Dictionary {
     submittedOn: string;
     decidedOn: { accepted: string; returned: string };
     acceptedHelp: string;
+    reviewPrompt: string;
     noteLabel: { submit: string; accept: string; return: string };
     confirmHelp: { submit: string; accept: string; return: string };
     do: { submit: string; accept: string; return: string };
@@ -647,6 +650,8 @@ export interface Dictionary {
     cancel: string;
     activate: string;
     needsDate: string;
+    ownerNeedsDate: string;
+    awaitingDate: string;
     activateConfirm: string;
     activateConfirmBody: string;
     terminate: string;
@@ -770,6 +775,8 @@ export interface Dictionary {
     durationDays: string;
     days: string;
     hint: string;
+    notes: string;
+    closedEarlyDeadline: string;
     conflict_starts_later: string;
     conflict_finishes_later: string;
     conflict_takes_longer: string;
@@ -836,6 +843,7 @@ export interface Dictionary {
   };
   versions: {
     version: string;
+    original: string;
     before: string;
     yourOfferVersion: string;
     pricedOn: string;
@@ -1164,6 +1172,7 @@ export interface Dictionary {
     replace: string;
     noRequirements: string;
     addLaterHint: string;
+    submittedSeeStatus: string;
   };
   stakeholder: {
     heading: string;
@@ -1419,6 +1428,8 @@ export interface Dictionary {
       pastDueBody: string;
       updatePayment: string;
       billingUnavailable: string;
+      requestAccess: string;
+      accessRequested: string;
       renews: string;
       ends: string;
       monthly: string;
@@ -1520,6 +1531,7 @@ export interface Dictionary {
       postProject: string;
       posting: string;
       saveAsDraft: string;
+      publishAfterApproval: string;
       draftNote: string;
       sidebarHeading: string;
       tip1: string;
@@ -1530,6 +1542,9 @@ export interface Dictionary {
     };
     projectDetail: {
       reviewOffers: string;
+      headingDraft: string;
+      headingAwarded: string;
+      headingEnded: string;
       sealedBadge: string;
       ownerVisibleBadge: string;
       publish: string;
@@ -1614,6 +1629,7 @@ export interface Dictionary {
       reupload: string;
       upload: string;
       footerNote: string;
+      startDraft: string;
     };
   };
   admin: {
@@ -1886,7 +1902,7 @@ export const en: Dictionary = {
   quality: {
     ready: "Ready for preview",
     readyHint: "Nothing essential is missing. Look over any suggestions below, then preview and publish when you're ready — nothing is published until you do.",
-    notReady: "{count} thing(s) to fix before publishing",
+    notReady: "Things to fix before publishing: {count}",
     notReadyHint: "Providers couldn't understand or price this requirement yet. Each item says what is missing and where to fix it.",
     warningsHeading: "Suggestions (won't stop you publishing)",
     section_details: "Fix in Details",
@@ -1970,6 +1986,7 @@ export const en: Dictionary = {
     preparingHeading: "Preparing an offer",
     changedShort: "changed since you started",
     preparingFor: "You are preparing an offer for",
+    yourOfferFor: "Your offer for",
     reviewFirst: "Confirm you’ve reviewed the current requirement to continue preparing your offer.",
     draftStatus: "Draft — not submitted. Nothing is sent to the owner until you submit it.",
     draftStarted: "started",
@@ -2034,8 +2051,8 @@ export const en: Dictionary = {
   offerValidity: {
     until: "Valid until {date}",
     lapsed: "Validity ended",
-    answersSince: "{n} answer(s) published after this offer",
-    answersSinceProvider: "{n} answer(s) were published to every provider after you submitted. Check the Q&A: revise your offer if they change it.",
+    answersSince: "Answers published after this offer: {n}",
+    answersSinceProvider: "Answers published to every provider since you submitted: {n}. Check the Q&A: revise your offer if they change it.",
     asked: "Asked the provider to confirm",
     ask: "Ask to confirm",
     askHint: "Made on an earlier version or past its validity: the provider confirms it stands before it can be awarded.",
@@ -2091,7 +2108,7 @@ export const en: Dictionary = {
     summary: "{avg} / 5 · {n} reviews",
     completed: "{n} completed U-Tender transactions",
     none: "No completed U-Tender transactions yet",
-    terminated: "{n} agreement(s) terminated before completion",
+    terminated: "Agreements terminated before completion: {n}",
     noReviews: "No owner reviews yet",
     verified: "Owner review · completed U-Tender transaction",
     note: "For information only: it doesn't affect eligibility, verification or award, and offers are never ordered by it.",
@@ -2199,6 +2216,7 @@ export const en: Dictionary = {
       transactions_on_hold: "Transactions on hold",
       agreements_not_in_force: "Agreements not yet in force",
       providers_awaiting_review: "Service providers awaiting verification",
+      access_requested: "Providers asking to have their access activated",
       owners_awaiting_review: "Owners awaiting verification",
       provider_payment_failed: "Verified providers whose payment failed",
       open_review_reports: "Reported reviews to decide",
@@ -2338,6 +2356,7 @@ export const en: Dictionary = {
     heading: "History",
     awarded: "Awarded",
     terms_confirmed: "Terms confirmed by the service provider",
+    terms_changed: "Terms changed by the owner: the service provider confirms them again",
     in_force: "Agreement in force",
     document: "Document added",
     change_proposed: "Change {n} proposed",
@@ -2357,11 +2376,12 @@ export const en: Dictionary = {
   completion: {
     heading: "Work completion",
     status: { none: "Not yet submitted", submitted: "Submitted as complete — awaiting the owner's review", returned: "Returned for correction", accepted: "Accepted as complete" },
-    outstanding: "{n} deliverable(s) still to be accepted before the work can be submitted as complete.",
+    outstanding: "Deliverables still to be accepted before the work can be submitted as complete: {n}.",
     openChange: "A proposed change is awaiting an answer; settle it before submitting the work as complete.",
     submittedOn: "Submitted as complete on",
     decidedOn: { accepted: "Accepted on", returned: "Returned on" },
     acceptedHelp: "The owner accepted the work as complete, which closed the transaction.",
+    reviewPrompt: "Leave your review of the other party",
     noteLabel: { submit: "Note for the owner (optional)", accept: "Note (optional)", return: "What needs correcting?" },
     confirmHelp: {
       submit: "The owner will review the work and accept it or return it for correction.",
@@ -2487,6 +2507,8 @@ export const en: Dictionary = {
     cancel: "Cancel",
     activate: "Mark as in force",
     needsDate: "Enter the effective date first.",
+    ownerNeedsDate: "Next step is yours: enter the agreement's effective date (Edit reference and effective date, below). The service provider can then confirm the terms, and you put the agreement in force.",
+    awaitingDate: "Waiting for the owner to enter the agreement's effective date. You can confirm the terms once they do.",
     activateConfirm: "Mark the agreement as in force?",
     activateConfirmBody: "Do this once both parties have agreed. Its reference and effective date can't be changed afterwards.",
     terminate: "Terminate the agreement",
@@ -2629,6 +2651,8 @@ export const en: Dictionary = {
     durationDays: "Or duration (days)",
     days: "days",
     hint: "Give a completion date or a duration, not both. Work can’t start or finish before offers close.",
+    notes: "Timing notes",
+    closedEarlyDeadline: "Closed early on {date}. The offer deadline was {deadline}.",
     conflict_starts_later: "You propose to start after the owner’s expected start date.",
     conflict_finishes_later: "You propose to finish after the owner’s expected completion.",
     conflict_takes_longer: "You propose more days than the owner’s expected duration.",
@@ -2662,7 +2686,7 @@ export const en: Dictionary = {
     items: "{n} items",
     loadMore: "Show more opportunities",
     loading: "Loading…",
-    hiddenIneligible: "{n} open requirement(s) aren’t shown because their conditions (provider type, qualifications, type of work or area) don’t match your account.",
+    hiddenIneligible: "Open requirements not shown because their conditions (provider type, qualifications, type of work or area) don’t match your account: {n}.",
     checkServices: "Check the services and areas you declared",
     lump_sum: "One total",
     per_item: "Per item",
@@ -2681,7 +2705,7 @@ export const en: Dictionary = {
     closedNow: "Offers closed",
     leftDays: "{d} d {h} h left to respond",
     leftHours: "{h} h left to respond",
-    documents: "{n} documents",
+    documents: "Documents: {n}",
     published: "Published {date}",
     sealed: "Sealed offers",
     sealedHint: "Offers stay sealed: the owner sees prices only after the deadline.",
@@ -2695,6 +2719,7 @@ export const en: Dictionary = {
   },
   versions: {
     version: "Version {n}",
+    original: "The original requirement",
     before: "See the requirement as it was before (version {n})",
     yourOfferVersion: "See the requirement your offer was priced on (version {n})",
     pricedOn: "Priced on version {n}",
@@ -3022,6 +3047,7 @@ export const en: Dictionary = {
     locked: "Documents can't be changed while your verification is under review or after a decision.",
     replace: "Replace",
     noRequirements: "No documents are currently required for this account.",
+    submittedSeeStatus: "Submitted for review. See your application status",
     addLaterHint: "You're verified. You can add optional qualifications at any time — each is reviewed on its own and your access continues meanwhile.",
   },
   stakeholder: {
@@ -3297,6 +3323,8 @@ export const en: Dictionary = {
       pastDueBody: "Viewing full requirements and sending offers is paused until the payment goes through. Update your card below — your existing subscription continues; there's no need to subscribe again.",
       updatePayment: "Update payment method",
       billingUnavailable: "Online subscription isn't available yet. The U-Tender team can activate your marketplace access directly.",
+      requestAccess: "Ask the U-Tender team to activate my access",
+      accessRequested: "You asked on {date}. The U-Tender team will activate your access and you'll be notified.",
       renews: "Renews",
       ends: "Cancelled: access ends",
       monthly: "monthly",
@@ -3367,7 +3395,7 @@ export const en: Dictionary = {
       ownerVisible: "Owner-visible",
       noMatch: "No projects match your filters.",
       nothingHere: "Nothing here.",
-      offersReceived: "offer(s) received",
+      offersReceived: "Offers received: {n}",
       readyToReview: "ready to review",
       deadline: "Deadline",
       trade: "Trade",
@@ -3398,6 +3426,7 @@ export const en: Dictionary = {
       postProject: "Post project",
       posting: "Posting…",
       saveAsDraft: "Save as draft",
+      publishAfterApproval: "Your account is still being verified. Save this as a draft now; you can publish it once your account is approved.",
       draftNote: "A draft is only visible to you. Publish it later from the project page when you're ready for bids.",
       sidebarHeading: "Before you post",
       tip1: "Clear drawings get more accurate offers — include dimensions where you can.",
@@ -3408,6 +3437,9 @@ export const en: Dictionary = {
     },
     projectDetail: {
       reviewOffers: "Review offers",
+      headingDraft: "Draft requirement",
+      headingAwarded: "Award and transaction",
+      headingEnded: "Requirement outcome",
       sealedBadge: "Sealed",
       ownerVisibleBadge: "Owner-visible",
       publish: "Publish — start accepting bids",
@@ -3428,7 +3460,7 @@ export const en: Dictionary = {
       lowestBid: "Lowest bid",
       averageBid: "Average bid",
       highestBid: "Highest bid",
-      sealedBidsReceived: "sealed bid(s) received",
+      sealedBidsReceived: "Sealed bids received: {n}",
       sealedExplanation:
         "This is a sealed tender — bidder identities and amounts stay hidden from you until bidding closes. Close bidding to reveal and evaluate them.",
       noOffersYet: "No offers yet. Service providers can bid until the deadline above.",
@@ -3436,7 +3468,7 @@ export const en: Dictionary = {
       offersLoadError: "Could not load the offers. Refresh the page to try again.",
       offersTruncated: "Showing the first {n} offers.",
       withdrawnCount: "{n} withdrawn",
-      inboxReceived: "{n} offer(s) received",
+      inboxReceived: "Offers received: {n}",
       inboxActive: "{n} active",
       inboxRevised: "{n} revised",
       mixedVersions: "These offers answer different versions of the requirement ({versions}). Check which version each offer was made against before reading them side by side.",
@@ -3494,7 +3526,8 @@ export const en: Dictionary = {
       reupload: "Re-upload",
       upload: "Upload",
       footerNote:
-        "You'll be notified as soon as your account is fully approved. Posting and managing projects stays locked until then.",
+        "You'll be notified as soon as your account is fully approved. Meanwhile you can prepare your requirements as drafts; publishing them waits for approval.",
+      startDraft: "Prepare a requirement",
     },
   },
   admin: {
@@ -3854,6 +3887,7 @@ export const ar: Dictionary = {
     preparingHeading: "عروض قيد الإعداد",
     changedShort: "تغيّر منذ أن بدأت",
     preparingFor: "أنت تُعِدّ عرضًا للطلب",
+    yourOfferFor: "عرضك للطلب",
     reviewFirst: "أكّد أنك راجعت الطلب الحالي لمتابعة إعداد عرضك.",
     draftStatus: "مسودة — لم تُقدَّم. لا يُرسل شيء إلى المالك حتى تقدّمها.",
     draftStarted: "بدأت في",
@@ -3918,8 +3952,8 @@ export const ar: Dictionary = {
   offerValidity: {
     until: "ساري حتى {date}",
     lapsed: "انتهت مدة السريان",
-    answersSince: "{n} إجابة نُشرت بعد هذا العرض",
-    answersSinceProvider: "نُشرت {n} إجابة لجميع مقدمي الخدمة بعد تقديم عرضك. راجع الأسئلة والأجوبة وعدّل عرضك إن غيّرته.",
+    answersSince: "إجابات نُشرت بعد هذا العرض: {n}",
+    answersSinceProvider: "إجابات نُشرت لجميع مقدمي الخدمة منذ تقديم عرضك: {n}. راجع الأسئلة والأجوبة وعدّل عرضك إن غيّرته.",
     asked: "طُلب من مقدم الخدمة التأكيد",
     ask: "اطلب التأكيد",
     askHint: "قُدّم على إصدار سابق أو انتهت مدة سريانه: يؤكد مقدم الخدمة أنه ما زال قائمًا قبل ترسيته.",
@@ -4083,6 +4117,7 @@ export const ar: Dictionary = {
       transactions_on_hold: "معاملات متوقفة مؤقتًا",
       agreements_not_in_force: "اتفاقيات لم تدخل حيز التنفيذ بعد",
       providers_awaiting_review: "مقدمو خدمة بانتظار التوثيق",
+      access_requested: "مقدمو خدمة يطلبون تفعيل وصولهم",
       owners_awaiting_review: "ملاك بانتظار التوثيق",
       provider_payment_failed: "مقدمو خدمة موثَّقون فشل دفعهم",
       open_review_reports: "تقييمات مبلغ عنها بانتظار القرار",
@@ -4222,6 +4257,7 @@ export const ar: Dictionary = {
     heading: "السجل",
     awarded: "تمت الترسية",
     terms_confirmed: "أكّد مقدم الخدمة الشروط",
+    terms_changed: "غيّر المالك الشروط: يؤكدها مقدم الخدمة مجددًا",
     in_force: "سريان الاتفاقية",
     document: "أُضيف مستند",
     change_proposed: "اقتُرح التغيير {n}",
@@ -4246,6 +4282,7 @@ export const ar: Dictionary = {
     submittedOn: "قُدّم كمكتمل في",
     decidedOn: { accepted: "قُبل في", returned: "أُعيد في" },
     acceptedHelp: "قبل المالك العمل كمكتمل، وبذلك أُغلقت المعاملة.",
+    reviewPrompt: "اكتب تقييمك للطرف الآخر",
     noteLabel: { submit: "ملاحظة للمالك (اختياري)", accept: "ملاحظة (اختياري)", return: "ما الذي يحتاج إلى تصحيح؟" },
     confirmHelp: {
       submit: "سيراجع المالك العمل ويقبله أو يعيده للتصحيح.",
@@ -4371,6 +4408,8 @@ export const ar: Dictionary = {
     cancel: "إلغاء",
     activate: "تحديد كسارية",
     needsDate: "أدخل تاريخ السريان أولاً.",
+    ownerNeedsDate: "الخطوة التالية عليك: أدخل تاريخ سريان الاتفاقية (تعديل المرجع وتاريخ السريان، أدناه). بعدها يؤكد مقدم الخدمة الشروط، ثم تجعل الاتفاقية سارية.",
+    awaitingDate: "بانتظار أن يُدخل المالك تاريخ سريان الاتفاقية. يمكنك تأكيد الشروط بعد ذلك.",
     activateConfirm: "تحديد الاتفاقية كسارية؟",
     activateConfirmBody: "قم بذلك بعد اتفاق الطرفين. لا يمكن تغيير المرجع وتاريخ السريان بعد ذلك.",
     terminate: "إنهاء الاتفاقية",
@@ -4513,6 +4552,8 @@ export const ar: Dictionary = {
     durationDays: "أو المدة (بالأيام)",
     days: "يومًا",
     hint: "أدخل تاريخ الإنجاز أو المدة، وليس كليهما. لا يمكن أن يبدأ العمل أو ينتهي قبل إغلاق العروض.",
+    notes: "ملاحظات حول التوقيت",
+    closedEarlyDeadline: "أُغلق مبكرًا في {date}. كان الموعد النهائي للعروض {deadline}.",
     conflict_starts_later: "تقترح البدء بعد تاريخ البدء الذي يتوقعه المالك.",
     conflict_finishes_later: "تقترح الإنجاز بعد موعد الإنجاز الذي يتوقعه المالك.",
     conflict_takes_longer: "تقترح مدة أطول من المدة التي يتوقعها المالك.",
@@ -4565,7 +4606,7 @@ export const ar: Dictionary = {
     closedNow: "أُغلق تقديم العروض",
     leftDays: "متبقٍ {d} يوم و{h} ساعة للرد",
     leftHours: "متبقٍ {h} ساعة للرد",
-    documents: "{n} مستندات",
+    documents: "المستندات: {n}",
     published: "نُشر {date}",
     sealed: "عروض مختومة",
     sealedHint: "تبقى العروض مختومة: لا يرى المالك الأسعار إلا بعد الموعد النهائي.",
@@ -4579,6 +4620,7 @@ export const ar: Dictionary = {
   },
   versions: {
     version: "النسخة {n}",
+    original: "النسخة الأصلية من الطلب",
     before: "اطّلع على الطلب كما كان قبل التغيير (النسخة {n})",
     yourOfferVersion: "اطّلع على الطلب الذي سُعّر عرضك على أساسه (النسخة {n})",
     pricedOn: "سُعّر على النسخة {n}",
@@ -4906,6 +4948,7 @@ export const ar: Dictionary = {
     locked: "لا يمكن تغيير المستندات أثناء مراجعة طلب التحقق أو بعد اتخاذ قرار بشأنه.",
     replace: "استبدال",
     noRequirements: "لا توجد مستندات مطلوبة حاليًا لهذا الحساب.",
+    submittedSeeStatus: "أُرسل للمراجعة. اطّلع على حالة طلبك",
     addLaterHint: "حسابك موثق. يمكنك إضافة مؤهلات اختيارية في أي وقت — تُراجع كل منها على حدة ويستمر وصولك أثناء ذلك.",
   },
   stakeholder: {
@@ -5181,6 +5224,8 @@ export const ar: Dictionary = {
       pastDueBody: "عرض الطلبات كاملة وإرسال العروض متوقفان حتى تنجح عملية الدفع. حدّث بطاقتك من الزر أدناه — اشتراكك الحالي مستمر ولا حاجة للاشتراك مجددًا.",
       updatePayment: "تحديث وسيلة الدفع",
       billingUnavailable: "الاشتراك عبر الإنترنت غير متاح بعد. يمكن لفريق U-Tender تفعيل وصولك إلى السوق مباشرةً.",
+      requestAccess: "اطلب من فريق U-Tender تفعيل وصولي",
+      accessRequested: "طلبت ذلك في {date}. سيفعّل فريق U-Tender وصولك وسيصلك إشعار بذلك.",
       renews: "يتجدد في",
       ends: "أُلغي: ينتهي الوصول في",
       monthly: "شهري",
@@ -5251,7 +5296,7 @@ export const ar: Dictionary = {
       ownerVisible: "مرئي للمالك",
       noMatch: "لا توجد مشاريع مطابقة لعوامل التصفية.",
       nothingHere: "لا يوجد شيء هنا.",
-      offersReceived: "عرض/عروض مستلمة",
+      offersReceived: "العروض المستلمة: {n}",
       readyToReview: "جاهز للمراجعة",
       deadline: "الموعد النهائي",
       trade: "التخصص",
@@ -5282,6 +5327,7 @@ export const ar: Dictionary = {
       postProject: "نشر المشروع",
       posting: "جارٍ النشر…",
       saveAsDraft: "حفظ كمسودة",
+      publishAfterApproval: "لا يزال حسابك قيد التوثيق. احفظ هذا كمسودة الآن؛ ويمكنك نشره بعد الموافقة على حسابك.",
       draftNote: "المسودة مرئية لك فقط. يمكنك نشرها لاحقًا من صفحة المشروع عندما تكون جاهزًا لاستقبال العروض.",
       sidebarHeading: "قبل أن تنشر",
       tip1: "المخططات الواضحة تُنتج عروضًا أدق — أضف الأبعاد قدر الإمكان.",
@@ -5292,6 +5338,9 @@ export const ar: Dictionary = {
     },
     projectDetail: {
       reviewOffers: "مراجعة العروض",
+      headingDraft: "مسودة طلب",
+      headingAwarded: "الترسية والمعاملة",
+      headingEnded: "نتيجة الطلب",
       sealedBadge: "مغلق (سري)",
       ownerVisibleBadge: "مرئي للمالك",
       publish: "نشر — بدء استقبال العروض",
@@ -5312,7 +5361,7 @@ export const ar: Dictionary = {
       lowestBid: "أقل عرض",
       averageBid: "متوسط العروض",
       highestBid: "أعلى عرض",
-      sealedBidsReceived: "عرض/عروض سرية مستلمة",
+      sealedBidsReceived: "العروض السرية المستلمة: {n}",
       sealedExplanation:
         "هذا عطاء مغلق (سري) — تبقى هويات مزوّدي الخدمات وقيم عروضهم مخفية عنك حتى يُغلق تقديم العروض. أغلق تقديم العروض لكشفها وتقييمها.",
       noOffersYet: "لا توجد عروض بعد. يمكن لمزوّدي الخدمات تقديم عروض حتى الموعد النهائي أعلاه.",
@@ -5320,7 +5369,7 @@ export const ar: Dictionary = {
       offersLoadError: "تعذر تحميل العروض. حدّث الصفحة للمحاولة مجددًا.",
       offersTruncated: "يُعرض أول {n} عرض.",
       withdrawnCount: "{n} مسحوب",
-      inboxReceived: "{n} عرض/عروض مستلمة",
+      inboxReceived: "العروض المستلمة: {n}",
       inboxActive: "{n} قائم",
       inboxRevised: "{n} معدّل",
       mixedVersions: "هذه العروض مقدّمة على إصدارات مختلفة من المتطلب ({versions}). تحقّق من الإصدار الذي قُدّم عليه كل عرض قبل قراءتها جنبًا إلى جنب.",
@@ -5378,7 +5427,8 @@ export const ar: Dictionary = {
       reupload: "إعادة الرفع",
       upload: "رفع",
       footerNote:
-        "سيتم إعلامك بمجرد الموافقة الكاملة على حسابك. يبقى نشر المشاريع وإدارتها مقفلاً حتى ذلك الحين.",
+        "سيتم إعلامك بمجرد الموافقة الكاملة على حسابك. في الأثناء يمكنك إعداد طلباتك كمسودات؛ أما نشرها فينتظر الموافقة.",
+      startDraft: "أعدّ طلبًا",
     },
   },
   admin: {

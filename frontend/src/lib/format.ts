@@ -76,3 +76,9 @@ export function timeLeft(t: (key: string) => string, iso: string): string {
   const hours = Math.floor((ms % 86_400_000) / 3_600_000);
   return days > 0 ? t("feed.leftDays").replace("{d}", String(days)).replace("{h}", String(hours)) : t("feed.leftHours").replace("{h}", String(hours));
 }
+
+// A record's id as people read it out: the first 8 characters, upper case.
+// The full id stays on hover (title) for support to look it up.
+export function shortRef(id: string): string {
+  return id.replace(/-/g, "").slice(0, 8).toUpperCase();
+}

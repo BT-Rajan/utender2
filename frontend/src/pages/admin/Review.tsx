@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import type { ServiceProviderProfile, DocumentStatus } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { ApplicationDecisionControls, DocumentDecisionControls, type DocumentDecision } from "@/components/AdminReviewControls";
 import { QueryError } from "@/components/QueryError";
+import { StakeholderSummary, type Stakeholder } from "@/components/Stakeholder";
 
 interface QueueDocument {
   id: string;
@@ -36,6 +38,7 @@ function expiryLabel(d: QueueDocument): { text: string; tone: "expired" | "soon"
 
 interface QueueEntry {
   service_provider: ServiceProviderProfile;
+  stakeholder?: Stakeholder | null;
   documents: QueueDocument[];
 }
 
@@ -150,6 +153,13 @@ export function AdminReviewPage() {
                 <div>
                   <h3 className="font-display font-semibold text-lg">{selected.service_provider.company_name}</h3>
                   <p className="text-[12.5px] text-steel">{selected.service_provider.primary_trade || "Trade not set"}</p>
+                  {/* What the decision rests on: who it is, its licence, who applied -- not only the trading name. */}
+                  <p className="text-[12.5px] text-steel" data-testid="review-license">
+                    License number: {selected.service_provider.license_number || "not given"}
+                  </p>
+                  <Link to={`/admin/service-providers/${selected.service_provider.user_id}`} className="font-mono text-[11px] text-blue underline">
+                    Open the full record
+                  </Link>
                 </div>
                 <span
                   className={`font-mono text-[10px] uppercase px-2.5 py-1 rounded-full ${statusBadge(
@@ -159,6 +169,12 @@ export function AdminReviewPage() {
                   {selected.service_provider.verification_status.replace("_", " ")}
                 </span>
               </div>
+
+              {selected.stakeholder && (
+                <div className="mt-3" data-testid="review-stakeholder">
+                  <StakeholderSummary stakeholder={selected.stakeholder} viewerIsAdmin />
+                </div>
+              )}
 
               <div className="divide-y divide-border mt-4">
                 {selected.documents.map((d) => (
@@ -228,6 +244,7 @@ export function AdminReviewPage() {
               <div className="py-4.5 border-t border-border mt-1">
                 <ApplicationDecisionControls
                   canApprove={readyToApprove}
+                  blockedReason="Approve each required document above first."
                   pending={approveMutation.isPending || applicationMutation.isPending}
                   onApprove={() => approveMutation.mutate(selected.service_provider.user_id)}
                   onRequestChanges={(note) => applicationMutation.mutate({ serviceProviderId: selected.service_provider.user_id, action: "request-changes", note })}
