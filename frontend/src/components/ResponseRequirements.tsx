@@ -5,6 +5,7 @@ import type { Offer, ProjectDetail, ResponseRequirements } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
 import { money } from "@/lib/money";
+import { useReportUnsaved } from "@/lib/unsavedSections";
 
 // Stage 3.8: what a provider's offer must contain. The price itself is always
 // required (as one total or a rate per item, from the Stage 3.4 pricing
@@ -51,6 +52,7 @@ export function ResponseRequirementsEditor({ project }: { project: ProjectDetail
     declarations: values.declarations.map((d) => d.text.trim()).filter(Boolean),
   });
   const dirty = JSON.stringify(payload()) !== JSON.stringify(rules);
+  useReportUnsaved(t("response.heading"), dirty);
   const set = (patch: Partial<typeof values>) => {
     setSaved(false);
     setValues((v) => ({ ...v, ...patch }));

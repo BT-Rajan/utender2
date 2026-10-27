@@ -29,6 +29,7 @@ import { AmendPublishedForm, AmendmentsList, PauseControl } from "@/components/P
 import { InvitePreviousProviders } from "@/components/PreviousProviders";
 import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES, sortDocuments } from "@/lib/documents";
 import { KUWAIT_GOVERNORATES, formatArea } from "@/lib/location";
+import { UnsavedSectionsProvider, useReportUnsaved, useUnsavedSections } from "@/lib/unsavedSections";
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.detail : fallback;
@@ -272,6 +273,7 @@ function DraftDetailsForm({ project }: { project: ProjectDetail }) {
     area !== (project.area ?? "") ||
     address !== (project.address ?? "") ||
     description !== (project.description ?? "");
+  useReportUnsaved(t("draftDetails.heading"), dirty);
 
   const save = useMutation({
     mutationFn: () => apiFetch<ProjectDetail>(`/projects/${project.id}`, {
@@ -387,10 +389,20 @@ function DraftDetailsForm({ project }: { project: ProjectDetail }) {
   );
 }
 
+// The draft's sections report unsaved changes to the page (publish warns about them).
 export function OwnerProjectDetailPage() {
+  return (
+    <UnsavedSectionsProvider>
+      <OwnerProjectDetail />
+    </UnsavedSectionsProvider>
+  );
+}
+
+function OwnerProjectDetail() {
   const { t, language } = useI18n();
   const { id } = useParams<{ id: string }>();
   const accountApproved = useAccountApproved("owner"); // Batch A: under re-review, the job page stays; reviews wait
+  const unsavedSections = useUnsavedSections();
   const queryClient = useQueryClient();
   const [rating, setRating] = useState(0);
   // Stage 6.6: offers chosen for side-by-side comparison (live ones only).
@@ -672,6 +684,8 @@ export function OwnerProjectDetailPage() {
                 // Stage 3.14: publishing is a deliberate step, never a stray click.
                 const text = t("draftDetails.publishConfirm").replace("{title}", project.title).replace("{deadline}", formatDeadline(project.bid_deadline));
                 const [title, ...body] = text.split("\n\n");
+                // Unsaved edits in a section: said first, so they aren't published without them.
+                if (unsavedSections.length) body.unshift(`⚠ ${t("draftDetails.unsavedBeforePublish").replace("{sections}", unsavedSections.join(", "))}`);
                 void confirm({ title, body: body.join("\n\n"), confirmLabel: t("owner.projectDetail.publish") }).then(
                   (ok) => ok && lifecycleMutation.mutate("publish"),
                 );
@@ -877,7 +891,7 @@ export function OwnerProjectDetailPage() {
               projectId={project.id}
               role="owner"
               qaOpen={project.tender_rules.questions_open}
-              closesAt={project.tender_rules.questions_close_at}
+              closesAt={project.status === "draft" ? null : project.tender_rules.questions_close_at}  // a draft hasn't opened Q&A yet
             />
           </div>
         </div>
@@ -888,7 +902,7 @@ export function OwnerProjectDetailPage() {
             <div role="alert" className="border border-dashed border-red rounded p-8 text-center text-sm text-red">
               {t("owner.projectDetail.offersLoadError")}
             </div>
-          ) : offersLoading ? null : !offers?.length ? (
+          ) : offersLoading || project.status === "draft" ? null : !offers?.length ? (  // a draft can't have offers yet
             <div className="border border-dashed border-border rounded p-8 text-center text-sm text-steel">
               {project.status === "open" ? t("owner.projectDetail.noOffersYet") : t("owner.projectDetail.noOffersReceived")}
             </div>

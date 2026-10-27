@@ -49,6 +49,8 @@ export function InvitePage() {
     setError(null);
     try {
       await apiFetch(`/account/invitations/${token}/accept`, { method: "POST" });
+      // The invitation is used up now: drop it rather than re-read it (a 404), and refresh the rest.
+      queryClient.removeQueries({ queryKey: ["invitation", token] });
       queryClient.invalidateQueries();
       navigate(user?.role === "owner" ? "/owner/dashboard" : "/service-provider/dashboard");
     } catch (err) {

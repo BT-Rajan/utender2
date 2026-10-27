@@ -7,6 +7,7 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { ApplicationDecisionControls, DocumentDecisionControls, type DocumentDecision } from "@/components/AdminReviewControls";
 import { QueryError } from "@/components/QueryError";
 import { StakeholderSummary, type Stakeholder } from "@/components/Stakeholder";
+import { useWorkLabel } from "@/components/CategoryField";
 
 interface QueueDocument {
   id: string;
@@ -56,6 +57,7 @@ function statusBadge(status: string) {
 }
 
 export function AdminReviewPage() {
+  const workLabel = useWorkLabel();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -140,7 +142,7 @@ export function AdminReviewPage() {
               >
                 <div className="font-display font-semibold text-sm">{entry.service_provider.company_name}</div>
                 <div className="font-mono text-[10.5px] text-steel mt-1">
-                  {entry.service_provider.primary_trade || "Trade not set"} · Submitted{" "}
+                  {workLabel(entry.service_provider)} · Submitted{" "}
                   {new Date(entry.service_provider.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                 </div>
               </button>
@@ -152,7 +154,7 @@ export function AdminReviewPage() {
               <div className="flex justify-between items-start gap-2 mb-1">
                 <div>
                   <h3 className="font-display font-semibold text-lg">{selected.service_provider.company_name}</h3>
-                  <p className="text-[12.5px] text-steel">{selected.service_provider.primary_trade || "Trade not set"}</p>
+                  <p className="text-[12.5px] text-steel">{workLabel(selected.service_provider)}</p>
                   {/* What the decision rests on: who it is, its licence, who applied -- not only the trading name. */}
                   <p className="text-[12.5px] text-steel" data-testid="review-license">
                     License number: {selected.service_provider.license_number || "not given"}
@@ -244,7 +246,6 @@ export function AdminReviewPage() {
               <div className="py-4.5 border-t border-border mt-1">
                 <ApplicationDecisionControls
                   canApprove={readyToApprove}
-                  blockedReason="Approve each required document above first."
                   pending={approveMutation.isPending || applicationMutation.isPending}
                   onApprove={() => approveMutation.mutate(selected.service_provider.user_id)}
                   onRequestChanges={(note) => applicationMutation.mutate({ serviceProviderId: selected.service_provider.user_id, action: "request-changes", note })}

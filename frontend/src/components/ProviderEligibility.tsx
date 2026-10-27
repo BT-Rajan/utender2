@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import type { EligibilityQualification, EligibilityReason, ProjectDetail, ProviderEligibility } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
+import { useReportUnsaved } from "@/lib/unsavedSections";
 
 // Stage 3.9: who may respond to this requirement, on top of platform
 // verification. Qualifications come from the platform's own (admin-managed)
@@ -35,6 +36,7 @@ export function ProviderEligibilityEditor({ project }: { project: ProjectDetail 
   }, [JSON.stringify(rules)]);
 
   const dirty = JSON.stringify(values) !== JSON.stringify(initial());
+  useReportUnsaved(t("eligibility.heading"), dirty);
   const set = (patch: Partial<typeof values>) => {
     setSaved(false);
     setValues((v) => ({ ...v, ...patch }));

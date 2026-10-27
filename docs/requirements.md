@@ -1838,4 +1838,13 @@ Stages 1 and 2 were built before the numbered stage-by-stage work and are recons
   - **Wording and display:** counts read correctly for any number; "Your offer for" once submitted; the owner page heading follows the requirement's state; version 0 reads as the original requirement; award and agreement references show a short code (full id on hover); admin history shows actions in words; one date format; the overview's period is labelled Kuwait time; the overview's owner and provider counts exclude admins; the identity form's labels are linked to their fields; a link to the review form where the work is accepted; the page header refreshes when the agreement's status changes.
   - **Tests:** `tests/test_e2e_usability_fixes.py`.
 
+- **Second end-to-end run (onboarding and friction only, no new features):**
+  - **Nothing typed is lost:** "Participate" loads the new draft at once, so the offer form can be saved from the first visit. On a draft requirement, publishing lists any section with unsaved changes first (published rules can't be changed afterwards), and the browser asks before the page is closed or reloaded with changes pending.
+  - **Draft page reads as a draft:** it no longer says questions "closed" or "no offers were received" before publication. The offer deadline and questions cut-off are labelled Kuwait time, as they are stored (they said "your local time").
+  - **Clarification notices land on the question:** the link opens the offer page at the owner's question (`#offer-clarifications`), and the answer box says what to write.
+  - **Admin:** provider lists show the types of work each provider chose (not "Trade not set"). The provider review page shows one hint, not two.
+  - **Invitations:** accepting no longer re-reads the used invitation.
+  - **Wording:** the publish preview's exclusion counts read correctly for any number; rating stars have labels in the page's language.
+  - **Tests:** `tests/test_e2e_usability_fixes.py` (clarification link).
+
 _Later Stage 9 steps are added as they are implemented._

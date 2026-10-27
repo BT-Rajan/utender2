@@ -114,3 +114,19 @@ def test_the_overview_counts_owners_not_admins_who_signed_up_as_one(db):
     db.get(User, _me(promoted)).role = "admin"
     db.commit()
     assert admin.get("/admin/overview").json()["accounts"]["data"]["owners"]["total"] == 1
+
+
+def test_a_clarification_notice_opens_at_the_question(db):
+    """Second run: the owner's question sits low on a long page; its notice
+    links straight to it."""
+    from app.models.enums import NotificationType
+    from app.models.notification import Notification
+
+    owner = _account(db, "owner", "clar@owner.example")
+    sp = _account(db, "service_provider", "clar@sp.example")
+    pid = _tender(owner)
+    offer_id = _submitted(sp, pid)["id"]
+    owner.post(f"/owner/projects/{pid}/close")
+    assert owner.post(f"/owner/projects/{pid}/offers/{offer_id}/clarifications", json={"question": "Which membrane brand?"}).status_code in (200, 201)
+    notice = db.query(Notification).filter(Notification.user_id == _me(sp), Notification.type == NotificationType.offer_clarification_requested).one()
+    assert notice.link == f"/service-provider/projects/{pid}/offer#offer-clarifications"

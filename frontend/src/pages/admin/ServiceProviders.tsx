@@ -4,6 +4,7 @@ import { apiFetch } from "@/api/client";
 import type { ServiceProviderProfile } from "@/api/types";
 import { stars } from "@/lib/format";
 import { QueryError } from "@/components/QueryError";
+import { useWorkLabel } from "@/components/CategoryField";
 
 function statusBadge(status: string) {
   switch (status) {
@@ -29,6 +30,7 @@ const MARKETPLACE_BADGE: Record<string, string> = {
 };
 
 export function AdminServiceProvidersPage() {
+  const workLabel = useWorkLabel();
   const {
     data: service_providers,
     isError,
@@ -67,7 +69,7 @@ export function AdminServiceProvidersPage() {
               <tr key={c.user_id} className="border-b border-border">
                 <td className="py-3 px-2.5">
                   <div className="font-display font-semibold text-[13.5px]">{c.company_name}</div>
-                  <div className="text-[11.5px] text-steel-light">{c.primary_trade || "Trade not set"}</div>
+                  <div className="text-[11.5px] text-steel-light">{workLabel(c)}</div>
                 </td>
                 <td className="py-3 px-2.5">
                   <div className="flex flex-col gap-1 items-start">

@@ -5,6 +5,7 @@ import type { ProjectDetail } from "@/api/types";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useI18n } from "@/i18n/I18nContext";
 import { localInputToUtcIso, toLocalInputValue } from "@/lib/dates";
+import { useReportUnsaved } from "@/lib/unsavedSections";
 
 // Stage 3.7: the two kinds of date on a draft requirement, kept visibly
 // apart -- the offer deadline (bid_deadline, the one the server enforces)
@@ -28,6 +29,7 @@ export function DraftDates({ project }: { project: ProjectDetail }) {
   }, [project.bid_deadline, project.expected_start_date, project.expected_completion_date, project.expected_duration_days]);
 
   const dirty = JSON.stringify(values) !== JSON.stringify(initial());
+  useReportUnsaved(t("dates.heading"), dirty);
   const set = (patch: Partial<typeof values>) => {
     setSaved(false);
     setValues((v) => ({ ...v, ...patch }));
