@@ -130,6 +130,19 @@ def require_verified_owner(user: User = Depends(require_owner), db: Session = De
     return user
 
 
+def may_prepare_drafts(profile) -> bool:
+    """An owner whose verification is submitted (or done) can prepare drafts
+    while it waits: they stay private to its side, and publishing still needs
+    an approved, active account (require_verified_owner)."""
+    return profile is not None and not profile.is_suspended and profile.verification_status.value in ("pending_review", "changes_requested", "approved")
+
+
+def require_owner_who_may_draft(user: User = Depends(require_owner), db: Session = Depends(get_db)) -> User:
+    if not may_prepare_drafts(acting_profile(db, user)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="not_approved")
+    return user
+
+
 def get_owner_profile(user: User, db: Session) -> OwnerProfile:
     profile = acting_profile(db, user)
     if not profile:

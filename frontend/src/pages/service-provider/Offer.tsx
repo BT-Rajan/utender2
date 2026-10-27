@@ -19,7 +19,7 @@ import { outcomeText } from "@/components/ClosureOutcome";
 import { AgreementPanel } from "@/components/AgreementPanel";
 import { OwnerReview } from "@/components/OwnerReview";
 import { money } from "@/lib/money";
-import { fullDate, timeLeft } from "@/lib/format";
+import { fullDate, shortRef, timeLeft } from "@/lib/format";
 import { formatArea } from "@/lib/location";
 
 interface AwardRecord {
@@ -53,7 +53,7 @@ function AwardOutcome({ projectId }: { projectId: string }) {
       )}
       {award.mine && award.id && (
         <span className="block text-steel" data-testid="award-reference">
-          {t("awardHandover.reference")}: <span className="break-all">{award.id}</span>
+          {t("awardHandover.reference")}: <span className="font-mono" title={award.id}>{shortRef(award.id)}</span>
         </span>
       )}
     </p>
@@ -262,7 +262,7 @@ export function ServiceProviderOfferPage() {
           )}
           {/* Stage 5.1: which requirement this offer is for. */}
           <p className="mb-4 text-sm text-navy" data-testid="preparing-for">
-            {t("participate.preparingFor")} <strong dir="auto" className="font-display">{project.title}</strong>
+            {t(existingOffer && existingOffer.status !== "draft" ? "participate.yourOfferFor" : "participate.preparingFor")} <strong dir="auto" className="font-display">{project.title}</strong>
             {draft && (
               <span className="block font-mono text-xs text-steel mt-1" data-testid="draft-status">
                 {t("participate.draftStatus")}

@@ -35,9 +35,21 @@ def _by(db: Session, column, *where) -> dict:
     return {(k.value if hasattr(k, "value") else k): n for k, n in db.query(column, func.count()).filter(*where).group_by(column).all()}
 
 
+def _current_role(model, role):
+    """Only accounts that have that role now: an admin is created by signing up
+    and changing the role, which leaves a profile row behind (README)."""
+    from sqlalchemy import and_, select
+
+    from app.models.user import User
+
+    return and_(_stakeholders(model), model.user_id.in_(select(User.id).where(User.role == role)))
+
+
 def _accounts(db: Session, now: datetime) -> dict:
-    owners = _stakeholders(OwnerProfile)
-    providers = _stakeholders(ServiceProviderProfile)
+    from app.models.enums import UserRole
+
+    owners = _current_role(OwnerProfile, UserRole.owner)
+    providers = _current_role(ServiceProviderProfile, UserRole.service_provider)
     owner_status = _by(db, OwnerProfile.verification_status, owners, OwnerProfile.is_suspended.is_(False))
     provider_status = _by(db, ServiceProviderProfile.verification_status, providers, ServiceProviderProfile.is_suspended.is_(False))
     paying = ServiceProviderProfile.subscription_status.in_([SubscriptionStatus.active, SubscriptionStatus.trialing])
@@ -168,6 +180,13 @@ def _attention(db: Session, now: datetime) -> list[dict]:
     if failed_count:
         out.append({"kind": "provider_payment_failed", "count": failed_count, "link": "/admin/service-providers/",
                     "items": _items(failed.order_by(ServiceProviderProfile.user_id).limit(LIST_LIMIT).all())})
+    # A verified provider asked the team to activate its access (no online subscription).
+    from app.services.access_requests import open_requests
+
+    asked = open_requests(db)
+    if asked:
+        out.append({"kind": "access_requested", "count": len(asked), "link": "/admin/service-providers/",
+                    "items": _items(asked[:LIST_LIMIT])})
     # Stage 9.10: emails that couldn't be sent in the last day -- what and when (the business
     # action they were about is unaffected; 9.5). No link: there is nothing to retry from here.
     from app.models.email_failure import EmailFailure

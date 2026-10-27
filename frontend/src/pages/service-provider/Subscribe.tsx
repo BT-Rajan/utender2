@@ -9,6 +9,43 @@ import { formatMoney, usePricing, type PlanPrice } from "@/lib/publicInfo";
 import { fullDate } from "@/lib/format";
 import { SupportContact } from "@/components/SupportContact";
 
+// Online subscription unavailable: the provider asks the U-Tender team to
+// activate its access (listed on the admin overview), and sees that it asked.
+function RequestAccess() {
+  const { t, language } = useI18n();
+  const [error, setError] = useState<string | null>(null);
+  const { data, refetch } = useQuery({
+    queryKey: ["access-request"],
+    queryFn: () => apiFetch<{ requested_at: string | null }>("/billing/access-request"),
+  });
+  const ask = useMutation({
+    mutationFn: () => apiFetch<{ requested_at: string | null }>("/billing/access-request", { method: "POST" }),
+    onSuccess: () => { setError(null); void refetch(); },
+    onError: (err) => setError(err instanceof ApiError ? err.detail : t("service_provider.subscribe.checkoutError")),
+  });
+  if (data?.requested_at) {
+    return (
+      <p className="text-sm text-green mt-3" data-testid="access-requested">
+        {t("service_provider.subscribe.accessRequested").replace("{date}", fullDate(data.requested_at, language))}
+      </p>
+    );
+  }
+  return (
+    <div className="mt-3">
+      <ErrorBanner message={error} />
+      <button
+        type="button"
+        onClick={() => ask.mutate()}
+        disabled={ask.isPending}
+        className="bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 w-full"
+        data-testid="request-access"
+      >
+        {t("service_provider.subscribe.requestAccess")}
+      </button>
+    </div>
+  );
+}
+
 function PlanToggle({
   plans,
   plan,
@@ -74,6 +111,7 @@ function PlanToggle({
           <div className="mb-5">
             <p className="text-sm text-steel">{t("service_provider.subscribe.billingUnavailable")}</p>
             <SupportContact />
+            <RequestAccess />
           </div>
         )}
         <ul className="mb-6">
@@ -83,14 +121,17 @@ function PlanToggle({
             </li>
           ))}
         </ul>
-        <button
-          type="button"
-          onClick={onSubscribe}
-          disabled={pending || !selected}
-          className="bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 w-full"
-        >
-          {t("service_provider.subscribe.start")}
-        </button>
+        {/* No online plan: no checkout button to wait on -- the request above is the way in. */}
+        {selected && (
+          <button
+            type="button"
+            onClick={onSubscribe}
+            disabled={pending}
+            className="bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 w-full"
+          >
+            {t("service_provider.subscribe.start")}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -197,7 +238,7 @@ export function ServiceProviderSubscribePage() {
             onSubscribe={() => checkoutMutation.mutate()}
             pending={checkoutMutation.isPending}
           />
-          <p className="text-xs text-steel-light mt-6 max-w-md">{t("service_provider.subscribe.checkoutNote")}</p>
+          {!!plans?.length && <p className="text-xs text-steel-light mt-6 max-w-md">{t("service_provider.subscribe.checkoutNote")}</p>}
         </>
       )}
     </main>

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import type { ServiceProviderDocument, ServiceProviderProfile } from "@/api/types";
@@ -24,10 +24,22 @@ export function ServiceProviderVerifyPage() {
   // profile; re-seeding then would wipe a trading name or licence number the
   // provider had typed but not yet submitted (Stage 9.13).
   const seeded = useRef(false);
+  // The saved trading name the field was last seeded with: while the provider
+  // hasn't edited it, it follows the saved one -- set to the organization's
+  // legal name when the account is set up as a company.
+  const seededName = useRef<string | null>(null);
   useEffect(() => {
-    if (!profile || seeded.current) return;
+    if (!profile) return;
+    const saved = profile.company_name ?? "";
+    if (seeded.current) {
+      const previous = seededName.current;  // read now: the updater may run after the ref moves on
+      setCompanyName((typed) => (typed === previous ? saved : typed));
+      seededName.current = saved;
+      return;
+    }
     seeded.current = true;
-    setCompanyName(profile.company_name ?? "");
+    seededName.current = saved;
+    setCompanyName(saved);
     setLicenseNumber(profile.license_number ?? "");
   }, [profile]);
 
@@ -52,7 +64,15 @@ export function ServiceProviderVerifyPage() {
 
   const submitMutation = useMutation({
     mutationFn: () => apiFetch("/service-provider/submit-for-review", { method: "POST", body: { company_name: companyName, license_number: licenseNumber || null } }),
-    onSuccess: () => navigate("/service-provider/status"),
+    // Refetch first: the status page reads the same profile, and a cached "incomplete" one sends it straight back here.
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["service-provider-profile"] }),
+        queryClient.invalidateQueries({ queryKey: ["service-provider-documents"] }),
+        queryClient.invalidateQueries({ queryKey: ["verification-gate-profile"] }),
+      ]);
+      navigate("/service-provider/status");
+    },
   });
 
   const { data: identity } = useIdentity();
@@ -84,8 +104,9 @@ export function ServiceProviderVerifyPage() {
 
       <form onSubmit={handleSubmit} className="mb-10 grid gap-4 max-w-2xl">
         <div>
-          <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">{t("service_provider.verify.companyName")}</label>
+          <label htmlFor="sp-trading-name" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">{t("service_provider.verify.companyName")}</label>
           <input
+            id="sp-trading-name"
             value={companyName}
             onChange={(e) => setCompanyName(e.target.value)}
             required
@@ -93,8 +114,9 @@ export function ServiceProviderVerifyPage() {
           />
         </div>
         <div>
-          <label className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">{t("service_provider.verify.licenseNumber")}</label>
+          <label htmlFor="sp-license-number" className="block font-mono text-[11px] uppercase tracking-wide text-steel mb-1">{t("service_provider.verify.licenseNumber")}</label>
           <input
+            id="sp-license-number"
             value={licenseNumber}
             onChange={(e) => setLicenseNumber(e.target.value)}
             className="w-full border border-border rounded px-3 py-2 text-sm"
@@ -116,13 +138,16 @@ export function ServiceProviderVerifyPage() {
           }}
         />
 
-        <button
+        {/* Under review: nothing to submit here -- point to where the application now stands. */}
+        {profile?.verification_status === "pending_review" ? (
+          <Link to="/service-provider/status" className="mt-4 text-sm text-blue underline w-fit" data-testid="see-status">{t("verification.submittedSeeStatus")}</Link>
+        ) : <button
           type="submit"
           disabled={submitMutation.isPending || !established || !editable}
           className="mt-4 bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 w-fit"
         >
           {submitMutation.isPending ? t("service_provider.verify.submitting") : t("service_provider.verify.submit")}
-        </button>
+        </button>}
         {identity && !established && <p className="text-xs text-amber-dark">{t("stakeholder.mustEstablish")}</p>}
       </form>
     </main>

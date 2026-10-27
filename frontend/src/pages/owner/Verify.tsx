@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import type { OwnerDocument, OwnerProfile } from "@/api/types";
@@ -39,7 +39,15 @@ export function OwnerVerifyPage() {
 
   const submitMutation = useMutation({
     mutationFn: () => apiFetch("/owner/submit-for-review", { method: "POST" }),
-    onSuccess: () => navigate("/owner/status"),
+    // Refetch first: the status page reads the same profile, and a cached "incomplete" one sends it straight back here.
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["owner-profile"] }),
+        queryClient.invalidateQueries({ queryKey: ["owner-documents"] }),
+        queryClient.invalidateQueries({ queryKey: ["verification-gate-profile"] }),
+      ]);
+      navigate("/owner/status");
+    },
   });
 
   const { data: identity } = useIdentity();
@@ -81,13 +89,16 @@ export function OwnerVerifyPage() {
           }}
         />
 
-        <button
+        {/* Under review: nothing to submit here -- point to where the application now stands. */}
+        {profile?.verification_status === "pending_review" ? (
+          <Link to="/owner/status" className="mt-4 text-sm text-blue underline w-fit" data-testid="see-status">{t("verification.submittedSeeStatus")}</Link>
+        ) : <button
           type="submit"
           disabled={submitMutation.isPending || !established || !editable}
           className="mt-4 bg-amber hover:bg-amber-dark disabled:opacity-60 text-white font-semibold text-sm rounded px-5 py-2.5 w-fit"
         >
           {submitMutation.isPending ? t("owner.verify.submitting") : t("owner.verify.submit")}
-        </button>
+        </button>}
         {identity && !established && <p className="text-xs text-amber-dark">{t("stakeholder.mustEstablish")}</p>}
       </form>
     </main>

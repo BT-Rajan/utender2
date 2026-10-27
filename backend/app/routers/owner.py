@@ -7,7 +7,7 @@ from sqlalchemy import case
 from sqlalchemy.orm import Session, object_session
 
 from app.db import get_db
-from app.deps import get_owner_profile, require_owner
+from app.deps import get_owner_profile, may_prepare_drafts, require_owner
 from app.models.agreement import Agreement
 from app.models.audit_log import AuditLog
 from app.models.award_record import AwardRecord
@@ -66,7 +66,7 @@ def eligibility_qualifications(user: User = Depends(require_owner), db: Session 
     return [EligibilityQualification(id=r.id, name=r.name, description=r.description) for r in qualification_options(db)]
 
 
-def _get_owned_project(project_id: str, user: User, db: Session, *, lock: bool = False) -> Project:
+def _get_owned_project(project_id: str, user: User, db: Session, *, lock: bool = False, draft_ok: bool = False) -> Project:
     # lock=True for anything that CHANGES the tender's state: take the tender
     # row lock first and judge the state under it (see lock_project), so two
     # transitions at once -- close vs cancel, award vs award, award vs a bid
@@ -80,6 +80,9 @@ def _get_owned_project(project_id: str, user: User, db: Session, *, lock: bool =
         # require_verified_owner, checked after ownership so everyone else
         # still gets the 404 they always did.
         profile = acting_profile(db, user)
+        # draft_ok: a draft's own housekeeping (discarding it) is open while verification is under review.
+        if draft_ok and project.status == ProjectStatus.draft and may_prepare_drafts(profile):
+            return project
         if not profile or not profile.is_verified_active:
             raise HTTPException(status_code=403, detail="not_approved")
     return project
@@ -1156,7 +1159,7 @@ def discard_draft(project_id: str, user: User = Depends(require_owner), db: Sess
     draft -- never published, so as private as ever -- marked discarded: no
     longer listed, editable or publishable. Kept (with its files) rather than
     deleted, so the audit trail still points at a record."""
-    project = _get_owned_project(project_id, user, db, lock=True)
+    project = _get_owned_project(project_id, user, db, lock=True, draft_ok=True)
     if project.status != ProjectStatus.draft:
         raise HTTPException(status_code=400, detail="Only a draft can be discarded.")
     if project.discarded_at is not None:

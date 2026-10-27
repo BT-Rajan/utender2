@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError, API_URL, draftVersion } from "@/api/client";
 import type { Drawing, Offer, ProjectDetail } from "@/api/types";
-import { formatDeadline, formatSize, fullDate, timeRemaining, stars } from "@/lib/format";
+import { formatDeadline, formatSize, fullDate, shortRef, timeRemaining, stars } from "@/lib/format";
 import { RatingInput } from "@/components/RatingInput";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { RequirementItemsEditor, RequirementItemsView } from "@/components/RequirementItems";
@@ -80,13 +80,13 @@ function AwardSummary({ projectId, currency }: { projectId: string; currency: st
         {award.material_revision != null && (
           <>
             <dt className="text-steel">{t("awardHandover.version")}</dt>
-            <dd>{t("versions.version").replace("{n}", String(award.material_revision))}</dd>
+            <dd>{award.material_revision === 0 ? t("versions.original") : t("versions.version").replace("{n}", String(award.material_revision))}</dd>
           </>
         )}
         {award.id && (
           <>
             <dt className="text-steel">{t("awardHandover.reference")}</dt>
-            <dd className="font-mono text-xs break-all" data-testid="award-reference">{award.id}</dd>
+            <dd className="font-mono text-xs" data-testid="award-reference" title={award.id}>{shortRef(award.id)}</dd>
           </>
         )}
       </dl>
@@ -568,7 +568,12 @@ export function OwnerProjectDetailPage() {
       <div className="flex items-start justify-between flex-wrap gap-4 mb-6">
         <div>
           <span className="font-mono text-[10.5px] uppercase tracking-widest text-amber-dark block mb-1">{project.title}</span>
-          <h1 className="font-display text-2xl font-semibold text-navy mb-1">{t("owner.projectDetail.reviewOffers")}</h1>
+          <h1 className="font-display text-2xl font-semibold text-navy mb-1">{t(
+            project.status === "draft" ? "owner.projectDetail.headingDraft"
+              : project.status === "awarded" ? "owner.projectDetail.headingAwarded"
+                : ["no_award", "canceled", "expired"].includes(project.status) ? "owner.projectDetail.headingEnded"
+                  : "owner.projectDetail.reviewOffers",
+          )}</h1>
           <p className="text-[13.5px] text-steel">
             {formatArea(t, project.governorate, project.area)} — {project.address}
           </p>
@@ -657,7 +662,10 @@ export function OwnerProjectDetailPage() {
         project.status === "closed" ||
         project.status === "under_evaluation") && (
         <div className="flex flex-wrap gap-2 mb-6">
-          {editableDraft && (
+          {editableDraft && accountApproved === false && (
+            <p className="text-xs text-amber-dark" data-testid="publish-after-approval">{t("owner.projectNew.publishAfterApproval")}</p>
+          )}
+          {editableDraft && accountApproved !== false && (
             <button
               type="button"
               onClick={() => {
@@ -848,7 +856,9 @@ export function OwnerProjectDetailPage() {
             }`}
           >
             {/* Stage 9.13: a countdown only while offers are open -- once closed early, the time left means nothing. */}
-            {project.status === "open" ? `⏱ ${timeRemaining(project.bid_deadline)} — ` : ""}{fullDate(project.bid_deadline, language)}
+            {project.status !== "open" && project.closed_at && new Date(project.closed_at) < new Date(project.bid_deadline)
+              ? t("timing.closedEarlyDeadline").replace("{date}", fullDate(project.closed_at, language)).replace("{deadline}", fullDate(project.bid_deadline, language))
+              : `${project.status === "open" ? `⏱ ${timeRemaining(project.bid_deadline)} — ` : ""}${fullDate(project.bid_deadline, language)}`}
             {formatWorkTiming(t, project) && <div className="mt-1 text-steel">{formatWorkTiming(t, project)}</div>}
           </div>
           {project.description && (
@@ -887,7 +897,7 @@ export function OwnerProjectDetailPage() {
               <div className="text-xl mb-2">🔒</div>
               <p className="text-sm text-navy font-semibold mb-1">
                 {/* A withdrawn offer isn't one received for consideration. */}
-                {offers.filter((o) => o.status !== "withdrawn").length} {t("owner.projectDetail.sealedBidsReceived")}
+                {t("owner.projectDetail.sealedBidsReceived").replace("{n}", String(offers.filter((o) => o.status !== "withdrawn").length))}
                 {offers.some((o) => o.status === "withdrawn") && (
                   <span className="font-normal text-steel">
                     {" · "}
@@ -1051,7 +1061,9 @@ export function OwnerProjectDetailPage() {
                           onClick={() => {
                             // Stage 6.13: a final decision -- said plainly, and confirmed first.
                             const name = o.service_provider_company_name ?? t("owner.projectDetail.theServiceProvider");
-                            const body = t("award.confirmBody").replace("{provider}", name).replace("{amount}", money(o.amount, project.currency));
+                            // Answers published after this offer: the provider may not have priced on them -- said before the final step.
+                            const later = o.answers_since ? `\n\n${t("offerValidity.answersSince").replace("{n}", String(o.answers_since))}` : "";
+                            const body = t("award.confirmBody").replace("{provider}", name).replace("{amount}", money(o.amount, project.currency)) + later;
                             void confirm({ title: t("award.confirmTitle").replace("{provider}", name), body, confirmLabel: t("award.confirm") }).then(
                               (ok) => ok && approveMutation.mutate({ offerId: o.id }),
                             );
@@ -1059,7 +1071,7 @@ export function OwnerProjectDetailPage() {
                           disabled={approveMutation.isPending}
                           className="bg-navy hover:bg-navy-deep disabled:opacity-60 text-white text-xs font-semibold rounded px-3 py-1.5"
                         >
-                          {t("owner.projectDetail.approve")}
+                          {t("award.confirm")}
                         </button>
                       ) : project.status === "open" ? (
                         <span className="font-mono text-[10px] text-steel-light">{t("owner.projectDetail.closeToAwardHint")}</span>
@@ -1082,7 +1094,7 @@ export function OwnerProjectDetailPage() {
       {project.status !== "draft" && <EvaluationNotes projectId={project.id} />}
 
       {winner && (existingReview || reviewable) && (
-        <div className="mt-8 max-w-xl">
+        <div className="mt-8 max-w-xl" id="review">
           <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-2">
             {t("owner.projectDetail.rateServiceProvider")} {winner.name ?? t("owner.projectDetail.theServiceProvider")}
           </h3>
@@ -1091,7 +1103,7 @@ export function OwnerProjectDetailPage() {
               <span className="text-amber text-lg tracking-tight">{stars(existingReview.rating)}</span>
               {existingReview.comment && <p className="text-sm text-steel mt-2">{existingReview.comment}</p>}
               <p className="font-mono text-[10.5px] text-steel-light mt-2">
-                {t("owner.projectDetail.submittedOn")} {new Date(existingReview.created_at).toLocaleDateString()}
+                {t("owner.projectDetail.submittedOn")} {fullDate(existingReview.created_at, language, false)}
               </p>
               {existingReview.hidden && <p className="text-xs text-amber-dark mt-1">{t("report.hiddenNote")}</p>}
               {existingReview.revealed === false && (

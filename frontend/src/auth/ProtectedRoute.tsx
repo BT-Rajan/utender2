@@ -30,7 +30,13 @@ const GATE_CONFIG: Partial<Record<UserRole, { endpoint: string; statusPath: stri
 // (Stage 7.14) -- the server decides what each may see and do there. Only a
 // rejected account, or a suspended provider (the server hides the job from
 // it), is sent to the status page.
-function passesGate(role: UserRole, gate: true | "job", profile: VerificationGatedProfile): boolean {
+// gate="draft": the owner's dashboard, new requirement and preview. Drafts can
+// be prepared while verification is under review (changes requested, pending
+// review); publishing still waits for approval (the server decides).
+function passesGate(role: UserRole, gate: true | "job" | "draft", profile: VerificationGatedProfile): boolean {
+  if (gate === "draft") {
+    return !profile.is_suspended && ["pending_review", "changes_requested", "approved"].includes(profile.verification_status);
+  }
   if (gate === "job") {
     if (profile.verification_status === "rejected") return false;
     return !(profile.is_suspended && role === "service_provider");
@@ -44,7 +50,7 @@ export function ProtectedRoute({
   children,
 }: {
   role: UserRole;
-  gate?: boolean | "job";
+  gate?: boolean | "job" | "draft";
   children: ReactNode;
 }) {
   const { user, loading } = useAuth();

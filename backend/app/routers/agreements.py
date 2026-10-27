@@ -114,16 +114,19 @@ def _review_overdue(db: Session, agreement: Agreement) -> bool:
     return waited_long_enough(db, agreement.project_id, agreement.completion_submitted_at)
 
 
-def _clear_confirmation(agreement: Agreement) -> bool:
+def _clear_confirmation(db: Session, agreement: Agreement, user: User) -> bool:
     """Batch A: the provider confirmed the terms as they were; any change by the
     owner side means they must confirm again before the agreement can take force.
-    True when a confirmation was cleared (the provider is then told)."""
+    True when a confirmation was cleared (the provider is then told). The
+    history shows the change between the two confirmations."""
     cleared = agreement.provider_confirmed_at is not None
     agreement.provider_confirmed_at = agreement.provider_confirmed_by = None
+    if cleared:
+        _record(db, agreement, "terms_changed", "owner", user, None, datetime.utcnow().replace(microsecond=0))
     return cleared
 
 
-def _reconfirm_after_paper_change(agreement: Agreement, side: str, user: User) -> bool:
+def _reconfirm_after_paper_change(db: Session, agreement: Agreement, side: str, user: User) -> bool:
     """Batch D: the signed papers are part of the terms the provider confirmed.
     When the owner side adds or removes one while the agreement is still being
     prepared, the provider must confirm again -- otherwise the owner could put
@@ -135,7 +138,7 @@ def _reconfirm_after_paper_change(agreement: Agreement, side: str, user: User) -
         return False
     cleared = side == "owner" and agreement.provider_confirmed_at is not None
     if cleared:
-        _clear_confirmation(agreement)
+        _clear_confirmation(db, agreement, user)
     _touch(agreement, user)
     return cleared
 
@@ -460,7 +463,7 @@ def update_agreement(
     award_day = kuwait_date(award.created_at)
     if effective is not None and effective < award_day:
         raise HTTPException(status_code=400, detail="The agreement can't take effect before the award.")
-    reconfirm = (reference, effective) != (agreement.reference, agreement.effective_date) and _clear_confirmation(agreement)
+    reconfirm = (reference, effective) != (agreement.reference, agreement.effective_date) and _clear_confirmation(db, agreement, user)
     agreement.reference, agreement.effective_date = reference, effective
     _touch(agreement, user)
     log_action(db, actor_id=user.id, action="agreement.update", target_type="agreement", target_id=agreement.id,
@@ -732,7 +735,7 @@ async def attach_agreement_document(
                 _record(db, agreement, "document", side, user, doc.file_name, doc.uploaded_at or datetime.utcnow().replace(microsecond=0), document_id=doc.id)
             # Any paper of the terms -- whatever it is linked to -- changes what
             # the provider confirmed while the agreement is being prepared.
-            reconfirm = _reconfirm_after_paper_change(agreement, side, user)
+            reconfirm = _reconfirm_after_paper_change(db, agreement, side, user)
         # log_action commits: the document and its audit entry land together.
         log_action(db, actor_id=user.id, action="agreement.document_add", target_type="agreement", target_id=agreement.id, new_value=f"{doc.id}:{kind}")
     except Exception:  # never leave a stored file no record points to
@@ -761,7 +764,7 @@ def remove_agreement_document(project_id: str, document_id: str, user: User = De
         raise HTTPException(status_code=400, detail="Documents of an agreement in force or terminated stay on record.")
     path, reconfirm = doc.file_path, False
     if doc.kind not in EVIDENCE_KINDS:  # a paper of the terms, whatever it is linked to
-        reconfirm = _reconfirm_after_paper_change(agreement, side, user)
+        reconfirm = _reconfirm_after_paper_change(db, agreement, side, user)
     db.delete(doc)
     log_action(db, actor_id=user.id, action="agreement.document_remove", target_type="agreement", target_id=agreement.id, previous_value=f"{document_id}:{doc.kind}")
     if reconfirm:

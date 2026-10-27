@@ -55,6 +55,8 @@ export function Completion({
         </p>
       )}
       {status === "accepted" && <p className="text-xs text-steel mt-1">{t(`${c}.acceptedHelp`)}</p>}
+      {/* The review form is at the foot of the page: point to it where the transaction closes. */}
+      {status === "accepted" && <a href="#review" className="text-xs text-blue underline" data-testid="review-prompt">{t(`${c}.reviewPrompt`)}</a>}
 
       {open ? (
         <form className="grid gap-1 mt-2 max-w-md" onSubmit={(ev) => { ev.preventDefault(); act.mutate({ ...open, note: open.note.trim() }); }}>

@@ -55,7 +55,7 @@ export function OwnerReview({ projectId }: { projectId: string }) {
   const name = transaction?.owner_name ?? t("ownerReview.theOwner");
 
   return (
-    <section className="mt-4 max-w-xl text-ink" data-testid="owner-review">
+    <section className="mt-4 max-w-xl text-ink" data-testid="owner-review" id="review">
       <h3 className="font-mono text-[11px] uppercase tracking-wide text-navy mb-2" dir="auto">{t("ownerReview.heading").replace("{owner}", name)}</h3>
       <ErrorBanner message={error} />
       {review ? (

@@ -3,7 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/api/client";
 import type { AuditLogEntry, ServiceProviderProfile, PaymentOverrideRecord } from "@/api/types";
-import { stars } from "@/lib/format";
+import { fullDate, stars } from "@/lib/format";
+import { auditLabel } from "@/lib/auditLabels";
 import { DeleteServiceProviderForm } from "@/components/DeleteServiceProviderForm";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { AdminOrganizationMembers, type Member } from "@/components/AdminOrganizationMembers";
@@ -36,6 +37,7 @@ const MARKETPLACE_STATUS_BADGE: Record<string, string> = {
 };
 
 function MarketplaceAccessPanel({ serviceProviderId, service_provider }: { serviceProviderId: string; service_provider: ServiceProviderProfile }) {
+  const { language } = useI18n();
   const queryClient = useQueryClient();
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -87,9 +89,9 @@ function MarketplaceAccessPanel({ serviceProviderId, service_provider }: { servi
         Subscription: {service_provider.subscription_status || "none"}
         {service_provider.subscription_interval && ` (${service_provider.subscription_interval})`}
         {service_provider.subscription_current_period_end &&
-          ` · ${service_provider.subscription_cancel_at_period_end ? "ends" : "renews"} ${new Date(service_provider.subscription_current_period_end).toLocaleDateString()}`}
+          ` · ${service_provider.subscription_cancel_at_period_end ? "ends" : "renews"} ${fullDate(service_provider.subscription_current_period_end, language, false)}`}
         {/* Stage 9.6: when Stripe last told us anything, and whether the platform lets it bid now. */}
-        {service_provider.subscription_event_at && ` · last billing event ${new Date(service_provider.subscription_event_at).toLocaleString()}`}
+        {service_provider.subscription_event_at && ` · last billing event ${fullDate(service_provider.subscription_event_at, language)}`}
         {` · marketplace: ${service_provider.marketplace_status}`}
       </p>
 
@@ -131,10 +133,10 @@ function MarketplaceAccessPanel({ serviceProviderId, service_provider }: { servi
           <ul className="space-y-2">
             {overrides.map((o) => (
               <li key={o.id} className="text-[11.5px] text-steel">
-                <span className="font-mono text-[10px] text-steel-light">{new Date(o.created_at).toLocaleString()}</span>
+                <span className="font-mono text-[10px] text-steel-light">{fullDate(o.created_at, language)}</span>
                 {" — "}
                 {o.reason}
-                {o.revoked_at && <span className="text-red"> (revoked {new Date(o.revoked_at).toLocaleString()})</span>}
+                {o.revoked_at && <span className="text-red"> (revoked {fullDate(o.revoked_at, language)})</span>}
               </li>
             ))}
           </ul>
@@ -145,6 +147,7 @@ function MarketplaceAccessPanel({ serviceProviderId, service_provider }: { servi
 }
 
 function ActivityLogPanel({ serviceProviderId }: { serviceProviderId: string }) {
+  const { language } = useI18n();
   const { data: entries } = useQuery({
     queryKey: ["admin-audit-log", serviceProviderId],
     queryFn: () => apiFetch<AuditLogEntry[]>(`/admin/service-providers/${serviceProviderId}/audit-log`),
@@ -158,9 +161,9 @@ function ActivityLogPanel({ serviceProviderId }: { serviceProviderId: string }) 
       <ul className="space-y-2 max-h-64 overflow-y-auto">
         {entries.map((e) => (
           <li key={e.id} className="text-[11.5px] text-steel border-b border-border pb-2 last:border-0">
-            <div className="font-mono text-[10px] text-steel-light">{new Date(e.created_at).toLocaleString()}</div>
+            <div className="font-mono text-[10px] text-steel-light">{fullDate(e.created_at, language)}</div>
             <div>
-              <span className="font-semibold text-navy">{e.action}</span>
+              <span className="font-semibold text-navy" title={e.action}>{auditLabel(e.action)}</span>
               {e.previous_value !== null && e.new_value !== null && (
                 <span className="text-steel-light">
                   {" "}

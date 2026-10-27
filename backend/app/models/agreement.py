@@ -118,7 +118,7 @@ EXECUTION_UPDATE_KINDS = ("started", "progress", "on_hold", "resumed", "delivere
 # Stage 7.13: the transaction's other business events, recorded in the same
 # numbered log so the history's order is the order the server applied them.
 TRANSACTION_EVENT_KINDS = (
-    "terms_confirmed", "in_force", "document", "change_proposed", "change_agreed", "change_rejected", "change_withdrawn", "change_lapsed",
+    "terms_confirmed", "terms_changed", "in_force", "document", "change_proposed", "change_agreed", "change_rejected", "change_withdrawn", "change_lapsed",
     "terminated", "completed",
 )
 

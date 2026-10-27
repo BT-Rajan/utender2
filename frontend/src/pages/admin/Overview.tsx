@@ -211,7 +211,7 @@ interface Metrics {
 
 const PERIODS = ["today", "7d", "30d", "month", "all"] as const;
 
-// Stage 9.9: what happened in a period (UTC, server clock), the period's
+// Stage 9.9: what happened in a period (server clock, shown in Kuwait time), the period's
 // requirement and provider funnels, and today's subscription picture -- counts
 // from the records, each with its definition on hover. No prices or names.
 export function MarketplaceMetrics() {
@@ -233,7 +233,7 @@ export function MarketplaceMetrics() {
           ))}
         </div>
       </div>
-      {data?.since && <p className="text-xs text-steel">{t("metrics.since")} {fullDate(data.since, language)} (UTC)</p>}
+      {data?.since && <p className="text-xs text-steel">{t("metrics.since")} {fullDate(data.since, language)} ({t("detail.kuwaitTime")})</p>}
       {error && <ErrorBanner message={t("ops.failed")} />}
       {data && (
         <div className="grid gap-4 sm:grid-cols-2">

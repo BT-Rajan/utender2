@@ -44,8 +44,11 @@ export function useIdentity() {
   return useQuery({ queryKey: ["identity"], queryFn: () => apiFetch<Identity>("/account/identity") });
 }
 
-function Label({ children }: { children: React.ReactNode }) {
-  return <div className="font-mono text-[10px] uppercase tracking-wide text-steel mb-1">{children}</div>;
+// With htmlFor it is the field's own <label> (clicking it focuses the field,
+// screen readers announce it); without, a caption above read-only text.
+function Label({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) {
+  const className = "block font-mono text-[10px] uppercase tracking-wide text-steel mb-1";
+  return htmlFor ? <label htmlFor={htmlFor} className={className}>{children}</label> : <div className={className}>{children}</div>;
 }
 
 // Account created -> identity established -> verified -> eligible.
@@ -191,12 +194,13 @@ export function StakeholderSection() {
           {type === "organization" && (
             <div className="grid gap-3 ps-1">
               <div>
-                <Label>{t("stakeholder.legalName")}</Label>
-                <input value={legalName} onChange={(e) => setLegalName(e.target.value)} required className="w-full border border-border rounded px-3 py-2 text-sm" />
+                <Label htmlFor="stakeholder-legal-name">{t("stakeholder.legalName")}</Label>
+                <input id="stakeholder-legal-name" value={legalName} onChange={(e) => setLegalName(e.target.value)} required className="w-full border border-border rounded px-3 py-2 text-sm" />
               </div>
               <div>
-                <Label>{t("stakeholder.position")}</Label>
+                <Label htmlFor="stakeholder-position">{t("stakeholder.position")}</Label>
                 <input
+                  id="stakeholder-position"
                   value={position}
                   onChange={(e) => setPosition(e.target.value)}
                   placeholder={t("stakeholder.positionPlaceholder")}
